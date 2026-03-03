@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Guest Submission</h3>
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post">
+      {{ form.hidden_tag() }}
+      {% if form.errors %}
+        <div class="alert alert-danger">
+            <strong>Please ***REMOVED***x:</strong>
+                <ul class="mb-0">
+                {% for ***REMOVED***eld, errs in form.errors.items() %}
+                    {% for e in errs %}
+                        <li>{{ ***REMOVED***eld }}: {{ e }}</li>
+                    {% endfor %}
+                {% endfor %}
+                </ul>
+        </div>
+      {% endif %}
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Email</label>
+          {{ form.guest_email(class="form-control") }}
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Name (optional)</label>
+          {{ form.guest_name(class="form-control") }}
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Title</label>
+        {{ form.title(class="form-control") }}
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Due Date (48+ hours minimum)</label>
+        {{ form.due_at(class="form-control", type="datetime-local") }}
+      </div>
+
+      <div class="row">
+        <div class="col-md-4 mb-3">{{ form.request_type(class="form-select") }}</div>
+        <div class="col-md-4 mb-3">{{ form.priority(class="form-select") }}</div>
+        <div class="col-md-4 mb-3">{{ form.pricebook_status(class="form-select") }}</div>
+      </div>
+
+      <div class="form-check mb-3">
+        {{ form.requires_c_review(class="form-check-input") }}
+        <label class="form-check-label">Requires Dept C Review?</label>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Donor Part Number</label>
+            {{ form.donor_part_number(class="form-control") }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Target Part Number</label>
+            {{ form.target_part_number(class="form-control") }}
+            <div class="form-text">Required for Instructions.</div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label class="form-label">If no donor, reason</label>
+            {{ form.no_donor_reason(class="form-select") }}
+            <div class="form-text">Only valid for Part Number requests when the part number needs to be created.</div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        {{ form.description(class="form-control", rows="6") }}
+      </div>
+
+      <button id="submitBtn" class="btn btn-primary" type="submit">Submit Request</button>
+    </form>
+  </div>
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.querySelector("form");
+  const btn = document.getElementById("submitBtn");
+  if (!form || !btn) return;
+
+  form.addEventListener("submit", function () {
+    btn.disabled = true;
+    btn.innerText = "Submitting...";
+  });
+});
+</script>
+{% endblock %}

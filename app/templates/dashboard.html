@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Dashboard</h3>
+
+{% if mode == "A" %}
+  <div class="d-flex justify-content-between mb-3">
+    <div></div>
+    <a class="btn btn-primary" href="{{ url_for('requests.request_new') }}">New Request</a>
+  </div>
+  <div class="list-group">
+    {% for r in requests %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
+        <div class="d-flex justify-content-between">
+          <strong>#{{ r.id }} · {{ r.title }}</strong>
+          <span class="badge text-bg-secondary">{{ r.status }}</span>
+        </div>
+        <small class="text-muted">
+            {{ r.pricebook_status }} · {{ r.priority }}
+            · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
+            · C Review: {{ "Yes" if r.requires_c_review else "No" }}
+        </small>
+      </a>
+    {% else %}
+      <div class="text-muted">No requests yet.</div>
+    {% endfor %}
+  </div>
+
+{% elif mode == "B" %}
+  {% for label, items in buckets.items() %}
+    <h5 class="mt-4">{{ label }}</h5>
+    <div class="list-group">
+      {% for r in items %}
+        <a class="list-group-item list-group-item-action" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
+          <div class="d-flex justify-content-between">
+            <strong>#{{ r.id }} · {{ r.title }}</strong>
+            <span class="badge text-bg-secondary">{{ r.status }}</span>
+          </div>
+            <small class="text-muted">
+                {{ r.pricebook_status }} · {{ r.priority }}
+                · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
+                · C Review: {{ "Yes" if r.requires_c_review else "No" }}
+            </small>
+        </a>
+      {% else %}
+        <div class="text-muted">No items.</div>
+      {% endfor %}
+
+    </div>
+  {% endfor %}
+
+{% elif mode == "C" %}
+  <h5>Pending Review</h5>
+  <div class="list-group">
+    {% for r in requests %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
+        <div class="d-flex justify-content-between">
+          <strong>#{{ r.id }} · {{ r.title }}</strong>
+          <span class="badge text-bg-secondary">{{ r.status }}</span>
+        </div>
+
+            <small class="text-muted">
+                {{ r.pricebook_status }} · {{ r.priority }}
+                · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
+                · C Review: {{ "Yes" if r.requires_c_review else "No" }}
+            </small>
+      </a>
+    {% else %}
+      <div class="text-muted">No pending items.</div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

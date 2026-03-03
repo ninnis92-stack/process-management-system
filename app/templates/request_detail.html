@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-2">Request #{{ req.id }} · {{ req.title }}</h3>
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <span class="badge text-bg-secondary">Status: {{ req.status }}</span>
+  <span class="badge text-bg-info">Owner Dept: {{ req.owner_department }}</span>
+  <span class="badge text-bg-light text-dark">Priority: {{ req.priority }}</span>
+  <span class="badge text-bg-warning">C Review: {{ "Required" if req.requires_c_review else "Not required" }}</span>
+</div>
+
+<div><strong>Due:</strong> {{ req.due_at.strftime("%b %d, %Y %I:%M %p") if req.due_at else "—" }}</div>
+
+<div class="row g-3">
+  <div class="col-md-7">
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5>Details</h5>
+        <div><strong>Type:</strong> {{ req.request_type }}</div>
+        <div><strong>Price book:</strong> {{ req.pricebook_status.replace("_"," ") }}</div>
+        <hr/>
+        <div style="white-space:pre-wrap">{{ req.description }}</div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5>Artifacts</h5>
+
+        <ul class="mb-3">
+          {% for a in req.artifacts %}
+            <li class="mb-2">
+              <strong>{{ a.artifact_type }}</strong>
+
+              {% if a.artifact_type == "part_number" %}
+                — Target: <code>{{ a.target_part_number or "—" }}</code>
+
+                {% if a.donor_part_number %}
+                  — Donor: <code>{{ a.donor_part_number }}</code>
+                {% else %}
+                  — Donor: <em>none</em>
+                  (Reason: {{ a.no_donor_reason.replace("_"," ") if a.no_donor_reason else "n/a" }})
+                {% endif %}
+
+              {% elif a.artifact_type == "instructions" %}
+                — Donor: <code>{{ a.donor_part_number or "—" }}</code>
+                — Target: <code>{{ a.target_part_number or "—" }}</code>
+                — URL:
+                {% if a.instructions_url %}
+                  <a href="{{ a.instructions_url }}" target="_blank">{{ a.instructions_url }}</a>
+                {% else %}
+                  <em>none</em>
+                {% endif %}
+              {% endif %}
+
+              {% if current_user.department == "A" and a.edit_requested %}
+                <div class="mt-2 p-2 border rounded bg-light">
+                  <div class="small text-muted mb-1">Dept B edit request note:</div>
+                  <div style="white-space:pre-wrap">{{ a.edit_requested_note }}</div>
+
+                  <form method="post" action="{{ url_for('requests.edit_artifact', artifact_id=a.id) }}">
+                    {{ artifact_form.hidden_tag() }}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Donor Part Number</label>
+                                {{ artifact_form.donor_part_number(class="form-control") }}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Target Part Number</label>
+                                {{ form.target_part_number(class="form-control") }}
+                                <div class="form-text">Required for Instructions.</div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">If no donor, reason</label>
+                                {{ artifact_form.no_donor_reason(class="form-select") }}
+                                <div class="form-text">Only valid for Part Number requests when the part number needs to be created.</div>
+                            </div>
+                        </div>
+                    <button class="btn btn-sm btn-primary mt-2">Edit Artifact (opens edit flow)</button>
+                  </form>
+                </div>
+              {% endif %}
+
+              {% if current_user.department == "B" and a.artifact_type == "part_number" %}
+                <form method="post"
+                      action="{{ url_for('requests.set_artifact_donor', artifact_id=a.id) }}"
+                      class="mt-2">
+                  {{ donor_form.hidden_tag() }}
+                  <div class="input-group">
+                    <input type="text"
+                           name="donor_part_number"
+                           class="form-control"
+                           placeholder="Add/Update donor part number"
+                           value="{{ a.donor_part_number or '' }}">
+                    <button class="btn btn-outline-primary btn-sm">Save Donor</button>
+                  </div>
+                </form>
+              {% endif %}
+            </li>
+          {% else %}
+            <li class="text-muted">None yet.</li>
+          {% endfor %}
+        </ul>
+
+        {% if current_user.department == "A" %}
+            {% if not has_part_number or not has_instructions %}
+                <form method="post" action="{{ url_for('requests.add_artifact', request_id=req.id) }}">
+                {{ artifact_form.hidden_tag() }}
+
+                <div class="mb-2">
+                    <label class="form-label">Artifact Type</label>
+                    {{ artifact_form.artifact_type(class="form-select") }}
+                    <div class="form-text">
+                        You can only add an artifact type that doesn't exist yet.
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Donor Part Number</label>
+                    {{ artifact_form.donor_part_number(class="form-control") }}
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Target Part Number</label>
+                    {{ artifact_form.target_part_number(class="form-control") }}
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Reason (only if no donor for Part Number)</label>
+                    {{ artifact_form.no_donor_reason(class="form-select") }}
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Instructions URL (required for Instructions)</label>
+                    {{ artifact_form.instructions_url(class="form-control", placeholder="https://...") }}
+                </div>
+
+                <button class="btn btn-outline-primary w-100">Add Artifact</button>
+                </form>
+            {% else %}
+                <div class="text-muted">Artifacts already exist. Edit only if Dept B requests changes.</div>
+            {% endif %}
+        {% endif %}
+
+        {% if current_user.department == "B" %}
+            {% if not has_part_number %}
+                <form method="post" action="{{ url_for('requests.add_artifact', request_id=req.id) }}">
+                {{ artifact_form.hidden_tag() }}
+
+                <div class="mb-2">
+                    <label class="form-label">Artifact Type</label>
+                    {{ artifact_form.artifact_type(class="form-select") }}
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Donor Part Number</label>
+                    {{ artifact_form.donor_part_number(class="form-control") }}
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Target Part Number</label>
+                    {{ artifact_form.target_part_number(class="form-control") }}
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Reason (only if no donor for Part Number)</label>
+                    {{ artifact_form.no_donor_reason(class="form-select") }}
+                </div>
+
+                <button class="btn btn-outline-primary w-100">Add Part Number Artifact</button>
+                </form>
+            {% else %}
+                <div class="text-muted">Part Number artifact already exists. Edit/update it if needed.</div>
+            {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5>Handoffs / Submissions</h5>
+        {% for s in submissions %}
+          <div class="border rounded p-2 mb-2">
+            <div class="d-flex justify-content-between">
+              <strong>{{ s.from_department }} → {{ s.to_department }}</strong>
+              <small class="text-muted">{{ s.created_at }}</small>
+            </div>
+            <div><strong>{{ s.summary }}</strong></div>
+            <div style="white-space:pre-wrap">{{ s.details }}</div>
+
+            {% if s.attachments %}
+              <div class="mt-2 d-flex flex-wrap gap-2">
+                {% for att in s.attachments %}
+                  <a href="{{ url_for('requests.download_attachment', attachment_id=att.id) }}" target="_blank" class="thumb">
+                    <img src="{{ url_for('requests.download_attachment', attachment_id=att.id) }}" alt="{{ att.original_***REMOVED***lename }}" />
+                  </a>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="text-muted">No submissions yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  <div class="col-md-5">
+
+    {% if current_user.department == "B" %}
+      <div class="card shadow-sm mb-3">
+        <div class="card-body">
+          <h5>Dept B Controls</h5>
+          <div class="small text-muted mb-2">
+            Toggle Dept C review only in early stages (NEW_FROM_A / B_IN_PROGRESS). Requires a reason and logs to audit.
+          </div>
+          <form method="post" action="{{ url_for('requests.toggle_c_review', request_id=req.id) }}">
+            {{ toggle_form.hidden_tag() }}
+            <div class="mb-2">
+              <label class="form-label">Reason</label>
+              {{ toggle_form.reason(class="form-control", rows="3", placeholder="Why is Dept C review required/not required for this request?") }}
+            </div>
+            <button class="btn btn-outline-warning w-100">
+              Toggle C Review Required (Currently: {{ "Required" if req.requires_c_review else "Not required" }})
+            </button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5>Transition (Guarded)</h5>
+        {% if transition_form.to_status.choices %}
+          <form method="post" action="{{ url_for('requests.do_transition', request_id=req.id) }}" enctype="multipart/form-data">
+            {{ transition_form.hidden_tag() }}
+            <div class="mb-2">
+              <label class="form-label">Next Status</label>
+              {{ transition_form.to_status(class="form-select") }}
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label">Submission Summary (required for handoffs)</label>
+              {{ transition_form.submission_summary(class="form-control", placeholder="Short summary") }}
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Submission Details (required for handoffs)</label>
+              {{ transition_form.submission_details(class="form-control", rows="4", placeholder="What was locked in, what to review, assumptions...") }}
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label">Attachments (images)</label>
+              {{ transition_form.***REMOVED***les(class="form-control", multiple=True, id="***REMOVED***leInput") }}
+              <div id="pasteZone" class="paste-zone mt-2">
+                Click here then paste (Ctrl+V) screenshots, or drag images into this box.
+              </div>
+              <div id="preview" class="d-flex flex-wrap gap-2 mt-2"></div>
+            </div>
+
+            <button class="btn btn-primary w-100">Apply Transition</button>
+          </form>
+        {% else %}
+          <div class="text-muted">No transitions available for your department at this status.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5>Comments</h5>
+        <div class="small text-muted mb-2">You’ll see public + your department’s internal notes.</div>
+
+        <div class="border rounded p-2 mb-3" style="max-height: 240px; overflow:auto;">
+          {% for c in comments %}
+            <div class="mb-2">
+              <div class="d-flex justify-content-between">
+                <strong>
+                  {% if c.author_type == "user" %}{{ c.author_user.email }}{% else %}Guest: {{ c.author_guest_email }}{% endif %}
+                </strong>
+                <small class="text-muted">{{ c.created_at }}</small>
+              </div>
+              <div class="badge text-bg-light text-dark mb-1">{{ c.visibility_scope }}</div>
+              <div style="white-space:pre-wrap">{{ c.body }}</div>
+            </div>
+          {% else %}
+            <div class="text-muted">No comments.</div>
+          {% endfor %}
+        </div>
+
+        <form method="post" action="{{ url_for('requests.add_comment', request_id=req.id) }}">
+          {{ comment_form.hidden_tag() }}
+          <div class="mb-2">
+            <label class="form-label">Visibility</label>
+            {{ comment_form.visibility_scope(class="form-select") }}
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Comment</label>
+            {{ comment_form.body(class="form-control", rows="3") }}
+          </div>
+          <button class="btn btn-outline-primary w-100">Add Comment</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5>Audit Timeline</h5>
+        <div class="border rounded p-2" style="max-height: 220px; overflow:auto;">
+          {% for a in audit %}
+            <div class="mb-2">
+              <div class="d-flex justify-content-between">
+                <strong>{{ a.action_type }}</strong>
+                <small class="text-muted">{{ a.created_at }}</small>
+              </div>
+              <div class="text-muted small">{{ a.actor_type }} · {{ a.actor_label }}</div>
+              {% if a.from_status or a.to_status %}
+                <div class="small">Status: {{ a.from_status }} → {{ a.to_status }}</div>
+              {% endif %}
+              {% if a.note %}
+                <div style="white-space:pre-wrap">{{ a.note }}</div>
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="text-muted">No audit entries.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

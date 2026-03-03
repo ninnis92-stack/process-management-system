@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-2">Guest Tracking View</h3>
+<div class="alert alert-info">
+  Save this page URL to track your request and add comments.
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5>#{{ req.id }} · {{ req.title }}</h5>
+    <div class="d-flex gap-2 mb-2 flex-wrap">
+      <span class="badge text-bg-secondary">{{ req.status }}</span>
+      <span class="badge text-bg-light text-dark">{{ req.priority }}</span>
+      <span class="badge text-bg-warning">C Review: {{ "Required" if req.requires_c_review else "Not required" }}</span>
+    </div>
+    <div><strong>Price Book:</strong> {{ req.pricebook_status }}</div>
+    <div><strong>Due:</strong> {{ req.due_at.strftime("%b %d, %Y %I:%M %p") if req.due_at else "—" }}</div>
+    <hr/>
+    <div style="white-space:pre-wrap">{{ req.description }}</div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5>Public Handoffs</h5>
+    {% for s in submissions %}
+      <div class="border rounded p-2 mb-2">
+        <div class="d-flex justify-content-between">
+          <strong>{{ s.from_department }} → {{ s.to_department }}</strong>
+          <small class="text-muted">{{ s.created_at }}</small>
+        </div>
+        <div><strong>{{ s.summary }}</strong></div>
+        <div style="white-space:pre-wrap">{{ s.details }}</div>
+      </div>
+    {% else %}
+      <div class="text-muted">No public handoffs yet.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5>Public Comments</h5>
+    <div class="border rounded p-2 mb-3" style="max-height: 220px; overflow:auto;">
+      {% for c in comments %}
+        <div class="mb-2">
+          <div class="d-flex justify-content-between">
+            <strong>{% if c.author_type == "guest" %}Guest: {{ c.author_guest_email }}{% else %}{{ c.author_user.email }}{% endif %}</strong>
+            <small class="text-muted">{{ c.created_at }}</small>
+          </div>
+          <div style="white-space:pre-wrap">{{ c.body }}</div>
+        </div>
+      {% else %}
+        <div class="text-muted">No comments.</div>
+      {% endfor %}
+    </div>
+
+    <form method="post">
+      {{ form.csrf_token }}
+      <div class="mb-2">
+        <label class="form-label">Add comment</label>
+        {{ form.body(class="form-control", rows="3") }}
+      </div>
+      <button class="btn btn-outline-primary w-100">Add Comment</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
