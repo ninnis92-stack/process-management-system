@@ -25,3 +25,6 @@ class Con***REMOVED***g:
     MAX_FILES_PER_SUBMISSION = 10
     MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
     DISABLE_UPLOADS = os.getenv("DISABLE_UPLOADS", "False") == "True"
+    
+    # For serverless environments, allow overriding the upload folder to a writable location
+    UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads"))
