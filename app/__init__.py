@@ -35,10 +35,12 @@ def create_app():
     from .auth.routes import auth_bp
     from .requests_bp.routes import requests_bp
     from .external.routes import external_bp
+    from .noti***REMOVED***cations.routes import noti***REMOVED***cations_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(requests_bp)
     app.register_blueprint(external_bp)
+    app.register_blueprint(noti***REMOVED***cations_bp)
 
     # DEV ONLY: auto-create tables
     if os.getenv("AUTO_CREATE_DB", "True") == "True":

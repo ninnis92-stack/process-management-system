@@ -10,7 +10,7 @@ class NewRequestForm(FlaskForm):
     title = StringField("Title", validators=[DataRequired(), Length(max=200)])
     request_type = SelectField("Request Type", choices=[
         ("part_number", "Part Number"),
-        ("instructions", "Instructions"),
+        ("instructions", "Method"),
         ("both", "Both"),
     ], validators=[DataRequired()])
 
@@ -41,13 +41,12 @@ class NewRequestForm(FlaskForm):
     ],
     validators=[DataRequired()],
     )
-    description = TextAreaField("Description", validators=[DataRequired()])
+    description = TextAreaField("Description", validators=[Optional()])
     priority = SelectField("Priority", choices=[
         ("low", "Low"),
         ("medium", "Medium"),
         ("high", "High"),
     ], validators=[DataRequired()])
-    requires_c_review = BooleanField("Requires Dept C Review?", default=True)
     def validate_due_at(self, ***REMOVED***eld):
         min_due = datetime.utcnow() + timedelta(hours=48)
         if ***REMOVED***eld.data < min_due:
@@ -66,10 +65,10 @@ class NewRequestForm(FlaskForm):
         # Instructions require donor + target
         if req_type == "instructions":
             if not donor:
-                self.donor_part_number.errors.append("Donor part number is required for Instructions.")
+                self.donor_part_number.errors.append("Donor part number is required for Method.")
                 return False
             if not target:
-                self.target_part_number.errors.append("Target part number is required for Instructions.")
+                self.target_part_number.errors.append("Target part number is required for Method.")
                 return False
             if reason:
                 self.no_donor_reason.errors.append("Reason is only used when no donor is provided for Part Number requests.")
@@ -110,7 +109,7 @@ class DonorOnlyForm(FlaskForm):
 class ArtifactForm(FlaskForm):
     artifact_type = SelectField("Artifact Type", choices=[
         ("part_number", "Part Number"),
-        ("instructions", "Instructions"),
+        ("instructions", "Method"),
     ], validators=[DataRequired()])
 
     donor_part_number = StringField("Donor Part Number", validators=[Optional(), Length(max=120)])
@@ -125,13 +124,7 @@ class ArtifactForm(FlaskForm):
         validators=[Optional()],
     )
 
-    no_donor_reason = SelectField("Reason (if no donor part number)", choices=[
-        ("", "-- select a reason --"),
-        ("part_number_unknown", "Part number unknown"),
-        ("part_number_needs_to_be_created", "Part number needs to be created"),
-    ], validators=[Optional()])
-
-    instructions_url = StringField("Instructions URL", validators=[Optional(), Length(max=800)])
+    instructions_url = StringField("Method URL", validators=[Optional(), Length(max=800)])
 
     def validate(self, extra_validators=None):
         ok = super().validate(extra_validators=extra_validators)
@@ -164,20 +157,20 @@ class ArtifactForm(FlaskForm):
             return True
 
         if t == "instructions":
-            # Require donor and target for instructions
+            # Require donor and target for method artifacts
             if not donor:
-                self.donor_part_number.errors.append("Donor part number is required for instructions.")
+                self.donor_part_number.errors.append("Donor part number is required for Method.")
                 return False
             if not target:
-                self.target_part_number.errors.append("Target part number is required for instructions.")
+                self.target_part_number.errors.append("Target part number is required for Method.")
                 return False
             if not url:
-                self.instructions_url.errors.append("Instructions URL is required.")
+                self.instructions_url.errors.append("Method URL is required.")
                 return False
 
             # Validate URL format lightly (WTForms URL validator expects schemes)
             if not (url.startswith("http://") or url.startswith("https://")):
-                self.instructions_url.errors.append("Instructions URL must start with http:// or https://")
+                self.instructions_url.errors.append("Method URL must start with http:// or https://")
                 return False
 
             # Reason should not be used for instructions
@@ -198,6 +191,11 @@ class TransitionForm(FlaskForm):
     submission_summary = StringField("Submission Summary", validators=[Length(max=200)])
     submission_details = TextAreaField("Submission Details")
     ***REMOVED***les = MultipleFileField("Attachments (images only)")
+    requires_c_review = BooleanField("Requires C Review", validators=[Optional()])
 
 class ToggleCReviewForm(FlaskForm):
     reason = TextAreaField("Reason (required)", validators=[DataRequired()])
+
+class AssignmentForm(FlaskForm):
+    # Choices injected at runtime per department; -1 means unassigned
+    assignee = SelectField("Assign To", choices=[], coerce=int, validators=[Optional()])

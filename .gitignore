@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Byte-compiled / optimized / DLL ***REMOVED***les
 __pycache__/
 *.py[codz]
@@ -205,3 +206,27 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+=======
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+.env.*
+
+# Flask/instance
+instance/
+app.db
+*.db
+*.sqlite*
+uploads/
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+>>>>>>> 73a0e67 (Initial commit - process management protoype)

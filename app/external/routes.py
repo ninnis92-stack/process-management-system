@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, abort
 from ..extensions import db
 from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission
-from .forms import ExternalNewRequestForm, ExternalCommentForm
+from .forms import ExternalNewRequestForm, ExternalCommentForm, GuestLookupForm
 
 external_bp = Blueprint("external", __name__, url_pre***REMOVED***x="/external")
 
@@ -27,7 +27,7 @@ def external_new():
             request_type=form.request_type.data,
             description=form.description.data.strip(),
             priority=form.priority.data,
-            requires_c_review=form.requires_c_review.data,
+            requires_c_review=False,
             status="NEW_FROM_A",
             owner_department="B",
             submitter_type="guest",
@@ -100,6 +100,19 @@ def _get_req_by_token(token: str) -> ReqModel:
     if not req:
         abort(404)
     return req
+
+@external_bp.route("/dashboard", methods=["GET", "POST"])
+def external_dashboard():
+    form = GuestLookupForm()
+    if form.validate_on_submit():
+        rid = form.request_id.data
+        email = (form.guest_email.data or "").strip().lower()
+        req = ReqModel.query.***REMOVED***lter_by(id=rid, guest_email=email).***REMOVED***rst()
+        if not req:
+            flash("Request not found for that number and email.", "danger")
+            return render_template("external_dashboard.html", form=form)
+        return redirect(url_for("external.external_detail", token=req.guest_access_token))
+    return render_template("external_dashboard.html", form=form)
 
 @external_bp.route("/<token>", methods=["GET", "POST"])
 def external_detail(token: str):

@@ -8,50 +8,94 @@
   <link rel="stylesheet" href="{{ url_for('static', ***REMOVED***lename='styles.css') }}">
 </head>
 
-<body class="bg-light">
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <div class="container">
-    <a class="navbar-brand" href="{{ url_for('requests.dashboard') }}">ProcessMgmt</a>
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-light btn-sm" href="{{ url_for('external.external_new') }}">Guest Submit</a>
-      {% if current_user.is_authenticated %}
-        <span class="badge text-bg-secondary align-self-center">Dept {{ current_user.department }} · {{ current_user.email }}</span>
-        <form method="post" action="{{ url_for('auth.logout') }}">
-          <button class="btn btn-outline-light btn-sm">Logout</button>
-        </form>
-      {% else %}
-        <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.sso_login') }}">SSO Login</a>
-      {% endif %}
-    </div>
-  </div>
-</nav>
+<body class="theme-body top-nav-layout">
+  <a href="#content" class="skip-link">Skip to content</a>
 
-<!-- ✅ FLASH MESSAGES (keep only this one block) -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <div class="container mt-3">
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  <nav class="navbar theme-nav navbar-expand-lg navbar-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center brand-stack" href="{{ url_for('requests.dashboard') }}">
+        {% if con***REMOVED***g.LOGO_URL %}
+          <img src="{{ con***REMOVED***g.LOGO_URL }}" alt="FlowForge logo" class="brand-logo-img" style="height:40px; margin-right:10px;" />
+        {% else %}
+          <div class="logo-fallback" style="width:40px;height:40px; font-size:0.9rem; margin-right:10px;">FF</div>
+        {% endif %}
+        <div>
+          <div class="brand-title">FlowForge</div>
+          <div id="motivation" class="brand-quote" aria-live="polite">Loading inspiration…</div>
         </div>
-      {% endfor %}
+      </a>
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="mainNav">
+        <ul class="navbar-nav ms-3 me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('requests.dashboard') }}">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('requests.request_new') }}">New Request</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('external.external_new') }}">Guest Submit</a></li>
+        </ul>
+
+        <div class="d-flex align-items-center nav-actions gap-2">
+          <button id="vibeBtn" class="btn btn-outline-light btn-sm">Vibe · <span id="vibeLabel">—</span></button>
+
+          {% if current_user.is_authenticated %}
+            <button id="notifBtn" class="btn btn-outline-light btn-sm position-relative notif-btn" type="button" aria-label="Noti***REMOVED***cations">
+              <span class="notif-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18"><path ***REMOVED***ll="currentColor" d="M12 2a7 7 0 0 0-7 7v3.3l-.9 1.8A1 1 0 0 0 5 16h14a1 1 0 0 0 .9-1.9L19 12.3V9a7 7 0 0 0-7-7Zm0 20a3 3 0 0 0 2.82-2H9.18A3 3 0 0 0 12 22Z"/></svg>
+              </span>
+              <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+            </button>
+
+            <span class="text-light small ms-1">{{ current_user.name or current_user.email }}</span>
+            <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
+              <button type="submit" class="btn btn-outline-light btn-sm">Logout</button>
+            </form>
+          {% else %}
+            <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.login') }}">Login</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  {% if current_user.is_authenticated %}
+    <div id="notifDropdown" class="notif-dropdown card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Noti***REMOVED***cations</strong>
+        <small id="notifMomentum" class="text-muted">Momentum: —</small>
+      </div>
+      <div class="card-body">
+        <div id="notifList"></div>
+      </div>
     </div>
   {% endif %}
-{% endwith %}
 
-<div class="container my-4">
-  {% block content %}{% endblock %}
-</div>
+  <main id="content" class="main container my-3" role="main" tabindex="-1">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mb-3">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="{{ url_for('static', ***REMOVED***lename='app.js') }}"></script>
+    {% block content %}{% endblock %}
+  </main>
 
-<script>
-setTimeout(() => {
-  document.querySelectorAll('.alert').forEach(a => a.remove());
-}, 4000);
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', ***REMOVED***lename='app.js') }}"></script>
 
+  <script>
+    setTimeout(() => {
+      document.querySelectorAll('.alert').forEach(a => a.remove());
+    }, 4000);
+  </script>
 </body>
 </html>

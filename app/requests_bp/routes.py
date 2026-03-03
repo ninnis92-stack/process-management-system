@@ -1,17 +1,46 @@
 import os
 import uuid
 from flask import Blueprint, render_template, redirect, request, url_for, flash, abort, send_***REMOVED***le, current_app
+from sqlalchemy import or_
 from flask_login import login_required, current_user
 from flask_wtf import form
 from werkzeug.utils import secure_***REMOVED***lename
 
 from ..extensions import db
-from ..models import Request as ReqModel, Comment, AuditLog, Artifact, Submission, Attachment
-from .forms import NewRequestForm, CommentForm, ArtifactForm, TransitionForm, ToggleCReviewForm, RequestArtifactEditForm, DonorOnlyForm
+from ..models import Request as ReqModel, Comment, AuditLog, Artifact, Submission, Attachment, Noti***REMOVED***cation, User
+from .forms import (
+    NewRequestForm,
+    CommentForm,
+    ArtifactForm,
+    TransitionForm,
+    ToggleCReviewForm,
+    RequestArtifactEditForm,
+    DonorOnlyForm,
+    AssignmentForm,
+)
 from .permissions import can_view_request, visible_comment_scopes_for_user, allowed_comment_scopes_for_user
 from .workflow import transition_allowed, owner_for_status, handoff_for_transition
 
 requests_bp = Blueprint("requests", __name__, url_pre***REMOVED***x="")
+
+def _active_users_in_dept(dept: str):
+    return User.query.***REMOVED***lter_by(department=dept, is_active=True).all()
+
+def _assignment_choices(dept: str):
+    users = User.query.***REMOVED***lter_by(department=dept, is_active=True).order_by(User.name.asc(), User.email.asc()).all()
+    return [(-1, "Unassigned")] + [(u.id, u.name or u.email) for u in users]
+
+def _notify_users(user_ids, req: ReqModel, title: str, body: str, ntype: str = "info"):
+    link = url_for("requests.request_detail", request_id=req.id)
+    for uid in {uid for uid in user_ids if uid}:
+        db.session.add(Noti***REMOVED***cation(
+            user_id=uid,
+            request_id=req.id,
+            type=ntype,
+            title=title,
+            body=body,
+            url=link,
+        ))
 
 def _has_part_number_artifact(req: ReqModel) -> bool:
     return any(a.artifact_type == "part_number" for a in req.artifacts)
@@ -81,22 +110,64 @@ def root():
 @login_required
 def dashboard():
     dept = current_user.department
+    q = (request.args.get("q") or "").strip()
     if dept == "A":
-        my_reqs = ReqModel.query.***REMOVED***lter_by(created_by_user_id=current_user.id).order_by(ReqModel.updated_at.desc()).all()
-        return render_template("dashboard.html", mode="A", requests=my_reqs)
+        base = ReqModel.query.***REMOVED***lter_by(created_by_user_id=current_user.id)
+        if q:
+            try:
+                qid = int(q)
+            except Exception:
+                qid = None
+            term = f"%{q}%"
+            if qid:
+                base = base.***REMOVED***lter(or_(ReqModel.id == qid, ReqModel.description.ilike(term)))
+            else:
+                base = base.***REMOVED***lter(ReqModel.description.ilike(term))
+        my_reqs = base.order_by(ReqModel.updated_at.desc()).all()
+        return render_template("dashboard.html", mode="A", requests=my_reqs, q=q)
     if dept == "B":
+        # build bucket queries and optionally ***REMOVED***lter by search term
+        term = None
+        qid = None
+        if q:
+            try:
+                qid = int(q)
+            except Exception:
+                qid = None
+            term = f"%{q}%"
+
+        def qry_for(status):
+            base = ReqModel.query.***REMOVED***lter(ReqModel.owner_department == "B", ReqModel.status == status)
+            if q:
+                if qid:
+                    base = base.***REMOVED***lter(or_(ReqModel.id == qid, ReqModel.description.ilike(term)))
+                else:
+                    base = base.***REMOVED***lter(ReqModel.description.ilike(term))
+            return base.order_by(ReqModel.updated_at.desc()).all()
+
         buckets = {
-            "New from A": ReqModel.query.***REMOVED***lter(ReqModel.owner_department=="B", ReqModel.status=="NEW_FROM_A").order_by(ReqModel.updated_at.desc()).all(),
-            "In B Review": ReqModel.query.***REMOVED***lter(ReqModel.owner_department=="B", ReqModel.status=="B_IN_PROGRESS").order_by(ReqModel.updated_at.desc()).all(),
-            "Needs changes": ReqModel.query.***REMOVED***lter(ReqModel.owner_department=="B", ReqModel.status=="C_NEEDS_CHANGES").order_by(ReqModel.updated_at.desc()).all(),
-            "Approved by C": ReqModel.query.***REMOVED***lter(ReqModel.owner_department=="B", ReqModel.status=="C_APPROVED").order_by(ReqModel.updated_at.desc()).all(),
-            "Final review": ReqModel.query.***REMOVED***lter(ReqModel.owner_department=="B", ReqModel.status=="B_FINAL_REVIEW").order_by(ReqModel.updated_at.desc()).all(),
-            "Sent to A": ReqModel.query.***REMOVED***lter(ReqModel.owner_department=="B", ReqModel.status=="SENT_TO_A").order_by(ReqModel.updated_at.desc()).all(),
+            "New from A": qry_for("NEW_FROM_A"),
+            "In B Review": qry_for("B_IN_PROGRESS"),
+            "Needs changes": qry_for("C_NEEDS_CHANGES"),
+            "Approved by C": qry_for("C_APPROVED"),
+            "Final review": qry_for("B_FINAL_REVIEW"),
+            "Sent to A": qry_for("SENT_TO_A"),
         }
-        return render_template("dashboard.html", mode="B", buckets=buckets)
+        return render_template("dashboard.html", mode="B", buckets=buckets, q=q)
     if dept == "C":
-        pending = ReqModel.query.***REMOVED***lter_by(status="PENDING_C_REVIEW").order_by(ReqModel.updated_at.desc()).all()
-        return render_template("dashboard.html", mode="C", requests=pending)
+        base = ReqModel.query.***REMOVED***lter_by(status="PENDING_C_REVIEW")
+        if q:
+            try:
+                qid = int(q)
+            except Exception:
+                qid = None
+            term = f"%{q}%"
+            if qid:
+                base = base.***REMOVED***lter(or_(ReqModel.id == qid, ReqModel.description.ilike(term)))
+            else:
+                base = base.***REMOVED***lter(ReqModel.description.ilike(term))
+        pending = base.order_by(ReqModel.updated_at.desc()).all()
+        return render_template("dashboard.html", mode="C", requests=pending, q=q)
     abort(403)
 
 @requests_bp.route("/requests/new", methods=["GET", "POST"])
@@ -118,7 +189,7 @@ def request_new():
             pricebook_status=form.pricebook_status.data,
             description=form.description.data.strip(),
             priority=form.priority.data,
-            requires_c_review=form.requires_c_review.data,
+            requires_c_review=False,
             status="NEW_FROM_A",
             owner_department="B",
             submitter_type="user",
@@ -175,18 +246,29 @@ def request_detail(request_id: int):
     artifact_form = ArtifactForm()
 
     transition_form = TransitionForm()
-    dept = current_user.department
-    possible = []
-    for to in ("B_IN_PROGRESS","PENDING_C_REVIEW","C_APPROVED","C_NEEDS_CHANGES","B_FINAL_REVIEW","SENT_TO_A","CLOSED"):
-        if is_transition_valid_for_request(req, dept, req.status, to):
-            possible.append((to, to.replace("_"," ").title()))
-    transition_form.to_status.choices = possible
+    all_statuses = (
+        "NEW_FROM_A",
+        "B_IN_PROGRESS",
+        "PENDING_C_REVIEW",
+        "C_NEEDS_CHANGES",
+        "C_APPROVED",
+        "B_FINAL_REVIEW",
+        "SENT_TO_A",
+        "CLOSED",
+    )
+    transition_form.to_status.choices = [(s, s.replace("_", " ").title()) for s in all_statuses if s != req.status]
 
     toggle_form = ToggleCReviewForm()
 
     request_edit_form = RequestArtifactEditForm()
 
     donor_form = DonorOnlyForm()
+
+    assignment_form = None
+    if current_user.department in ("B", "C") and req.owner_department == current_user.department:
+        assignment_form = AssignmentForm()
+        assignment_form.assignee.choices = _assignment_choices(current_user.department)
+        assignment_form.assignee.data = req.assigned_to_user_id or -1
 
     submissions = Submission.query.***REMOVED***lter_by(request_id=req.id).order_by(Submission.created_at.asc()).all()
     audit = AuditLog.query.***REMOVED***lter_by(request_id=req.id).order_by(AuditLog.created_at.asc()).all()
@@ -205,6 +287,7 @@ def request_detail(request_id: int):
         toggle_form=toggle_form,
         request_edit_form = request_edit_form,
         donor_form=donor_form,
+        assignment_form=assignment_form,
         has_part_number=has_part_number,
         has_instructions=has_instructions,
     )
@@ -309,27 +392,33 @@ def do_transition(request_id: int):
 
     form = TransitionForm()
     dept = current_user.department
-
-    possible = []
-    for to in ("B_IN_PROGRESS","PENDING_C_REVIEW","C_APPROVED","C_NEEDS_CHANGES","B_FINAL_REVIEW","SENT_TO_A","CLOSED"):
-        if is_transition_valid_for_request(req, dept, req.status, to):
-            possible.append((to, to))
-    form.to_status.choices = possible
+    all_statuses = (
+        "NEW_FROM_A",
+        "B_IN_PROGRESS",
+        "PENDING_C_REVIEW",
+        "C_NEEDS_CHANGES",
+        "C_APPROVED",
+        "B_FINAL_REVIEW",
+        "SENT_TO_A",
+        "CLOSED",
+    )
+    form.to_status.choices = [(s, s) for s in all_statuses if s != req.status]
 
     if not form.validate_on_submit():
         flash("Transition failed validation.", "danger")
         return redirect(url_for("requests.request_detail", request_id=req.id))
 
     to_status = form.to_status.data
-    if not is_transition_valid_for_request(req, dept, req.status, to_status):
-        abort(403)
 
-    # If this transition is a handoff, require submission + attachments optional
+    # If this transition is a handoff, normally require submission + attachments optional
+    # Exception: allow Dept B and Dept C to hand off without providing submission details.
     handoff = handoff_for_transition(req.status, to_status)
     if handoff:
-        if not form.submission_summary.data or not form.submission_details.data:
-            flash("Submission Summary and Details are required for this handoff.", "danger")
-            return redirect(url_for("requests.request_detail", request_id=req.id))
+        # Only enforce submission content when the acting department is not B/C
+        if current_user.department not in ("B", "C"):
+            if not form.submission_summary.data or not form.submission_details.data:
+                flash("Submission Summary and Details are required for this handoff.", "danger")
+                return redirect(url_for("requests.request_detail", request_id=req.id))
 
         try:
             validated = _validate_***REMOVED***les(form.***REMOVED***les.data)
@@ -376,8 +465,85 @@ def do_transition(request_id: int):
 
     _log(req, "status_change", note=f"Status changed by Dept {dept}.", from_status=from_status, to_status=to_status)
 
+    # Notify parties on handoff between departments
+    if handoff:
+        notif_targets = set()
+        for d in handoff:
+            for u in _active_users_in_dept(d):
+                notif_targets.add(u.id)
+        if req.created_by_user_id:
+            notif_targets.add(req.created_by_user_id)
+        if req.assigned_to_user_id:
+            notif_targets.add(req.assigned_to_user_id)
+
+        notif_title = f"Request #{req.id} handed off {handoff[0]} → {handoff[1]}"
+        notif_body = f"{req.title} moved {from_status} → {to_status}."
+        _notify_users(notif_targets, req, notif_title, notif_body, ntype="handoff")
+    # Allow Dept B to set the requires_c_review flag as part of the transition
+    if current_user.department == "B" and hasattr(form, 'requires_c_review'):
+        try:
+            new_flag = bool(form.requires_c_review.data)
+        except Exception:
+            new_flag = False
+        if req.requires_c_review != new_flag:
+            old_flag = req.requires_c_review
+            req.requires_c_review = new_flag
+            _log(req, "c_review_set", note=f"Dept B set requires_c_review: {old_flag} → {new_flag}")
+
     db.session.commit()
     flash(f"Moved to {to_status}.", "success")
+    return redirect(url_for("requests.request_detail", request_id=req.id))
+
+@requests_bp.route("/requests/<int:request_id>/assign", methods=["POST"])
+@login_required
+def assign_request(request_id: int):
+    req = ReqModel.query.get_or_404(request_id)
+    if not can_view_request(req):
+        abort(403)
+    if current_user.department not in ("B", "C"):
+        abort(403)
+    if req.owner_department != current_user.department:
+        abort(403)
+
+    form = AssignmentForm()
+    form.assignee.choices = _assignment_choices(current_user.department)
+    if not form.validate_on_submit():
+        flash("Choose a valid assignee.", "danger")
+        return redirect(url_for("requests.request_detail", request_id=req.id))
+
+    selected_id = form.assignee.data
+    new_assignee = None
+    if selected_id != -1:
+        new_assignee = User.query.***REMOVED***lter_by(id=selected_id, department=current_user.department, is_active=True).***REMOVED***rst()
+        if not new_assignee:
+            flash("Invalid assignee for your department.", "danger")
+            return redirect(url_for("requests.request_detail", request_id=req.id))
+
+    previous = req.assigned_to_user
+    prev_id = previous.id if previous else None
+    new_id = new_assignee.id if new_assignee else None
+    if prev_id == new_id:
+        flash("Assignment unchanged.", "info")
+        return redirect(url_for("requests.request_detail", request_id=req.id))
+
+    req.assigned_to_user = new_assignee
+
+    note = f"Assignment changed: {(previous.name or previous.email) if previous else 'Unassigned'} → {(new_assignee.name or new_assignee.email) if new_assignee else 'Unassigned'}"
+    _log(req, "assignment_changed", note=note)
+
+    notif_targets = set()
+    if new_assignee:
+        notif_targets.add(new_assignee.id)
+        if req.created_by_user_id:
+            notif_targets.add(req.created_by_user_id)
+
+    if notif_targets:
+        title = f"Request #{req.id} assigned to {(new_assignee.name or new_assignee.email) if new_assignee else 'Unassigned'}"
+        body = req.title
+        _notify_users(notif_targets, req, title, body, ntype="assignment")
+
+    db.session.commit()
+    flash("Assignment updated.", "success")
     return redirect(url_for("requests.request_detail", request_id=req.id))
 
 @requests_bp.route("/requests/<int:request_id>/toggle_c_review", methods=["POST"])
@@ -467,18 +633,13 @@ def edit_artifact(artifact_id: int):
         abort(403)
 
     form = ArtifactForm()
+    form.artifact_type.choices = [(artifact.artifact_type, artifact.artifact_type)]
+    form.artifact_type.data = artifact.artifact_type
+
     if not form.validate_on_submit():
         flash("Artifact failed validation.", "danger")
-        return redirect(...)
+        return redirect(url_for("requests.request_detail", request_id=req.id))
 
-    if not can_add_artifact(req, dept, form.artifact_type.data):
-        abort(403)
-
-    # then create artifact...
-    
-    # Enforce: B can only edit part_number (already checked),
-    # A edit only allowed when requested (already checked),
-    # and A should NOT change artifact type (keep it stable).
     if form.artifact_type.data != artifact.artifact_type:
         flash("Artifact type cannot be changed.", "danger")
         return redirect(url_for("requests.request_detail", request_id=req.id))
@@ -486,9 +647,10 @@ def edit_artifact(artifact_id: int):
     artifact.donor_part_number = (form.donor_part_number.data or "").strip() or None
     artifact.target_part_number = (form.target_part_number.data or "").strip() or None
     artifact.no_donor_reason = (form.no_donor_reason.data or "").strip() or None
-    artifact.instructions_url = (form.instructions_url.data or "").strip() or None
+    artifact.instructions_url = None
+    if artifact.artifact_type == "instructions":
+        artifact.instructions_url = (form.instructions_url.data or "").strip() or None
 
-    # If Dept A edits, clear the edit request flag (so it’s “locked” again)
     if dept == "A":
         artifact.edit_requested = False
         artifact.edit_requested_note = None

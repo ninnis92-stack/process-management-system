@@ -19,12 +19,12 @@ class Con***REMOVED***g:
     OIDC_REDIRECT_URI = os.getenv("OIDC_REDIRECT_URI")
 
     # Uploads (note: not durable on Vercel)
-    UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+    _default_upload_folder = os.path.join(BASE_DIR, "uploads")
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024
     ALLOWED_IMAGE_MIMES = {"image/png", "image/jpeg", "image/webp"}
     MAX_FILES_PER_SUBMISSION = 10
     MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
     DISABLE_UPLOADS = os.getenv("DISABLE_UPLOADS", "False") == "True"
-    
+
     # For serverless environments, allow overriding the upload folder to a writable location
-    UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads"))
+    UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", _default_upload_folder)

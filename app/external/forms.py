@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms.***REMOVED***elds import DateTimeLocalField
-from wtforms import StringField, TextAreaField, SelectField, BooleanField
+from wtforms import StringField, TextAreaField, SelectField, BooleanField, IntegerField
 from wtforms.validators import DataRequired, Email, Length, ValidationError, Optional
 from datetime import datetime, timedelta
 
@@ -15,7 +15,7 @@ class ExternalNewRequestForm(FlaskForm):
         "Request Type",
         choices=[
             ("part_number", "Part Number"),
-            ("instructions", "Instructions"),
+            ("instructions", "Method"),
             ("both", "Both"),
         ],
         validators=[DataRequired()],
@@ -62,8 +62,6 @@ class ExternalNewRequestForm(FlaskForm):
         validators=[DataRequired()],
     )
 
-    requires_c_review = BooleanField("Requires Dept C Review?", default=True)
-
     # Enforce donor/target rules based on request_type
     def validate(self, extra_validators=None):
         ok = super().validate(extra_validators=extra_validators)
@@ -75,13 +73,13 @@ class ExternalNewRequestForm(FlaskForm):
         target = (self.target_part_number.data or "").strip()
         reason = (self.no_donor_reason.data or "").strip()
 
-        # Instructions require donor + target (and "Both" includes instructions)
+        # Method require donor + target (and "Both" includes method)
         if req_type in ("instructions", "both"):
             if not donor:
-                self.donor_part_number.errors.append("Donor part number is required for Instructions.")
+                self.donor_part_number.errors.append("Donor part number is required for Method.")
                 return False
             if not target:
-                self.target_part_number.errors.append("Target part number is required for Instructions.")
+                self.target_part_number.errors.append("Target part number is required for Method.")
                 return False
             if reason == "needs_create":
                 self.no_donor_reason.errors.append("This reason only applies to Part Number requests.")
@@ -110,3 +108,8 @@ class ExternalNewRequestForm(FlaskForm):
 
 class ExternalCommentForm(FlaskForm):
     body = TextAreaField("Comment", validators=[DataRequired(), Length(max=2000)])
+
+
+class GuestLookupForm(FlaskForm):
+    request_id = IntegerField("Request Number", validators=[DataRequired()])
+    guest_email = StringField("Your Email", validators=[DataRequired(), Email()])

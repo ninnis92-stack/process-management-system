@@ -36,6 +36,18 @@ ACTION_TYPES = (
     "c_review_toggled",
 )
 
+class Noti***REMOVED***cation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=True)
+    type = db.Column(db.String(40), nullable=False, default="generic")
+    title = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.Text, nullable=True)
+    url = db.Column(db.String(500), nullable=True)
+    is_read = db.Column(db.Boolean, nullable=False, default=False)
+    dedupe_key = db.Column(db.String(120), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     sso_sub = db.Column(db.String(255), unique=True, nullable=True, index=True)

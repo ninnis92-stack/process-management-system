@@ -25,7 +25,7 @@
           <label class="form-label">Donor Part Number</label>
           {{ form.donor_part_number(class="form-control") }}
           <div class="form-text">
-            Required for Instructions, and required for Both.
+            Required for Method, and required for Both.
           </div>
         </div>
 
@@ -33,7 +33,7 @@
           <label class="form-label">Target Part Number</label>
           {{ form.target_part_number(class="form-control") }}
           <div class="form-text">
-            Required for Instructions. Optional for Part Number / Both at submission (can be ***REMOVED***lled later).
+            Required for Method. Optional for Part Number / Both at submission (can be ***REMOVED***lled later).
           </div>
         </div>
 
@@ -71,11 +71,6 @@
       <div class="mb-3">
         <label class="form-label">Due Date (48+ hours minimum)</label>
         {{ form.due_at(class="form-control", type="datetime-local") }}
-      </div>
-
-      <div class="form-check mb-3">
-        {{ form.requires_c_review(class="form-check-input") }}
-        <label class="form-check-label">Requires Dept C Review?</label>
       </div>
 
       <div class="mb-3">

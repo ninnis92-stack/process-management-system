@@ -1,24 +1,78 @@
 {% extends "base.html" %}
 {% block content %}
 <h3 class="mb-3">Dashboard</h3>
+  <form class="d-flex mb-3" method="get" action="{{ url_for('requests.dashboard') }}">
+    <input id="searchInput" name="q" class="form-control me-2" type="search" placeholder="Search by request # or description" aria-label="Search" value="{{ q or request.args.get('q','') }}">
+    <button class="btn btn-outline-secondary" type="submit">Search</button>
+    {% if q %}
+      <a href="{{ url_for('requests.dashboard') }}" class="btn btn-link ms-2">Clear</a>
+    {% endif %}
+  </form>
+{# Compute summary counts from whichever collection is being shown (requests or buckets) #}
+{% set total = 0 %}
+{% set high = 0 %}
+{% set medium = 0 %}
+{% set low = 0 %}
 
+{% if mode == 'B' and buckets is de***REMOVED***ned %}
+  {% for label, items in buckets.items() %}
+    {% for r in items %}
+      {% set total = total + 1 %}
+      {% if r.priority == 'high' %}{% set high = high + 1 %}{% endif %}
+      {% if r.priority == 'medium' %}{% set medium = medium + 1 %}{% endif %}
+      {% if r.priority == 'low' %}{% set low = low + 1 %}{% endif %}
+    {% endfor %}
+  {% endfor %}
+{% else %}
+  {% for r in requests or [] %}
+    {% set total = total + 1 %}
+    {% if r.priority == 'high' %}{% set high = high + 1 %}{% endif %}
+    {% if r.priority == 'medium' %}{% set medium = medium + 1 %}{% endif %}
+    {% if r.priority == 'low' %}{% set low = low + 1 %}{% endif %}
+  {% endfor %}
+{% endif %}
+
+<div class="dashboard-summary">
+  <div class="summary-chip"><span class="count">{{ total }}</span>Total</div>
+  <div class="summary-chip"><span class="count">{{ high }}</span>High</div>
+  <div class="summary-chip"><span class="count">{{ medium }}</span>Medium</div>
+  <div class="summary-chip"><span class="count">{{ low }}</span>Low</div>
+</div>
+    
 {% if mode == "A" %}
   <div class="d-flex justify-content-between mb-3">
     <div></div>
     <a class="btn btn-primary" href="{{ url_for('requests.request_new') }}">New Request</a>
   </div>
-  <div class="list-group">
+    <div class="list-group">
     {% for r in requests %}
-      <a class="list-group-item list-group-item-action" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
-        <div class="d-flex justify-content-between">
-          <strong>#{{ r.id }} · {{ r.title }}</strong>
-          <span class="badge text-bg-secondary">{{ r.status }}</span>
+      {% set delay = (loop.index0 * 0.04) %}
+      {% set pct = 5 %}
+      {% if r.status == 'NEW_FROM_A' %}{% set pct = 10 %}{% elif r.status == 'B_IN_PROGRESS' %}{% set pct = 35 %}{% elif r.status == 'PENDING_C_REVIEW' %}{% set pct = 60 %}{% elif r.status == 'C_APPROVED' %}{% set pct = 80 %}{% elif r.status == 'B_FINAL_REVIEW' %}{% set pct = 90 %}{% elif r.status == 'SENT_TO_A' %}{% set pct = 98 %}{% elif r.status == 'C_NEEDS_CHANGES' %}{% set pct = 45 %}{% endif %}
+      <a class="list-group-item list-group-item-action productivity" href="{{ url_for('requests.request_detail', request_id=r.id) }}" data-delay="{{ delay }}">
+        <div class="d-flex align-items-center w-100">
+          <div style="width:52px; flex:0 0 52px; display:flex; align-items:center; gap:8px;">
+            {% if r.assignee %}
+              <div class="avatar avatar-sm" title="{{ r.assignee.name }}">{{ r.assignee.initials }}</div>
+            {% else %}
+              <div class="avatar avatar-sm" title="Unassigned"></div>
+            {% endif %}
+            <div class="badge status text-bg-secondary">{{ r.status }}</div>
+          </div>
+
+                      <div class="meta">
+                        <div class="title">#{{ r.id }} · {{ r.title }}</div>
+                        <div class="text-muted small">{{ r.pricebook_status|replace('_',' ') }} · <span class="badge priority-{{ r.priority|default('low') }}">{{ r.priority|default('low')|title }}</span> · Due: {{ r.due_at.strftime("%b %d") if r.due_at else "—" }}</div>
+            <div class="status-progress mt-1"><span data-pct="{{ pct }}"></span></div>
+          </div>
+
+          <div class="quick-actions">
+            <a class="btn btn-sm btn-outline-light" href="{{ url_for('requests.request_detail', request_id=r.id) }}">View</a>
+            {% if current_user.department in ['B','C'] %}
+              <a class="btn btn-sm btn-primary" href="{{ url_for('requests.request_detail', request_id=r.id) }}#assign">Assign</a>
+            {% endif %}
+          </div>
         </div>
-        <small class="text-muted">
-            {{ r.pricebook_status }} · {{ r.priority }}
-            · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
-            · C Review: {{ "Yes" if r.requires_c_review else "No" }}
-        </small>
       </a>
     {% else %}
       <div class="text-muted">No requests yet.</div>
@@ -26,43 +80,97 @@
   </div>
 
 {% elif mode == "B" %}
-  {% for label, items in buckets.items() %}
-    <h5 class="mt-4">{{ label }}</h5>
-    <div class="list-group">
-      {% for r in items %}
-        <a class="list-group-item list-group-item-action" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
-          <div class="d-flex justify-content-between">
-            <strong>#{{ r.id }} · {{ r.title }}</strong>
-            <span class="badge text-bg-secondary">{{ r.status }}</span>
+  <div class="buckets-grid">
+    {% for label, items in buckets.items() %}
+      {% set high_count = items|selectattr('priority','equalto','high')|list|length %}
+      {% set med_count = items|selectattr('priority','equalto','medium')|list|length %}
+      {% set low_count = items|selectattr('priority','equalto','low')|list|length %}
+      <div class="bucket-card">
+        <div class="bucket-header">
+          <div class="bucket-head-left">
+            <div class="bucket-title">{{ label }}</div>
+            <div class="bucket-sub">{{ items|length }} items</div>
           </div>
-            <small class="text-muted">
-                {{ r.pricebook_status }} · {{ r.priority }}
-                · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
-                · C Review: {{ "Yes" if r.requires_c_review else "No" }}
-            </small>
-        </a>
-      {% else %}
-        <div class="text-muted">No items.</div>
-      {% endfor %}
+          <div class="bucket-actions">
+            <div class="priority-chips">
+              <span class="badge priority-high">H {{ high_count }}</span>
+              <span class="badge priority-medium">M {{ med_count }}</span>
+              <span class="badge priority-low">L {{ low_count }}</span>
+            </div>
+            <a href="{{ url_for('requests.dashboard') }}?bucket={{ label }}" class="view-all">View all</a>
+            <div class="bucket-count">{{ items|length }}</div>
+          </div>
+        </div>
 
-    </div>
-  {% endfor %}
+        <div class="bucket-list">
+          {% for r in items[:6] %}
+            {% set delay = (loop.index0 * 0.04) %}
+            <a class="list-group-item list-group-item-action productivity" href="{{ url_for('requests.request_detail', request_id=r.id) }}" data-delay="{{ delay }}">
+              <div class="d-flex align-items-center w-100">
+                <div style="width:48px; flex:0 0 48px; display:flex; align-items:center; gap:8px;">
+                  {% if r.assignee %}
+                    <div class="avatar avatar-xs" title="{{ r.assignee.name }}">{{ r.assignee.initials }}</div>
+                  {% else %}
+                    <div class="avatar avatar-xs" title="Unassigned"></div>
+                  {% endif %}
+                </div>
+
+                <div class="meta">
+                  <div class="title">#{{ r.id }} · {{ r.title|truncate(64, True, '...') }}</div>
+                  <div class="text-muted small">{{ r.pricebook_status|replace('_',' ') }} · <span class="badge priority-{{ r.priority|default('low') }}">{{ r.priority|default('low')|title }}</span>
+                    <span class="due">· Due: {{ r.due_at.strftime("%b %d") if r.due_at else "—" }}</span>
+                  </div>
+                </div>
+
+                <div class="quick-actions">
+                  <a class="btn btn-sm btn-outline-light" href="{{ url_for('requests.request_detail', request_id=r.id) }}">View</a>
+                </div>
+              </div>
+            </a>
+          {% else %}
+            <div class="bucket-empty">No items.</div>
+          {% endfor %}
+          {% if items|length > 6 %}
+            <div class="mt-2">
+              <a href="{{ url_for('requests.dashboard') }}?bucket={{ label }}" class="small">View all ({{ items|length }})</a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
 
 {% elif mode == "C" %}
   <h5>Pending Review</h5>
   <div class="list-group">
-    {% for r in requests %}
-      <a class="list-group-item list-group-item-action" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
-        <div class="d-flex justify-content-between">
-          <strong>#{{ r.id }} · {{ r.title }}</strong>
-          <span class="badge text-bg-secondary">{{ r.status }}</span>
-        </div>
+  {% for r in requests or [] %}
+    {% set delay = (loop.index0 * 0.04) %}
+    {% set pct = 5 %}
+    {% if r.status == 'NEW_FROM_A' %}{% set pct = 10 %}{% elif r.status == 'B_IN_PROGRESS' %}{% set pct = 35 %}{% elif r.status == 'PENDING_C_REVIEW' %}{% set pct = 60 %}{% elif r.status == 'C_APPROVED' %}{% set pct = 80 %}{% elif r.status == 'B_FINAL_REVIEW' %}{% set pct = 90 %}{% elif r.status == 'SENT_TO_A' %}{% set pct = 98 %}{% elif r.status == 'C_NEEDS_CHANGES' %}{% set pct = 45 %}{% endif %}
+    <a class="list-group-item list-group-item-action productivity" href="{{ url_for('requests.request_detail', request_id=r.id) }}" data-delay="{{ delay }}">
+        <div class="d-flex align-items-center w-100">
+          <div style="width:52px; flex:0 0 52px; display:flex; align-items:center; gap:8px;">
+            {% if r.assignee %}
+              <div class="avatar avatar-sm" title="{{ r.assignee.name }}">{{ r.assignee.initials }}</div>
+            {% else %}
+              <div class="avatar avatar-sm" title="Unassigned"></div>
+            {% endif %}
+            <div class="badge status text-bg-secondary">{{ r.status }}</div>
+          </div>
 
-            <small class="text-muted">
-                {{ r.pricebook_status }} · {{ r.priority }}
-                · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
-                · C Review: {{ "Yes" if r.requires_c_review else "No" }}
-            </small>
+          <div class="meta">
+            <div class="title">#{{ r.id }} · {{ r.title }}</div>
+            <div class="text-muted small">{{ r.pricebook_status|replace('_',' ') }} · <span class="badge priority-{{ r.priority|default('low') }}">{{ r.priority|default('low')|title }}</span> · Due: {{ r.due_at.strftime("%b %d, %Y") if r.due_at else "—" }}</div>
+            <div class="status-progress mt-1"><span data-pct="{{ pct }}"></span></div>
+          </div>
+
+          <div class="quick-actions">
+            <a class="btn btn-sm btn-outline-light" href="{{ url_for('requests.request_detail', request_id=r.id) }}">View</a>
+            {% if current_user.department in ['B','C'] %}
+              <a class="btn btn-sm btn-primary" href="{{ url_for('requests.request_detail', request_id=r.id) }}#assign">Assign</a>
+            {% endif %}
+          </div>
+        </div>
       </a>
     {% else %}
       <div class="text-muted">No pending items.</div>
