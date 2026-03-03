@@ -1,0 +1,29 @@
+.paste-zone {
+  border: 2px dashed #bbb;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+  color: #555;
+  outline: none;
+}
+
+.paste-zone-hover {
+  border-color: #0d6efd;
+  background: #f6faff;
+}
+
+.preview-img {
+  width: 90px;
+  height: 90px;
+  object-***REMOVED***t: cover;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+}
+
+a.thumb img {
+  width: 90px;
+  height: 90px;
+  object-***REMOVED***t: cover;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+}
