@@ -61,8 +61,7 @@ class NewRequestForm(FlaskForm):
         target = (self.target_part_number.data or "").strip()
         reason = (self.no_donor_reason.data or "").strip()
 
-        # Instructions require donor + target (and Both includes instructions)
-        # Instructions require donor + target
+        # Instructions (Method) require donor + target (and Both includes instructions)
         if req_type == "instructions":
             if not donor:
                 self.donor_part_number.errors.append("Donor part number is required for Method.")
@@ -124,6 +123,12 @@ class ArtifactForm(FlaskForm):
         validators=[Optional()],
     )
 
+    no_donor_reason = SelectField("Reason (if no donor part number)", choices=[
+        ("", "-- select a reason --"),
+        ("part_number_unknown", "Part number unknown"),
+        ("part_number_needs_to_be_created", "Part number needs to be created"),
+    ], validators=[Optional()])
+
     instructions_url = StringField("Method URL", validators=[Optional(), Length(max=800)])
 
     def validate(self, extra_validators=None):
@@ -157,12 +162,12 @@ class ArtifactForm(FlaskForm):
             return True
 
         if t == "instructions":
-            # Require donor and target for method artifacts
+            # Require donor and target for Method (stored as "instructions" type)
             if not donor:
-                self.donor_part_number.errors.append("Donor part number is required for Method.")
+                self.donor_part_number.errors.append("Donor part number is required for method.")
                 return False
             if not target:
-                self.target_part_number.errors.append("Target part number is required for Method.")
+                self.target_part_number.errors.append("Target part number is required for method.")
                 return False
             if not url:
                 self.instructions_url.errors.append("Method URL is required.")
@@ -173,7 +178,7 @@ class ArtifactForm(FlaskForm):
                 self.instructions_url.errors.append("Method URL must start with http:// or https://")
                 return False
 
-            # Reason should not be used for instructions
+            # Reason should not be used for Method
             if reason:
                 self.no_donor_reason.errors.append("Reason is only for Part Number artifacts.")
                 return False

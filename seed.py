@@ -23,6 +23,7 @@ def main():
                 )
                 db.session.add(u)
         db.session.commit()
+        print("DB =", ...)
         print("Seeded users:")
         print("a@example.com / password123 (Dept A)")
         print("b@example.com / password123 (Dept B)")

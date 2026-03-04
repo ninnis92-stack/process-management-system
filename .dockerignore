@@ -1,0 +1,24 @@
+# flyctl launch added from .gitignore
+# Python
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.venv
+**/venv
+**/.env
+**/.env.*
+
+# Flask/instance
+**/instance
+**/app.db
+**/*.db
+**/*.sqlite*
+**/uploads
+
+# macOS
+**/.DS_Store
+
+# VS Code
+**/.vscode
+fly.toml

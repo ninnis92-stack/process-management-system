@@ -11,19 +11,37 @@ auth_bp = Blueprint("auth", __name__, url_pre***REMOVED***x="/auth")
 
 
 # ---------- SSO ----------
+# Keep SSO endpoints ready; falls back to local auth until the IdP con***REMOVED***g is fully wired.
 @auth_bp.route("/sso/login")
 def sso_login():
     if not current_app.con***REMOVED***g.get("SSO_ENABLED"):
         return redirect(url_for("auth.login"))  # fallback to local login
 
-    redirect_uri = current_app.con***REMOVED***g["OIDC_REDIRECT_URI"]
+    if not hasattr(oauth, "oidc"):
+        flash("SSO is not fully con***REMOVED***gured. Using local login.", "warning")
+        return redirect(url_for("auth.login"))
+
+    redirect_uri = current_app.con***REMOVED***g.get("OIDC_REDIRECT_URI")
+    if not redirect_uri:
+        flash("SSO redirect not con***REMOVED***gured.", "warning")
+        return redirect(url_for("auth.login"))
+
     return oauth.oidc.authorize_redirect(redirect_uri)
 
 
 @auth_bp.route("/sso/callback")
 def sso_callback():
-    token = oauth.oidc.authorize_access_token()
-    userinfo = oauth.oidc.parse_id_token(token)
+    if not hasattr(oauth, "oidc"):
+        flash("SSO not available.", "danger")
+        return redirect(url_for("auth.login"))
+
+    try:
+        token = oauth.oidc.authorize_access_token()
+        userinfo = oauth.oidc.parse_id_token(token)
+    except Exception as e:  # noqa: BLE001
+        current_app.logger.exception("SSO callback failed")
+        flash("SSO login failed.", "danger")
+        return redirect(url_for("auth.login"))
 
     sub = userinfo.get("sub")
     email = (userinfo.get("email") or "").lower().strip()

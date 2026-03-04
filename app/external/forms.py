@@ -50,7 +50,7 @@ class ExternalNewRequestForm(FlaskForm):
         validators=[DataRequired()],
     )
 
-    description = TextAreaField("Description", validators=[DataRequired()])
+    description = TextAreaField("Description", validators=[Optional(), Length(max=4000)])
 
     priority = SelectField(
         "Priority",
@@ -73,7 +73,7 @@ class ExternalNewRequestForm(FlaskForm):
         target = (self.target_part_number.data or "").strip()
         reason = (self.no_donor_reason.data or "").strip()
 
-        # Method require donor + target (and "Both" includes method)
+        # Method (stored as "instructions") requires donor + target (and "Both" includes instructions)
         if req_type in ("instructions", "both"):
             if not donor:
                 self.donor_part_number.errors.append("Donor part number is required for Method.")

@@ -3,37 +3,35 @@
   if (!slot) return;
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
   const lines = [
-    "Ship, then shine.",
-    "Small wins stack.",
-    "Ask early, move fast.",
-    "Simplify to speed up.",
-    "Close loops daily.",
-    "Progress beats perfect.",
-    "Start narrow, ***REMOVED***nish strong.",
-    "Done is feedback-ready.",
-    "Fewer steps, faster flow.",
-    "Clarity cuts rework.",
-    "Draft fast, re***REMOVED***ne once.",
-    "Make blockers visible.",
-    "One owner, clear path.",
-    "Tiny tasks, quick momentum.",
-    "Decide, then iterate.",
-    "Questions save sprints.",
-    "Line up decisions early.",
-    "Name the next step.",
-    "Timebox and move.",
-    "Share early, shift left.",
-    "Less noise, more signal.",
-    "Unblock, then optimize.",
-    "Focus beats frenzy.",
-    "Steady pace wins.",
+    "Small steps every day lead to big change.",
+    "Progress is a series of tiny wins.",
+    "Focus on the next best small thing.",
+    "Clear the smallest blocker ***REMOVED***rst.",
+    "Good questions are progress in disguise.",
+    "Ship early, learn quickly.",
+    "Simplify to amplify speed.",
+    "Finish one thing well today.",
+    "Share early to reduce rework.",
+    "A clear step beats vague intentions.",
+    "Iterate in public and get better.",
+    "Design for the next small win.",
+    "Make the path obvious for others.",
+    "Break big things into two-doable-parts.",
+    "Decide, then adjust with data.",
+    "Consistent effort compounds.",
+    "Remove one assumption and test it.",
+    "Celebrate the smallest progress.",
+    "Turn feedback into action quickly.",
+    "Clarity saves time later.",
+    "Protect time for deep work.",
+    "Ask for help — it speeds things up.",
+    "Make the next step unambiguous.",
+    "Done is a great place to improve from."
   ];
 
-  // Deterministic daily shuffle so the order changes each day but stays stable within the day
-  const today = new Date();
-  const daySeed = Number(`${today.getUTCFullYear()}${today.getUTCMonth() + 1}${today.getUTCDate()}`);
+  // Stable per-day seed (days since epoch) so the order changes each day.
+  const daySeed = Math.floor(Date.now() / 86400000);
   function mulberry32(a) {
     return function () {
       a |= 0; a = a + 0x6D2B79F5 | 0;
@@ -42,49 +40,158 @@
       return ((t ^ t >>> 14) >>> 0) / 4294967296;
     };
   }
-  const rand = mulberry32(daySeed);
-  const order = lines
-    .map(v => ({ v, r: rand() }))
-    .sort((a, b) => a.r - b.r)
-    .map(o => o.v);
 
+  const rand = mulberry32(daySeed);
+  const order = lines.map(v => ({ v, r: rand() })).sort((a, b) => a.r - b.r).map(o => o.v);
   let idx = 0;
-  slot.textContent = order[idx];
-  slot.style.opacity = 1;
+
+  // show text with optional animation
+  function showQuote(i, animate = true) {
+    if (!slot) return;
+    if (prefersReduced || !animate) {
+      slot.textContent = order[i];
+      slot.style.opacity = 1;
+      slot.style.transform = 'translateY(0)';
+      return;
+    }
+    slot.style.opacity = 0;
+    slot.style.transform = 'translateY(-6px)';
+    setTimeout(() => {
+      slot.textContent = order[i];
+      slot.style.transform = 'translateY(6px)';
+      requestAnimationFrame(() => {
+        slot.style.opacity = 1;
+        slot.style.transform = 'translateY(0)';
+      });
+    }, 180);
+  }
+
+  showQuote(idx, false);
+
+  // make clickable and keyboard-activatable
+  slot.setAttribute('role', 'button');
+  slot.setAttribute('tabindex', '0');
+  slot.style.cursor = 'pointer';
+
+  function advance() {
+    const nextIdx = (idx + 1) % order.length;
+    if (!prefersReduced && slot.animate) {
+      // animate out
+      const out = slot.animate([
+        { opacity: 1, transform: 'translateY(0)' },
+        { opacity: 0, transform: 'translateY(-8px)' }
+      ], { duration: 200, easing: 'cubic-bezier(.2,.8,.2,1)', ***REMOVED***ll: 'forwards' });
+      out.on***REMOVED***nish = () => {
+        idx = nextIdx;
+        slot.textContent = order[idx];
+        // animate in
+        const _in = slot.animate([
+          { opacity: 0, transform: 'translateY(8px)' },
+          { opacity: 1, transform: 'translateY(0)' }
+        ], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)', ***REMOVED***ll: 'forwards' });
+      };
+    } else {
+      idx = nextIdx;
+      showQuote(idx, !prefersReduced);
+    }
+  }
+
+  slot.addEventListener('click', () => advance());
+  slot.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      advance();
+    }
+  });
 
   if (!prefersReduced) {
-    setInterval(() => {
-      slot.style.opacity = 0;
-      slot.style.transform = "translateY(-6px)";
-      setTimeout(() => {
-        idx = (idx + 1) % order.length;
-        slot.textContent = order[idx];
-        slot.style.transform = "translateY(6px)";
-        requestAnimationFrame(() => {
-          slot.style.opacity = 1;
-          slot.style.transform = "translateY(0)";
-        });
-      }, 180);
-    }, 8000);
+    setInterval(() => advance(), 8000);
   }
 })();
 
-(function initDashboardStyles() {
-  // Apply delay and pct values emitted as data attributes in templates
-  document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[data-delay]').forEach(el => {
-      const d = el.getAttribute('data-delay');
-      if (d != null && d !== '') el.style.animationDelay = String(d) + 's';
-    });
-    document.querySelectorAll('[data-pct]').forEach(span => {
-      const pct = span.getAttribute('data-pct');
-      if (pct != null && pct !== '') span.style.width = String(pct) + '%';
-    });
+(function initTheme() {
+  const btn = document.getElementById("vibeBtn");
+  if (!btn) return;
+
+  // 24 pastel / muted palettes that are easy on the eyes (accent = primary, accent2 = softer shade)
+  const palettes = [
+    { name: "Soft Coral", accent: "#E47D6A", accent2: "#F5E9E6" },
+    { name: "Warm Sand", accent: "#DDB892", accent2: "#FAF5EE" },
+    { name: "Moss", accent: "#A7C28C", accent2: "#F0F7ED" },
+    { name: "Sage", accent: "#8FA98A", accent2: "#EFF6EE" },
+    { name: "Muted Teal", accent: "#6FB1B1", accent2: "#EDF7F7" },
+    { name: "Sky", accent: "#7FB3D5", accent2: "#EFF8FC" },
+    { name: "Powder Blue", accent: "#9FC6E7", accent2: "#F6FBFF" },
+    { name: "Lavender", accent: "#B9A7E0", accent2: "#F6F3FB" },
+    { name: "Lilac", accent: "#C7B3D6", accent2: "#FBF8FD" },
+    { name: "Muted Pink", accent: "#E8B7C8", accent2: "#FFF5F8" },
+    { name: "Peach", accent: "#F2B091", accent2: "#FFF6F2" },
+    { name: "Butter", accent: "#F4D58D", accent2: "#FFFDF2" },
+    { name: "Pistachio", accent: "#D6E8C3", accent2: "#FBFDF4" },
+    { name: "Mint", accent: "#BFEAD6", accent2: "#F9FFFB" },
+    { name: "Seafoam", accent: "#9EE3C5", accent2: "#F7FFF6" },
+    { name: "Aqua", accent: "#8ED6D1", accent2: "#F4FFFE" },
+    { name: "Robin Egg", accent: "#8EC7E6", accent2: "#F5FDFF" },
+    { name: "Periwinkle", accent: "#B2C8F9", accent2: "#F8FBFF" },
+    { name: "Dusty Blue", accent: "#9BB1C8", accent2: "#F6F9FB" },
+    { name: "Slate Rose", accent: "#C9A6A6", accent2: "#FBF6F6" },
+    { name: "Tea", accent: "#C9D6B3", accent2: "#FBFDF4" },
+    { name: "Stone", accent: "#BFC8C6", accent2: "#F7F9F9" },
+    { name: "Soft Gray", accent: "#BDC3C7", accent2: "#FAFBFC" },
+    { name: "Charcoal Mist", accent: "#93A0A8", accent2: "#F1F5F6" },
+    { name: "Aurora", accent: "#0F766E", accent2: "#E6FAF8" }
+  ];
+
+  function hexToRgb(hex) {
+    const normalized = hex.replace('#', '');
+    const bigint = parseInt(normalized.length === 3
+      ? normalized.split('').map(c => c + c).join('')
+      : normalized, 16);
+    return {
+      r: (bigint >> 16) & 255,
+      g: (bigint >> 8) & 255,
+      b: bigint & 255,
+    };
+  }
+
+  function darkenHex(hex, factor) {
+    const { r, g, b } = hexToRgb(hex);
+    const dr = Math.max(0, Math.floor(r * (1 - factor)));
+    const dg = Math.max(0, Math.floor(g * (1 - factor)));
+    const db = Math.max(0, Math.floor(b * (1 - factor)));
+    return `rgb(${dr}, ${dg}, ${db})`;
+  }
+
+  function applyTheme(idx) {
+    const p = palettes[idx] || palettes[0];
+    const root = document.documentElement;
+    root.style.setProperty("--accent", p.accent);
+    root.style.setProperty("--accent-2", p.accent2 || p.accent);
+    // gentle nav background derived from the accent (muted for pastel palettes)
+    root.style.setProperty("--nav-bg", darkenHex(p.accent, 0.56));
+    const rgb = hexToRgb(p.accent);
+    root.style.setProperty("--focus", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.16)`);
+    root.style.setProperty(
+      "--page-bg",
+      `radial-gradient(circle at 20% 20%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.10), transparent 30%), radial-gradient(circle at 80% 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.06), transparent 28%), #fbfcfe`
+    );
+    const vibeLabel = document.getElementById("vibeLabel");
+    if (vibeLabel) vibeLabel.textContent = p.name;
+    localStorage.setItem("vibeTheme", String(idx));
+  }
+
+  const stored = Number(localStorage.getItem("vibeTheme"));
+  const dailySeed = (new Date()).getUTCDate() + (new Date()).getUTCMonth() * 31;
+  const startIdx = Number.isFinite(stored) ? stored % palettes.length : (dailySeed % palettes.length);
+  applyTheme(startIdx);
+
+  btn.addEventListener("click", () => {
+    const next = ((Number(localStorage.getItem("vibeTheme")) || 0) + 1) % palettes.length;
+    applyTheme(next);
   });
 })();
 
 (function initSearchHelpers() {
-  // Highlight search terms in titles and small text and add '/' shortcut to focus search
   function escapeRegExp(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
@@ -94,7 +201,6 @@
     const q = (params.get('q') || '').trim();
     const input = document.getElementById('searchInput');
 
-    // Keyboard shortcut: focus search on '/'
     document.addEventListener('keydown', (e) => {
       const active = document.activeElement;
       const tag = active && active.tagName && active.tagName.toLowerCase();
@@ -106,85 +212,11 @@
 
     if (!q) return;
     const re = new RegExp(escapeRegExp(q), 'ig');
-    const toHighlight = document.querySelectorAll('.title, .text-muted, .meta');
-    toHighlight.forEach(el => {
-      try {
-        // Simple innerHTML replace — acceptable for small snippets in this prototype
-        const original = el.innerHTML;
-        const replaced = original.replace(re, match => `<mark class="search-hit">${match}</mark>`);
-        if (replaced !== original) el.innerHTML = replaced;
-      } catch (e) {
-        // fallback: ignore highlighting errors
-      }
+    document.querySelectorAll('.title, .text-muted, .meta').forEach(el => {
+      const original = el.innerHTML;
+      const replaced = original.replace(re, m => `<mark class="search-hit">${m}</mark>`);
+      if (replaced !== original) el.innerHTML = replaced;
     });
-
-    // Optional: scroll to ***REMOVED***rst hit
-    const ***REMOVED***rst = document.querySelector('mark.search-hit');
-    if (***REMOVED***rst) ***REMOVED***rst.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  });
-})();
-
-/* Highlight style */
-const style = document.createElement('style');
-style.textContent = `mark.search-hit { background: rgba(255,230,140,0.95); padding: 0 2px; border-radius: 2px; }`;
-document.head.appendChild(style);
-
-(function initTheme() {
-  const btn = document.getElementById("vibeBtn");
-  if (!btn) return;
-
-  const palettes = [
-    { name: "Red", nav: "#0b1726", accent: "#D32F2F", accent2: "#D32F2F", page: null },
-    { name: "Magenta", nav: "#0b1726", accent: "#AD1457", accent2: "#AD1457", page: null },
-    { name: "Purple", nav: "#0b1726", accent: "#8E24AA", accent2: "#8E24AA", page: null },
-    { name: "Deep Purple", nav: "#0b1726", accent: "#5E35B1", accent2: "#5E35B1", page: null },
-    { name: "Indigo", nav: "#0b1726", accent: "#3949AB", accent2: "#3949AB", page: null },
-    { name: "Navy", nav: "#0b1726", accent: "#0D47A1", accent2: "#0D47A1", page: null },
-    { name: "Blue", nav: "#0b1726", accent: "#1E88E5", accent2: "#1E88E5", page: null },
-    { name: "Light Blue", nav: "#0b1726", accent: "#039BE5", accent2: "#039BE5", page: null },
-    { name: "Cyan", nav: "#0b1726", accent: "#00ACC1", accent2: "#00ACC1", page: null },
-    { name: "Teal", nav: "#0b1726", accent: "#00897B", accent2: "#00897B", page: null },
-    { name: "Green", nav: "#0b1726", accent: "#43A047", accent2: "#43A047", page: null },
-    { name: "Light Green", nav: "#0b1726", accent: "#7CB342", accent2: "#7CB342", page: null },
-    { name: "Lime", nav: "#0b1726", accent: "#C0CA33", accent2: "#C0CA33", page: null },
-    { name: "Yellow", nav: "#0b1726", accent: "#FBC02D", accent2: "#FBC02D", page: null },
-    { name: "Amber", nav: "#0b1726", accent: "#FFA000", accent2: "#FFA000", page: null },
-    { name: "Orange", nav: "#0b1726", accent: "#FB8C00", accent2: "#FB8C00", page: null },
-    { name: "Deep Orange", nav: "#0b1726", accent: "#F4511E", accent2: "#F4511E", page: null },
-    { name: "Coral", nav: "#0b1726", accent: "#FF7043", accent2: "#FF7043", page: null },
-    { name: "Olive", nav: "#0b1726", accent: "#827717", accent2: "#827717", page: null },
-    { name: "Gold", nav: "#0b1726", accent: "#B8860B", accent2: "#B8860B", page: null },
-    { name: "Brown", nav: "#0b1726", accent: "#6D4C41", accent2: "#6D4C41", page: null },
-    { name: "Blue Gray", nav: "#0b1726", accent: "#546E7A", accent2: "#546E7A", page: null },
-    { name: "Gray", nav: "#0b1726", accent: "#616161", accent2: "#616161", page: null },
-    { name: "Slate", nav: "#0b1726", accent: "#37474F", accent2: "#37474F", page: null },
-  ];
-
-  function applyTheme(idx) {
-    const p = palettes[idx] || palettes[0];
-    const root = document.documentElement;
-    root.style.setProperty("--nav-bg", p.nav);
-    root.style.setProperty("--nav-text", "#eef2f7");
-    root.style.setProperty("--accent", p.accent);
-    root.style.setProperty("--accent-2", p.accent2);
-    if (p.page) {
-      document.body.style.background = p.page;
-    }
-    const vibeLabel = document.getElementById("vibeLabel");
-    btn.textContent = `Vibe · ${p.name}`;
-    if (vibeLabel) vibeLabel.textContent = p.name;
-    localStorage.setItem("vibeTheme", String(idx));
-  }
-
-  const stored = Number(localStorage.getItem("vibeTheme"));
-  const dailySeed = (new Date()).getUTCDate() + (new Date()).getUTCMonth() * 31;
-  const seededStart = dailySeed % palettes.length;
-  const startIdx = Number.isFinite(stored) ? stored % palettes.length : seededStart;
-  applyTheme(startIdx);
-
-  btn.addEventListener("click", () => {
-    const next = ((Number(localStorage.getItem("vibeTheme")) || 0) + 1) % palettes.length;
-    applyTheme(next);
   });
 })();
 
@@ -243,12 +275,8 @@ document.head.appendChild(style);
     if (!item) return;
     const id = item.dataset.id;
     const url = item.dataset.url;
-    try {
-      await fetch(`/noti***REMOVED***cations/${id}/read`, { method: "POST" });
-    } catch (e) { /* ignore */ }
-    if (url) {
-      window.location.href = url;
-    }
+    try { await fetch(`/noti***REMOVED***cations/${id}/read`, { method: "POST" }); } catch (e) {}
+    if (url) window.location.href = url;
   });
 
   btn.addEventListener("click", async () => {
@@ -270,35 +298,6 @@ document.head.appendChild(style);
 
   refreshCount();
   setInterval(refreshCount, 30000);
-})();
-
-(function initFocusPills() {
-  const lines = [
-    "Unblock one item",
-    "Share a draft",
-    "Close a loop",
-    "Prep a handoff",
-    "Trim one step",
-    "Ask one question",
-  ];
-  document.querySelectorAll(".focus-pill").forEach((pill, i) => {
-    const text = lines[i % lines.length];
-    pill.textContent = `Focus: ${text}`;
-  });
-})();
-
-(function initAlertEncouragements() {
-  const lines = [
-    "Small wins stack—keep going.",
-    "Share early, shift left.",
-    "Finish one thing today.",
-  ];
-  document.querySelectorAll(".alert").forEach((a, i) => {
-    const line = document.createElement("div");
-    line.className = "small text-muted mt-1";
-    line.textContent = lines[i % lines.length];
-    a.appendChild(line);
-  });
 })();
 
 (function initFilePreview() {
@@ -344,9 +343,7 @@ document.head.appendChild(style);
     e.preventDefault();
     pasteZone.classList.add("paste-zone-hover");
   });
-  pasteZone.addEventListener("dragleave", () => {
-    pasteZone.classList.remove("paste-zone-hover");
-  });
+  pasteZone.addEventListener("dragleave", () => pasteZone.classList.remove("paste-zone-hover"));
   pasteZone.addEventListener("drop", (e) => {
     e.preventDefault();
     pasteZone.classList.remove("paste-zone-hover");
@@ -358,4 +355,34 @@ document.head.appendChild(style);
     dt.items.clear();
     for (const f of ***REMOVED***leInput.***REMOVED***les) addFile(f);
   });
+})();
+
+(function initPresence(){
+  const el = document.getElementById('presenceList');
+  if(!el) return;
+  const rid = el.dataset.requestId;
+  if(!rid) return;
+
+  async function heartbeat(){
+    try { await fetch(`/requests/${rid}/presence`, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } }); } catch(e) {}
+  }
+
+  async function refresh(){
+    try {
+      const r = await fetch(`/requests/${rid}/presence`);
+      if(!r.ok) return;
+      const data = await r.json();
+      const viewers = data.viewers || [];
+      if(!viewers.length){
+        el.textContent = "No teammates viewing right now.";
+        return;
+      }
+      el.innerHTML = viewers.map(v => `<span class="badge text-bg-light text-dark me-1">${v.email}</span>`).join(' ');
+    } catch(e) {}
+  }
+
+  heartbeat();
+  refresh();
+  setInterval(heartbeat, 20000);
+  setInterval(refresh, 10000);
 })();

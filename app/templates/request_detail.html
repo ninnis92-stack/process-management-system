@@ -1,14 +1,45 @@
 {% extends "base.html" %}
 {% block content %}
 <h3 class="mb-2">Request #{{ req.id }} · {{ req.title }}</h3>
-<div class="d-flex gap-2 mb-3 flex-wrap">
-  <span class="badge text-bg-secondary">Status: {{ req.status }}</span>
+{% if next_hint %}
+  <div class="alert alert-primary d-flex align-items-center gap-2">
+    <span>🔎</span>
+    <div>{{ next_hint }}</div>
+  </div>
+{% endif %}
+
+<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+  {% set icon = {
+    'NEW_FROM_A': '✨',
+    'B_IN_PROGRESS': '⏳',
+    'PENDING_C_REVIEW': '🔍',
+    'EXEC_APPROVAL': '🗝️',
+    'B_FINAL_REVIEW': '🧭',
+    'SENT_TO_A': '📨',
+    'CLOSED': '✅'
+  }.get(req.status, '•') %}
+  <span class="badge text-bg-secondary">{{ icon }} {{ 'Requires executive approval' if req.status == 'EXEC_APPROVAL' else req.status }}</span>
   <span class="badge text-bg-info">Owner Dept: {{ req.owner_department }}</span>
   <span class="badge text-bg-light text-dark">Priority: {{ req.priority }}</span>
   <span class="badge text-bg-warning">C Review: {{ "Required" if req.requires_c_review else "Not required" }}</span>
+  {% if req.due_at %}
+    {% set due_badge = 'Due in ' ~ ((req.due_at - now).days) ~ 'd' if req.due_at >= now else 'Overdue' %}
+    <span class="badge {{ 'bg-danger' if req.due_at < now else 'bg-info text-dark' }}">{{ due_badge }}</span>
+  {% endif %}
+  {% if current_user.department in ['B','C'] %}
+    <span class="badge text-bg-light text-dark">Assigned: {{ assigned_user.name or assigned_user.email if assigned_user else 'Unassigned' }}</span>
+    {% if (not assigned_user or assigned_user.id == current_user.id) and req.status != 'CLOSED' %}
+      <form method="post" action="{{ url_for('requests.assign_self', request_id=req.id) }}" class="d-inline">
+        {{ comment_form.csrf_token }}
+        <button class="btn btn-sm btn-outline-primary">Assign to me</button>
+      </form>
+    {% endif %}
+  {% endif %}
 </div>
 
-<div><strong>Due:</strong> {{ req.due_at.strftime("%b %d, %Y %I:%M %p") if req.due_at else "—" }}</div>
+<div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
+  <strong>Due:</strong> {{ req.due_at.strftime("%b %d, %Y %I:%M %p") if req.due_at else "—" }}
+</div>
 
 <div class="row g-3">
   <div class="col-md-7">
@@ -17,7 +48,7 @@
       <div class="card-body">
         <h5>Details</h5>
         <div><strong>Type:</strong> {{ req.request_type }}</div>
-        <div><strong>Price book:</strong> {{ req.pricebook_status|replace('_',' ') }}</div>
+        <div><strong>Price book:</strong> {{ req.pricebook_display }}</div>
         <hr/>
         <div style="white-space:pre-wrap">{{ req.description }}</div>
       </div>
@@ -26,11 +57,10 @@
     <div class="card shadow-sm mb-3">
       <div class="card-body">
         <h5>Artifacts</h5>
-
-        <ul class="mb-3">
+        <ul class="list-unstyled mb-3">
           {% for a in req.artifacts %}
             <li class="mb-2">
-              <strong>{{ a.artifact_type }}</strong>
+              <strong>{{ 'Part Number' if a.artifact_type == 'part_number' else 'Method' }}</strong>
 
               {% if a.artifact_type == "part_number" %}
                 — Target: <code>{{ a.target_part_number or "—" }}</code>
@@ -60,25 +90,25 @@
 
                   <form method="post" action="{{ url_for('requests.edit_artifact', artifact_id=a.id) }}">
                     {{ artifact_form.hidden_tag() }}
-                  {{ artifact_form.artifact_type(type="hidden", value=a.artifact_type) }}
-                  <div class="small text-muted mb-2">Editing {{ a.artifact_type }} artifact</div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Donor Part Number</label>
+                    {{ artifact_form.artifact_type(type="hidden", value=a.artifact_type) }}
+                    <div class="small text-muted mb-2">Editing {{ a.artifact_type }} artifact</div>
+                    <div class="row">
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Donor Part Number</label>
                         {{ artifact_form.donor_part_number(class="form-control", value=a.donor_part_number or "") }}
-                            </div>
+                      </div>
 
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Target Part Number</label>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Target Part Number</label>
                         {{ artifact_form.target_part_number(class="form-control", value=a.target_part_number or "") }}
-                                <div class="form-text">Required for Method.</div>
-                            </div>
+                        <div class="form-text">Required for Method.</div>
+                      </div>
 
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">If no donor, reason</label>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">If no donor, reason</label>
                         {{ artifact_form.no_donor_reason(class="form-select", value=a.no_donor_reason or "") }}
-                                <div class="form-text">Only valid for Part Number requests when the part number needs to be created.</div>
-                            </div>
+                        <div class="form-text">Only valid for Part Number requests when the part number needs to be created.</div>
+                      </div>
 
                       {% if a.artifact_type == "instructions" %}
                       <div class="col-12 mb-3">
@@ -86,7 +116,7 @@
                         {{ artifact_form.instructions_url(class="form-control", value=a.instructions_url or "", placeholder="https://...") }}
                       </div>
                       {% endif %}
-                        </div>
+                    </div>
                     <button class="btn btn-sm btn-primary mt-2">Edit Artifact (opens edit flow)</button>
                   </form>
                 </div>
@@ -118,22 +148,6 @@
                   </form>
                 </div>
               {% endif %}
-
-              {% if current_user.department == "B" and a.artifact_type == "part_number" %}
-                <form method="post"
-                      action="{{ url_for('requests.set_artifact_donor', artifact_id=a.id) }}"
-                      class="mt-2">
-                  {{ donor_form.hidden_tag() }}
-                  <div class="input-group">
-                    <input type="text"
-                           name="donor_part_number"
-                           class="form-control"
-                           placeholder="Add/Update donor part number"
-                           value="{{ a.donor_part_number or '' }}">
-                    <button class="btn btn-outline-primary btn-sm">Save Donor</button>
-                  </div>
-                </form>
-              {% endif %}
             </li>
           {% else %}
             <li class="text-muted">None yet.</li>
@@ -141,75 +155,75 @@
         </ul>
 
         {% if current_user.department == "A" %}
-            {% if not has_part_number or not has_instructions %}
-                <form method="post" action="{{ url_for('requests.add_artifact', request_id=req.id) }}">
-                {{ artifact_form.hidden_tag() }}
+          {% if not has_part_number or not has_instructions %}
+            <form method="post" action="{{ url_for('requests.add_artifact', request_id=req.id) }}">
+              {{ artifact_form.hidden_tag() }}
 
-                <div class="mb-2">
-                    <label class="form-label">Artifact Type</label>
-                    {{ artifact_form.artifact_type(class="form-select") }}
-                    <div class="form-text">
-                        You can only add an artifact type that doesn't exist yet.
-                    </div>
+              <div class="mb-2">
+                <label class="form-label">Artifact Type</label>
+                {{ artifact_form.artifact_type(class="form-select") }}
+                <div class="form-text">
+                  You can only add an artifact type that doesn't exist yet.
                 </div>
+              </div>
 
-                <div class="mb-2">
-                    <label class="form-label">Donor Part Number</label>
-                    {{ artifact_form.donor_part_number(class="form-control") }}
-                </div>
+              <div class="mb-2">
+                <label class="form-label">Donor Part Number</label>
+                {{ artifact_form.donor_part_number(class="form-control") }}
+              </div>
 
-                <div class="mb-2">
-                    <label class="form-label">Target Part Number</label>
-                    {{ artifact_form.target_part_number(class="form-control") }}
-                </div>
+              <div class="mb-2">
+                <label class="form-label">Target Part Number</label>
+                {{ artifact_form.target_part_number(class="form-control") }}
+              </div>
 
-                <div class="mb-2">
-                    <label class="form-label">Reason (only if no donor for Part Number)</label>
-                    {{ artifact_form.no_donor_reason(class="form-select") }}
-                </div>
+              <div class="mb-2">
+                <label class="form-label">Reason (only if no donor for Part Number)</label>
+                {{ artifact_form.no_donor_reason(class="form-select") }}
+              </div>
 
-                <div class="mb-2">
-                  <label class="form-label">Method URL (required for Method)</label>
-                  {{ artifact_form.instructions_url(class="form-control", placeholder="https://...") }}
-                </div>
+              <div class="mb-2">
+                <label class="form-label">Method URL (required for Method)</label>
+                {{ artifact_form.instructions_url(class="form-control", placeholder="https://...") }}
+              </div>
 
-                <button class="btn btn-outline-primary w-100">Add Artifact</button>
-                </form>
-            {% else %}
-                <div class="text-muted">Artifacts already exist. Edit only if Dept B requests changes.</div>
-            {% endif %}
+              <button class="btn btn-outline-primary w-100">Add Artifact</button>
+            </form>
+          {% else %}
+            <div class="text-muted">Artifacts already exist. Edit only if Dept B requests changes.</div>
+          {% endif %}
         {% endif %}
 
         {% if current_user.department == "B" %}
-            {% if not has_part_number %}
-                <form method="post" action="{{ url_for('requests.add_artifact', request_id=req.id) }}">
-                {{ artifact_form.hidden_tag() }}
+          {% if not has_part_number %}
+            <form method="post" action="{{ url_for('requests.add_artifact', request_id=req.id) }}">
+              {{ artifact_form.hidden_tag() }}
 
-                <div class="mb-2">
-                    <label class="form-label">Artifact Type</label>
-                    {{ artifact_form.artifact_type(class="form-select") }}
-                </div>
+              <div class="mb-2">
+                <label class="form-label">Artifact Type</label>
+                {{ artifact_form.artifact_type(class="form-select") }}
+              </div>
 
-                <div class="mb-2">
-                    <label class="form-label">Donor Part Number</label>
-                    {{ artifact_form.donor_part_number(class="form-control") }}
-                </div>
+              <div class="mb-2">
+                <label class="form-label">Donor Part Number</label>
+                {{ artifact_form.donor_part_number(class="form-control") }}
+              </div>
 
-                <div class="mb-2">
-                    <label class="form-label">Target Part Number</label>
-                    {{ artifact_form.target_part_number(class="form-control") }}
-                </div>
+              <div class="mb-2">
+                <label class="form-label">Target Part Number</label>
+                {{ artifact_form.target_part_number(class="form-control") }}
+              </div>
 
-                <div class="mb-2">
-                    <label class="form-label">Reason (only if no donor for Part Number)</label>
-                    {{ artifact_form.no_donor_reason(class="form-select") }}
-                </div>
+              <div class="mb-2">
+                <label class="form-label">Reason (only if no donor for Part Number)</label>
+                {{ artifact_form.no_donor_reason(class="form-select") }}
+              </div>
 
-                <button class="btn btn-outline-primary w-100">Add Part Number Artifact</button>
-                </form>
-            {% else %}
-                <div class="text-muted">Part Number artifact already exists. Edit/update it if needed.</div>
-            {% endif %}
+              <button class="btn btn-outline-primary w-100">Add Part Number Artifact</button>
+            </form>
+          {% else %}
+            <div class="text-muted">Part Number artifact already exists. Edit/update it if needed.</div>
+          {% endif %}
         {% endif %}
       </div>
     </div>
@@ -246,6 +260,13 @@
 
   <div class="col-md-5">
 
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5>Collaboration</h5>
+        <div id="presenceList" data-request-id="{{ req.id }}" class="small text-muted">Connecting…</div>
+      </div>
+    </div>
+
     <div class="card shadow-sm mb-3" id="assign">
       <div class="card-body">
         <h5 id="assign-heading">Assignment</h5>
@@ -267,6 +288,30 @@
       </div>
     </div>
 
+    {% if current_user.department == "B" %}
+      <div class="card shadow-sm mb-3">
+        <div class="card-body">
+          <h5>Method / Part (placeholder)</h5>
+          <div class="small text-muted mb-2">Enter the created method ID or part number.</div>
+          <form method="post" action="{{ url_for('requests.store_veri***REMOVED***cation_placeholder', request_id=req.id) }}">
+            <div class="mb-2">
+              <label class="form-label">Method ID</label>
+              <input type="text" name="created_method" class="form-control" placeholder="e.g. M-1234">
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Part Number</label>
+              <input type="text" name="created_part_number" class="form-control" placeholder="e.g. PN-5678">
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Notes (optional)</label>
+              <textarea name="note" class="form-control" rows="2" placeholder="Context, source system, etc."></textarea>
+            </div>
+            <button class="btn btn-outline-primary w-100">Verify</button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+
     {# Dept B Controls moved into Transition section as a checkbox. #}
 
     <div class="card shadow-sm mb-3">
@@ -285,8 +330,8 @@
               {{ transition_form.submission_summary(class="form-control", placeholder="Short summary") }}
             </div>
             <div class="mb-2">
-              <label class="form-label">Submission Details (required for handoffs)</label>
-              {{ transition_form.submission_details(class="form-control", rows="4", placeholder="What was locked in, what to review, assumptions...") }}
+              <label class="form-label">Submission Details{% if current_user.department not in ['B', 'C'] %} (required for handoffs){% endif %}</label>
+              {{ transition_form.submission_details(class="form-control", rows="4", placeholder="What was locked in, what to review, assumptions...", required=(current_user.department not in ['B', 'C'])) }}
             </div>
 
             <div class="mb-2">
