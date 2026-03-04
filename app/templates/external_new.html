@@ -44,11 +44,6 @@
         <div class="col-md-4 mb-3">{{ form.pricebook_status(class="form-select") }}</div>
       </div>
 
-      <div class="form-check mb-3">
-        {{ form.requires_c_review(class="form-check-input") }}
-        <label class="form-check-label">Requires Dept C Review?</label>
-      </div>
-
       <div class="row">
         <div class="col-md-6 mb-3">
             <label class="form-label">Donor Part Number</label>
@@ -58,7 +53,7 @@
         <div class="col-md-6 mb-3">
             <label class="form-label">Target Part Number</label>
             {{ form.target_part_number(class="form-control") }}
-            <div class="form-text">Required for Instructions.</div>
+            <div class="form-text">Required for Method.</div>
         </div>
 
         <div class="col-md-6 mb-3">
@@ -69,7 +64,7 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Description</label>
+        <label class="form-label">Description (optional)</label>
         {{ form.description(class="form-control", rows="6") }}
       </div>
 

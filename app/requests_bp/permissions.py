@@ -5,8 +5,8 @@ def can_view_request(req: Request) -> bool:
     if current_user.is_authenticated:
         if current_user.department in ("B", "C"):
             return True
-        # Dept A: only requests created by this user
-        return req.created_by_user_id == current_user.id
+        # Dept A: allow if created by this user or if Dept A currently owns the request
+        return req.created_by_user_id == current_user.id or req.owner_department == "A"
     return False
 
 def visible_comment_scopes_for_user() -> set[str]:

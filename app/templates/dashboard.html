@@ -2,67 +2,223 @@
 {% block content %}
 <h3 class="mb-3">Dashboard</h3>
 
+<form class="mb-3" method="get" action="{{ url_for('requests.search_requests') }}">
+  <div class="input-group">
+    <input type="text" name="q" class="form-control" placeholder="Search by ID or description" value="{{ request.args.get('q','') }}">
+    <button class="btn btn-outline-primary" type="submit">Search</button>
+  </div>
+</form>
+
 {% if mode == "A" %}
-  <div class="d-flex justify-content-between mb-3">
-    <div></div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h5 class="mb-0">Dept A — Your requests</h5>
+      <small class="text-muted">Submit, approve, or reopen ***REMOVED***nished work.</small>
+    </div>
     <a class="btn btn-primary" href="{{ url_for('requests.request_new') }}">New Request</a>
   </div>
-  <div class="list-group">
+
+  <div class="row g-3">
     {% for r in requests %}
-      <a class="list-group-item list-group-item-action" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
-        <div class="d-flex justify-content-between">
-          <strong>#{{ r.id }} · {{ r.title }}</strong>
-          <span class="badge text-bg-secondary">{{ r.status }}</span>
-        </div>
-        <small class="text-muted">
-            {{ r.pricebook_status }} · {{ r.priority }}
-            · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
-            · C Review: {{ "Yes" if r.requires_c_review else "No" }}
-        </small>
-      </a>
+      <div class="col-md-6">
+        <a class="card h-100 text-reset card-link-wrap" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <div>
+                <div class="small text-muted">#{{ r.id }}</div>
+                <div class="fw-semibold">{{ r.title }}</div>
+              </div>
+              {% set cls = {
+                'NEW_FROM_A': 'status-new',
+                'B_IN_PROGRESS': 'status-progress',
+                'WAITING_ON_A_RESPONSE': 'status-waiting',
+                'PENDING_C_REVIEW': 'status-c-review',
+                'EXEC_APPROVAL': 'status-exec',
+                'B_FINAL_REVIEW': 'status-***REMOVED***nal',
+                'SENT_TO_A': 'status-sent',
+                'CLOSED': 'status-closed'
+              }.get(r.status, 'status-default') %}
+              {% set icon = {
+                'NEW_FROM_A': '✨',
+                'B_IN_PROGRESS': '⏳',
+                'WAITING_ON_A_RESPONSE': '📭',
+                'PENDING_C_REVIEW': '🔍',
+                'EXEC_APPROVAL': '🗝️',
+                'B_FINAL_REVIEW': '🧭',
+                'SENT_TO_A': '📨',
+                'CLOSED': '✅'
+              }.get(r.status, '•') %}
+              <span class="badge status-pill {{ cls }}">{{ icon }} {{ 'Pending review from Department A' if r.status == 'WAITING_ON_A_RESPONSE' else 'In progress by Department B' if r.status == 'B_IN_PROGRESS' else 'Under review by Department C' if r.status == 'PENDING_C_REVIEW' else 'Requires executive approval' if r.status == 'EXEC_APPROVAL' else r.status }}</span>
+            </div>
+            <div class="small text-muted">
+              {{ r.pricebook_display }} · {{ r.priority }} · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
+            </div>
+            <div class="small mt-2">C Review: {{ "Required" if r.requires_c_review else "Not required" }}</div>
+            {% set due_badge = 'Due in ' ~ ((r.due_at - now).days) ~ 'd' if r.due_at and r.due_at >= now else 'Overdue' if r.due_at else 'No due date' %}
+            <div class="mt-2 d-flex gap-2 align-items-center flex-wrap">
+              {% if r.due_at %}
+                <span class="badge {{ 'bg-danger' if r.due_at < now else 'bg-info text-dark' }}">{{ due_badge }}</span>
+              {% endif %}
+            </div>
+          </div>
+        </a>
+      </div>
     {% else %}
-      <div class="text-muted">No requests yet.</div>
+      <div class="col-12 text-muted">No requests yet.</div>
     {% endfor %}
   </div>
 
 {% elif mode == "B" %}
-  {% for label, items in buckets.items() %}
-    <h5 class="mt-4">{{ label }}</h5>
-    <div class="list-group">
-      {% for r in items %}
-        <a class="list-group-item list-group-item-action" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
-          <div class="d-flex justify-content-between">
-            <strong>#{{ r.id }} · {{ r.title }}</strong>
-            <span class="badge text-bg-secondary">{{ r.status }}</span>
-          </div>
-            <small class="text-muted">
-                {{ r.pricebook_status }} · {{ r.priority }}
-                · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
-                · C Review: {{ "Yes" if r.requires_c_review else "No" }}
-            </small>
-        </a>
-      {% else %}
-        <div class="text-muted">No items.</div>
-      {% endfor %}
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+      <h5 class="mb-0">Dept B — Work queue</h5>
+      <small class="text-muted">Filter by status or browse buckets.</small>
+    </div>
+  </div>
 
+  {% if status_counts %}
+  {% set bucket_links = {
+    'B_IN_PROGRESS': ('in_progress', 'in-progress-by-department-b'),
+    'WAITING_ON_A_RESPONSE': ('waiting_on_department_a', 'pending-review-from-department-a'),
+    'PENDING_C_REVIEW': ('under_review_by_department_c', 'under-review-by-department-c'),
+    'EXEC_APPROVAL': ('exec_approval', 'exec-approval-required'),
+    'B_FINAL_REVIEW': ('under_***REMOVED***nal_review', '***REMOVED***nal-review'),
+    'SENT_TO_A': ('SENT_TO_A', 'sent-to-a'),
+    'CLOSED': ('CLOSED', 'closed'),
+  } %}
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    {% for code, label, cls in [
+      ('B_IN_PROGRESS', 'In progress', 'bg-primary'),
+      ('WAITING_ON_A_RESPONSE', 'Pending review from Department A', 'bg-warning text-dark'),
+      ('PENDING_C_REVIEW', 'Under C review', 'bg-info text-dark'),
+      ('EXEC_APPROVAL', 'Exec approval required', 'bg-dark'),
+      ('B_FINAL_REVIEW', 'Final review', 'bg-warning text-dark'),
+      ('SENT_TO_A', 'Sent to A', 'bg-success'),
+      ('CLOSED', 'Closed', 'bg-secondary')
+    ] %}
+      {% set ***REMOVED***lter_key, anchor = bucket_links.get(code, ('', '')) %}
+      {% set href = url_for('requests.dashboard', status=***REMOVED***lter_key) ~ ('#bucket-' ~ anchor) %}
+      <a class="badge {{ cls }} text-decoration-none" href="{{ href }}">{{ label }}: {{ status_counts.get(code, 0) }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="d-flex align-items-center mb-3">
+    <form id="statusFilterForm" method="get">
+      <label for="statusFilter" class="me-2">Filter status:</label>
+      <select id="statusFilter" name="status" class="form-select form-select-sm" onchange="document.getElementById('statusFilterForm').submit()">
+        {% set sf = request.args.get('status', '') %}
+        <option value="" {{ '' == sf and 'selected' or '' }}>All</option>
+        <option value="in_progress" {{ 'in_progress' == sf and 'selected' or '' }}>In progress</option>
+        <option value="method_created" {{ 'method_created' == sf and 'selected' or '' }}>Method created</option>
+        <option value="part_number_created" {{ 'part_number_created' == sf and 'selected' or '' }}>Part number created</option>
+        <option value="under_review_by_department_c" {{ 'under_review_by_department_c' == sf and 'selected' or '' }}>Under review by Department C</option>
+        <option value="waiting_on_department_a" {{ 'waiting_on_department_a' == sf and 'selected' or '' }}>Pending review from Department A</option>
+        <option value="under_***REMOVED***nal_review" {{ 'under_***REMOVED***nal_review' == sf and 'selected' or '' }}>Under ***REMOVED***nal review</option>
+        <option value="exec_approval" {{ 'exec_approval' == sf and 'selected' or '' }}>Exec approval required</option>
+        <option value="request_denied" {{ 'request_denied' == sf and 'selected' or '' }}>Request denied</option>
+      </select>
+    </form>
+  </div>
+
+  {% for label, items in buckets.items() %}
+    {% set anchor_id = 'bucket-' ~ label|replace(' ', '-')|lower() %}
+    <div class="card mb-3" id="{{ anchor_id }}">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>{{ label }}</strong>
+        <span class="badge text-bg-light text-dark">{{ items|length }} item{{ '' if items|length == 1 else 's' }}</span>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for r in items %}
+          <a class="list-group-item list-group-item-action text-reset" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
+            <div class="d-flex justify-content-between">
+              <strong>#{{ r.id }} · {{ r.title }}</strong>
+              {% set cls = {
+                'NEW_FROM_A': 'status-new',
+                'B_IN_PROGRESS': 'status-progress',
+                'WAITING_ON_A_RESPONSE': 'status-waiting',
+                'PENDING_C_REVIEW': 'status-c-review',
+                'EXEC_APPROVAL': 'status-exec',
+                'B_FINAL_REVIEW': 'status-***REMOVED***nal',
+                'SENT_TO_A': 'status-sent',
+                'CLOSED': 'status-closed'
+              }.get(r.status, 'status-default') %}
+              {% set icon = {
+                'NEW_FROM_A': '✨',
+                'B_IN_PROGRESS': '⏳',
+                'WAITING_ON_A_RESPONSE': '📭',
+                'PENDING_C_REVIEW': '🔍',
+                'EXEC_APPROVAL': '🗝️',
+                'B_FINAL_REVIEW': '🧭',
+                'SENT_TO_A': '📨',
+                'CLOSED': '✅'
+              }.get(r.status, '•') %}
+          <span class="badge status-pill {{ cls }}">{{ icon }} {{ 'Pending review from Department A' if r.status == 'WAITING_ON_A_RESPONSE' else 'In progress by Department B' if r.status == 'B_IN_PROGRESS' else 'Under review by Department C' if r.status == 'PENDING_C_REVIEW' else 'Requires executive approval' if r.status == 'EXEC_APPROVAL' else r.status }}</span>
+            </div>
+            <small class="text-muted">
+                {{ r.pricebook_display }} · {{ r.priority }}
+                · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
+                · C Review: {{ "Required" if r.requires_c_review else "Not required" }}
+            </small>
+            <div class="mt-2 d-flex gap-2 align-items-center flex-wrap">
+              {% if r.due_at %}
+                {% set due_badge = 'Due in ' ~ ((r.due_at - now).days) ~ 'd' if r.due_at and r.due_at >= now else 'Overdue' %}
+                <span class="badge {{ 'bg-danger' if r.due_at < now else 'bg-info text-dark' }}">{{ due_badge }}</span>
+              {% endif %}
+            </div>
+          </a>
+        {% else %}
+          <div class="list-group-item text-muted">No items.</div>
+        {% endfor %}
+      </div>
     </div>
   {% endfor %}
 
 {% elif mode == "C" %}
-  <h5>Pending Review</h5>
-  <div class="list-group">
-    {% for r in requests %}
-      <a class="list-group-item list-group-item-action" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+      <h5 class="mb-0">Dept C — Pending review</h5>
+      <small class="text-muted">Review handoffs awaiting your approval or change request.</small>
+    </div>
+  </div>
+
+      <div class="list-group">
+        {% for r in requests %}
+          <a class="list-group-item list-group-item-action text-reset" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
         <div class="d-flex justify-content-between">
-          <strong>#{{ r.id }} · {{ r.title }}</strong>
-          <span class="badge text-bg-secondary">{{ r.status }}</span>
+              <strong>#{{ r.id }} · {{ r.title }}</strong>
+          {% set cls = {
+            'NEW_FROM_A': 'status-new',
+            'B_IN_PROGRESS': 'status-progress',
+            'WAITING_ON_A_RESPONSE': 'status-waiting',
+            'PENDING_C_REVIEW': 'status-c-review',
+            'B_FINAL_REVIEW': 'status-***REMOVED***nal',
+            'SENT_TO_A': 'status-sent',
+            'CLOSED': 'status-closed'
+          }.get(r.status, 'status-default') %}
+          {% set icon = {
+            'NEW_FROM_A': '✨',
+            'B_IN_PROGRESS': '⏳',
+            'WAITING_ON_A_RESPONSE': '📭',
+            'PENDING_C_REVIEW': '🔍',
+            'B_FINAL_REVIEW': '🧭',
+            'SENT_TO_A': '📨',
+            'CLOSED': '✅'
+          }.get(r.status, '•') %}
+          <span class="badge status-pill {{ cls }}">{{ icon }} {{ 'Pending review from Department A' if r.status == 'WAITING_ON_A_RESPONSE' else 'In progress by Department B' if r.status == 'B_IN_PROGRESS' else 'Under review by Department C' if r.status == 'PENDING_C_REVIEW' else r.status }}</span>
         </div>
 
             <small class="text-muted">
-                {{ r.pricebook_status }} · {{ r.priority }}
+                {{ r.pricebook_display }} · {{ r.priority }}
                 · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
-                · C Review: {{ "Yes" if r.requires_c_review else "No" }}
+                · C Review: {{ "Required" if r.requires_c_review else "Not required" }}
             </small>
+        <div class="mt-2 d-flex gap-2 align-items-center flex-wrap">
+          {% if r.due_at %}
+            {% set due_badge = 'Due in ' ~ ((r.due_at - now).days) ~ 'd' if r.due_at and r.due_at >= now else 'Overdue' %}
+            <span class="badge {{ 'bg-danger' if r.due_at < now else 'bg-info text-dark' }}">{{ due_badge }}</span>
+          {% endif %}
+        </div>
       </a>
     {% else %}
       <div class="text-muted">No pending items.</div>

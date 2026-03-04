@@ -1,3 +1,5 @@
+"""Data models for users, requests, artifacts, comments, submissions, and audit trails."""
+
 from datetime import datetime, timedelta
 import secrets
 from flask_login import UserMixin
@@ -8,7 +10,9 @@ DEPARTMENTS = ("A", "B", "C")
 STATUSES = (
     "NEW_FROM_A",
     "B_IN_PROGRESS",
+    "WAITING_ON_A_RESPONSE",
     "PENDING_C_REVIEW",
+    "EXEC_APPROVAL",
     "C_NEEDS_CHANGES",
     "C_APPROVED",
     "B_FINAL_REVIEW",
@@ -18,6 +22,11 @@ STATUSES = (
 
 REQUEST_TYPES = ("part_number", "instructions", "both")
 PRIORITIES = ("low", "medium", "high")
+PRICEBOOK_LABELS = {
+    "in_pricebook": "In price book",
+    "not_in_pricebook": "Not in price book",
+    "unknown": "Unknown / needs check",
+}
 
 VISIBILITY_SCOPES = (
     "public",
@@ -37,16 +46,38 @@ ACTION_TYPES = (
 )
 
 class User(db.Model, UserMixin):
+    """Application user account (local or SSO-backed)."""
     id = db.Column(db.Integer, primary_key=True)
     sso_sub = db.Column(db.String(255), unique=True, nullable=True, index=True)
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     name = db.Column(db.String(255), nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     department = db.Column(db.String(1), nullable=False, default="A")  # A/B/C
-    is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+
+class Noti***REMOVED***cation(db.Model):
+    """In-app noti***REMOVED***cation with optional deep link and dedupe key."""
+    id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    user = db.relationship("User", backref="noti***REMOVED***cations")
+
+    request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=True)
+    request = db.relationship("Request")
+
+    type = db.Column(db.String(40), nullable=False)  # e.g. status_change, edit_requested, new_comment
+    title = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.Text, nullable=True)
+
+    url = db.Column(db.String(500), nullable=True)   # where to click
+    dedupe_key = db.Column(db.String(200), nullable=True, index=True)
+    is_read = db.Column(db.Boolean, nullable=False, default=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 class Request(db.Model):
+    """Primary work item moving across departments; may be guest-accessible."""
     id = db.Column(db.Integer, primary_key=True)
 
     title = db.Column(db.String(200), nullable=False)
@@ -56,7 +87,7 @@ class Request(db.Model):
     priority = db.Column(db.String(20), nullable=False)
 
     # NEW: Optional Dept C review
-    requires_c_review = db.Column(db.Boolean, nullable=False, default=True)
+    requires_c_review = db.Column(db.Boolean, nullable=False, default=False)
 
     status = db.Column(db.String(40), nullable=False, default="NEW_FROM_A")
     owner_department = db.Column(db.String(1), nullable=False, default="B")
@@ -88,7 +119,13 @@ class Request(db.Model):
             self.guest_access_token = secrets.token_urlsafe(32)
             self.guest_token_expires_at = datetime.utcnow() + timedelta(days=days_valid)
 
+    @property
+    def pricebook_display(self) -> str:
+        """User-facing price book label with safe fallback for unexpected values."""
+        return PRICEBOOK_LABELS.get(self.pricebook_status, PRICEBOOK_LABELS["unknown"])
+
 class Artifact(db.Model):
+    """Artifacts attached to a request (part numbers or instructions)."""
     id = db.Column(db.Integer, primary_key=True)
     request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False)
 
@@ -114,6 +151,7 @@ class Artifact(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class Comment(db.Model):
+    """Request discussion entry with scoped visibility."""
     id = db.Column(db.Integer, primary_key=True)
     request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False)
 
@@ -128,6 +166,7 @@ class Comment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Submission(db.Model):
+    """Handoff packet between departments, optionally public to submitter."""
     id = db.Column(db.Integer, primary_key=True)
     request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False)
 
@@ -151,6 +190,7 @@ class Submission(db.Model):
     attachments = db.relationship("Attachment", backref="submission", lazy=True, cascade="all, delete-orphan")
 
 class Attachment(db.Model):
+    """Files attached to a submission (e.g., screenshots)."""
     id = db.Column(db.Integer, primary_key=True)
     submission_id = db.Column(db.Integer, db.ForeignKey("submission.id"), nullable=False)
 
@@ -166,6 +206,7 @@ class Attachment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class AuditLog(db.Model):
+    """Immutable audit trail for actions on a request."""
     id = db.Column(db.Integer, primary_key=True)
     request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False)
 

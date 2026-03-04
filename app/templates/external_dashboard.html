@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Guest Dashboard</h3>
+<p class="text-muted">Enter your request number and email to view your guest request.</p>
+<form method="post" class="card p-3 shadow-sm guest-dashboard-form" style="max-width: 480px;">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">
+    <label class="form-label">Request Number</label>
+    {{ form.request_id(class="form-control", placeholder="e.g. 123") }}
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Your Email</label>
+    {{ form.guest_email(class="form-control", placeholder="you@example.com") }}
+  </div>
+  <button class="btn btn-primary">Open Guest Dashboard</button>
+</form>
+{% endblock %}

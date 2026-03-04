@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Search</h3>
+<form class="mb-3" method="get" action="{{ url_for('requests.search_requests') }}">
+  <div class="input-group">
+    <input type="text" name="q" class="form-control" placeholder="Search by ID or description" value="{{ q }}">
+    <button class="btn btn-primary" type="submit">Search</button>
+  </div>
+</form>
+
+{% if q and results is not none %}
+  <div class="mb-2 text-muted">Showing {{ results|length }} result{{ '' if results|length == 1 else 's' }} for "{{ q }}"</div>
+  <div class="list-group">
+    {% for r in results %}
+      {% set cls = {
+        'NEW_FROM_A': 'status-new',
+        'B_IN_PROGRESS': 'status-progress',
+        'PENDING_C_REVIEW': 'status-c-review',
+        'EXEC_APPROVAL': 'status-exec',
+        'B_FINAL_REVIEW': 'status-***REMOVED***nal',
+        'SENT_TO_A': 'status-sent',
+        'CLOSED': 'status-closed'
+      }.get(r.status, 'status-default') %}
+      {% set icon = {
+        'NEW_FROM_A': '✨',
+        'B_IN_PROGRESS': '⏳',
+        'PENDING_C_REVIEW': '🔍',
+        'EXEC_APPROVAL': '🗝️',
+        'B_FINAL_REVIEW': '🧭',
+        'SENT_TO_A': '📨',
+        'CLOSED': '✅'
+      }.get(r.status, '•') %}
+      <div class="list-group-item list-group-item-action">
+        <div class="d-flex justify-content-between">
+          <strong>#{{ r.id }} · <a class="text-reset" href="{{ url_for('requests.request_detail', request_id=r.id) }}">{{ r.title }}</a></strong>
+          <span class="badge status-pill {{ cls }}">{{ icon }} {{ r.status }}</span>
+        </div>
+        <small class="text-muted">
+          {{ r.pricebook_display }} · {{ r.priority }}
+          · Due: {{ r.due_at.strftime('%b %d, %Y %I:%M %p') if r.due_at else '—' }}
+          · Updated: {{ r.updated_at.strftime('%b %d, %Y %I:%M %p') if r.updated_at else '—' }}
+        </small>
+      </div>
+    {% else %}
+      <div class="list-group-item text-muted">No results.</div>
+    {% endfor %}
+  </div>
+{% elif not q %}
+  <div class="text-muted">Enter a request ID or keywords to search.</div>
+{% else %}
+  <div class="text-muted">No results.</div>
+{% endif %}
+{% endblock %}

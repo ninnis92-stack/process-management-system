@@ -1,7 +1,10 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, abort
+import smtplib
+from email.message import EmailMessage
+from flask import Blueprint, render_template, redirect, url_for, flash, abort, current_app
+
 from ..extensions import db
-from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission
-from .forms import ExternalNewRequestForm, ExternalCommentForm
+from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Noti***REMOVED***cation
+from .forms import ExternalNewRequestForm, ExternalCommentForm, GuestLookupForm
 
 external_bp = Blueprint("external", __name__, url_pre***REMOVED***x="/external")
 
@@ -18,16 +21,62 @@ def _log(req, action_type, note=None, from_status=None, to_status=None, actor_ty
     )
     db.session.add(entry)
 
+def users_in_department(dept: str):
+    return User.query.***REMOVED***lter_by(department=dept, is_active=True).all()
+
+
+def notify_users(users, *, title: str, body: str, url: str, ntype: str, request_id: int = None):
+    for u in users:
+        db.session.add(Noti***REMOVED***cation(
+            user_id=u.id,
+            request_id=request_id,
+            type=ntype,
+            title=title,
+            body=body,
+            url=url,
+        ))
+
+
+def _send_guest_email(to_email: str, subject: str, body: str) -> None:
+    host = current_app.con***REMOVED***g.get("SMTP_HOST")
+    port = current_app.con***REMOVED***g.get("SMTP_PORT", 587)
+    username = current_app.con***REMOVED***g.get("SMTP_USERNAME")
+    password = current_app.con***REMOVED***g.get("SMTP_PASSWORD")
+    from_email = current_app.con***REMOVED***g.get("MAIL_FROM", username)
+    use_tls = current_app.con***REMOVED***g.get("SMTP_USE_TLS", True)
+
+    if not host or not from_email:
+        current_app.logger.warning("Email not sent: SMTP_HOST or MAIL_FROM not con***REMOVED***gured")
+        return
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = from_email
+    msg["To"] = to_email
+    msg.set_content(body)
+
+    try:
+        with smtplib.SMTP(host, port) as server:
+            if use_tls:
+                server.starttls()
+            if username and password:
+                server.login(username, password)
+            server.send_message(msg)
+    except Exception as exc:  # noqa: BLE001
+        current_app.logger.error("Failed to send guest email", exc_info=exc)
+
 @external_bp.route("/new", methods=["GET", "POST"])
 def external_new():
     form = ExternalNewRequestForm()
     if form.validate_on_submit():
+        desc = (form.description.data or "").strip()
+
         req = ReqModel(
             title=form.title.data.strip(),
             request_type=form.request_type.data,
-            description=form.description.data.strip(),
+            description=desc,
             priority=form.priority.data,
-            requires_c_review=form.requires_c_review.data,
+            requires_c_review=False,
             status="NEW_FROM_A",
             owner_department="B",
             submitter_type="guest",
@@ -39,6 +88,16 @@ def external_new():
         req.ensure_guest_token()
         db.session.add(req)
         db.session.flush()  # req.id available now
+
+        dept_users = users_in_department(req.owner_department)
+        notify_users(
+            dept_users,
+            title=f"New guest request submitted (Request #{req.id})",
+            body=req.title,
+            url=url_for("requests.request_detail", request_id=req.id),
+            ntype="new_request",
+            request_id=req.id,
+        )
 
         donor = (form.donor_part_number.data or "").strip() or None
         target = (form.target_part_number.data or "").strip() or None
@@ -82,7 +141,7 @@ def external_new():
             from_status="NEW_FROM_A",
             to_status="NEW_FROM_A",
             summary="Initial submission (Guest)",
-            details=req.description,
+            details=desc,
             is_public_to_submitter=True,
             created_by_guest_email=req.guest_email,
         )
@@ -90,10 +149,34 @@ def external_new():
         _log(req, "submission_created", note="Initial submission packet created (Guest A→B).", actor_label=req.guest_email)
 
         db.session.commit()
+        # Email the guest with their request number and tracking link (best-effort)
+        link = url_for("external.external_detail", token=req.guest_access_token, _external=True)
+        _send_guest_email(
+            req.guest_email,
+            subject=f"Your request #{req.id}",
+            body=f"Thanks for submitting your request. Your request number is #{req.id}.\n\nTrack it here: {link}\n",
+        )
         flash(f"Request #{req.id} submitted successfully. You can use this page to track updates.", "success")
         return redirect(url_for("external.external_detail", token=req.guest_access_token))
 
     return render_template("external_new.html", form=form)
+
+
+@external_bp.route("/dashboard", methods=["GET", "POST"])
+def external_dashboard():
+    form = GuestLookupForm()
+    if form.validate_on_submit():
+        rid = form.request_id.data
+        email = (form.guest_email.data or "").strip().lower()
+        req = ReqModel.query.***REMOVED***lter_by(id=rid, submitter_type="guest").***REMOVED***rst()
+        if not req:
+            flash("Request not found.", "warning")
+        elif (req.guest_email or "").lower() != email:
+            flash("Email does not match this request.", "warning")
+        else:
+            return redirect(url_for("external.external_detail", token=req.guest_access_token))
+
+    return render_template("external_dashboard.html", form=form)
 
 def _get_req_by_token(token: str) -> ReqModel:
     req = ReqModel.query.***REMOVED***lter_by(guest_access_token=token).***REMOVED***rst()
@@ -133,3 +216,39 @@ def external_detail(token: str):
         form=form,
         token=token,
     )
+
+
+@external_bp.route("/<token>/reopen", methods=["POST"])
+def external_reopen(token: str):
+    req = _get_req_by_token(token)
+
+    # Guests may reopen only when the request is in SENT_TO_A or CLOSED
+    if req.status not in ("SENT_TO_A", "CLOSED"):
+        flash("This request cannot be reopened from its current status.", "warning")
+        return redirect(url_for("external.external_detail", token=token))
+
+    old_status = req.status
+    req.status = "B_IN_PROGRESS"
+    req.owner_department = "B"
+
+    _log(
+        req,
+        "status_change",
+        note=f"Guest reopened request (was {old_status}).",
+        from_status=old_status,
+        to_status=req.status,
+        actor_label=req.guest_email,
+    )
+
+    notify_users(
+        users_in_department("B"),
+        title=f"Request #{req.id} reopened by guest",
+        body=req.title,
+        url=url_for("requests.request_detail", request_id=req.id),
+        ntype="status_change",
+        request_id=req.id,
+    )
+
+    db.session.commit()
+    flash("Request reopened and sent back to Dept B.", "success")
+    return redirect(url_for("external.external_detail", token=token))

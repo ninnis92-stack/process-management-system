@@ -1,0 +1,27 @@
+# fly.toml app con***REMOVED***guration ***REMOVED***le generated for process-management-prototype on 2026-03-03T03:38:41-05:00
+#
+# See https://fly.io/docs/reference/con***REMOVED***guration/ for information about how to use this ***REMOVED***le.
+#
+
+app = 'process-management-prototype'
+primary_region = 'ewr'
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024
+
+[mounts]
+  source = "data"
+  destination = "/data"

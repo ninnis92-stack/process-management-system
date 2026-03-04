@@ -11,12 +11,21 @@
     <div class="d-flex gap-2 mb-2 flex-wrap">
       <span class="badge text-bg-secondary">{{ req.status }}</span>
       <span class="badge text-bg-light text-dark">{{ req.priority }}</span>
-      <span class="badge text-bg-warning">C Review: {{ "Required" if req.requires_c_review else "Not required" }}</span>
+      {% if req.requires_c_review %}
+        <span class="badge text-bg-warning">C Review: Required</span>
+      {% else %}
+        <span class="badge text-bg-secondary">C Review: Not required</span>
+      {% endif %}
     </div>
-    <div><strong>Price Book:</strong> {{ req.pricebook_status }}</div>
+    {% if req.assigned_to_user %}
+      <div class="text-muted mb-2">Assigned to: {{ req.assigned_to_user.name or req.assigned_to_user.email }}</div>
+    {% else %}
+      <div class="text-muted mb-2">Assigned to: Unassigned</div>
+    {% endif %}
+    <div><strong>Price Book:</strong> {{ req.pricebook_display }}</div>
     <div><strong>Due:</strong> {{ req.due_at.strftime("%b %d, %Y %I:%M %p") if req.due_at else "—" }}</div>
     <hr/>
-    <div style="white-space:pre-wrap">{{ req.description }}</div>
+    <div style="white-space:pre-wrap">{{ req.description or "No description provided." }}</div>
   </div>
 </div>
 
@@ -37,6 +46,19 @@
     {% endfor %}
   </div>
 </div>
+
+    {% if req.status in ["SENT_TO_A", "CLOSED"] %}
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5>Need changes?</h5>
+        <form method="post" action="{{ url_for('external.external_reopen', token=token) }}">
+          {{ form.csrf_token }}
+          <p class="text-muted mb-2">If something is wrong with the ***REMOVED***nished product, you can send it back to Dept B.</p>
+          <button class="btn btn-outline-warning w-100" type="submit">Reopen ticket (send to Dept B)</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
 
 <div class="card shadow-sm mb-3">
   <div class="card-body">
