@@ -209,6 +209,26 @@ a:hover { color: var(--accent-2); }
 .status-closed { background: #f2f4f6; color: #495057; }
 .status-default { background: #f1f3f5; color: #495057; }
 
+/* Improve readability for dashboard filter badges that use Bootstrap bg-* classes
+   when rendered as `.status-pill`. Force lighter backgrounds and black text so
+   counts are readable (e.g., 'Under C review', 'Exec approval required'). */
+.status-pill.bg-dark {
+  background: #f2f2f4 !important;
+  color: #000 !important;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.status-pill.bg-info {
+  background: #eaf6fb !important;
+  color: #000 !important;
+  border: 1px solid rgba(0,0,0,0.04);
+}
+.status-pill.bg-warning.text-dark {
+  /* keep warning variants readable but slightly lighter */
+  background: #fff8e6 !important;
+  color: #000 !important;
+  border: 1px solid rgba(0,0,0,0.04);
+}
+
 /* Dashboard bucket tweaks */
 .status-pill { border-radius: 999px; padding: 6px 10px; font-weight: 600; font-size: 0.85rem; }
 .bucket-list .list-group-item { padding: 12px 16px; border-left: none; border-right: none; border-radius: 0; }
