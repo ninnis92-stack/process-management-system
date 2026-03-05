@@ -129,8 +129,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
           function copyLink(btn) {
             try {
-              const inp = document.getElementById('trackingLinkInput');
-              navigator.clipboard.writeText(inp.value);
+              const anchor = document.getElementById('trackingLinkAnchor');
+              const url = anchor ? anchor.href : '';
+              navigator.clipboard.writeText(url);
               var orig = btn.innerText;
               btn.innerText = 'Copied';
               setTimeout(() => btn.innerText = orig, 1500);

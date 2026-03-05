@@ -135,6 +135,20 @@
       {% endif %}
     {% endwith %}
 
+    {# If a tracking link was provided in the template context (post-submission), show it in a green banner here too #}
+    {% if tracking_link and created_req %}
+      <div class="mb-3">
+        <div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
+          <div class="text-truncate pe-3" style="max-width:85%;">
+            <a id="topTrackingLink" href="{{ tracking_link }}" target="_blank" rel="noopener">{{ tracking_link }}</a>
+          </div>
+          <div class="btn-group ms-2" role="group">
+            <button class="btn btn-sm btn-outline-light" type="button" onclick="copyTextFromString('{{ tracking_link }}', this)">Copy</button>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
     {% block content %}{% endblock %}
   </main>
 
@@ -145,6 +159,16 @@
     setTimeout(() => {
       document.querySelectorAll('.alert').forEach(a => a.remove());
     }, 4000);
+    function copyTextFromString(text, btn) {
+      try {
+        navigator.clipboard.writeText(String(text));
+        var orig = btn.innerText;
+        btn.innerText = 'Copied';
+        setTimeout(() => btn.innerText = orig, 1500);
+      } catch (e) {
+        console.warn('Copy failed', e);
+      }
+    }
   </script>
 </body>
 </html>
