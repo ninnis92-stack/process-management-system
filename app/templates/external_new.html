@@ -93,18 +93,46 @@ document.addEventListener("DOMContentLoaded", function () {
               </div>
               <div class="modal-body">
                 <p>Thanks — your request has been logged.</p>
-                <p><strong>Request number:</strong> #{{ created_req.id }}</p>
-                <p><strong>Submitted email:</strong> {{ guest_email }}</p>
-                <p>Use this email and request number on the Guest Dashboard to check status. We'll also email you a tracking link when email is configured.</p>
+                <p><strong>Request number:</strong> <span id="reqNumber">#{{ created_req.id }}</span> <button class="btn btn-sm btn-outline-secondary ms-2" type="button" onclick="copyText('{{ created_req.id }}', this)">Copy</button></p>
+                <p><strong>Submitted email:</strong> <span id="reqEmail">{{ guest_email }}</span> <button class="btn btn-sm btn-outline-secondary ms-2" type="button" onclick="copyText('{{ guest_email }}', this)">Copy</button></p>
+                <p><strong>Tracking link:</strong></p>
+                <div class="input-group mb-2">
+                  <input id="trackingLinkInput" class="form-control" readonly value="{{ tracking_link or url_for('external.external_detail', token=created_req.guest_access_token, _external=True) }}" />
+                  <button class="btn btn-outline-secondary" type="button" onclick="copyLink(this)">Copy link</button>
+                </div>
+                <p class="small text-muted">Save the request number, the email you used, or this tracking link — you'll need them to view the request on the Guest Dashboard.</p>
               </div>
               <div class="modal-footer">
-                <a href="{{ url_for('external.external_detail', token=created_req.guest_access_token) }}" class="btn btn-secondary">Open Guest View</a>
+                <a id="openGuestBtn" href="{{ tracking_link or url_for('external.external_detail', token=created_req.guest_access_token, _external=True) }}" class="btn btn-secondary">Open Guest View</a>
                 <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
               </div>
             </div>
           </div>
         </div>
         <script>
+          function copyText(text, btn) {
+            try {
+              navigator.clipboard.writeText(String(text));
+              var orig = btn.innerText;
+              btn.innerText = 'Copied';
+              setTimeout(() => btn.innerText = orig, 1500);
+            } catch (e) {
+              console.warn('Copy failed', e);
+            }
+          }
+
+          function copyLink(btn) {
+            try {
+              const inp = document.getElementById('trackingLinkInput');
+              navigator.clipboard.writeText(inp.value);
+              var orig = btn.innerText;
+              btn.innerText = 'Copied';
+              setTimeout(() => btn.innerText = orig, 1500);
+            } catch (e) {
+              console.warn('Copy link failed', e);
+            }
+          }
+
           (function(){
             try {
               var m = new bootstrap.Modal(document.getElementById('guestCreatedModal'));
