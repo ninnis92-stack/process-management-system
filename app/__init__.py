@@ -169,7 +169,11 @@ def create_app():
         return response
 
     # DEV ONLY: auto-create tables
-    if os.getenv("AUTO_CREATE_DB", "True") == "True":
+    # NOTE: For production we prefer running Alembic migrations during the
+    # release step. Default AUTO_CREATE_DB is now False to avoid implicit
+    # create_all() in deployed instances. Set `AUTO_CREATE_DB=true` locally
+    # if you want the convenience behavior during development.
+    if os.getenv("AUTO_CREATE_DB", "False") == "True":
         with app.app_context():
             db.create_all()
 
@@ -231,5 +235,25 @@ def create_app():
         except Exception as e:
             app.logger.warning("Health check failed: %s", e)
             return (jsonify({"status": "unhealthy"}), 503)
+
+    # Optionally wait for DB readiness during app startup. When the
+    # `WAIT_FOR_DB` env var is set to a truthy value, the application will
+    # attempt a simple `SELECT 1` repeatedly before returning the app
+    # instance. This is helpful for deployments where the DB may not be
+    # immediately reachable at process start (e.g. cloud services).
+    if os.getenv("WAIT_FOR_DB", "False") == "True":
+        import time
+        from sqlalchemy import text
+        with app.app_context():
+            for _ in range(30):
+                try:
+                    db.session.execute(text("SELECT 1"))
+                    app.logger.info("Database reachable, continuing startup")
+                    break
+                except Exception:
+                    app.logger.info("Waiting for database to become available...")
+                    time.sleep(2)
+            else:
+                app.logger.warning("Timed out waiting for database (proceeding anyway)")
 
     return app

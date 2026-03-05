@@ -16,23 +16,27 @@ Quick steps to deploy and ensure the demo users and DB are created on Fly:
 
   flyctl deploy -a process-management-prototype-lingering-bush-6175
 
-  Note: The container entrypoint already waits for DB readiness and will
-  attempt to create tables if `AUTO_CREATE_DB` is `True` (default).
+  Note: The deployment `release_command` now runs Alembic migrations
+  (`alembic upgrade head`) during releases. The app no longer relies on
+  `db.create_all()` by default; `AUTO_CREATE_DB` is disabled in production
+  images. If you want the old behavior for local testing set
+  `AUTO_CREATE_DB=true` in your environment.
 
 3. After deployment, open an SSH session to the running instance and run the
   seed script to create demo users (run as the app user in the container):
 
   flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command "python3 seed.py"
 
-  Alternatively, you can run the remote create-tables helper first:
+  For ad-hoc maintenance you can still run the seeded release helper which
+  invokes Alembic and then runs `seed.py` (when `SSO_ENABLED` is not set):
 
-  flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command "python3 scripts/remote_create_tables.py"
+  flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command "python3 scripts/release_tasks.py"
 
 4. Confirm the app is healthy:
 
   curl -fsS https://process-management-prototype-lingering-bush-6175.fly.dev/health
 
-If you need CI/CD automation, add these steps to your pipeline: push → `flyctl deploy` → run remote `seed.py` via `flyctl ssh`.
+If you need CI/CD automation, add these steps to your pipeline: push → `flyctl deploy` (migrations run via release_command) → optional `flyctl ssh` maintenance commands.
 # FreshProcess Process Management Prototype
 
 Brief architecture map for reviewers.

@@ -7,6 +7,7 @@ primary_region = 'ord'
 [env]
   FLASK_DEBUG = "0"
   AUTO_CREATE_DB = "0"
+  WAIT_FOR_DB = "true"
 
 [[services]]
   internal_port = 8080

@@ -14,21 +14,21 @@ def get_csrf_and_cookies(session, url):
     r = session.get(url)
     r.raise_for_status()
     # Extract CSRF token from meta tag or hidden field
-    m = re.search(r"name=\"csrf_token\" value=\"([0-9a-fA-F-]+)\"", r.text)
+    m = re.search(r'name="csrf_token" value="([0-9a-fA-F-]+)"', r.text)
     if m:
         return m.group(1)
-    m = re.search(r"<meta name=\"csrf-token\" content=\"([^"]+)\"", r.text)
+    m = re.search(r'<meta name="csrf-token" content="([^"]+)"', r.text)
     if m:
         return m.group(1)
     # Fallback: look for csrf in form hidden inputs
-    m = re.search(r"<input[^>]+name=\"csrf_token\"[^>]+value=\"([^"]+)\"", r.text)
+    m = re.search(r'<input[^>]+name="csrf_token"[^>]+value="([^"]+)"', r.text)
     if m:
         return m.group(1)
     raise RuntimeError("CSRF token not found")
 
 
 def submit_guest(session, csrf, payload):
-    headers = {"Referer": BASE}
+    headers = {"Referer": f"{BASE}/external/new"}
     data = payload.copy()
     data["csrf_token"] = csrf
     r = session.post(urljoin(BASE, "/external/new"), data=data, headers=headers, allow_redirects=False)
@@ -37,16 +37,15 @@ def submit_guest(session, csrf, payload):
 
 def main():
     s = requests.Session()
-    csrf = get_csrf_and_cookies(s, BASE + "/external/new")
-
     for i in range(1, 7):
+        csrf = get_csrf_and_cookies(s, BASE + "/external/new")
         payload = {
             'guest_email': f'demo{i}@example.com',
             'guest_name': f'Demo {i}',
             'title': f'Smoke request {i}',
             'due_at': '2099-01-01T12:00',
             'request_type': 'part_number',
-            'priority': 'normal',
+            'priority': 'medium',
             'pricebook_status': 'unknown',
             'donor_part_number': f'D{i:03}',
             'target_part_number': f'T{i:03}',
@@ -64,6 +63,8 @@ def main():
                 print('Warning: confirmation not detected for', i)
         else:
             print('Unexpected status:', r.status_code)
+            # Dump a short excerpt for debugging
+            print(r.text[:800])
 
 
 if __name__ == '__main__':
