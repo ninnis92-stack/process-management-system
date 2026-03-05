@@ -147,7 +147,9 @@ def external_new():
             body=f"Thanks for submitting your request. Your request number is #{req.id}.\n\nTrack it here: {link}\n",
         )
         flash(f"Request #{req.id} submitted successfully. You can use this page to track updates.", "success")
-        return redirect(url_for("external.external_detail", token=req.guest_access_token))
+        # Render the same submission page but include the created request so we
+        # can show a confirmation modal with the request id and guest email.
+        return render_template("external_new.html", form=form, created_req=req, guest_email=req.guest_email)
 
     return render_template("external_new.html", form=form)
 
