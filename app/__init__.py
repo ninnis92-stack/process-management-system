@@ -96,7 +96,15 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id: str):
-        return db.session.get(User, int(user_id))
+        try:
+            return db.session.get(User, int(user_id))
+        except Exception:
+            # If the DB/tables aren't ready (e.g., fresh deploy with SQLite),
+            # avoid raising an exception during request handling and treat
+            # the visitor as anonymous so the app can return a login page
+            # instead of a 500. Specific DB errors (OperationalError) will
+            # be surfaced in the logs by SQLAlchemy where appropriate.
+            return None
 
     # Apply impersonation override on each request: if an admin has started an
     # acting-as session, temporarily present them as a member of the target dept.
