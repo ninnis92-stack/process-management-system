@@ -32,3 +32,9 @@ primary_region = 'ord'
   cpu_kind = 'shared'
   cpus = 1
   memory_mb = 1024
+
+[deploy]
+  # Run a one-time migration / table-creation step during deploy so new
+  # instances won't start with missing tables. For production, replace
+  # this with your Alembic command (e.g. `alembic upgrade head`).
+  release_command = "python scripts/remote_create_tables.py"
