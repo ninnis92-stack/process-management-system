@@ -150,6 +150,53 @@
     });
   }
 
+  // Protect the iframe by disabling state-changing actions inside it (fetch/XHR/form submissions).
+  function attachIframeProtector(iframeEl){
+    try{
+      const doc = iframeEl.contentDocument || iframeEl.contentWindow.document;
+      if(!doc) return;
+      // Inject a small script into the iframe to override fetch/XHR and prevent non-GET form submits.
+      const protector = doc.createElement('script');
+      protector.type = 'text/javascript';
+      protector.textContent = `
+        (function(){
+          try{
+            // Override fetch: block non-GET/HEAD methods
+            const _fetch = window.fetch;
+            window.fetch = function(input, init){ init = init || {}; const method = (init.method || 'GET').toUpperCase(); if(method !== 'GET' && method !== 'HEAD'){ console.warn('Blocked fetch with method', method); return Promise.resolve(new Response(null,{status:405,statusText:'Method Not Allowed'})); } return _fetch.call(this, input, init); };
+
+            // Override XMLHttpRequest to prevent non-GET sends
+            const OrigXHR = window.XMLHttpRequest;
+            function XHR(){
+              const rx = new OrigXHR();
+              const origOpen = rx.open;
+              let _method = 'GET';
+              rx.open = function(m, url, async){ _method = (m || 'GET').toUpperCase(); return origOpen.apply(this, arguments); };
+              const origSend = rx.send;
+              rx.send = function(body){ if(_method !== 'GET' && _method !== 'HEAD'){ try{ this.abort(); }catch(e){} console.warn('Blocked XHR with method', _method); return; } return origSend.apply(this, arguments); };
+              return rx;
+            }
+            window.XMLHttpRequest = XHR;
+
+            // Prevent form submissions that would change state
+            document.addEventListener('submit', function(ev){ try{ const f = ev.target; const m = (f.method || 'GET').toUpperCase(); if(m !== 'GET' && m !== 'HEAD'){ ev.preventDefault(); ev.stopImmediatePropagation(); alert('Form submissions are disabled in the debug mini-window to prevent data changes. Use the Debug Workspace in an isolated session for live edits.'); } }catch(e){} }, true);
+
+            // Prevent link clicks that use data-method or are intended as actions (common patterns)
+            document.addEventListener('click', function(ev){ try{ const a = ev.target.closest && ev.target.closest('a'); if(a){ const method = a.getAttribute('data-method') || a.getAttribute('data-action'); if(method){ ev.preventDefault(); alert('Action links are disabled in the debug mini-window to prevent data changes.'); } } }catch(e){} }, true);
+          }catch(e){}
+        })();
+      `;
+      doc.documentElement.appendChild(protector);
+    }catch(e){
+      // Could not inject (maybe cross-origin); in that case fall back to sandbox restrictions
+      console.warn('Could not attach iframe protector:', e);
+      try{ iframeEl.sandbox = iframeEl.sandbox.replace('allow-forms','').replace('allow-scripts',''); }catch(err){}
+    }
+  }
+
+  // Attach protector on initial load and whenever the iframe navigates
+  iframe.addEventListener('load', ()=>{ try{ attachIframeProtector(iframe); }catch(e){} });
+
   // If admin monitor dept quick links are clicked, update the mini window
   document.querySelectorAll('a[href^="?dept="]').forEach(a=>{
     a.addEventListener('click', (ev)=>{
