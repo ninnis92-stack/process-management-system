@@ -96,9 +96,15 @@ document.addEventListener("DOMContentLoaded", function () {
                 <p><strong>Request number:</strong> <span id="reqNumber">#{{ created_req.id }}</span> <button class="btn btn-sm btn-outline-secondary ms-2" type="button" onclick="copyText('{{ created_req.id }}', this)">Copy</button></p>
                 <p><strong>Submitted email:</strong> <span id="reqEmail">{{ guest_email }}</span> <button class="btn btn-sm btn-outline-secondary ms-2" type="button" onclick="copyText('{{ guest_email }}', this)">Copy</button></p>
                 <p><strong>Tracking link:</strong></p>
-                <div class="input-group mb-2">
-                  <input id="trackingLinkInput" class="form-control" readonly value="{{ tracking_link or url_for('external.external_detail', token=created_req.guest_access_token, _external=True) }}" />
-                  <button class="btn btn-outline-secondary" type="button" onclick="copyLink(this)">Copy link</button>
+                <div class="mb-2">
+                  <div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
+                    <div class="text-truncate pe-3" style="max-width:75%;">
+                      <a id="trackingLinkAnchor" href="{{ tracking_link or url_for('external.external_detail', token=created_req.guest_access_token, _external=True) }}" target="_blank" rel="noopener">{{ tracking_link or url_for('external.external_detail', token=created_req.guest_access_token, _external=True) }}</a>
+                    </div>
+                    <div class="btn-group ms-2" role="group">
+                      <button class="btn btn-sm btn-outline-light" type="button" onclick="copyLink(this)">Copy</button>
+                    </div>
+                  </div>
                 </div>
                 <p class="small text-muted">Save the request number, the email you used, or this tracking link — you'll need them to view the request on the Guest Dashboard.</p>
               </div>
