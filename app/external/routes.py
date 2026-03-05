@@ -1,6 +1,6 @@
 import smtplib
 from email.message import EmailMessage
-from flask import Blueprint, render_template, redirect, url_for, flash, abort, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, abort, current_app, request
 from sqlalchemy import func
 
 from ..extensions import db
