@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, abort, c
 from sqlalchemy import func
 
 from ..extensions import db
+from sqlalchemy.exc import OperationalError
 from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Notification
 from ..notifcations import notify_users, users_in_department
 from .forms import ExternalNewRequestForm, ExternalCommentForm, GuestLookupForm
@@ -76,7 +77,19 @@ def external_new():
         )
         req.ensure_guest_token()
         db.session.add(req)
-        db.session.flush()  # req.id available now
+        try:
+            db.session.flush()  # req.id available now
+        except OperationalError as err:
+            # In some deploys (SQLite on multiple instances) tables may be
+            # missing on a newly started machine. Attempt to create tables
+            # and retry once so guest submissions succeed on fresh instances.
+            current_app.logger.warning("Flush failed; attempting create_all and retry: %s", err)
+            try:
+                db.create_all()
+                db.session.flush()
+            except Exception:
+                current_app.logger.exception("Failed to create tables or flush on retry")
+                raise
 
         dept_users = users_in_department(req.owner_department)
         notify_users(
