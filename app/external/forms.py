@@ -73,8 +73,12 @@ class ExternalNewRequestForm(FlaskForm):
         target = (self.target_part_number.data or "").strip()
         reason = (self.no_donor_reason.data or "").strip()
 
-        # Method (stored as "instructions") requires donor + target (and "Both" includes instructions)
-        if req_type in ("instructions", "both"):
+        # Method (stored as "instructions") requires donor + target.
+        # When selecting "both" the Method portion requires a donor but the
+        # target part number is optional (the requester may be asking for a
+        # target to be created along with the method). Also, the "needs_create"
+        # reason only applies to pure Part Number requests.
+        if req_type == "instructions":
             if not donor:
                 self.donor_part_number.errors.append("Donor part number is required for Method.")
                 return False
@@ -83,6 +87,15 @@ class ExternalNewRequestForm(FlaskForm):
                 return False
             if reason == "needs_create":
                 self.no_donor_reason.errors.append("This reason only applies to Part Number requests.")
+                return False
+
+        if req_type == "both":
+            # Both: donor required, target optional; reason not allowed
+            if not donor:
+                self.donor_part_number.errors.append("Donor part number is required for Both.")
+                return False
+            if reason:
+                self.no_donor_reason.errors.append("This reason is only valid for Part Number requests. Provide a donor part number instead.")
                 return False
 
         # Part Number request: donor required unless reason == needs_create
