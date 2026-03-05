@@ -1,3 +1,31 @@
+PY=python3
+PIP=$(PY) -m pip
+REQ=requirements.txt
+FLY_APP ?= process-management-prototype-lingering-bush-6175
+
+.PHONY: install run seed migrate deploy test
+
+install:
+	$(PIP) install --upgrade pip
+	$(PIP) install -r $(REQ)
+
+run:
+	$(PY) run.py
+
+seed:
+	$(PY) seed.py
+
+migrate:
+	@echo "Running alembic upgrade head (requires alembic configured)"
+	alembic upgrade head
+
+deploy:
+	@git push origin HEAD
+	@echo "Deploying to Fly app: $(FLY_APP)"
+	@flyctl deploy -a $(FLY_APP)
+
+test:
+	pytest -q
 PYTHON?=python3
 PIP?=pip
 VENV?=.venv

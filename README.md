@@ -82,6 +82,33 @@ TOTP 2FA (local accounts):
 - Run the app with `python3 run.py`; default server binds to 0.0.0.0:8080 (see `run.py`).
 - Uploads land in `uploads/`; adjust `UPLOAD_FOLDER` env var if needed.
 
+Makefile conveniences
+- Use the provided `Makefile` for common tasks inside development or Codespaces:
+
+```bash
+# install dependencies
+make install
+
+# run the Flask dev server
+make run
+
+# seed the DB
+make seed
+
+# run tests
+make test
+
+# run alembic migrations (requires alembic setup)
+make migrate
+
+# deploy to Fly (requires flyctl auth and access)
+make deploy FLY_APP=process-management-prototype-lingering-bush-6175
+```
+
+CI
+- A GitHub Actions workflow is included at `.github/workflows/ci.yml` which runs tests on push and pull requests to `main`.
+
+
 ## Metrics (Prometheus)
 
 - The app exposes Prometheus-format metrics at `/metrics` (text exposition). A small DB-backed
