@@ -422,7 +422,6 @@ def search_requests():
     q = (request.args.get("q") or "").strip()
     dept = current_user.department
     base = ReqModel.query
-
     if dept == "A":
         base = base.filter(ReqModel.created_by_user_id == current_user.id)
     elif dept == "B":
@@ -465,7 +464,10 @@ def search_requests():
         else:
             qry = qry.filter(or_(*filters))
 
-    return render_template('search.html', results=qry.order_by(ReqModel.updated_at.desc()).all(), q=q)
+        results = qry.order_by(ReqModel.updated_at.desc()).all()
+
+    # If query is blank, return an empty result set instead of causing an error
+    return render_template('search.html', results=results, q=q)
 
 
 @requests_bp.route('/metrics/ui')
