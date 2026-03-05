@@ -139,6 +139,18 @@ git restore --source=origin/dev-scripts --worktree --staged -- dev-scripts
 
 Use these scripts only for local development and testing; they are intentionally not present on `main` to avoid accidental population of production databases.
 
+Debugging: interactive mini-window and debug workspace
+- The Admin Monitor now includes an interactive "mini-window" that loads any internal path (for example `/dashboard`, `/requests/123`) inside an iframe for quick debugging. Controls: `Load`, `Refresh`, `Open in new tab`, `Open Debug Workspace`.
+- The "Open Debug Workspace" opens a dedicated debug page at `/admin/debug_workspace?path=...` that embeds the requested internal path and shows guidance. Note: the debug workspace uses the same browser session and database as your current admin session — to get true session isolation, open the debug workspace in a Private/Incognito window or use a separate browser profile.
+
+Quick use:
+```bash
+# In Admin Monitor choose a department (e.g. /admin/monitor?dept=B), then:
+# - Enter an internal path in the mini-window input (e.g. /requests/1)
+# - Click Load to render it inside the mini-window iframe
+# - Click Open Debug Workspace to open the same path in a dedicated debug page (recommended to open in Private/Incognito for isolation)
+```
+
 ## Migrations, Background Workers, and Docker Compose
 
 This section summarizes the recommended steps for managing schema migrations,

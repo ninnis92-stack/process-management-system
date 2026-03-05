@@ -9,6 +9,7 @@ from ..models import Request as ReqModel, Artifact, Submission
 from datetime import datetime, timedelta
 from flask import request as flask_request
 from ..models import Notification, AuditLog
+from urllib.parse import unquote
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -318,6 +319,25 @@ def monitor():
 
     flash("Unknown department", "warning")
     return redirect(url_for("admin.monitor", dept="B"))
+
+
+@admin_bp.route('/debug_workspace')
+@login_required
+def debug_workspace():
+    # Small helper page that loads an internal path inside an iframe for debugging.
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    path = flask_request.args.get('path') or flask_request.args.get('url') or '/dashboard'
+    # Basic safety: allow only internal paths starting with '/'
+    try:
+        path = unquote(path)
+    except Exception:
+        pass
+    if not path.startswith('/'):
+        path = '/dashboard'
+    return render_template('admin_debug_workspace.html', path=path)
 
 
 @admin_bp.route("/audit")

@@ -140,6 +140,16 @@
     openBtn.addEventListener('click', (e)=>{ e.preventDefault(); const href = normalizePath(urlInput.value); window.open(href, '_blank'); });
   }
 
+  const openDebug = document.getElementById('miniOpenDebug');
+  if(openDebug){
+    openDebug.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const path = encodeURIComponent(normalizePath(urlInput.value));
+      // Open the admin debug workspace which embeds the path and provides guidance for isolation
+      window.open(`/admin/debug_workspace?path=${path}`, '_blank', 'noopener');
+    });
+  }
+
   // If admin monitor dept quick links are clicked, update the mini window
   document.querySelectorAll('a[href^="?dept="]').forEach(a=>{
     a.addEventListener('click', (ev)=>{
