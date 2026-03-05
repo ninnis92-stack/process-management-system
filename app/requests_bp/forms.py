@@ -1,8 +1,8 @@
-from dataclasses import ***REMOVED***eld
+from dataclasses import field
 
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, MultipleFileField, BooleanField
-from wtforms.***REMOVED***elds import DateTimeLocalField
+from wtforms.fields import DateTimeLocalField
 from wtforms.validators import DataRequired, Length, Optional, URL, ValidationError
 from datetime import datetime, timedelta
 
@@ -47,9 +47,9 @@ class NewRequestForm(FlaskForm):
         ("medium", "Medium"),
         ("high", "High"),
     ], validators=[DataRequired()])
-    def validate_due_at(self, ***REMOVED***eld):
+    def validate_due_at(self, field):
         min_due = datetime.utcnow() + timedelta(hours=48)
-        if ***REMOVED***eld.data < min_due:
+        if field.data < min_due:
             raise ValidationError("Due date must be at least 48 hours from now.")
     def validate(self, extra_validators=None):
         ok = super().validate(extra_validators=extra_validators)
@@ -195,7 +195,7 @@ class TransitionForm(FlaskForm):
     to_status = SelectField("Next Status", choices=[], validators=[DataRequired()])
     submission_summary = StringField("Submission Summary", validators=[Length(max=200)])
     submission_details = TextAreaField("Submission Details")
-    ***REMOVED***les = MultipleFileField("Attachments (images only)")
+    files = MultipleFileField("Attachments (images only)")
     requires_c_review = BooleanField("Requires C Review", validators=[Optional()])
 
 class ToggleCReviewForm(FlaskForm):

@@ -8,10 +8,10 @@ from datetime import datetime, timedelta
 from app.models import User, Request as ReqModel, Artifact
 
 
-@pytest.***REMOVED***xture()
+@pytest.fixture()
 def app():
     app = create_app()
-    app.con***REMOVED***g.update(
+    app.config.update(
         TESTING=True,
         WTF_CSRF_ENABLED=False,
     )
@@ -20,15 +20,15 @@ def app():
     yield app
 
 
-@pytest.***REMOVED***xture()
+@pytest.fixture()
 def client(app):
     return app.test_client()
 
 
-@pytest.***REMOVED***xture()
+@pytest.fixture()
 def b_user(app):
     with app.app_context():
-        user = User.query.***REMOVED***lter_by(email="b@example.com").***REMOVED***rst()
+        user = User.query.filter_by(email="b@example.com").first()
         if not user:
             user = User(
                 name="Dept B User",
@@ -84,7 +84,7 @@ def _seed_requests(app):
         db.session.commit()
 
 
-def test_dashboard_***REMOVED***lters_render(client, b_user, app):
+def test_dashboard_filters_render(client, b_user, app):
     _seed_requests(app)
 
     resp = client.post(
@@ -104,7 +104,7 @@ def test_dashboard_***REMOVED***lters_render(client, b_user, app):
         ("method_created", "Method created"),
         ("part_number_created", "Part number created"),
         ("under_review_by_department_c", "Under review by Department C"),
-        ("under_***REMOVED***nal_review", "Under ***REMOVED***nal review"),
+        ("under_final_review", "Under final review"),
         ("request_denied", "Request denied"),
     ]
     for val, label in required:
@@ -117,5 +117,5 @@ def test_dashboard_***REMOVED***lters_render(client, b_user, app):
     assert "Method Created Req" in client.get("/dashboard?status=method_created").get_data(as_text=True)
     assert "Part Number Created Req" in client.get("/dashboard?status=part_number_created").get_data(as_text=True)
     assert "Pending C Review Req" in client.get("/dashboard?status=under_review_by_department_c").get_data(as_text=True)
-    assert "Final Review Req" in client.get("/dashboard?status=under_***REMOVED***nal_review").get_data(as_text=True)
+    assert "Final Review Req" in client.get("/dashboard?status=under_final_review").get_data(as_text=True)
     assert "Closed Req" in client.get("/dashboard?status=request_denied").get_data(as_text=True)

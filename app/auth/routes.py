@@ -12,23 +12,23 @@ from ..extensions import db
 from .sso import oauth
 from .sso import token_has_mfa
 
-auth_bp = Blueprint("auth", __name__, url_pre***REMOVED***x="/auth")
+auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 
 # ---------- SSO ----------
-# Keep SSO endpoints ready; falls back to local auth until the IdP con***REMOVED***g is fully wired.
+# Keep SSO endpoints ready; falls back to local auth until the IdP config is fully wired.
 @auth_bp.route("/sso/login")
 def sso_login():
-    if not current_app.con***REMOVED***g.get("SSO_ENABLED"):
+    if not current_app.config.get("SSO_ENABLED"):
         return redirect(url_for("auth.login"))  # fallback to local login
 
     if not hasattr(oauth, "oidc"):
-        flash("SSO is not fully con***REMOVED***gured. Using local login.", "warning")
+        flash("SSO is not fully configured. Using local login.", "warning")
         return redirect(url_for("auth.login"))
 
-    redirect_uri = current_app.con***REMOVED***g.get("OIDC_REDIRECT_URI")
+    redirect_uri = current_app.config.get("OIDC_REDIRECT_URI")
     if not redirect_uri:
-        flash("SSO redirect not con***REMOVED***gured.", "warning")
+        flash("SSO redirect not configured.", "warning")
         return redirect(url_for("auth.login"))
 
     return oauth.oidc.authorize_redirect(redirect_uri)
@@ -55,7 +55,7 @@ def sso_callback():
     if not email:
         return "SSO login failed: no email claim.", 400
 
-    user = User.query.***REMOVED***lter((User.sso_sub == sub) | (User.email == email)).***REMOVED***rst()
+    user = User.query.filter((User.sso_sub == sub) | (User.email == email)).first()
 
     if not user:
         user = User(
@@ -92,12 +92,12 @@ def sso_callback():
 def login():
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.***REMOVED***lter_by(email=form.email.data.strip().lower()).***REMOVED***rst()
+        user = User.query.filter_by(email=form.email.data.strip().lower()).first()
         if not user or not user.is_active or not check_password_hash(user.password_hash, form.password.data):
             flash("Invalid credentials.", "danger")
             return render_template("login.html", form=form)
 
-        # If user has TOTP enabled, require TOTP veri***REMOVED***cation before completing login
+        # If user has TOTP enabled, require TOTP verification before completing login
         if getattr(user, 'totp_enabled', False):
             if pyotp is None:
                 flash('Two-factor authentication is not available; contact an administrator.', 'danger')
@@ -127,18 +127,18 @@ def totp_setup():
         flash('Two-factor authentication support is not installed on this instance.', 'warning')
         return redirect(url_for('requests.dashboard'))
 
-    # Generate a secret and show provisioning URI; require con***REMOVED***rmation with a code
+    # Generate a secret and show provisioning URI; require confirmation with a code
     if flask_request.method == 'GET':
         secret = pyotp.random_base32()
         session['new_totp_secret'] = secret
-        provisioning_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=current_user.email, issuer_name=current_app.con***REMOVED***g.get('APP_NAME','ProcessMgmt'))
+        provisioning_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=current_user.email, issuer_name=current_app.config.get('APP_NAME','ProcessMgmt'))
         return render_template('totp_setup.html', secret=secret, provisioning_uri=provisioning_uri)
 
     # POST: verify provided code and enable TOTP
     code = flask_request.form.get('code')
     secret = session.get('new_totp_secret')
     if not secret or not code:
-        flash('Missing veri***REMOVED***cation code.', 'danger')
+        flash('Missing verification code.', 'danger')
         return redirect(url_for('auth.totp_setup'))
 
     if pyotp.TOTP(secret).verify(code):
@@ -182,7 +182,7 @@ def totp_verify():
         return render_template('totp_verify.html')
 
     if not u.totp_secret:
-        flash('2FA not con***REMOVED***gured for this account.', 'danger')
+        flash('2FA not configured for this account.', 'danger')
         session.pop('pre_2fa_userid', None)
         return redirect(url_for('auth.login'))
 
@@ -190,7 +190,7 @@ def totp_verify():
         # Successful, complete login
         session.pop('pre_2fa_userid', None)
         login_user(u)
-        session['totp_veri***REMOVED***ed'] = True
+        session['totp_verified'] = True
         return redirect(url_for('requests.dashboard'))
 
     flash('Invalid code.', 'danger')

@@ -1,8 +1,8 @@
 import os
 
-BASE_DIR = os.path.abspath(os.path.dirname(__***REMOVED***le__))
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-class Con***REMOVED***g:
+class Config:
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     if not SQLALCHEMY_DATABASE_URI:
         # local default
@@ -19,7 +19,7 @@ class Con***REMOVED***g:
     OIDC_DISCOVERY_URL = os.getenv("OIDC_DISCOVERY_URL")
     OIDC_REDIRECT_URI = os.getenv("OIDC_REDIRECT_URI")
     OIDC_LOGOUT_URL = os.getenv("OIDC_LOGOUT_URL")  # optional
-    OIDC_SCOPES = os.getenv("OIDC_SCOPES", "openid email pro***REMOVED***le")
+    OIDC_SCOPES = os.getenv("OIDC_SCOPES", "openid email profile")
     SSO_FALLBACK_LOCAL = os.getenv("SSO_FALLBACK_LOCAL", "True") == "True"
 
     # Uploads (note: not durable on Vercel)
@@ -39,7 +39,7 @@ class Con***REMOVED***g:
     PART_API_TOKEN = os.getenv("PART_API_TOKEN")
     PART_API_TIMEOUT = int(os.getenv("PART_API_TIMEOUT", "5"))
 
-    # Method veri***REMOVED***cation (separate service allowing different endpoints/tokens)
+    # Method verification (separate service allowing different endpoints/tokens)
     METHOD_API_ENABLED = os.getenv("METHOD_API_ENABLED", "False") == "True"
     METHOD_API_URL = os.getenv("METHOD_API_URL")
     METHOD_API_TOKEN = os.getenv("METHOD_API_TOKEN")

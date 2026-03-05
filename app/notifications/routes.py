@@ -1,20 +1,20 @@
 from flask import Blueprint, jsonify, redirect, url_for, request
 from flask_login import login_required, current_user
 from ..extensions import db
-from ..models import Noti***REMOVED***cation
+from ..models import Notification
 
-noti***REMOVED***cations_bp = Blueprint("noti***REMOVED***cations", __name__, url_pre***REMOVED***x="/noti***REMOVED***cations")
+notifications_bp = Blueprint("notifications", __name__, url_prefix="/notifications")
 
-@noti***REMOVED***cations_bp.get("/unread_count")
+@notifications_bp.get("/unread_count")
 @login_required
 def unread_count():
-    count = Noti***REMOVED***cation.query.***REMOVED***lter_by(user_id=current_user.id, is_read=False).count()
+    count = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
     return jsonify({"count": count})
 
-@noti***REMOVED***cations_bp.get("/latest")
+@notifications_bp.get("/latest")
 @login_required
 def latest():
-    items = Noti***REMOVED***cation.query.***REMOVED***lter_by(user_id=current_user.id).order_by(Noti***REMOVED***cation.created_at.desc()).limit(10).all()
+    items = Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).limit(10).all()
     return jsonify([{
         "id": n.id,
         "title": n.title,
@@ -24,10 +24,10 @@ def latest():
         "created_at": n.created_at.isoformat(),
     } for n in items])
 
-@noti***REMOVED***cations_bp.post("/<int:notif_id>/read")
+@notifications_bp.post("/<int:notif_id>/read")
 @login_required
 def mark_read(notif_id: int):
-    n = Noti***REMOVED***cation.query.***REMOVED***lter_by(id=notif_id, user_id=current_user.id).***REMOVED***rst_or_404()
+    n = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
     n.is_read = True
     db.session.commit()
     return jsonify({"ok": True})

@@ -1,6 +1,6 @@
-# fly.toml app con***REMOVED***guration ***REMOVED***le generated for process-management-prototype on 2026-03-03T03:38:41-05:00
+# fly.toml app configuration file generated for process-management-prototype on 2026-03-03T03:38:41-05:00
 #
-# See https://fly.io/docs/reference/con***REMOVED***guration/ for information about how to use this ***REMOVED***le.
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
 app = "process-management-prototype"

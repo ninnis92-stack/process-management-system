@@ -1,5 +1,5 @@
-# This ***REMOVED***le must be used with "source <venv>/bin/activate.***REMOVED***sh" *from ***REMOVED***sh*
-# (https://***REMOVED***shshell.com/); you cannot run it directly.
+# This file must be used with "source <venv>/bin/activate.fish" *from fish*
+# (https://fishshell.com/); you cannot run it directly.
 
 function deactivate  -d "Exit virtual environment and return to normal shell environment"
     # reset old environment variables
@@ -13,10 +13,10 @@ function deactivate  -d "Exit virtual environment and return to normal shell env
     end
 
     if test -n "$_OLD_FISH_PROMPT_OVERRIDE"
-        functions -e ***REMOVED***sh_prompt
+        functions -e fish_prompt
         set -e _OLD_FISH_PROMPT_OVERRIDE
-        functions -c _old_***REMOVED***sh_prompt ***REMOVED***sh_prompt
-        functions -e _old_***REMOVED***sh_prompt
+        functions -c _old_fish_prompt fish_prompt
+        functions -e _old_fish_prompt
     end
 
     set -e VIRTUAL_ENV
@@ -41,13 +41,13 @@ if set -q PYTHONHOME
 end
 
 if test -z "$VIRTUAL_ENV_DISABLE_PROMPT"
-    # ***REMOVED***sh uses a function instead of an env var to generate the prompt.
+    # fish uses a function instead of an env var to generate the prompt.
 
-    # Save the current ***REMOVED***sh_prompt function as the function _old_***REMOVED***sh_prompt.
-    functions -c ***REMOVED***sh_prompt _old_***REMOVED***sh_prompt
+    # Save the current fish_prompt function as the function _old_fish_prompt.
+    functions -c fish_prompt _old_fish_prompt
 
     # With the original prompt function renamed, we can override with our own.
-    function ***REMOVED***sh_prompt
+    function fish_prompt
         # Save the return status of the last command.
         set -l old_status $status
 
@@ -57,7 +57,7 @@ if test -z "$VIRTUAL_ENV_DISABLE_PROMPT"
         # Restore the return status of the previous command.
         echo "exit $old_status" | .
         # Output the original/"old" prompt.
-        _old_***REMOVED***sh_prompt
+        _old_fish_prompt
     end
 
     set -gx _OLD_FISH_PROMPT_OVERRIDE "$VIRTUAL_ENV"

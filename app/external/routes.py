@@ -3,11 +3,11 @@ from email.message import EmailMessage
 from flask import Blueprint, render_template, redirect, url_for, flash, abort, current_app
 
 from ..extensions import db
-from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Noti***REMOVED***cation
+from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Notification
 from ..notifcations import notify_users, users_in_department
 from .forms import ExternalNewRequestForm, ExternalCommentForm, GuestLookupForm
 
-external_bp = Blueprint("external", __name__, url_pre***REMOVED***x="/external")
+external_bp = Blueprint("external", __name__, url_prefix="/external")
 
 def _log(req, action_type, note=None, from_status=None, to_status=None, actor_type="guest", actor_label=None):
     entry = AuditLog(
@@ -22,19 +22,19 @@ def _log(req, action_type, note=None, from_status=None, to_status=None, actor_ty
     )
     db.session.add(entry)
 
-# Noti***REMOVED***cation helpers imported from app/notifcations.py
+# Notification helpers imported from app/notifcations.py
 
 
 def _send_guest_email(to_email: str, subject: str, body: str) -> None:
-    host = current_app.con***REMOVED***g.get("SMTP_HOST")
-    port = current_app.con***REMOVED***g.get("SMTP_PORT", 587)
-    username = current_app.con***REMOVED***g.get("SMTP_USERNAME")
-    password = current_app.con***REMOVED***g.get("SMTP_PASSWORD")
-    from_email = current_app.con***REMOVED***g.get("MAIL_FROM", username)
-    use_tls = current_app.con***REMOVED***g.get("SMTP_USE_TLS", True)
+    host = current_app.config.get("SMTP_HOST")
+    port = current_app.config.get("SMTP_PORT", 587)
+    username = current_app.config.get("SMTP_USERNAME")
+    password = current_app.config.get("SMTP_PASSWORD")
+    from_email = current_app.config.get("MAIL_FROM", username)
+    use_tls = current_app.config.get("SMTP_USE_TLS", True)
 
     if not host or not from_email:
-        current_app.logger.warning("Email not sent: SMTP_HOST or MAIL_FROM not con***REMOVED***gured")
+        current_app.logger.warning("Email not sent: SMTP_HOST or MAIL_FROM not configured")
         return
 
     msg = EmailMessage()
@@ -157,7 +157,7 @@ def external_dashboard():
     if form.validate_on_submit():
         rid = form.request_id.data
         email = (form.guest_email.data or "").strip().lower()
-        req = ReqModel.query.***REMOVED***lter_by(id=rid, submitter_type="guest").***REMOVED***rst()
+        req = ReqModel.query.filter_by(id=rid, submitter_type="guest").first()
         if not req:
             flash("Request not found.", "warning")
         elif (req.guest_email or "").lower() != email:
@@ -168,7 +168,7 @@ def external_dashboard():
     return render_template("external_dashboard.html", form=form)
 
 def _get_req_by_token(token: str) -> ReqModel:
-    req = ReqModel.query.***REMOVED***lter_by(guest_access_token=token).***REMOVED***rst()
+    req = ReqModel.query.filter_by(guest_access_token=token).first()
     if not req:
         abort(404)
     return req
@@ -177,7 +177,7 @@ def _get_req_by_token(token: str) -> ReqModel:
 def external_detail(token: str):
     req = _get_req_by_token(token)
 
-    public_comments = Comment.query.***REMOVED***lter_by(request_id=req.id, visibility_scope="public").order_by(Comment.created_at.asc()).all()
+    public_comments = Comment.query.filter_by(request_id=req.id, visibility_scope="public").order_by(Comment.created_at.asc()).all()
     public_submissions = [s for s in req.submissions if s.is_public_to_submitter]
     public_audit = list(req.audit_logs)
 

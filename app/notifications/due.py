@@ -1,20 +1,20 @@
 from datetime import datetime, timedelta
 from flask import url_for
 from ..extensions import db
-from ..models import Request as ReqModel, User, Noti***REMOVED***cation
+from ..models import Request as ReqModel, User, Notification
 
 def users_in_dept(dept: str):
-    return User.query.***REMOVED***lter_by(department=dept, is_active=True).all()
+    return User.query.filter_by(department=dept, is_active=True).all()
 
-def send_due_soon_noti***REMOVED***cations(app, hours=24):
+def send_due_soon_notifications(app, hours=24):
     now = datetime.utcnow()
     soon = now + timedelta(hours=hours)
 
     # not closed + has due date within window
     reqs = (ReqModel.query
-            .***REMOVED***lter(ReqModel.due_at != None)
-            .***REMOVED***lter(ReqModel.due_at <= soon)
-            .***REMOVED***lter(ReqModel.status != "CLOSED")
+            .filter(ReqModel.due_at != None)
+            .filter(ReqModel.due_at <= soon)
+            .filter(ReqModel.status != "CLOSED")
             .all())
 
     for req in reqs:
@@ -30,11 +30,11 @@ def send_due_soon_noti***REMOVED***cations(app, hours=24):
         dedupe = f"due_{hours}h:req_{req.id}"
 
         for u in {t.id: t for t in targets}.values():
-            exists = Noti***REMOVED***cation.query.***REMOVED***lter_by(user_id=u.id, dedupe_key=dedupe).***REMOVED***rst()
+            exists = Notification.query.filter_by(user_id=u.id, dedupe_key=dedupe).first()
             if exists:
                 continue
 
-            db.session.add(Noti***REMOVED***cation(
+            db.session.add(Notification(
                 user_id=u.id,
                 request_id=req.id,
                 type="due_soon",

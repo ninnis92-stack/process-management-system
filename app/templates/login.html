@@ -5,7 +5,7 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h4 class="mb-3">Login</h4>
-        {% if con***REMOVED***g.SSO_ENABLED %}
+        {% if config.SSO_ENABLED %}
           <a class="btn btn-outline-primary w-100 mb-3" href="{{ url_for('auth.sso_login') }}">Sign in with SSO</a>
           <div class="text-muted small mb-2">Having trouble? Use local login below.</div>
         {% endif %}

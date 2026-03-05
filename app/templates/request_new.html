@@ -9,11 +9,11 @@
 
       {% if form.errors %}
         <div class="alert alert-danger">
-          <strong>Please ***REMOVED***x:</strong>
+          <strong>Please fix:</strong>
           <ul class="mb-0">
-            {% for ***REMOVED***eld, errs in form.errors.items() %}
+            {% for field, errs in form.errors.items() %}
               {% for e in errs %}
-                <li>{{ ***REMOVED***eld }}: {{ e }}</li>
+                <li>{{ field }}: {{ e }}</li>
               {% endfor %}
             {% endfor %}
           </ul>
@@ -33,7 +33,7 @@
           <label class="form-label">Target Part Number</label>
           {{ form.target_part_number(class="form-control") }}
           <div class="form-text">
-            Required for Method. Optional for Part Number / Both at submission (can be ***REMOVED***lled later).
+            Required for Method. Optional for Part Number / Both at submission (can be filled later).
           </div>
         </div>
 

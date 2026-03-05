@@ -6,10 +6,10 @@ from typing import Optional, List, Dict
 from sqlalchemy import or_, and_
 
 from flask import (
-    Blueprint, render_template, redirect, request, url_for, flash, abort, send_***REMOVED***le, current_app, jsonify
+    Blueprint, render_template, redirect, request, url_for, flash, abort, send_file, current_app, jsonify
 )
 from flask_login import login_required, current_user
-from werkzeug.utils import secure_***REMOVED***lename
+from werkzeug.utils import secure_filename
 
 from ..extensions import db
 from ..models import (
@@ -20,7 +20,7 @@ from ..models import (
     Submission,
     Attachment,
     User,
-    Noti***REMOVED***cation,
+    Notification,
 )
 from .forms import (
     NewRequestForm,
@@ -38,12 +38,12 @@ from .permissions import (
     allowed_comment_scopes_for_user,
 )
 from .workflow import transition_allowed, owner_for_status, handoff_for_transition
-from ..services.veri***REMOVED***cation import Veri***REMOVED***cationService
+from ..services.verification import VerificationService
 from ..notifcations import notify_users, users_in_department
 
 
 
-requests_bp = Blueprint("requests", __name__, url_pre***REMOVED***x="")
+requests_bp = Blueprint("requests", __name__, url_prefix="")
 
 # Ephemeral in-process presence tracker: request_id -> { user_id: {"email": str, "dept": str, "ts": float} }
 _presence: Dict[int, Dict[int, Dict[str, object]]] = {}
@@ -55,7 +55,7 @@ _presence: Dict[int, Dict[int, Dict[str, object]]] = {}
 
 def _exclude_old_closed(query):
     cutoff = datetime.utcnow() - timedelta(hours=24)
-    return query.***REMOVED***lter(or_(ReqModel.status != "CLOSED", ReqModel.updated_at >= cutoff))
+    return query.filter(or_(ReqModel.status != "CLOSED", ReqModel.updated_at >= cutoff))
 
 def _has_part_number_artifact(req: ReqModel) -> bool:
     return any(a.artifact_type == "part_number" for a in req.artifacts)
@@ -108,7 +108,7 @@ def _log(req: ReqModel, action_type: str, note: Optional[str] = None,
 
 
 def _users_in_dept(dept: str) -> List[User]:
-    return User.query.***REMOVED***lter_by(department=dept, is_active=True).all()
+    return User.query.filter_by(department=dept, is_active=True).all()
 
 
 def _assignment_choices(dept: str):
@@ -117,14 +117,14 @@ def _assignment_choices(dept: str):
 
 
 
-# Noti***REMOVED***cation helpers are provided by app/notifcations.py (imported above)
+# Notification helpers are provided by app/notifcations.py (imported above)
 
 
 def is_transition_valid_for_request(req: ReqModel, dept: str, from_status: str, to_status: str) -> bool:
     if not transition_allowed(dept, from_status, to_status):
         return False
 
-    # If C review is required: block bypass to ***REMOVED***nal review
+    # If C review is required: block bypass to final review
     if req.requires_c_review and to_status == "B_FINAL_REVIEW" and from_status in ("NEW_FROM_A", "B_IN_PROGRESS"):
         return False
 
@@ -150,48 +150,48 @@ def dashboard():
     dept = current_user.department
 
     if dept == "A":
-        my_reqs = _exclude_old_closed(ReqModel.query.***REMOVED***lter_by(
+        my_reqs = _exclude_old_closed(ReqModel.query.filter_by(
             created_by_user_id=current_user.id
         )).order_by(ReqModel.updated_at.desc()).all()
         return render_template("dashboard.html", mode="A", requests=my_reqs, now=datetime.utcnow())
 
     if dept == "B":
-        # Allow ***REMOVED***ltering by a single status via query param `status`
-        status_***REMOVED***lter = request.args.get("status")
+        # Allow filtering by a single status via query param `status`
+        status_filter = request.args.get("status")
 
         # Status bar counts for Dept B (owner_department == "B")
         status_counts = {
-            "B_IN_PROGRESS": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "B_IN_PROGRESS": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B", ReqModel.status == "B_IN_PROGRESS"
             )).count(),
-            "WAITING_ON_A_RESPONSE": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "WAITING_ON_A_RESPONSE": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B", ReqModel.status == "WAITING_ON_A_RESPONSE"
             )).count(),
-            "PENDING_C_REVIEW": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "PENDING_C_REVIEW": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B", ReqModel.status == "PENDING_C_REVIEW"
             )).count(),
-            "EXEC_APPROVAL": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "EXEC_APPROVAL": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B", ReqModel.status == "EXEC_APPROVAL"
             )).count(),
-            "B_FINAL_REVIEW": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "B_FINAL_REVIEW": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B", ReqModel.status == "B_FINAL_REVIEW"
             )).count(),
-            "SENT_TO_A": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "SENT_TO_A": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B", ReqModel.status == "SENT_TO_A"
             )).count(),
-            "CLOSED": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "CLOSED": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B", ReqModel.status == "CLOSED"
             )).count(),
         }
 
-        # Semantic status ***REMOVED***lters for Dept B dashboard
+        # Semantic status filters for Dept B dashboard
         STATUS_LABELS = {
             "in_progress": "In progress by Department B",
             "method_created": "Method created",
             "part_number_created": "Part number created",
             "under_review_by_department_c": "Under review by Department C",
             "waiting_on_department_a": "Pending review from Department A",
-            "under_***REMOVED***nal_review": "Under ***REMOVED***nal review",
+            "under_final_review": "Under final review",
             "request_denied": "Request denied",
             # fallbacks for raw status codes
             "NEW_FROM_A": "New from A",
@@ -203,121 +203,121 @@ def dashboard():
             "All": "All (B)",
         }
 
-        # Build buckets based on the selected semantic ***REMOVED***lter, otherwise show default buckets
-        if status_***REMOVED***lter:
-            sf = status_***REMOVED***lter
+        # Build buckets based on the selected semantic filter, otherwise show default buckets
+        if status_filter:
+            sf = status_filter
             if sf == "in_progress":
-                items = _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+                items = _exclude_old_closed(ReqModel.query.filter(
                     ReqModel.owner_department == "B",
                     ReqModel.status == "B_IN_PROGRESS",
                 )).order_by(ReqModel.updated_at.desc()).all()
             elif sf == "method_created":
                 # Requests with an 'instructions' artifact
-                items = _exclude_old_closed(ReqModel.query.join(Artifact).***REMOVED***lter(
+                items = _exclude_old_closed(ReqModel.query.join(Artifact).filter(
                     ReqModel.owner_department == "B",
                     Artifact.artifact_type == "instructions",
                 )).order_by(ReqModel.updated_at.desc()).distinct().all()
             elif sf == "part_number_created":
-                # Requests with a part_number artifact that has any part number ***REMOVED***lled
-                items = _exclude_old_closed(ReqModel.query.join(Artifact).***REMOVED***lter(
+                # Requests with a part_number artifact that has any part number filled
+                items = _exclude_old_closed(ReqModel.query.join(Artifact).filter(
                     ReqModel.owner_department == "B",
                     Artifact.artifact_type == "part_number",
                     (Artifact.target_part_number.isnot(None)) | (Artifact.donor_part_number.isnot(None)),
                 )).order_by(ReqModel.updated_at.desc()).distinct().all()
             elif sf == "under_review_by_department_c":
-                items = _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+                items = _exclude_old_closed(ReqModel.query.filter(
                     ReqModel.owner_department == "B",
                     ReqModel.status == "PENDING_C_REVIEW",
                 )).order_by(ReqModel.updated_at.desc()).all()
             elif sf == "waiting_on_department_a":
-                items = _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+                items = _exclude_old_closed(ReqModel.query.filter(
                     ReqModel.owner_department == "B",
                     ReqModel.status == "WAITING_ON_A_RESPONSE",
                 )).order_by(ReqModel.updated_at.desc()).all()
-            elif sf == "under_***REMOVED***nal_review":
-                items = _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            elif sf == "under_final_review":
+                items = _exclude_old_closed(ReqModel.query.filter(
                     ReqModel.owner_department == "B",
                     ReqModel.status == "B_FINAL_REVIEW",
                 )).order_by(ReqModel.updated_at.desc()).all()
             elif sf == "exec_approval":
-                items = _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+                items = _exclude_old_closed(ReqModel.query.filter(
                     ReqModel.owner_department == "B",
                     ReqModel.status == "EXEC_APPROVAL",
                 )).order_by(ReqModel.updated_at.desc()).all()
             elif sf == "request_denied":
-                items = _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+                items = _exclude_old_closed(ReqModel.query.filter(
                     ReqModel.owner_department == "B",
                     ReqModel.status == "CLOSED",
                 )).order_by(ReqModel.updated_at.desc()).all()
             else:
                 # fallback: treat as raw status code
-                items = _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+                items = _exclude_old_closed(ReqModel.query.filter(
                     ReqModel.owner_department == "B",
-                    ReqModel.status == status_***REMOVED***lter,
+                    ReqModel.status == status_filter,
                 )).order_by(ReqModel.updated_at.desc()).all()
 
-            label = STATUS_LABELS.get(status_***REMOVED***lter, status_***REMOVED***lter)
+            label = STATUS_LABELS.get(status_filter, status_filter)
             buckets = {label: items}
         else:
             buckets = {
-            "New from A": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "New from A": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "NEW_FROM_A",
             )).order_by(ReqModel.updated_at.desc()).all(),
 
-            "In progress by Department B": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "In progress by Department B": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "B_IN_PROGRESS",
             )).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Pending review from Department A": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "Pending review from Department A": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "WAITING_ON_A_RESPONSE",
             )).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Needs changes": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "Needs changes": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "C_NEEDS_CHANGES",
             )).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Exec approval required": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "Exec approval required": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "EXEC_APPROVAL",
             )).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Approved by C": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "Approved by C": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "C_APPROVED",
             )).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Final review": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "Final review": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "B_FINAL_REVIEW",
             )).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Sent to A": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "Sent to A": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "SENT_TO_A",
             )).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Under review by Department C": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "Under review by Department C": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "PENDING_C_REVIEW",
             )).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Closed": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "Closed": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "CLOSED",
             )).order_by(ReqModel.updated_at.desc()).all(),
 
-            "All (B)": _exclude_old_closed(ReqModel.query.***REMOVED***lter(
+            "All (B)": _exclude_old_closed(ReqModel.query.filter(
                 ReqModel.owner_department == "B",
             )).order_by(ReqModel.updated_at.desc()).all(),
         }
         return render_template("dashboard.html", mode="B", buckets=buckets, status_counts=status_counts, now=datetime.utcnow())
 
     if dept == "C":
-        pending = ReqModel.query.***REMOVED***lter_by(
+        pending = ReqModel.query.filter_by(
             status="PENDING_C_REVIEW"
         ).order_by(ReqModel.updated_at.desc()).all()
         return render_template("dashboard.html", mode="C", requests=pending, now=datetime.utcnow())
@@ -333,31 +333,31 @@ def search_requests():
     base = ReqModel.query
 
     if dept == "A":
-        base = base.***REMOVED***lter(ReqModel.created_by_user_id == current_user.id)
+        base = base.filter(ReqModel.created_by_user_id == current_user.id)
     elif dept == "B":
-        base = base.***REMOVED***lter(ReqModel.owner_department == "B")
+        base = base.filter(ReqModel.owner_department == "B")
     else:
-        base = base.***REMOVED***lter(ReqModel.status.in_([
+        base = base.filter(ReqModel.status.in_([
             "PENDING_C_REVIEW", "C_NEEDS_CHANGES", "C_APPROVED", "B_FINAL_REVIEW", "SENT_TO_A", "CLOSED"
         ]))
 
     results = []
     if q:
-        # Numeric queries should match request id exactly, but also look for text in other ***REMOVED***elds
-        ***REMOVED***lters = [
+        # Numeric queries should match request id exactly, but also look for text in other fields
+        filters = [
             ReqModel.title.ilike(f"%{q}%"),
             ReqModel.description.ilike(f"%{q}%"),
         ]
 
         # Search artifacts (part numbers / instructions URL)
-        ***REMOVED***lters.extend([
+        filters.extend([
             Artifact.donor_part_number.ilike(f"%{q}%"),
             Artifact.target_part_number.ilike(f"%{q}%"),
             Artifact.instructions_url.ilike(f"%{q}%"),
         ])
 
         # Search comments and submissions text
-        ***REMOVED***lters.extend([
+        filters.extend([
             Comment.body.ilike(f"%{q}%"),
             Submission.summary.ilike(f"%{q}%"),
             Submission.details.ilike(f"%{q}%"),
@@ -369,10 +369,10 @@ def search_requests():
 
         if q.isdigit():
             # include exact id matches as well
-            id_***REMOVED***lter = ReqModel.id == int(q)
-            qry = qry.***REMOVED***lter(or_(id_***REMOVED***lter, ****REMOVED***lters))
+            id_filter = ReqModel.id == int(q)
+            qry = qry.filter(or_(id_filter, *filters))
         else:
-            qry = qry.***REMOVED***lter(or_(****REMOVED***lters))
+            qry = qry.filter(or_(*filters))
 
         results = qry.distinct().order_by(ReqModel.updated_at.desc()).limit(50).all()
 
@@ -418,8 +418,8 @@ def request_new():
             # "both" -> pick one type, OR you can create TWO artifacts. For now create part_number by default.
             artifact_type = "part_number"
 
-        instructions_***REMOVED***eld = getattr(form, "instructions_url", None)
-        instructions_url = (instructions_***REMOVED***eld.data or "").strip() if instructions_***REMOVED***eld else None
+        instructions_field = getattr(form, "instructions_url", None)
+        instructions_url = (instructions_field.data or "").strip() if instructions_field else None
 
         a = Artifact(
             request_id=req.id,
@@ -486,7 +486,7 @@ def request_detail(request_id: int):
             next_hint = "Review and either approve or request changes."
 
     allowed_scopes = visible_comment_scopes_for_user()
-    comments = Comment.query.***REMOVED***lter_by(request_id=req.id).order_by(Comment.created_at.asc()).all()
+    comments = Comment.query.filter_by(request_id=req.id).order_by(Comment.created_at.asc()).all()
     comments = [c for c in comments if c.visibility_scope in allowed_scopes]
 
     comment_form = CommentForm()
@@ -548,8 +548,8 @@ def request_detail(request_id: int):
         assignment_form.assignee.choices = _assignment_choices(current_user.department)
         assignment_form.assignee.data = req.assigned_to_user_id or -1
 
-    submissions = Submission.query.***REMOVED***lter_by(request_id=req.id).order_by(Submission.created_at.asc()).all()
-    audit = AuditLog.query.***REMOVED***lter_by(request_id=req.id).order_by(AuditLog.created_at.asc()).all()
+    submissions = Submission.query.filter_by(request_id=req.id).order_by(Submission.created_at.asc()).all()
+    audit = AuditLog.query.filter_by(request_id=req.id).order_by(AuditLog.created_at.asc()).all()
 
     has_part_number = any(a.artifact_type == "part_number" for a in req.artifacts)
     has_instructions = any(a.artifact_type == "instructions" for a in req.artifacts)
@@ -600,7 +600,7 @@ def assign_self(request_id: int):
     # Notify the original submitter if they are an internal user
     if req.created_by_user_id:
         assignee_label = current_user.name or current_user.email
-        db.session.add(Noti***REMOVED***cation(
+        db.session.add(Notification(
             user_id=req.created_by_user_id,
             request_id=req.id,
             type="assignment",
@@ -661,9 +661,9 @@ def request_presence(request_id: int):
 
 
 
-@requests_bp.route("/requests/<int:request_id>/veri***REMOVED***cation-placeholder", methods=["POST"])
+@requests_bp.route("/requests/<int:request_id>/verification-placeholder", methods=["POST"])
 @login_required
-def store_veri***REMOVED***cation_placeholder(request_id: int):
+def store_verification_placeholder(request_id: int):
     # Temporary logging endpoint; once integration is available, this should look up the method/part in the source system before persisting.
     req = ReqModel.query.get_or_404(request_id)
     if not can_view_request(req):
@@ -688,42 +688,42 @@ def store_veri***REMOVED***cation_placeholder(request_id: int):
     if note:
         note_lines.append(f"Note: {note}")
 
-    # Attempt to verify using con***REMOVED***gured external services (non-blocking)
-    veri***REMOVED***er = Veri***REMOVED***cationService()
+    # Attempt to verify using configured external services (non-blocking)
+    verifier = VerificationService()
     ver_results = []
     if created_method:
-        vm = veri***REMOVED***er.verify_method(created_method)
+        vm = verifier.verify_method(created_method)
         ver_results.append(("method", created_method, vm))
         if vm.get("ok") is True:
-            note_lines.append(f"Method veri***REMOVED***cation: OK")
+            note_lines.append(f"Method verification: OK")
         elif vm.get("ok") is False:
-            note_lines.append(f"Method veri***REMOVED***cation: FAILED ({vm.get('reason') or vm.get('error')})")
+            note_lines.append(f"Method verification: FAILED ({vm.get('reason') or vm.get('error')})")
         else:
-            note_lines.append("Method veri***REMOVED***cation: not con***REMOVED***gured")
+            note_lines.append("Method verification: not configured")
 
     if created_part:
-        vp = veri***REMOVED***er.verify_part_number(created_part)
+        vp = verifier.verify_part_number(created_part)
         ver_results.append(("part", created_part, vp))
         if vp.get("ok") is True:
-            note_lines.append(f"Part veri***REMOVED***cation: OK")
+            note_lines.append(f"Part verification: OK")
         elif vp.get("ok") is False:
-            note_lines.append(f"Part veri***REMOVED***cation: FAILED ({vp.get('reason') or vp.get('error')})")
+            note_lines.append(f"Part verification: FAILED ({vp.get('reason') or vp.get('error')})")
         else:
-            note_lines.append("Part veri***REMOVED***cation: not con***REMOVED***gured")
+            note_lines.append("Part verification: not configured")
 
-    _log(req, "veri***REMOVED***cation_placeholder", note="; ".join(note_lines))
+    _log(req, "verification_placeholder", note="; ".join(note_lines))
     db.session.commit()
 
     # Provide immediate feedback to the user
     flashes = ["Logged for now."]
     for kind, value, res in ver_results:
         if res.get("ok") is True:
-            flashes.append(f"{kind.title()} '{value}' veri***REMOVED***ed OK.")
+            flashes.append(f"{kind.title()} '{value}' verified OK.")
         elif res.get("ok") is False:
             reason = res.get("reason") or res.get("error") or "unknown"
-            flashes.append(f"{kind.title()} '{value}' veri***REMOVED***cation failed: {reason}.")
+            flashes.append(f"{kind.title()} '{value}' verification failed: {reason}.")
         else:
-            flashes.append(f"{kind.title()} '{value}' veri***REMOVED***cation not con***REMOVED***gured.")
+            flashes.append(f"{kind.title()} '{value}' verification not configured.")
 
     for msg in flashes:
         flash(msg, "info")
@@ -867,15 +867,15 @@ def add_artifact(request_id: int):
     return redirect(url_for("requests.request_detail", request_id=req.id))
 
 
-def _validate_***REMOVED***les(***REMOVED***les) -> list:
-    cfg = current_app.con***REMOVED***g
+def _validate_files(files) -> list:
+    cfg = current_app.config
     cleaned = []
-    if not ***REMOVED***les:
+    if not files:
         return cleaned
-    if len(***REMOVED***les) > cfg["MAX_FILES_PER_SUBMISSION"]:
-        raise ValueError(f"Too many ***REMOVED***les (max {cfg['MAX_FILES_PER_SUBMISSION']}).")
-    for f in ***REMOVED***les:
-        if not f or not f.***REMOVED***lename:
+    if len(files) > cfg["MAX_FILES_PER_SUBMISSION"]:
+        raise ValueError(f"Too many files (max {cfg['MAX_FILES_PER_SUBMISSION']}).")
+    for f in files:
+        if not f or not f.filename:
             continue
         if f.mimetype not in cfg["ALLOWED_IMAGE_MIMES"]:
             raise ValueError("Only PNG/JPEG/WebP images are allowed.")
@@ -972,7 +972,7 @@ def do_transition(request_id: int):
                 return redirect(url_for("requests.request_detail", request_id=req.id))
 
         try:
-            validated = _validate_***REMOVED***les(form.***REMOVED***les.data)
+            validated = _validate_files(form.files.data)
         except ValueError as e:
             flash(str(e), "danger")
             return redirect(url_for("requests.request_detail", request_id=req.id))
@@ -995,15 +995,15 @@ def do_transition(request_id: int):
 
         # attachments
         for f, size in validated:
-            orig = secure_***REMOVED***lename(f.***REMOVED***lename)
+            orig = secure_filename(f.filename)
             stored = f"{uuid.uuid4().hex}_{orig}"
-            save_path = os.path.join(current_app.con***REMOVED***g["UPLOAD_FOLDER"], stored)
+            save_path = os.path.join(current_app.config["UPLOAD_FOLDER"], stored)
             f.save(save_path)
             db.session.add(Attachment(
                 submission_id=sub.id,
                 uploaded_by_user_id=current_user.id,
-                original_***REMOVED***lename=orig,
-                stored_***REMOVED***lename=stored,
+                original_filename=orig,
+                stored_filename=stored,
                 content_type=f.mimetype,
                 size_bytes=size,
             ))
@@ -1011,7 +1011,7 @@ def do_transition(request_id: int):
         _log(req, "submission_created", note=f"Submission packet created ({from_dept}→{to_dept}).")
 
         # Set the request status/owner before notifying recipients so the receiving
-        # department has permission to view the request when they click the noti***REMOVED***cation.
+        # department has permission to view the request when they click the notification.
         req.status = to_status
         req.owner_department = owner_for_status(to_status)
 
@@ -1098,11 +1098,11 @@ def assign_request(request_id: int):
     selected_id = form.assignee.data
     new_assignee = None
     if selected_id != -1:
-        new_assignee = User.query.***REMOVED***lter_by(
+        new_assignee = User.query.filter_by(
             id=selected_id,
             department=current_user.department,
             is_active=True,
-        ).***REMOVED***rst()
+        ).first()
         if not new_assignee:
             flash("Invalid assignee for your department.", "danger")
             return redirect(url_for("requests.request_detail", request_id=req.id))
@@ -1184,13 +1184,13 @@ def download_attachment(attachment_id: int):
     if not can_view_request(req):
         abort(403)
 
-    ***REMOVED***le_path = os.path.join(current_app.con***REMOVED***g["UPLOAD_FOLDER"], att.stored_***REMOVED***lename)
-    if not os.path.exists(***REMOVED***le_path):
+    file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], att.stored_filename)
+    if not os.path.exists(file_path):
         abort(404)
 
-    return send_***REMOVED***le(
-        ***REMOVED***le_path,
+    return send_file(
+        file_path,
         mimetype=att.content_type,
         as_attachment=False,
-        download_name=att.original_***REMOVED***lename,
+        download_name=att.original_filename,
     )

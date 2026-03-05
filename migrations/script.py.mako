@@ -3,7 +3,7 @@ from alembic import op
 %>
 """Generic Alembic script template placeholder.
 
-This ***REMOVED***le exists as a minimal template for generated revisions.
+This file exists as a minimal template for generated revisions.
 """
 
 revision = '${up_revision}'

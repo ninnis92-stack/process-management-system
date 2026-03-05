@@ -1,15 +1,15 @@
-"""In-app noti***REMOVED***cation utilities and email delivery helpers.
+"""In-app notification utilities and email delivery helpers.
 
-This module persists `Noti***REMOVED***cation` rows in the DB and attempts to send
+This module persists `Notification` rows in the DB and attempts to send
 emails to users. In development the code falls back to a thread-based
-background sender; when `RQ_ENABLED` and `REDIS_URL` are con***REMOVED***gured the
+background sender; when `RQ_ENABLED` and `REDIS_URL` are configured the
 send will be enqueued to RQ so a separate worker can process deliveries.
 
 Keep the send path idempotent and non-blocking from request handlers.
 """
 
 from .extensions import db
-from .models import Noti***REMOVED***cation, User
+from .models import Notification, User
 from flask import current_app
 from threading import Thread
 
@@ -39,7 +39,7 @@ except Exception:  # pragma: no cover - tasks module may be unavailable to stati
 
 
 def users_in_department(dept: str):
-    return User.query.***REMOVED***lter_by(department=dept, is_active=True).all()
+    return User.query.filter_by(department=dept, is_active=True).all()
 
 
 def _send_emails_async(recipients_map, subject, body, html=None, request_id=None):
@@ -53,12 +53,12 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
     except Exception:
         app = None
 
-    # If RQ (Redis Queue) is enabled and con***REMOVED***gured, enqueue the send task.
+    # If RQ (Redis Queue) is enabled and configured, enqueue the send task.
     rq_enabled = False
     redis_url = None
     if app:
-        rq_enabled = bool(app.con***REMOVED***g.get("RQ_ENABLED", False))
-        redis_url = app.con***REMOVED***g.get("REDIS_URL") or app.con***REMOVED***g.get("RQ_REDIS_URL")
+        rq_enabled = bool(app.config.get("RQ_ENABLED", False))
+        redis_url = app.config.get("REDIS_URL") or app.config.get("RQ_REDIS_URL")
 
     if rq_enabled and redis_url:
         try:
@@ -93,7 +93,7 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
                 for e in skipped:
                     uid = recipients_map.get(e)
                     if uid:
-                        db.session.add(Noti***REMOVED***cation(
+                        db.session.add(Notification(
                             user_id=uid,
                             request_id=request_id,
                             type="email_skipped",
@@ -105,7 +105,7 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
                 if error:
                     for e, uid in recipients_map.items():
                         if uid:
-                            db.session.add(Noti***REMOVED***cation(
+                            db.session.add(Notification(
                                 user_id=uid,
                                 request_id=request_id,
                                 type="email_failed",
@@ -118,7 +118,7 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
                     try:
                         db.session.commit()
                     except Exception:
-                        _current.logger.exception("Failed to commit email-send noti***REMOVED***cations")
+                        _current.logger.exception("Failed to commit email-send notifications")
 
             except Exception:
                 _current.logger.exception("Email sending failed")
@@ -127,11 +127,11 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
 
 
 def notify_users(users, title, body=None, url=None, ntype="generic", request_id=None):
-    # Persist in-app noti***REMOVED***cations
+    # Persist in-app notifications
     recipients_map = {}
     for u in users:
         db.session.add(
-            Noti***REMOVED***cation(
+            Notification(
                 user_id=u.id,
                 request_id=request_id,
                 type=ntype,
@@ -143,7 +143,7 @@ def notify_users(users, title, body=None, url=None, ntype="generic", request_id=
         if getattr(u, "email", None):
             recipients_map[u.email] = u.id
 
-    # Fire-and-forget email noti***REMOVED***cations (non-blocking). Email sending is optional/con***REMOVED***g-driven
+    # Fire-and-forget email notifications (non-blocking). Email sending is optional/config-driven
     if recipients_map:
         subject = title
         text_body = (body or "") + ("\n\n" + url if url else "")

@@ -4,10 +4,10 @@
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const lines = [
-    "Sort today: socks ***REMOVED***rst, worries later.",
+    "Sort today: socks first, worries later.",
     "A folded stack is a small victory.",
     "One load at a time, one win at a time.",
-    "Tackle the smallest basket ***REMOVED***rst.",
+    "Tackle the smallest basket first.",
     "Fresh socks, fresh perspective.",
     "Turn laundry into a tiny ritual of calm.",
     "Don't wait for motivation—start the wash.",
@@ -15,7 +15,7 @@
     "Fold with intention; carry less chaos.",
     "A warm dryer is a hug for your clothes.",
     "Separate colors, not your priorities.",
-    "Make today productive—***REMOVED***nish one load.",
+    "Make today productive—finish one load.",
     "Every matched pair is progress.",
     "Treat stains as experiments, not failures.",
     "Declutter your closet, declutter your day.",
@@ -23,10 +23,10 @@
     "Air-dry patience; speed comes after practice.",
     "Small care preserves the longest wear.",
     "Refresh your routine with a fresh load.",
-    "Laundry ***REMOVED*** is peace earned.",
+    "Laundry fi is peace earned.",
     "Celebrate a completed basket.",
-    "Put it away; let it be ***REMOVED***nished.",
-    "Socks ***REMOVED***nd their way home eventually.",
+    "Put it away; let it be finished.",
+    "Socks find their way home eventually.",
     "Folded clothes, elevated mood."
   ];
 
@@ -80,15 +80,15 @@
       const out = slot.animate([
         { opacity: 1, transform: 'translateY(0)' },
         { opacity: 0, transform: 'translateY(-8px)' }
-      ], { duration: 200, easing: 'cubic-bezier(.2,.8,.2,1)', ***REMOVED***ll: 'forwards' });
-      out.on***REMOVED***nish = () => {
+      ], { duration: 200, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+      out.onfinish = () => {
         idx = nextIdx;
         slot.textContent = order[idx];
         // animate in
         const _in = slot.animate([
           { opacity: 0, transform: 'translateY(8px)' },
           { opacity: 1, transform: 'translateY(0)' }
-        ], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)', ***REMOVED***ll: 'forwards' });
+        ], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
       };
     } else {
       idx = nextIdx;
@@ -245,7 +245,7 @@
   });
 })();
 
-(function initNoti***REMOVED***cations() {
+(function initNotifications() {
   const btn = document.getElementById("notifBtn");
   const dd = document.getElementById("notifDropdown");
   const list = document.getElementById("notifList");
@@ -259,7 +259,7 @@
 
   async function refreshCount() {
     try {
-      const r = await fetch("/noti***REMOVED***cations/unread_count");
+      const r = await fetch("/notifications/unread_count");
       if (!r.ok) return;
       const data = await r.json();
       if (data.count > 0) {
@@ -273,14 +273,14 @@
         setActive(false);
       }
     } catch (e) {
-      list.innerHTML = "<div class='text-muted'>Unable to load noti***REMOVED***cations right now.</div>";
+      list.innerHTML = "<div class='text-muted'>Unable to load notifications right now.</div>";
     }
   }
 
   async function loadLatest() {
     list.innerHTML = "<div class='text-muted'>Loading…</div>";
     try {
-      const r = await fetch("/noti***REMOVED***cations/latest");
+      const r = await fetch("/notifications/latest");
       if (!r.ok) return;
       const items = await r.json();
       list.innerHTML = items.map(n => `
@@ -289,9 +289,9 @@
           ${n.body ? `<div>${n.body}</div>` : ""}
           ${n.url ? `<div class="small text-primary">Open</div>` : ""}
         </div>
-      `).join("") || "<div class='text-muted'>No noti***REMOVED***cations.</div>";
+      `).join("") || "<div class='text-muted'>No notifications.</div>";
     } catch (e) {
-      list.innerHTML = "<div class='text-muted'>Unable to load noti***REMOVED***cations right now.</div>";
+      list.innerHTML = "<div class='text-muted'>Unable to load notifications right now.</div>";
     }
   }
 
@@ -300,7 +300,7 @@
     if (!item) return;
     const id = item.dataset.id;
     const url = item.dataset.url;
-    try { await fetch(`/noti***REMOVED***cations/${id}/read`, { method: "POST" }); } catch (e) {}
+    try { await fetch(`/notifications/${id}/read`, { method: "POST" }); } catch (e) {}
     if (url) window.location.href = url;
   });
 
@@ -326,28 +326,28 @@
 })();
 
 (function initFilePreview() {
-  const ***REMOVED***leInput = document.getElementById("***REMOVED***leInput");
+  const fileInput = document.getElementById("fileInput");
   const pasteZone = document.getElementById("pasteZone");
   const preview = document.getElementById("preview");
-  if (!***REMOVED***leInput || !pasteZone || !preview) return;
+  if (!fileInput || !pasteZone || !preview) return;
 
   const dt = new DataTransfer();
 
   function refreshPreview() {
     preview.innerHTML = "";
-    for (const ***REMOVED***le of dt.***REMOVED***les) {
+    for (const file of dt.files) {
       const img = document.createElement("img");
       img.className = "preview-img";
-      img.alt = ***REMOVED***le.name;
-      img.src = URL.createObjectURL(***REMOVED***le);
+      img.alt = file.name;
+      img.src = URL.createObjectURL(file);
       preview.appendChild(img);
     }
-    ***REMOVED***leInput.***REMOVED***les = dt.***REMOVED***les;
+    fileInput.files = dt.files;
   }
 
-  function addFile(***REMOVED***le) {
-    if (!***REMOVED***le.type.startsWith("image/")) return;
-    dt.items.add(***REMOVED***le);
+  function addFile(file) {
+    if (!file.type.startsWith("image/")) return;
+    dt.items.add(file);
     refreshPreview();
   }
 
@@ -358,8 +358,8 @@
     const items = e.clipboardData?.items || [];
     for (const item of items) {
       if (item.type.startsWith("image/")) {
-        const ***REMOVED***le = item.getAsFile();
-        if (***REMOVED***le) addFile(***REMOVED***le);
+        const file = item.getAsFile();
+        if (file) addFile(file);
       }
     }
   });
@@ -372,13 +372,13 @@
   pasteZone.addEventListener("drop", (e) => {
     e.preventDefault();
     pasteZone.classList.remove("paste-zone-hover");
-    const ***REMOVED***les = e.dataTransfer?.***REMOVED***les || [];
-    for (const f of ***REMOVED***les) addFile(f);
+    const files = e.dataTransfer?.files || [];
+    for (const f of files) addFile(f);
   });
 
-  ***REMOVED***leInput.addEventListener("change", () => {
+  fileInput.addEventListener("change", () => {
     dt.items.clear();
-    for (const f of ***REMOVED***leInput.***REMOVED***les) addFile(f);
+    for (const f of fileInput.files) addFile(f);
   });
 })();
 

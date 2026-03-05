@@ -37,7 +37,7 @@
                 <button class="btn btn-sm btn-outline-primary me-1">Act as Dept {{ u.department }}</button>
               </form>
             {% endif %}
-            <form method="post" action="{{ url_for('admin.delete_user', user_id=u.id) }}" class="d-inline" onsubmit="return con***REMOVED***rm('Delete user {{ u.email }}?');">
+            <form method="post" action="{{ url_for('admin.delete_user', user_id=u.id) }}" class="d-inline" onsubmit="return confirm('Delete user {{ u.email }}?');">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-sm btn-outline-danger">Delete</button>
             </form>

@@ -3,11 +3,11 @@
 Brief architecture map for reviewers.
 
 ## Overview
-- Flask app with blueprints: `auth` (login/SSO), `requests_bp` (core workflow), `external` (guest links), `noti***REMOVED***cations` (in-app notices).
+- Flask app with blueprints: `auth` (login/SSO), `requests_bp` (core workflow), `external` (guest links), `notifications` (in-app notices).
 - Data layer: SQLAlchemy models in `app/models.py`; migrations are not wired (tables auto-create in dev via `AUTO_CREATE_DB`).
 Migrations:
 
- - The project does not include an Alembic scaffold by default, but a migration ***REMOVED***le has been added at `migrations/versions/0001_add_is_admin.py` which adds the `is_admin` column to the `user` table.
+ - The project does not include an Alembic scaffold by default, but a migration file has been added at `migrations/versions/0001_add_is_admin.py` which adds the `is_admin` column to the `user` table.
 
  - Recommended workflow (one-time setup):
 
@@ -74,11 +74,11 @@ TOTP 2FA (local accounts):
 - SSO init lives in `app/auth/sso.py`; routes in `app/auth/routes.py`.
 SSO & 2FA:
 
-- The app includes a minimal OIDC integration scaffold in `app/auth/sso.py`. SSO is disabled by default. Enable it with these con***REMOVED***g values:
+- The app includes a minimal OIDC integration scaffold in `app/auth/sso.py`. SSO is disabled by default. Enable it with these config values:
 
 ```
 SSO_ENABLED=true
-OIDC_DISCOVERY_URL=https://your-idp/.well-known/openid-con***REMOVED***guration
+OIDC_DISCOVERY_URL=https://your-idp/.well-known/openid-configuration
 OIDC_CLIENT_ID=...
 OIDC_CLIENT_SECRET=...
 OIDC_REDIRECT_URI=https://your-app/_auth/oidc/callback
@@ -92,20 +92,20 @@ Admin Hardening Checklist:
 - Use `SSO_REQUIRE_MFA=true` to enforce MFA for admins when your IdP reports it.
 - Audit logs are viewable at `/admin/audit` once signed-in as an admin.
 
-## Noti***REMOVED***cations
-- Stored in DB via `Noti***REMOVED***cation` model; created via `notify_users` helper in `requests_bp/routes.py`.
+## Notifications
+- Stored in DB via `Notification` model; created via `notify_users` helper in `requests_bp/routes.py`.
 - Types include status changes, nudges, and request creation; surfaced in UI banner (template logic in `base.html`).
 
 ## Search & Filtering
 - Search endpoint `/search` (title/description/id) scoped by department access.
-- Dept B dashboard shows status buckets and semantic ***REMOVED***lters (in progress, C review, ***REMOVED***nal review, etc.). Closed items >24h are hidden.
+- Dept B dashboard shows status buckets and semantic filters (in progress, C review, final review, etc.). Closed items >24h are hidden.
 
 ## Nudges
 - Only the original submitter can nudge; gated to 48h after creation and 24h cooldown; Dept C cannot send nudges.
 
 ## Forms & Validations
 - WTForms in `app/requests_bp/forms.py` drive request create/edit/transition forms.
-- File uploads stored under `UPLOAD_FOLDER`; only PNG/JPEG/WebP allowed; 10MB per ***REMOVED***le; `MAX_FILES_PER_SUBMISSION` controls count.
+- File uploads stored under `UPLOAD_FOLDER`; only PNG/JPEG/WebP allowed; 10MB per file; `MAX_FILES_PER_SUBMISSION` controls count.
 
 ## Guest Access
 - Guest tokens created per request (`Request.ensure_guest_token`). Guests can view/update via `external` blueprint using tokenized links.
@@ -117,11 +117,11 @@ Admin Hardening Checklist:
 ### Integrations (prototype-friendly)
 - Email: set `EMAIL_ENABLED=true` and provide SMTP settings (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_USE_TLS`) to enable real email sending. By default the app logs email contents to the application logger for prototype testing.
 - Ticketing: set `TICKETING_ENABLED=true` and `TICKETING_URL`/`TICKETING_TOKEN` to enable creating tickets in an external system. When disabled the app returns prototype ticket ids.
-- Part/Method veri***REMOVED***cation APIs: set `PART_API_ENABLED`/`METHOD_API_ENABLED` and respective `*_API_URL`/`*_API_TOKEN` to enable remote validation. When disabled the veri***REMOVED***cation endpoint logs and returns non-blocking feedback.
+- Part/Method verification APIs: set `PART_API_ENABLED`/`METHOD_API_ENABLED` and respective `*_API_URL`/`*_API_TOKEN` to enable remote validation. When disabled the verification endpoint logs and returns non-blocking feedback.
 
 ## Dev Notes
 - Run `python3 seed.py` to seed sample data.
-- Server entrypoint: `run.py` (Flask), Docker***REMOVED***le provided; Fly/Vercel con***REMOVED***gs included for deployment experiments.
+- Server entrypoint: `run.py` (Flask), Dockerfile provided; Fly/Vercel configs included for deployment experiments.
 
 Dev-only smoke-test scripts
 - Smoke-test helper scripts (creating sample requests, populating UI buckets, and a webhook sender) have been moved out of the main `scripts/` folder and restored on a dedicated branch and folder: `dev-scripts/` on the `dev-scripts` branch. This keeps `main` clean for deployments.
@@ -132,7 +132,7 @@ Dev-only smoke-test scripts
 git fetch origin dev-scripts:dev-scripts
 git checkout dev-scripts
 
-# or copy ***REMOVED***les into your current branch
+# or copy files into your current branch
 git checkout main
 git restore --source=origin/dev-scripts --worktree --staged -- dev-scripts
 ```
@@ -209,7 +209,7 @@ attach the token.
 If you need to accept external webhooks or anonymous POSTs (for example, third-party
 services), avoid disabling CSRF globally. Instead either:
 
-- Exempt only the speci***REMOVED***c route(s) from CSRF protection using `csrf.exempt` and validate the
+- Exempt only the specific route(s) from CSRF protection using `csrf.exempt` and validate the
   payload via a shared secret or signature header, or
 - Require a pre-shared HMAC signature/header from the sender and verify it server-side before
   accepting the payload.
@@ -219,4 +219,4 @@ Document any exemptions in your deployment notes so reviewers understand the sec
 ## Known Gaps
 - No Alembic migrations; schema auto-creates in dev.
 - Guest detail page surfaces public submissions/comments only; internal notes stay hidden.
-- Placeholder veri***REMOVED***cation endpoint (routes) still needs real lookup logic.
+- Placeholder verification endpoint (routes) still needs real lookup logic.

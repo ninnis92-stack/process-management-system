@@ -7,11 +7,11 @@
       {{ form.hidden_tag() }}
       {% if form.errors %}
         <div class="alert alert-danger">
-            <strong>Please ***REMOVED***x:</strong>
+            <strong>Please fix:</strong>
                 <ul class="mb-0">
-                {% for ***REMOVED***eld, errs in form.errors.items() %}
+                {% for field, errs in form.errors.items() %}
                     {% for e in errs %}
-                        <li>{{ ***REMOVED***eld }}: {{ e }}</li>
+                        <li>{{ field }}: {{ e }}</li>
                     {% endfor %}
                 {% endfor %}
                 </ul>

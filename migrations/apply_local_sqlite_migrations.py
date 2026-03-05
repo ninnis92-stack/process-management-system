@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply small schema ***REMOVED***xes to local SQLite DB used for development.
+"""Apply small schema fixes to local SQLite DB used for development.
 
 This script will:
 - Add `event_ts` column to `audit_log` if missing.
@@ -9,19 +9,19 @@ Run from project root with the active virtualenv python if needed.
 """
 import sqlite3
 import sys
-from con***REMOVED***g import Con***REMOVED***g
+from config import Config
 import os
 
 
 def get_db_path():
-    uri = Con***REMOVED***g.SQLALCHEMY_DATABASE_URI
+    uri = Config.SQLALCHEMY_DATABASE_URI
     if uri.startswith("sqlite:///"):
         return uri.replace("sqlite:///", "")
     # fallback paths
     if uri.startswith("sqlite://"):
         return uri.replace("sqlite://", "")
     # prefer the instance DB
-    return os.path.join(os.path.dirname(__***REMOVED***le__), "..", "instance", "app.db")
+    return os.path.join(os.path.dirname(__file__), "..", "instance", "app.db")
 
 
 def main():
@@ -29,13 +29,13 @@ def main():
     path = os.path.abspath(path)
     if not os.path.exists(path):
         # try instance/app.db as fallback
-        alt = os.path.join(os.path.dirname(__***REMOVED***le__), '..', 'instance', 'app.db')
+        alt = os.path.join(os.path.dirname(__file__), '..', 'instance', 'app.db')
         alt = os.path.abspath(alt)
         if os.path.exists(alt):
             path = alt
             print('Falling back to', alt)
         else:
-            print("DB ***REMOVED***le not found at:", path)
+            print("DB file not found at:", path)
             sys.exit(0)
 
     print("Using DB:", path)

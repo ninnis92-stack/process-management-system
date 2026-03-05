@@ -7,7 +7,7 @@ from app.models import Request as Req
 os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
 os.environ['AUTO_CREATE_DB'] = 'True'
 app = create_app()
-app.con***REMOVED***g.update({'TESTING': True, 'WTF_CSRF_ENABLED': False})
+app.config.update({'TESTING': True, 'WTF_CSRF_ENABLED': False})
 with app.app_context():
     db.create_all()
     client = app.test_client()

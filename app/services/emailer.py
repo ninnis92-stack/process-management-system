@@ -8,12 +8,12 @@ class EmailService:
     """Simple email adapter.
 
     Behavior:
-      - If `EMAIL_ENABLED` is True and SMTP_HOST/SMTP_PORT are con***REMOVED***gured, attempts to send via SMTP.
+      - If `EMAIL_ENABLED` is True and SMTP_HOST/SMTP_PORT are configured, attempts to send via SMTP.
       - Otherwise logs the outgoing message to `current_app.logger` for prototype use.
     """
 
     def __init__(self):
-        cfg = current_app.con***REMOVED***g
+        cfg = current_app.config
         self.enabled = cfg.get("EMAIL_ENABLED", False)
         self.host = cfg.get("SMTP_HOST")
         self.port = int(cfg.get("SMTP_PORT", 25)) if cfg.get("SMTP_PORT") else None

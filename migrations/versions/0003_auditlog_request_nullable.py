@@ -8,7 +8,7 @@ Create Date: 2026-03-04 18:40:00.000000
 from alembic import op
 import sqlalchemy as sa
 
-# revision identi***REMOVED***ers, used by Alembic.
+# revision identifiers, used by Alembic.
 revision = '0003_auditlog_request_nullable'
 down_revision = '0002_add_totp_columns'
 branch_labels = None

@@ -5,21 +5,21 @@ oauth = OAuth()
 def init_oauth(app):
     oauth.init_app(app)
 
-    if not app.con***REMOVED***g.get("SSO_ENABLED"):
+    if not app.config.get("SSO_ENABLED"):
         return False
 
-    # Ensure required values exist to avoid runtime errors when disabled/miscon***REMOVED***gured
+    # Ensure required values exist to avoid runtime errors when disabled/misconfigured
     required = ["OIDC_DISCOVERY_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_REDIRECT_URI"]
-    if not all(app.con***REMOVED***g.get(k) for k in required):
-        app.logger.warning("SSO_ENABLED but OIDC con***REMOVED***g missing; skipping OIDC registration")
+    if not all(app.config.get(k) for k in required):
+        app.logger.warning("SSO_ENABLED but OIDC config missing; skipping OIDC registration")
         return False
 
     oauth.register(
         name="oidc",
-        server_metadata_url=app.con***REMOVED***g["OIDC_DISCOVERY_URL"],
-        client_id=app.con***REMOVED***g["OIDC_CLIENT_ID"],
-        client_secret=app.con***REMOVED***g["OIDC_CLIENT_SECRET"],
-        client_kwargs={"scope": app.con***REMOVED***g.get("OIDC_SCOPES", "openid email pro***REMOVED***le")},
+        server_metadata_url=app.config["OIDC_DISCOVERY_URL"],
+        client_id=app.config["OIDC_CLIENT_ID"],
+        client_secret=app.config["OIDC_CLIENT_SECRET"],
+        client_kwargs={"scope": app.config.get("OIDC_SCOPES", "openid email profile")},
     )
     return True
 

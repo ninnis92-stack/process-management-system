@@ -8,16 +8,16 @@ contexts.
 
 from .services.emailer import EmailService
 from .extensions import db
-from .models import Noti***REMOVED***cation
+from .models import Notification
 
 
 def send_emails_task(recipients_map, subject, body, html=None, request_id=None):
-    """Send emails and persist any delivery/skipped failures as Noti***REMOVED***cations.
+    """Send emails and persist any delivery/skipped failures as Notifications.
 
     Parameters:
     - recipients_map: dict of email -> user_id
     - subject/body/html: message content
-    - request_id: optional request id to associate noti***REMOVED***cations with
+    - request_id: optional request id to associate notifications with
     """
     svc = EmailService()
     res = svc.send_email(list(recipients_map.keys()), subject, body, html=html)
@@ -28,7 +28,7 @@ def send_emails_task(recipients_map, subject, body, html=None, request_id=None):
     for e in skipped:
         uid = recipients_map.get(e)
         if uid:
-            db.session.add(Noti***REMOVED***cation(
+            db.session.add(Notification(
                 user_id=uid,
                 request_id=request_id,
                 type="email_skipped",
@@ -40,7 +40,7 @@ def send_emails_task(recipients_map, subject, body, html=None, request_id=None):
     if error:
         for e, uid in recipients_map.items():
             if uid:
-                db.session.add(Noti***REMOVED***cation(
+                db.session.add(Notification(
                     user_id=uid,
                     request_id=request_id,
                     type="email_failed",
@@ -56,6 +56,6 @@ def send_emails_task(recipients_map, subject, body, html=None, request_id=None):
             try:
                 import logging
 
-                logging.getLogger(__name__).exception("Failed to commit email-send noti***REMOVED***cations")
+                logging.getLogger(__name__).exception("Failed to commit email-send notifications")
             except Exception:
                 pass

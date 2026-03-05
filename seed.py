@@ -39,7 +39,7 @@ def main():
             ("Dept C User", "c@example.com", "C"),
         ]
         for name, email, dept in demo:
-            u = User.query.***REMOVED***lter_by(email=email).***REMOVED***rst()
+            u = User.query.filter_by(email=email).first()
             if not u:
                 u = User(
                     name=name,
@@ -51,8 +51,8 @@ def main():
                 db.session.add(u)
         db.session.commit()
 
-        # Ensure admin user(s) exist. Prefer ADMIN_EMAILS from con***REMOVED***g; else create a default admin.
-        admin_emails = app.con***REMOVED***g.get("ADMIN_EMAILS") or []
+        # Ensure admin user(s) exist. Prefer ADMIN_EMAILS from config; else create a default admin.
+        admin_emails = app.config.get("ADMIN_EMAILS") or []
         if not admin_emails:
             admin_emails = ["admin@example.com"]
 
@@ -60,7 +60,7 @@ def main():
             aemail = aemail.strip().lower()
             if not aemail:
                 continue
-            u = User.query.***REMOVED***lter_by(email=aemail).***REMOVED***rst()
+            u = User.query.filter_by(email=aemail).first()
             if not u:
                 u = User(
                     name="Admin",

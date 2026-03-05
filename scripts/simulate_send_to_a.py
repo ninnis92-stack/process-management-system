@@ -1,14 +1,14 @@
 from app import create_app
 from app.extensions import db
-from app.models import User, Request as ReqModel, Submission, Noti***REMOVED***cation
+from app.models import User, Request as ReqModel, Submission, Notification
 from app.requests_bp.workflow import owner_for_status
 from app.requests_bp.routes import notify_users, users_in_department
 
 app = create_app()
 
 with app.app_context():
-    # ***REMOVED***nd a Dept B user to act as the actor
-    actor = User.query.***REMOVED***lter_by(department='B').***REMOVED***rst()
+    # find a Dept B user to act as the actor
+    actor = User.query.filter_by(department='B').first()
     if not actor:
         print('No Dept B user found')
         raise SystemExit(1)
@@ -20,7 +20,7 @@ with app.app_context():
         title='Simulated handoff to A',
         request_type='part_number',
         pricebook_status='unknown',
-        description='Simulated request to test noti***REMOVED***cations',
+        description='Simulated request to test notifications',
         priority='medium',
         requires_c_review=False,
         status='B_FINAL_REVIEW',
@@ -64,6 +64,6 @@ with app.app_context():
     db.session.commit()
 
     print('Created request', req.id)
-    print('Noti***REMOVED***cations for Dept A:')
-    for n in Noti***REMOVED***cation.query.***REMOVED***lter(Noti***REMOVED***cation.user.has(department='A')).order_by(Noti***REMOVED***cation.created_at.desc()).limit(10):
+    print('Notifications for Dept A:')
+    for n in Notification.query.filter(Notification.user.has(department='A')).order_by(Notification.created_at.desc()).limit(10):
         print(n.id, n.user.email, n.title, n.url, 'read' if n.is_read else 'unread')

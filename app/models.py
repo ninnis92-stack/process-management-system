@@ -60,12 +60,12 @@ class User(db.Model, UserMixin):
     totp_secret = db.Column(db.String(64), nullable=True)
     totp_enabled = db.Column(db.Boolean, nullable=False, default=False)
 
-class Noti***REMOVED***cation(db.Model):
-    """In-app noti***REMOVED***cation with optional deep link and dedupe key."""
+class Notification(db.Model):
+    """In-app notification with optional deep link and dedupe key."""
     id = db.Column(db.Integer, primary_key=True)
 
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    user = db.relationship("User", backref="noti***REMOVED***cations")
+    user = db.relationship("User", backref="notifications")
 
     request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=True)
     request = db.relationship("Request")
@@ -202,8 +202,8 @@ class Attachment(db.Model):
     uploaded_by_user = db.relationship("User", foreign_keys=[uploaded_by_user_id])
     uploaded_by_guest_email = db.Column(db.String(255), nullable=True)
 
-    original_***REMOVED***lename = db.Column(db.String(255), nullable=False)
-    stored_***REMOVED***lename = db.Column(db.String(255), nullable=False, unique=True, index=True)
+    original_filename = db.Column(db.String(255), nullable=False)
+    stored_filename = db.Column(db.String(255), nullable=False, unique=True, index=True)
     content_type = db.Column(db.String(80), nullable=False)
     size_bytes = db.Column(db.Integer, nullable=False)
 

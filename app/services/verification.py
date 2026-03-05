@@ -3,17 +3,17 @@ from flask import current_app
 import requests
 
 
-class Veri***REMOVED***cationService:
-    """Small adapter to call external veri***REMOVED***cation APIs for parts and methods.
+class VerificationService:
+    """Small adapter to call external verification APIs for parts and methods.
 
     Behavior:
-      - If the relevant API is disabled or URL not con***REMOVED***gured, returns {'ok': None, 'reason': 'disabled'}
+      - If the relevant API is disabled or URL not configured, returns {'ok': None, 'reason': 'disabled'}
       - On success, returns {'ok': True/False, 'details': <api response dict>}.
       - On error, returns {'ok': False, 'reason': 'error', 'error': <message>}.
     """
 
     def __init__(self):
-        cfg = current_app.con***REMOVED***g
+        cfg = current_app.config
         self.part_enabled = cfg.get("PART_API_ENABLED", False)
         self.part_url = cfg.get("PART_API_URL")
         self.part_token = cfg.get("PART_API_TOKEN")

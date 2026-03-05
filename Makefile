@@ -5,7 +5,7 @@ VENV?=.venv
 .PHONY: help venv install test run seed db-init db-migrate db-upgrade db-stamp worker compose-up compose-down
 
 help:
-	@echo "Make***REMOVED***le commands:"
+	@echo "Makefile commands:"
 	@echo "  make venv           # create a virtualenv in .venv"
 	@echo "  make install        # install python requirements into venv"
 	@echo "  make test           # run pytest"
@@ -13,7 +13,7 @@ help:
 	@echo "  make seed           # seed sample data"
 	@echo "  make db-init        # initialize alembic migrations (one-time)"
 	@echo "  make db-migrate     # autogenerate a migration (requires FLASK_APP)"
-	@echo "  make db-upgrade     # apply migrations to the con***REMOVED***gured DB"
+	@echo "  make db-upgrade     # apply migrations to the configured DB"
 	@echo "  make db-stamp       # stamp the DB as head without applying DDL"
 	@echo "  make worker         # run the RQ worker (requires redis)"
 	@echo "  make compose-up     # start docker-compose services"

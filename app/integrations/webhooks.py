@@ -6,12 +6,12 @@ from flask import Blueprint, request, current_app, abort, jsonify
 from app import csrf
 from flask_wtf.csrf import generate_csrf
 
-integrations_bp = Blueprint("integrations_bp", __name__, url_pre***REMOVED***x="/integrations")
+integrations_bp = Blueprint("integrations_bp", __name__, url_prefix="/integrations")
 
 
 def _get_shared_secret():
-    # Prefer app con***REMOVED***g, then environment variable
-    return current_app.con***REMOVED***g.get("WEBHOOK_SHARED_SECRET") or os.getenv("WEBHOOK_SHARED_SECRET")
+    # Prefer app config, then environment variable
+    return current_app.config.get("WEBHOOK_SHARED_SECRET") or os.getenv("WEBHOOK_SHARED_SECRET")
 
 
 def valid_hmac(payload: bytes, signature: str, secret: str) -> bool:
@@ -34,20 +34,20 @@ def incoming_webhook():
 
     This route is intentionally CSRF-exempt; callers MUST present a valid
     HMAC signature in the `X-Webhook-Signature` header. The shared secret is
-    looked up from `WEBHOOK_SHARED_SECRET` in app con***REMOVED***g or env.
+    looked up from `WEBHOOK_SHARED_SECRET` in app config or env.
     """
     payload = request.get_data() or b""
     sig = request.headers.get("X-Webhook-Signature") or request.headers.get("X-Signature")
     secret = _get_shared_secret()
     if not secret:
-        current_app.logger.warning("Incoming webhook rejected: no shared secret con***REMOVED***gured")
+        current_app.logger.warning("Incoming webhook rejected: no shared secret configured")
         abort(401)
 
     if not valid_hmac(payload, sig, secret):
         current_app.logger.warning("Incoming webhook rejected: invalid signature")
         abort(401)
 
-    # At this point the webhook is authenticated. Implement service-speci***REMOVED***c
+    # At this point the webhook is authenticated. Implement service-specific
     # payload parsing and processing here. Keep processing short or enqueue a
     # background job.
     try:

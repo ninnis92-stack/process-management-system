@@ -8,9 +8,9 @@ from .forms import AdminCreateUserForm
 from ..models import Request as ReqModel, Artifact, Submission
 from datetime import datetime, timedelta
 from flask import request as flask_request
-from ..models import Noti***REMOVED***cation, AuditLog
+from ..models import Notification, AuditLog
 
-admin_bp = Blueprint("admin", __name__, url_pre***REMOVED***x="/admin")
+admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
 def _is_admin_user():
@@ -19,8 +19,8 @@ def _is_admin_user():
         return False
 
     # If SSO is enabled and admin access requires MFA, enforce it.
-    if current_app.con***REMOVED***g.get("SSO_ENABLED") and current_app.con***REMOVED***g.get("SSO_REQUIRE_MFA"):
-        # SSO login flow should set `session['sso_mfa'] = True` when MFA was veri***REMOVED***ed.
+    if current_app.config.get("SSO_ENABLED") and current_app.config.get("SSO_REQUIRE_MFA"):
+        # SSO login flow should set `session['sso_mfa'] = True` when MFA was verified.
         return bool(session.get("sso_mfa", False))
 
     return True
@@ -51,7 +51,7 @@ def create_user():
         pw = form.password.data or "password123"
         is_active = bool(form.is_active.data)
 
-        existing = User.query.***REMOVED***lter_by(email=email).***REMOVED***rst()
+        existing = User.query.filter_by(email=email).first()
         if existing:
             existing.name = name or existing.name
             existing.department = dept
@@ -86,7 +86,7 @@ def edit_user(user_id: int):
 
     u = User.query.get_or_404(user_id)
     form = AdminCreateUserForm(obj=u)
-    # don't pre***REMOVED***ll password
+    # don't prefill password
     form.password.data = None
 
     if form.validate_on_submit():
@@ -236,14 +236,14 @@ def monitor():
 
     # Gather admin-only metrics
     total_users = User.query.count()
-    active_users = User.query.***REMOVED***lter_by(is_active=True).count()
-    admin_count = User.query.***REMOVED***lter_by(is_admin=True).count()
-    recent_email_issues = Noti***REMOVED***cation.query.***REMOVED***lter(Noti***REMOVED***cation.type.in_(["email_failed", "email_skipped"]))\
-        .order_by(Noti***REMOVED***cation.created_at.desc()).limit(20).all()
+    active_users = User.query.filter_by(is_active=True).count()
+    admin_count = User.query.filter_by(is_admin=True).count()
+    recent_email_issues = Notification.query.filter(Notification.type.in_(["email_failed", "email_skipped"]))\
+        .order_by(Notification.created_at.desc()).limit(20).all()
 
     if dept == "A":
         # Show requests created by users in Dept A (monitoring view)
-        reqs = ReqModel.query.join(User, ReqModel.created_by_user_id == User.id).***REMOVED***lter(
+        reqs = ReqModel.query.join(User, ReqModel.created_by_user_id == User.id).filter(
             User.department == "A"
         ).order_by(ReqModel.updated_at.desc()).all()
         dashboard_html = render_template("dashboard.html", mode="A", requests=reqs, now=now)
@@ -254,53 +254,53 @@ def monitor():
     if dept == "B":
         # Build buckets similar to Dept B dashboard but for monitoring
         buckets = {
-            "New from A": ReqModel.query.***REMOVED***lter(
+            "New from A": ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "NEW_FROM_A",
             ).order_by(ReqModel.updated_at.desc()).all(),
-            "In progress by Department B": ReqModel.query.***REMOVED***lter(
+            "In progress by Department B": ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "B_IN_PROGRESS",
             ).order_by(ReqModel.updated_at.desc()).all(),
-            "Pending review from Department A": ReqModel.query.***REMOVED***lter(
+            "Pending review from Department A": ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "WAITING_ON_A_RESPONSE",
             ).order_by(ReqModel.updated_at.desc()).all(),
-            "Needs changes": ReqModel.query.***REMOVED***lter(
+            "Needs changes": ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "C_NEEDS_CHANGES",
             ).order_by(ReqModel.updated_at.desc()).all(),
-            "Exec approval required": ReqModel.query.***REMOVED***lter(
+            "Exec approval required": ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "EXEC_APPROVAL",
             ).order_by(ReqModel.updated_at.desc()).all(),
-            "Approved by C": ReqModel.query.***REMOVED***lter(
+            "Approved by C": ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "C_APPROVED",
             ).order_by(ReqModel.updated_at.desc()).all(),
-            "Final review": ReqModel.query.***REMOVED***lter(
+            "Final review": ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "B_FINAL_REVIEW",
             ).order_by(ReqModel.updated_at.desc()).all(),
-            "Sent to A": ReqModel.query.***REMOVED***lter(
+            "Sent to A": ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "SENT_TO_A",
             ).order_by(ReqModel.updated_at.desc()).all(),
-            "Under review by Department C": ReqModel.query.***REMOVED***lter(
+            "Under review by Department C": ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "PENDING_C_REVIEW",
             ).order_by(ReqModel.updated_at.desc()).all(),
-            "Closed": ReqModel.query.***REMOVED***lter(
+            "Closed": ReqModel.query.filter(
                 ReqModel.owner_department == "B",
                 ReqModel.status == "CLOSED",
             ).order_by(ReqModel.updated_at.desc()).all(),
-            "All (B)": ReqModel.query.***REMOVED***lter(
+            "All (B)": ReqModel.query.filter(
                 ReqModel.owner_department == "B",
             ).order_by(ReqModel.updated_at.desc()).all(),
         }
 
         # status counts for quick badges
-        status_counts = {code: ReqModel.query.***REMOVED***lter(ReqModel.owner_department == "B", ReqModel.status == code).count() for code in [
+        status_counts = {code: ReqModel.query.filter(ReqModel.owner_department == "B", ReqModel.status == code).count() for code in [
             "B_IN_PROGRESS", "WAITING_ON_A_RESPONSE", "PENDING_C_REVIEW", "EXEC_APPROVAL", "B_FINAL_REVIEW", "SENT_TO_A", "CLOSED"
         ]}
 
@@ -310,7 +310,7 @@ def monitor():
                        recent_email_issues=recent_email_issues)
 
     if dept == "C":
-        pending = ReqModel.query.***REMOVED***lter_by(status="PENDING_C_REVIEW").order_by(ReqModel.updated_at.desc()).all()
+        pending = ReqModel.query.filter_by(status="PENDING_C_REVIEW").order_by(ReqModel.updated_at.desc()).all()
         dashboard_html = render_template("dashboard.html", mode="C", requests=pending, now=now)
         return render_template("admin_monitor.html", dept=dept, dashboard_html=dashboard_html,
                        total_users=total_users, active_users=active_users, admin_count=admin_count,
@@ -331,8 +331,8 @@ def audit():
     action = flask_request.args.get("action")
     audits = AuditLog.query.order_by(AuditLog.created_at.desc())
     if q:
-        audits = audits.join(User, AuditLog.actor_user_id == User.id).***REMOVED***lter(User.email.ilike(f"%{q}%"))
+        audits = audits.join(User, AuditLog.actor_user_id == User.id).filter(User.email.ilike(f"%{q}%"))
     if action:
-        audits = audits.***REMOVED***lter(AuditLog.action_type.ilike(f"%{action}%"))
+        audits = audits.filter(AuditLog.action_type.ilike(f"%{action}%"))
     audits = audits.limit(200).all()
     return render_template("admin_audit.html", audits=audits)

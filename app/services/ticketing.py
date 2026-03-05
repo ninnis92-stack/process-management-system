@@ -5,12 +5,12 @@ from flask import current_app
 class TicketingClient:
     """Stub adapter for integrating with external work-management systems (Jira, Zendesk, etc.).
 
-    - If `TICKETING_ENABLED` is False or no endpoint con***REMOVED***gured, this will return a prototype response (non-blocking).
-    - Providers should implement `create_ticket(summary, description, metadata)` returning an identi***REMOVED***er and URL.
+    - If `TICKETING_ENABLED` is False or no endpoint configured, this will return a prototype response (non-blocking).
+    - Providers should implement `create_ticket(summary, description, metadata)` returning an identifier and URL.
     """
 
     def __init__(self):
-        cfg = current_app.con***REMOVED***g
+        cfg = current_app.config
         self.enabled = cfg.get("TICKETING_ENABLED", False)
         self.url = cfg.get("TICKETING_URL")
         self.token = cfg.get("TICKETING_TOKEN")
