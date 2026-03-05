@@ -79,6 +79,18 @@
   transition: opacity 0.35s ease, transform 0.35s ease;
 }
 
+/* Keep the navbar stable regardless of quote length by fixing motivation height */
+#motivation {
+  /* Reserve two lines of text consistently so the navbar doesn't reflow */
+  height: 2.4rem;
+  min-height: 2.4rem;
+  max-height: 2.4rem;
+  overflow: hidden;
+}
+
+/* Ensure brand area centers vertically and doesn't cause navbar resizing */
+.theme-nav .navbar-brand, .theme-nav .brand-stack { align-items: center; display: flex; }
+
 a { color: var(--accent); }
 a:hover { color: var(--accent-2); }
 
