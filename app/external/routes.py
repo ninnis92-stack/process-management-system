@@ -7,6 +7,7 @@ from ..extensions import db
 from sqlalchemy.exc import OperationalError
 from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Notification
 from ..notifcations import notify_users, users_in_department
+from types import SimpleNamespace
 from werkzeug.routing import BuildError
 from .forms import ExternalNewRequestForm, ExternalCommentForm, GuestLookupForm
 
@@ -92,6 +93,7 @@ def external_new():
                 current_app.logger.exception("Failed to rollback session after flush error")
             try:
                 db.create_all()
+                db.session.add(req)  # Re-add the request instance to the session (rollback detached it)
                 db.session.flush()
             except Exception:
                 current_app.logger.exception("Failed to create tables or flush on retry")
@@ -175,8 +177,10 @@ def external_new():
             body=f"Thanks for submitting your request. Your request number is #{req.id}.\n\nTrack it here: {link}\n",
         )
         flash(f"Request #{req.id} submitted successfully. You can use this page to track updates.", "success")
-        # Render the submission page with the tracking link so the modal can show it
-        return render_template("external_new.html", form=form, created_req=req, guest_email=req.guest_email, tracking_link=link)
+        # Use Post-Redirect-Get so refresh doesn't resubmit the form. Redirect
+        # back to the guest submit page with minimal query args so the top
+        # banner can render the confirmation and the form stays cleared.
+        return redirect(url_for('external.external_new', created_req_id=req.id, guest_email=req.guest_email, tracking_link=link))
 
     return render_template("external_new.html", form=form)
 
@@ -235,6 +239,20 @@ def external_detail(token: str):
         )
         db.session.add(c)
         _log(req, "comment_added", note="Guest added a public comment.", actor_label=req.guest_email)
+            # If redirected after a successful POST, support showing the confirmation
+            # banner by accepting query params and creating a small object for the
+            # template to consume. This keeps the PRG pattern and ensures a refresh
+            # results in a fresh form.
+            created_req = None
+            tracking_link = None
+            if request.method == 'GET' and request.args.get('created_req_id'):
+                try:
+                    cid = int(request.args.get('created_req_id'))
+                except Exception:
+                    cid = None
+                if cid:
+                    created_req = SimpleNamespace(id=cid, guest_email=request.args.get('guest_email'))
+                    tracking_link = request.args.get('tracking_link')
         db.session.commit()
         flash("Comment added.", "success")
         return redirect(url_for("external.external_detail", token=token))
