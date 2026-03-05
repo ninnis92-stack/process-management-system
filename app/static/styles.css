@@ -251,3 +251,13 @@ canvas {
     font-size: 0.75rem;
   }
 }
+
+/* Remove native number input spinners for the guest dashboard request field */
+.guest-dashboard-form input[type=number]::-webkit-outer-spin-button,
+.guest-dashboard-form input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.guest-dashboard-form input[type=number] {
+  -moz-appearance: textfield;
+}
