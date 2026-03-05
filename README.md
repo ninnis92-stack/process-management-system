@@ -1,3 +1,38 @@
+# Process Management Prototype
+
+A small prototype app.
+
+## Deployment & seeding (Fly.io)
+
+Quick steps to deploy and ensure the demo users and DB are created on Fly:
+
+1. Push your branch to the Git remote named `origin`:
+
+  git add README.md
+  git commit -m "docs: add deployment and seeding instructions"
+  git push origin HEAD
+
+2. Deploy to Fly:
+
+  flyctl deploy -a process-management-prototype-lingering-bush-6175
+
+  Note: The container entrypoint already waits for DB readiness and will
+  attempt to create tables if `AUTO_CREATE_DB` is `True` (default).
+
+3. After deployment, open an SSH session to the running instance and run the
+  seed script to create demo users (run as the app user in the container):
+
+  flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command "python3 seed.py"
+
+  Alternatively, you can run the remote create-tables helper first:
+
+  flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command "python3 scripts/remote_create_tables.py"
+
+4. Confirm the app is healthy:
+
+  curl -fsS https://process-management-prototype-lingering-bush-6175.fly.dev/health
+
+If you need CI/CD automation, add these steps to your pipeline: push → `flyctl deploy` → run remote `seed.py` via `flyctl ssh`.
 # FreshProcess Process Management Prototype
 
 Brief architecture map for reviewers.
