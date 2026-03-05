@@ -1,3 +1,12 @@
+"""Routes and handlers for the core request workflow.
+
+This module implements the main blueprint for creating, viewing, assigning,
+and transitioning `Request` objects. It contains helper functions that
+encapsulate permission checks, assignment logic, and the lightweight
+in-process presence tracker used by the UI. Several endpoints also emit
+Prometheus metrics (via `app/metrics.py`) when available.
+"""
+
 import os
 import uuid
 import time

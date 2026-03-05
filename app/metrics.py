@@ -1,3 +1,17 @@
+"""Prometheus metrics helpers used by the application.
+
+This module exposes Counter and Gauge objects consumed throughout the
+codebase. When `prometheus_client` is not installed the module provides a
+no-op fallback so instrumentation calls do not raise ImportError and the app
+can run without Prometheus available (useful for lightweight local runs).
+
+Metrics provided:
+- `requests_created_total` — counter of created requests (label: dept)
+- `request_transitions_total` — counter for transitions (labels: from_status,to_status,dept)
+- `assignment_changes_total` — counter for assignment/clear actions (labels: dept,action)
+- `requests_by_owner` — gauge of current open requests per owner department
+"""
+
 import logging
 
 try:
@@ -57,7 +71,11 @@ requests_by_owner = Gauge(
 
 
 def metrics_output():
-    """Return Prometheus metrics payload (bytes) and content type."""
+    """Return Prometheus metrics payload (bytes) and content type.
+
+    This function centralizes generation of the exposition payload and protects
+    callers from exceptions that can occur while serializing collector state.
+    """
     try:
         return generate_latest(REGISTRY), CONTENT_TYPE_LATEST
     except Exception:
@@ -65,14 +83,26 @@ def metrics_output():
 
 
 def update_owner_gauge(session, ReqModel):
-    """Query DB to update requests_by_owner gauge."""
+    """Query DB and refresh the `requests_by_owner` gauge.
+
+    The helper queries the current counts per owner department and sets the
+    gauge labels accordingly. When `prometheus_client` is not present this is
+    a no-op to avoid depending on metrics for core app behavior.
+    """
     if not METRICS_AVAILABLE:
         return
-    # Clear previous values by setting to 0 for all known depts then set
-    counts = dict(session.query(ReqModel.owner_department, __import__('sqlalchemy').func.count(ReqModel.id)).group_by(ReqModel.owner_department).all())
+
+    # Gather counts grouped by owner_department and update the gauge labels.
+    counts = dict(
+        session.query(ReqModel.owner_department, __import__('sqlalchemy').func.count(ReqModel.id))
+        .group_by(ReqModel.owner_department)
+        .all()
+    )
     for d, v in counts.items():
         requests_by_owner.labels(dept=d).set(v)
-    # Ensure depts with zero get 0
+
+    # Make sure departments with zero items are explicitly set to 0 so Prometheus
+    # scraped series don't linger with stale samples in the registry.
     for d in ('A', 'B', 'C'):
         if d not in counts:
             requests_by_owner.labels(dept=d).set(0)

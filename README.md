@@ -43,6 +43,20 @@ TOTP 2FA (local accounts):
 - Run the app with `python3 run.py`; default server binds to 0.0.0.0:8080 (see `run.py`).
 - Uploads land in `uploads/`; adjust `UPLOAD_FOLDER` env var if needed.
 
+## Metrics (Prometheus)
+
+- The app exposes Prometheus-format metrics at `/metrics` (text exposition). A small DB-backed
+  human-friendly view is available at `/metrics/ui` and a machine-friendly JSON endpoint at
+  `/metrics/json` (supports `?range=daily|weekly|monthly|yearly`).
+- `app/metrics.py` contains counters and a gauge used by the application. The dependency on
+  `prometheus_client` is optional for local/dev runs — if the package is not installed the app
+  uses a safe noop fallback so the server can start. To enable full Prometheus support, install:
+
+```bash
+pip install prometheus_client
+```
+
+
 ## Status Labels & Workflow
 - Status flow: NEW_FROM_A → B_IN_PROGRESS → (optional) PENDING_C_REVIEW (owned by C) → C_APPROVED/C_NEEDS_CHANGES → B_FINAL_REVIEW → SENT_TO_A (owned by A) → CLOSED.
 - WAITING_ON_A_RESPONSE: Dept B is waiting on Department A; displayed as an informational badge.
