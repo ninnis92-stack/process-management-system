@@ -845,6 +845,23 @@ def set_artifact_donor(artifact_id: int):
     donor = (request.form.get("donor_part_number") or "").strip() or None
     a.donor_part_number = donor
     _log(req, "artifact_updated", note=f"Donor updated to: {donor}")
+    # Notify owner and Dept C (if applicable)
+    try:
+        recipients = list(users_in_department(req.owner_department))
+        if req.requires_c_review:
+            recipients.extend(users_in_department('C'))
+        uniq = {u.id: u for u in recipients}.values()
+        notify_users(
+            uniq,
+            title=f"Donor part number updated on Request #{req.id}",
+            body=(f"Donor set: {donor} — by {current_user.email}" if donor else f"Donor cleared by {current_user.email}"),
+            url=url_for("requests.request_detail", request_id=req.id),
+            ntype="artifact_donor_updated",
+            request_id=req.id,
+        )
+    except Exception:
+        current_app.logger.exception("Failed to queue donor notifications")
+
     db.session.commit()
     flash("Donor part number updated.", "success")
     return redirect(url_for("requests.request_detail", request_id=req.id))
@@ -869,8 +886,14 @@ def set_artifact_target(artifact_id: int):
 
     # Notify users in the owner department that the target was set
     try:
+        recipients = list(users_in_department(req.owner_department))
+        # If this request requires Dept C review, also notify Dept C users so they can see the part number
+        if req.requires_c_review:
+            recipients.extend(users_in_department('C'))
+        # Deduplicate
+        uniq = {u.id: u for u in recipients}.values()
         notify_users(
-            users_in_department(req.owner_department),
+            uniq,
             title=f"Part number updated on Request #{req.id}",
             body=(f"Target part number set: {target} — by {current_user.email}" if target else f"Target cleared by {current_user.email}"),
             url=url_for("requests.request_detail", request_id=req.id),
@@ -935,6 +958,10 @@ def edit_artifact(artifact_id: int):
             users.extend(users_in_department(creator_dept))
         # dedupe and exclude the acting user
         uniq = {u.id: u for u in users}.values()
+        # If this requires Dept C review, include Dept C users
+        if req.requires_c_review:
+            users.extend(users_in_department('C'))
+            uniq = {u.id: u for u in users}.values()
         recipients = [u for u in uniq if u.id != current_user.id]
         if recipients:
             title = f"Artifact updated on Request #{req.id}"
