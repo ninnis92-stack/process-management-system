@@ -36,5 +36,6 @@ primary_region = 'ord'
 [deploy]
   # Run a one-time migration / table-creation step during deploy so new
   # instances won't start with missing tables. For production, replace
-  # this with your Alembic command (e.g. `alembic upgrade head`).
-  release_command = "python scripts/remote_create_tables.py"
+  # this with your Alembic command (e.g. `alembic upgrade head`). The
+  # `release_tasks.py` will also run `seed.py` unless `SSO_ENABLED` is set.
+  release_command = "python scripts/release_tasks.py"
