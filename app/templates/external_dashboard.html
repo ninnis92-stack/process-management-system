@@ -14,4 +14,15 @@
   </div>
   <button class="btn btn-primary">Open Guest Dashboard</button>
 </form>
+{% if results is defined %}
+  <h4 class="mt-4">Open requests for {{ form.guest_email.data }}</h4>
+  <div class="list-group">
+    {% for r in results %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('external.external_detail', token=r.guest_access_token) }}">
+        <strong>Request #{{ r.id }}</strong> — {{ r.title }}
+        <div class="text-muted small">Status: {{ r.status }} • Updated {{ (now or r.updated_at).strftime('%Y-%m-%d %H:%M UTC') }}</div>
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}
 {% endblock %}

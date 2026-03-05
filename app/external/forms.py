@@ -124,5 +124,7 @@ class ExternalCommentForm(FlaskForm):
 
 
 class GuestLookupForm(FlaskForm):
-    request_id = IntegerField("Request Number", validators=[DataRequired()])
+    # Allow guests to either lookup a single request by id+email or
+    # provide just their email to list all their open requests.
+    request_id = IntegerField("Request Number", validators=[Optional()])
     guest_email = StringField("Your Email", validators=[DataRequired(), Email()])

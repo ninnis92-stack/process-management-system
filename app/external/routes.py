@@ -157,13 +157,26 @@ def external_dashboard():
     if form.validate_on_submit():
         rid = form.request_id.data
         email = (form.guest_email.data or "").strip().lower()
-        req = ReqModel.query.filter_by(id=rid, submitter_type="guest").first()
-        if not req:
-            flash("Request not found.", "warning")
-        elif (req.guest_email or "").lower() != email:
-            flash("Email does not match this request.", "warning")
+        # If a request id was provided, maintain existing behavior
+        if rid:
+            req = ReqModel.query.filter_by(id=rid, submitter_type="guest").first()
+            if not req:
+                flash("Request not found.", "warning")
+            elif (req.guest_email or "").lower() != email:
+                flash("Email does not match this request.", "warning")
+            else:
+                return redirect(url_for("external.external_detail", token=req.guest_access_token))
         else:
-            return redirect(url_for("external.external_detail", token=req.guest_access_token))
+            # No request id: list all open guest requests for this email
+            results = ReqModel.query.filter(
+                ReqModel.submitter_type == 'guest',
+                func.lower(ReqModel.guest_email) == email,
+                ReqModel.status != 'CLOSED'
+            ).order_by(ReqModel.updated_at.desc()).all()
+            if not results:
+                flash("No open requests found for this email.", "warning")
+            else:
+                return render_template('external_dashboard.html', form=form, results=results)
 
     return render_template("external_dashboard.html", form=form)
 

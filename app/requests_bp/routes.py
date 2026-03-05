@@ -241,8 +241,9 @@ def dashboard():
     artifact_form = ArtifactForm()
 
     if dept == "A":
+        # Dept A should see all open requests owned by Department A
         my_reqs = _exclude_old_closed(ReqModel.query.filter_by(
-            created_by_user_id=current_user.id
+            owner_department="A"
         )).order_by(ReqModel.updated_at.desc()).all()
         return render_template("dashboard.html", mode="A", requests=my_reqs, now=datetime.utcnow(), artifact_form=artifact_form)
 
