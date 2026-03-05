@@ -2,7 +2,7 @@
 {% block content %}
 <h3 class="mb-3">Dashboard</h3>
 
-<form class="d-flex mb-3" method="get" action="{{ url_for('requests.dashboard') }}">
+<form class="d-flex mb-3" method="get" action="{{ url_for('requests.search_requests') }}">
   <input id="searchInput" name="q" class="form-control me-2" type="search" placeholder="Search by request # or description" aria-label="Search" value="{{ request.args.get('q','') }}">
   <button class="btn btn-outline-secondary" type="submit">Search</button>
   {% if request.args.get('q') %}
@@ -75,28 +75,31 @@
   {% endif %}
 
   {% for label, items in buckets.items() %}
-    <div class="card mb-3" id="bucket-{{ label|replace(' ', '-')|lower() }}">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <strong>{{ label }}</strong>
-        <span class="badge text-bg-light text-dark">{{ items|length }} item{{ '' if items|length == 1 else 's' }}</span>
+    {% set open_items = items|selectattr('status', 'ne', 'CLOSED')|list %}
+    {% if open_items|length %}
+      <div class="card mb-3" id="bucket-{{ label|replace(' ', '-')|lower() }}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <strong>{{ label }}</strong>
+          <span class="badge text-bg-light text-dark">{{ open_items|length }} item{{ '' if open_items|length == 1 else 's' }}</span>
+        </div>
+        <div class="list-group list-group-flush">
+          {% for r in open_items %}
+            <a class="list-group-item list-group-item-action text-reset" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
+              <div class="d-flex justify-content-between">
+                <strong>#{{ r.id }} · {{ r.title }}</strong>
+                <span class="badge text-bg-secondary">{{ r.status }}</span>
+              </div>
+              <small class="text-muted">
+                {{ r.pricebook_display }} · {{ r.priority }} · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
+                · C Review: {{ "Required" if r.requires_c_review else "Not required" }}
+              </small>
+            </a>
+          {% else %}
+            <div class="list-group-item text-muted">No items.</div>
+          {% endfor %}
+        </div>
       </div>
-      <div class="list-group list-group-flush">
-        {% for r in items %}
-          <a class="list-group-item list-group-item-action text-reset" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
-            <div class="d-flex justify-content-between">
-              <strong>#{{ r.id }} · {{ r.title }}</strong>
-              <span class="badge text-bg-secondary">{{ r.status }}</span>
-            </div>
-            <small class="text-muted">
-              {{ r.pricebook_display }} · {{ r.priority }} · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
-              · C Review: {{ "Required" if r.requires_c_review else "Not required" }}
-            </small>
-          </a>
-        {% else %}
-          <div class="list-group-item text-muted">No items.</div>
-        {% endfor %}
-      </div>
-    </div>
+    {% endif %}
   {% endfor %}
 
 {% elif mode == "C" %}

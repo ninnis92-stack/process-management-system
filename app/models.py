@@ -55,6 +55,10 @@ class User(db.Model, UserMixin):
     department = db.Column(db.String(1), nullable=False, default="A")  # A/B/C
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
+    is_admin = db.Column(db.Boolean, nullable=False, default=False)
+    # Optional TOTP 2FA for local accounts
+    totp_secret = db.Column(db.String(64), nullable=True)
+    totp_enabled = db.Column(db.Boolean, nullable=False, default=False)
 
 class Noti***REMOVED***cation(db.Model):
     """In-app noti***REMOVED***cation with optional deep link and dedupe key."""
@@ -127,7 +131,7 @@ class Request(db.Model):
 class Artifact(db.Model):
     """Artifacts attached to a request (part numbers or instructions)."""
     id = db.Column(db.Integer, primary_key=True)
-    request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False)
+    request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=True)
 
     artifact_type = db.Column(db.String(30), nullable=False)  # part_number / instructions
 
@@ -220,4 +224,8 @@ class AuditLog(db.Model):
     to_status = db.Column(db.String(40), nullable=True)
     note = db.Column(db.Text, nullable=True)
 
+    # human-readable created timestamp (existing)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # explicit event timestamp for audit events (useful for indexing and queries)
+    event_ts = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

@@ -13,6 +13,12 @@
   --focus: rgba(11,97,238,0.14);
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 .theme-body {
   position: relative;
   background: var(--page-bg);
@@ -33,11 +39,26 @@
   z-index: 1000; /* keep above page content but below dropdowns that use higher z-index */
 }
 
+.impersonation-banner {
+  background: #fff3cd; /* light warning */
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  position: sticky;
+  top: 56px; /* sit just below the navbar */
+  z-index: 1050;
+}
+
 .navbar-brand, .navbar-nav .nav-link { color: var(--nav-text) !important; }
 .navbar-nav .nav-link.active { color: var(--accent) !important; font-weight: 600; }
 
 .brand-stack { flex-direction: row !important; align-items: center !important; gap: 10px !important; }
-.brand-title { font-weight: 700; color: var(--nav-text); }
+.brand-title { 
+  font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  font-weight: 800;
+  color: var(--nav-text);
+  font-size: 1.05rem;
+  letter-spacing: 0.2px;
+  line-height: 1;
+}
 .brand-quote { font-size: 0.86rem; font-style: italic; color: rgba(255,255,255,0.95); text-decoration: underline 1px rgba(255,255,255,0.18); }
 
 #motivation {
@@ -158,3 +179,75 @@ a:hover { color: var(--accent-2); }
 }
 
 .search-hit { background: rgba(255,230,140,0.95); padding: 0 2px; border-radius: 2px; }
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+.main {
+  overflow-x: hidden;
+}
+
+.notif-dropdown {
+  width: min(360px, calc(100vw - 1rem));
+}
+
+@media (max-width: 992px) {
+  .theme-nav {
+    top: 0;
+  }
+
+  .brand-stack {
+    gap: 8px !important;
+  }
+
+  #motivation {
+    max-width: 180px;
+  }
+
+  .nav-actions {
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .main.container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .card {
+    border-radius: 12px;
+  }
+
+  .notif-dropdown {
+    right: 0.5rem;
+    left: 0.5rem;
+    top: 3.25rem;
+    width: auto;
+  }
+
+  .badge {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 576px) {
+  .brand-title {
+    font-size: 0.95rem;
+  }
+
+  #motivation {
+    max-width: 140px;
+    font-size: 0.82rem;
+  }
+
+  .nav-actions .btn,
+  .nav-actions .badge {
+    font-size: 0.75rem;
+  }
+}

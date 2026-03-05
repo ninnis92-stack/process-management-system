@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, abort, c
 
 from ..extensions import db
 from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Noti***REMOVED***cation
+from ..notifcations import notify_users, users_in_department
 from .forms import ExternalNewRequestForm, ExternalCommentForm, GuestLookupForm
 
 external_bp = Blueprint("external", __name__, url_pre***REMOVED***x="/external")
@@ -21,20 +22,7 @@ def _log(req, action_type, note=None, from_status=None, to_status=None, actor_ty
     )
     db.session.add(entry)
 
-def users_in_department(dept: str):
-    return User.query.***REMOVED***lter_by(department=dept, is_active=True).all()
-
-
-def notify_users(users, *, title: str, body: str, url: str, ntype: str, request_id: int = None):
-    for u in users:
-        db.session.add(Noti***REMOVED***cation(
-            user_id=u.id,
-            request_id=request_id,
-            type=ntype,
-            title=title,
-            body=body,
-            url=url,
-        ))
+# Noti***REMOVED***cation helpers imported from app/notifcations.py
 
 
 def _send_guest_email(to_email: str, subject: str, body: str) -> None:
@@ -149,6 +137,7 @@ def external_new():
         _log(req, "submission_created", note="Initial submission packet created (Guest A→B).", actor_label=req.guest_email)
 
         db.session.commit()
+        
         # Email the guest with their request number and tracking link (best-effort)
         link = url_for("external.external_detail", token=req.guest_access_token, _external=True)
         _send_guest_email(

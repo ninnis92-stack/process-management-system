@@ -1,0 +1,60 @@
+from typing import Optional, Dict
+from flask import current_app
+import requests
+
+
+class Veri***REMOVED***cationService:
+    """Small adapter to call external veri***REMOVED***cation APIs for parts and methods.
+
+    Behavior:
+      - If the relevant API is disabled or URL not con***REMOVED***gured, returns {'ok': None, 'reason': 'disabled'}
+      - On success, returns {'ok': True/False, 'details': <api response dict>}.
+      - On error, returns {'ok': False, 'reason': 'error', 'error': <message>}.
+    """
+
+    def __init__(self):
+        cfg = current_app.con***REMOVED***g
+        self.part_enabled = cfg.get("PART_API_ENABLED", False)
+        self.part_url = cfg.get("PART_API_URL")
+        self.part_token = cfg.get("PART_API_TOKEN")
+        self.part_timeout = cfg.get("PART_API_TIMEOUT", 5)
+
+        self.method_enabled = cfg.get("METHOD_API_ENABLED", False)
+        self.method_url = cfg.get("METHOD_API_URL")
+        self.method_token = cfg.get("METHOD_API_TOKEN")
+        self.method_timeout = cfg.get("METHOD_API_TIMEOUT", 5)
+
+        self.session = requests.Session()
+        # Don't blindly set Authorization header if no token available; prefer per-request headers
+
+    def _call_api(self, url: str, params: dict, token: Optional[str], timeout: int) -> Dict:
+        headers = {}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        try:
+            resp = self.session.get(url, params=params, headers=headers, timeout=timeout)
+            resp.raise_for_status()
+            try:
+                return {"ok": True, "details": resp.json()}
+            except ValueError:
+                return {"ok": True, "details": {"raw": resp.text}}
+        except Exception as exc:
+            return {"ok": False, "reason": "error", "error": str(exc)}
+
+    def verify_part_number(self, part_number: str) -> Dict:
+        if not part_number:
+            return {"ok": False, "reason": "empty"}
+        if not self.part_enabled or not self.part_url:
+            return {"ok": None, "reason": "disabled"}
+        # Recommend provider implement GET /validate?part=... returning JSON {valid: true/false,...}
+        url = self.part_url.rstrip("/") + "/validate"
+        return self._call_api(url, {"part": part_number}, self.part_token, self.part_timeout)
+
+    def verify_method(self, method_id: str) -> Dict:
+        if not method_id:
+            return {"ok": False, "reason": "empty"}
+        if not self.method_enabled or not self.method_url:
+            return {"ok": None, "reason": "disabled"}
+        # Recommend provider implement GET /validate?method=... returning JSON {valid: true/false,...}
+        url = self.method_url.rstrip("/") + "/validate"
+        return self._call_api(url, {"method": method_id}, self.method_token, self.method_timeout)

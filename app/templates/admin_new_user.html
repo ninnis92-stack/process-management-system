@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Create / Update User</h3>
+<form method="post" class="card p-3" style="max-width: 720px;">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">
+    <label class="form-label">Email</label>
+    {{ form.email(class="form-control") }}
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Display name</label>
+    {{ form.name(class="form-control") }}
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Password (leave blank to keep current)</label>
+    {{ form.password(class="form-control") }}
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Department</label>
+    {{ form.department(class="form-select") }}
+  </div>
+  <div class="form-check mb-3">
+    {{ form.is_active(class="form-check-input") }}
+    <label class="form-check-label ms-2">Active</label>
+  </div>
+  <button class="btn btn-primary">Create / Update</button>
+</form>
+{% endblock %}

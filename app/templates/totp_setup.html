@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Enable Two-Factor Authentication</h2>
+
+<p>Scan the QR code in your authenticator app or enter the secret manually.</p>
+
+<div>
+  <p><strong>Secret:</strong> {{ secret }}</p>
+  <p><strong>Provisioning URI:</strong> {{ provisioning_uri }}</p>
+</div>
+
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-group">
+    <label for="code">Enter code from your authenticator app</label>
+    <input name="code" id="code" class="form-control" />
+  </div>
+  <button class="btn btn-primary">Enable 2FA</button>
+</form>
+
+{% endblock %}

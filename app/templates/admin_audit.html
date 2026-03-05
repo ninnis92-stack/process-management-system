@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Audit Log</h2>
+
+<form method="get" class="form-inline mb-3">
+  <input class="form-control mr-2" name="user" placeholder="user email" value="{{ request.args.get('user','') }}">
+  <input class="form-control mr-2" name="action" placeholder="action" value="{{ request.args.get('action','') }}">
+  <button class="btn btn-primary">Filter</button>
+</form>
+
+<table class="table table-sm">
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Actor</th>
+      <th>Action</th>
+      <th>Request</th>
+      <th>Note</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for a in audits %}
+    <tr>
+      <td>{{ a.created_at }}</td>
+      <td>{{ a.actor_label or (a.actor_user.email if a.actor_user else 'system') }}</td>
+      <td>{{ a.action_type }}</td>
+      <td>{% if a.request %}<a href="{{ url_for('requests.detail', request_id=a.request.id) }}">#{{ a.request.id }}</a>{% endif %}</td>
+      <td>{{ a.note }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5">No audit entries.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

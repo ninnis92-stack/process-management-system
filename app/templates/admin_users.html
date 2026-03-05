@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Admin — Users</h3>
+<div class="d-flex gap-2 mb-3">
+  <a class="btn btn-primary" href="{{ url_for('admin.create_user') }}">Create / Update User</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=A">Monitor A</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=B">Monitor B</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=C">Monitor C</a>
+</div>
+<div class="table-responsive">
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Name</th>
+        <th>Department</th>
+        <th>Active</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.email }}</td>
+          <td>{{ u.name or '' }}</td>
+          <td>{{ u.department }}</td>
+          <td>{{ 'Yes' if u.is_active else 'No' }}</td>
+          <td>{{ u.created_at }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.edit_user', user_id=u.id) }}">Edit</a>
+            <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.monitor') }}?dept=B">Monitor B</a>
+            {% if current_user.id != u.id %}
+              <form method="post" action="{{ url_for('admin.impersonate_dept') }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="dept" value="{{ u.department }}" />
+                <button class="btn btn-sm btn-outline-primary me-1">Act as Dept {{ u.department }}</button>
+              </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('admin.delete_user', user_id=u.id) }}" class="d-inline" onsubmit="return con***REMOVED***rm('Delete user {{ u.email }}?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-muted">No users.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

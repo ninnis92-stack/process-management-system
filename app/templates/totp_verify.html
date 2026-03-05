@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Two-Factor Veri***REMOVED***cation</h2>
+
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-group">
+    <label for="code">Enter code from your authenticator app</label>
+    <input name="code" id="code" class="form-control" />
+  </div>
+  <button class="btn btn-primary">Verify</button>
+</form>
+
+{% endblock %}

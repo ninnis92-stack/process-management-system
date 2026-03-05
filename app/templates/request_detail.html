@@ -294,6 +294,7 @@
           <h5>Method / Part (placeholder)</h5>
           <div class="small text-muted mb-2">Enter the created method ID or part number.</div>
           <form method="post" action="{{ url_for('requests.store_veri***REMOVED***cation_placeholder', request_id=req.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-2">
               <label class="form-label">Method ID</label>
               <input type="text" name="created_method" class="form-control" placeholder="e.g. M-1234">
@@ -326,11 +327,11 @@
             </div>
 
             <div class="mb-2">
-              <label class="form-label">Submission Summary (required for handoffs)</label>
+              <label id="submissionSummaryLabel" class="form-label">Submission Summary (required for handoffs)</label>
               {{ transition_form.submission_summary(class="form-control", placeholder="Short summary") }}
             </div>
             <div class="mb-2">
-              <label class="form-label">Submission Details{% if current_user.department not in ['B', 'C'] %} (required for handoffs){% endif %}</label>
+              <label id="submissionDetailsLabel" class="form-label">Submission Details{% if current_user.department not in ['B', 'C'] %} (required for handoffs){% endif %}</label>
               {{ transition_form.submission_details(class="form-control", rows="4", placeholder="What was locked in, what to review, assumptions...", required=(current_user.department not in ['B', 'C'])) }}
             </div>
 
@@ -423,4 +424,39 @@
 
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+  <div id="handoffTargetsData" data-targets='{{ handoff_targets|tojson }}' style="display:none"></div>
+  <script>
+    (function(){
+      const container = document.getElementById('handoffTargetsData');
+      let handoffTargets = [];
+      try {
+        handoffTargets = JSON.parse(container.dataset.targets || '[]');
+      } catch (e) {
+        handoffTargets = [];
+      }
+      const toSelect = document.querySelector('select[name="to_status"]');
+      const summaryEl = document.querySelector('input[name="submission_summary"]');
+      const detailsEl = document.querySelector('textarea[name="submission_details"]');
+      const summaryLabel = document.getElementById('submissionSummaryLabel');
+      const detailsLabel = document.getElementById('submissionDetailsLabel');
+
+      function updateForSelection() {
+        if (!toSelect) return;
+        const v = toSelect.value;
+        const isHandoff = handoffTargets.indexOf(v) !== -1;
+        if (summaryEl) summaryEl.required = isHandoff;
+        if (detailsEl) detailsEl.required = false; // details optional for transfers
+        if (summaryLabel) summaryLabel.textContent = isHandoff ? 'Submission Summary (required for transfers)' : 'Update Summary (optional)';
+        if (detailsLabel) detailsLabel.textContent = isHandoff ? 'Submission Details (optional)' : 'Submission Details (optional)';
+      }
+
+      if (toSelect) {
+        toSelect.addEventListener('change', updateForSelection);
+        updateForSelection();
+      }
+    })();
+  </script>
 {% endblock %}

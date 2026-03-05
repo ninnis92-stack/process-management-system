@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Admin Monitor — Dept {{ dept }}</h3>
+<div class="mb-3 d-flex gap-2">
+  <a class="btn btn-outline-primary" href="?dept=A">View Dept A</a>
+  <a class="btn btn-outline-primary" href="?dept=B">View Dept B</a>
+  <a class="btn btn-outline-primary" href="?dept=C">View Dept C</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5>Stats</h5>
+        <ul class="list-unstyled mb-0">
+          <li>Total users: <strong>{{ total_users }}</strong></li>
+          <li>Active users: <strong>{{ active_users }}</strong></li>
+          <li>Admins: <strong>{{ admin_count }}</strong></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5>Recent email issues</h5>
+        {% if recent_email_issues %}
+          <ul class="list-unstyled small mb-0">
+            {% for n in recent_email_issues %}
+              <li>
+                <div><strong>{{ n.title }}</strong></div>
+                <div class="text-muted">To user ID: {{ n.user_id }} — {{ n.created_at }}</div>
+                <div class="small">{{ n.body }}</div>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="text-muted">No recent issues.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5>Department view</h5>
+        <div>
+          {{ dashboard_html|safe }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

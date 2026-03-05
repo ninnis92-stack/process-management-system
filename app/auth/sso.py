@@ -22,3 +22,20 @@ def init_oauth(app):
         client_kwargs={"scope": app.con***REMOVED***g.get("OIDC_SCOPES", "openid email pro***REMOVED***le")},
     )
     return True
+
+
+def token_has_mfa(id_token: dict) -> bool:
+    """Inspect an OIDC id_token (decoded claims) for MFA/AMR indicators.
+
+    Returns True when the authentication methods (`amr`) include an MFA indicator
+    such as 'mfa' or 'otp'. This is a heuristic and depends on the IdP.
+    """
+    if not id_token:
+        return False
+    amr = id_token.get("amr") or []
+    if isinstance(amr, str):
+        amr = [amr]
+    for v in amr:
+        if v and v.lower() in ("mfa", "otp", "2fa", "hwk"):  # common indicators
+            return True
+    return False

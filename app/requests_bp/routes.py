@@ -38,10 +38,10 @@ from .permissions import (
     allowed_comment_scopes_for_user,
 )
 from .workflow import transition_allowed, owner_for_status, handoff_for_transition
+from ..services.veri***REMOVED***cation import Veri***REMOVED***cationService
+from ..notifcations import notify_users, users_in_department
 
 
-def users_in_department(dept: str):
-    return User.query.***REMOVED***lter_by(department=dept, is_active=True).all()
 
 requests_bp = Blueprint("requests", __name__, url_pre***REMOVED***x="")
 
@@ -117,17 +117,7 @@ def _assignment_choices(dept: str):
 
 
 
-# Uni***REMOVED***ed noti***REMOVED***cation helper
-def notify_users(users, *, title: str, body: Optional[str], url: str, ntype: str, request_id: Optional[int] = None):
-    for u in users:
-        db.session.add(Noti***REMOVED***cation(
-            user_id=u.id,
-            request_id=request_id,
-            type=ntype,
-            title=title,
-            body=body,
-            url=url,
-        ))
+# Noti***REMOVED***cation helpers are provided by app/notifcations.py (imported above)
 
 
 def is_transition_valid_for_request(req: ReqModel, dept: str, from_status: str, to_status: str) -> bool:
@@ -353,18 +343,38 @@ def search_requests():
 
     results = []
     if q:
+        # Numeric queries should match request id exactly, but also look for text in other ***REMOVED***elds
+        ***REMOVED***lters = [
+            ReqModel.title.ilike(f"%{q}%"),
+            ReqModel.description.ilike(f"%{q}%"),
+        ]
+
+        # Search artifacts (part numbers / instructions URL)
+        ***REMOVED***lters.extend([
+            Artifact.donor_part_number.ilike(f"%{q}%"),
+            Artifact.target_part_number.ilike(f"%{q}%"),
+            Artifact.instructions_url.ilike(f"%{q}%"),
+        ])
+
+        # Search comments and submissions text
+        ***REMOVED***lters.extend([
+            Comment.body.ilike(f"%{q}%"),
+            Submission.summary.ilike(f"%{q}%"),
+            Submission.details.ilike(f"%{q}%"),
+        ])
+
+        qry = base.outerjoin(Artifact, Artifact.request_id == ReqModel.id)
+        qry = qry.outerjoin(Comment, Comment.request_id == ReqModel.id)
+        qry = qry.outerjoin(Submission, Submission.request_id == ReqModel.id)
+
         if q.isdigit():
-            by_id = base.***REMOVED***lter(ReqModel.id == int(q))
-            by_text = base.***REMOVED***lter(or_(
-                ReqModel.title.ilike(f"%{q}%"),
-                ReqModel.description.ilike(f"%{q}%"),
-            ))
-            results = by_id.union(by_text).order_by(ReqModel.updated_at.desc()).limit(50).all()
+            # include exact id matches as well
+            id_***REMOVED***lter = ReqModel.id == int(q)
+            qry = qry.***REMOVED***lter(or_(id_***REMOVED***lter, ****REMOVED***lters))
         else:
-            results = base.***REMOVED***lter(or_(
-                ReqModel.title.ilike(f"%{q}%"),
-                ReqModel.description.ilike(f"%{q}%"),
-            )).order_by(ReqModel.updated_at.desc()).limit(50).all()
+            qry = qry.***REMOVED***lter(or_(****REMOVED***lters))
+
+        results = qry.distinct().order_by(ReqModel.updated_at.desc()).limit(50).all()
 
     return render_template("search.html", q=q, results=results, now=datetime.utcnow())
 
@@ -520,6 +530,7 @@ def request_detail(request_id: int):
                 label = to.replace("_", " ").title()
             possible.append((to, label))
         transition_form.to_status.choices = possible
+        transition_form.requires_c_review.data = req.requires_c_review
     else:
         possible = []
         for to in ("C_APPROVED", "C_NEEDS_CHANGES"):
@@ -561,6 +572,7 @@ def request_detail(request_id: int):
         next_hint=next_hint,
         now=now,
         assigned_user=req.assigned_to_user,
+        handoff_targets=[t for t, _ in possible if handoff_for_transition(req.status, t)],
     )
 
 
@@ -676,9 +688,46 @@ def store_veri***REMOVED***cation_placeholder(request_id: int):
     if note:
         note_lines.append(f"Note: {note}")
 
+    # Attempt to verify using con***REMOVED***gured external services (non-blocking)
+    veri***REMOVED***er = Veri***REMOVED***cationService()
+    ver_results = []
+    if created_method:
+        vm = veri***REMOVED***er.verify_method(created_method)
+        ver_results.append(("method", created_method, vm))
+        if vm.get("ok") is True:
+            note_lines.append(f"Method veri***REMOVED***cation: OK")
+        elif vm.get("ok") is False:
+            note_lines.append(f"Method veri***REMOVED***cation: FAILED ({vm.get('reason') or vm.get('error')})")
+        else:
+            note_lines.append("Method veri***REMOVED***cation: not con***REMOVED***gured")
+
+    if created_part:
+        vp = veri***REMOVED***er.verify_part_number(created_part)
+        ver_results.append(("part", created_part, vp))
+        if vp.get("ok") is True:
+            note_lines.append(f"Part veri***REMOVED***cation: OK")
+        elif vp.get("ok") is False:
+            note_lines.append(f"Part veri***REMOVED***cation: FAILED ({vp.get('reason') or vp.get('error')})")
+        else:
+            note_lines.append("Part veri***REMOVED***cation: not con***REMOVED***gured")
+
     _log(req, "veri***REMOVED***cation_placeholder", note="; ".join(note_lines))
     db.session.commit()
-    flash("Logged for now. Veri***REMOVED***cation API will be added when available.", "info")
+
+    # Provide immediate feedback to the user
+    flashes = ["Logged for now."]
+    for kind, value, res in ver_results:
+        if res.get("ok") is True:
+            flashes.append(f"{kind.title()} '{value}' veri***REMOVED***ed OK.")
+        elif res.get("ok") is False:
+            reason = res.get("reason") or res.get("error") or "unknown"
+            flashes.append(f"{kind.title()} '{value}' veri***REMOVED***cation failed: {reason}.")
+        else:
+            flashes.append(f"{kind.title()} '{value}' veri***REMOVED***cation not con***REMOVED***gured.")
+
+    for msg in flashes:
+        flash(msg, "info")
+
     return redirect(url_for("requests.request_detail", request_id=req.id))
 
 
@@ -881,6 +930,22 @@ def do_transition(request_id: int):
         return redirect(url_for("requests.request_detail", request_id=req.id))
 
     to_status = form.to_status.data
+
+    if dept == "B":
+        req.requires_c_review = bool(form.requires_c_review.data)
+
+        if req.requires_c_review and to_status in (
+            "B_IN_PROGRESS",
+            "WAITING_ON_A_RESPONSE",
+            "B_FINAL_REVIEW",
+        ):
+            to_status = "PENDING_C_REVIEW"
+            flash("Requires Dept C Review is checked — routing to Department C review.", "info")
+
+        if (not req.requires_c_review) and to_status == "PENDING_C_REVIEW":
+            to_status = "B_IN_PROGRESS"
+            flash("Requires Dept C Review is not checked — keeping request out of Department C review.", "info")
+
     if not is_transition_valid_for_request(req, dept, req.status, to_status):
         flash("That transition isn't allowed from the current status.", "danger")
         return redirect(url_for("requests.request_detail", request_id=req.id))
@@ -889,11 +954,21 @@ def do_transition(request_id: int):
 
     # If handoff, create submission (+ attachments), notify receiving dept
     handoff = handoff_for_transition(req.status, to_status)
+    # If no explicit handoff rule exists but the owner department implied by the
+    # target status differs from the current owner, treat this as a transfer
+    # handoff (e.g., selecting a status that names a different department).
+    if not handoff:
+        target_owner = owner_for_status(to_status)
+        if target_owner and target_owner != req.owner_department:
+            handoff = (req.owner_department, target_owner)
     if handoff:
-        # Only enforce submission content when the acting department is not B/C
-        if current_user.department not in ("B", "C"):
-            if not form.submission_summary.data or not form.submission_details.data:
-                flash("Submission Summary and Details are required for this handoff.", "danger")
+        # Require submission content only when the handoff crosses departments
+        from_dept, to_dept = handoff
+        require_submission = (from_dept != to_dept)
+
+        if require_submission:
+            if not form.submission_summary.data:
+                flash("Submission Summary is required when transferring a request to another department.", "danger")
                 return redirect(url_for("requests.request_detail", request_id=req.id))
 
         try:
@@ -902,7 +977,6 @@ def do_transition(request_id: int):
             flash(str(e), "danger")
             return redirect(url_for("requests.request_detail", request_id=req.id))
 
-        from_dept, to_dept = handoff
         is_public = (to_dept == "A") or (from_dept == "A")
 
         sub = Submission(
@@ -911,8 +985,8 @@ def do_transition(request_id: int):
             to_department=to_dept,
             from_status=req.status,
             to_status=to_status,
-            summary=form.submission_summary.data.strip(),
-            details=form.submission_details.data.strip(),
+            summary=(form.submission_summary.data or "").strip(),
+            details=(form.submission_details.data or "").strip(),
             is_public_to_submitter=is_public,
             created_by_user_id=current_user.id,
         )

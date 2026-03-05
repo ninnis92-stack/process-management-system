@@ -4,30 +4,30 @@
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const lines = [
-    "Small steps every day lead to big change.",
-    "Progress is a series of tiny wins.",
-    "Focus on the next best small thing.",
-    "Clear the smallest blocker ***REMOVED***rst.",
-    "Good questions are progress in disguise.",
-    "Ship early, learn quickly.",
-    "Simplify to amplify speed.",
-    "Finish one thing well today.",
-    "Share early to reduce rework.",
-    "A clear step beats vague intentions.",
-    "Iterate in public and get better.",
-    "Design for the next small win.",
-    "Make the path obvious for others.",
-    "Break big things into two-doable-parts.",
-    "Decide, then adjust with data.",
-    "Consistent effort compounds.",
-    "Remove one assumption and test it.",
-    "Celebrate the smallest progress.",
-    "Turn feedback into action quickly.",
-    "Clarity saves time later.",
-    "Protect time for deep work.",
-    "Ask for help — it speeds things up.",
-    "Make the next step unambiguous.",
-    "Done is a great place to improve from."
+    "Sort today: socks ***REMOVED***rst, worries later.",
+    "A folded stack is a small victory.",
+    "One load at a time, one win at a time.",
+    "Tackle the smallest basket ***REMOVED***rst.",
+    "Fresh socks, fresh perspective.",
+    "Turn laundry into a tiny ritual of calm.",
+    "Don't wait for motivation—start the wash.",
+    "Clean clothes, clearer head.",
+    "Fold with intention; carry less chaos.",
+    "A warm dryer is a hug for your clothes.",
+    "Separate colors, not your priorities.",
+    "Make today productive—***REMOVED***nish one load.",
+    "Every matched pair is progress.",
+    "Treat stains as experiments, not failures.",
+    "Declutter your closet, declutter your day.",
+    "A neat drawer frees mental space.",
+    "Air-dry patience; speed comes after practice.",
+    "Small care preserves the longest wear.",
+    "Refresh your routine with a fresh load.",
+    "Laundry ***REMOVED*** is peace earned.",
+    "Celebrate a completed basket.",
+    "Put it away; let it be ***REMOVED***nished.",
+    "Socks ***REMOVED***nd their way home eventually.",
+    "Folded clothes, elevated mood."
   ];
 
   // Stable per-day seed (days since epoch) so the order changes each day.
@@ -107,6 +107,31 @@
   if (!prefersReduced) {
     setInterval(() => advance(), 8000);
   }
+})();
+
+// Attach CSRF token from meta to fetch POST/PUT/DELETE requests automatically
+(function attachCsrfToFetch(){
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  if(!meta) return;
+  const token = meta.getAttribute('content');
+  if(!token) return;
+
+  const _orig = window.fetch;
+  window.fetch = function(input, init){
+    init = init || {};
+    const method = (init.method || 'GET').toUpperCase();
+    if(method !== 'GET' && method !== 'HEAD'){
+      init.headers = init.headers || {};
+      // Do not overwrite if already provided
+      if(!init.headers['X-CSRFToken'] && !init.headers['X-CSRF-Token']){
+        init.headers['X-CSRFToken'] = token;
+        init.headers['X-CSRF-Token'] = token;
+      }
+      // Also include common AJAX header
+      if(!init.headers['X-Requested-With']) init.headers['X-Requested-With'] = 'XMLHttpRequest';
+    }
+    return _orig.call(this, input, init);
+  };
 })();
 
 (function initTheme() {
