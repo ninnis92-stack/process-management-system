@@ -130,6 +130,25 @@ def create_app():
             except Exception:
                 pass
 
+        # Track the last successfully rendered GET URL in the session so that
+        # when the DB is temporarily unavailable we can redirect users back to
+        # the last working page instead of showing a persistent 503 on refresh.
+        from flask import session as _session, request as _request
+
+        @app.after_request
+        def _store_last_good(response):
+            try:
+                # Only store successful GET responses (status < 400).
+                if _request.method == 'GET' and response.status_code < 400:
+                    try:
+                        _session['last_good_url'] = _request.url
+                    except Exception:
+                        # Session may be unavailable in some contexts; ignore.
+                        pass
+            except Exception:
+                pass
+            return response
+
     from .auth.routes import auth_bp
     from .requests_bp.routes import requests_bp
     from .external.routes import external_bp
@@ -158,6 +177,19 @@ def create_app():
         @app.errorhandler(OperationalError)
         def _handle_db_op_error(err):
             app.logger.exception("Database operational error handled: %s", err)
+            # If we have a recorded last-good URL in the user's session, try
+            # redirecting them there so a browser refresh will return them to
+            # a previously loaded page instead of repeatedly showing the 503.
+            try:
+                from flask import session as _session, redirect, request as _request
+                last = _session.get('last_good_url')
+                # Avoid redirect loops: don't redirect back to the same failing URL
+                if last and last != _request.url:
+                    app.logger.info('Redirecting to last good URL after DB error: %s', last)
+                    return redirect(last)
+            except Exception:
+                pass
+
             return ("Service temporarily unavailable — database initializing. Please try again shortly.", 503)
     except Exception:
         # If SQLAlchemy isn't available for some reason, skip installing the handler.
