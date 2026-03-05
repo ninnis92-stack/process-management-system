@@ -22,3 +22,5 @@ Flask-Migrate==4.0.4
 redis==4.7.0
 rq==1.13.1
 prometheus_client==0.16.0
+alembic==1.11.1
+pyotp==2.8.0
