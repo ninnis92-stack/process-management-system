@@ -62,6 +62,17 @@ def external_new():
     form = ExternalNewRequestForm()
     if form.validate_on_submit():
         desc = (form.description.data or "").strip()
+        # Normalize guest email early for checks
+        guest_email = (form.guest_email.data or "").strip().lower()
+
+        # If the app is configured to require SSO-linked accounts for guest
+        # submissions, enforce that the provided email matches a user with
+        # an SSO subject (`sso_sub`)
+        if current_app.config.get("REQUIRE_SSO_FOR_GUEST", False):
+            u = User.query.filter_by(email=guest_email).first()
+            if not u or not u.sso_sub:
+                flash("Guest email must be an SSO-linked account.", "warning")
+                return render_template("external_new.html", form=form)
 
         req = ReqModel(
             title=form.title.data.strip(),
@@ -72,7 +83,7 @@ def external_new():
             status="NEW_FROM_A",
             owner_department="B",
             submitter_type="guest",
-            guest_email=form.guest_email.data.strip().lower(),
+            guest_email=guest_email,
             guest_name=form.guest_name.data.strip() if form.guest_name.data else None,
             pricebook_status=form.pricebook_status.data,
             due_at=form.due_at.data,

@@ -135,6 +135,14 @@ OIDC_REDIRECT_URI=https://your-app/_auth/oidc/callback
 
 - If your IdP communicates MFA in the `amr` claim, set `SSO_REQUIRE_MFA=true` to require MFA for admin access. The SSO flow sets `session['sso_mfa']` when it detects MFA in the id_token. Until your IdP is connected, SSO and MFA checks are inert.
 
+### Enforcing SSO for Guest Submissions (integration notes)
+
+- The app supports enforcing that guest submissions come from accounts already linked to your SSO provider. This is controlled by the `REQUIRE_SSO_FOR_GUEST` config flag (disabled by default).
+- When enabled the guest email provided on the `/external/new` form must match a `User` row whose `sso_sub` is populated (i.e. previously linked via SSO). If the email is not SSO-linked the form will show a friendly warning and the request will not be created.
+- To integrate: during your SSO onboarding flow ensure you create or update a local `User` with `email` and `sso_sub` set. Then enable `REQUIRE_SSO_FOR_GUEST=true` in your deployment environment to enforce the restriction.
+
+Smoke-test helper (placeholder): `scripts/smoke_sso_submit.py` is included to assist with later automation once you have test SSO cookies or an automated SSO test flow. It expects `SSO_TEST_COOKIE` and `SSO_TEST_EMAIL` env vars and demonstrates how to POST the guest form while authenticated.
+
 Admin Hardening Checklist:
 
 - Enable SSO and test with a non-production IdP before enforcing in production.
