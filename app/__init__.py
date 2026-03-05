@@ -149,4 +149,18 @@ def create_app():
         with app.app_context():
             db.create_all()
 
+    # Return a friendly 503 when the database isn't ready instead of a 500.
+    # This avoids exposing a stacktrace to end users during rolling deploys
+    # when a machine may briefly not have the DB/tables available.
+    try:
+        from sqlalchemy.exc import OperationalError
+
+        @app.errorhandler(OperationalError)
+        def _handle_db_op_error(err):
+            app.logger.exception("Database operational error handled: %s", err)
+            return ("Service temporarily unavailable — database initializing. Please try again shortly.", 503)
+    except Exception:
+        # If SQLAlchemy isn't available for some reason, skip installing the handler.
+        pass
+
     return app
