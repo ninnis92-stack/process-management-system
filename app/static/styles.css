@@ -91,6 +91,19 @@
 /* Ensure brand area centers vertically and doesn't cause navbar resizing */
 .theme-nav .navbar-brand, .theme-nav .brand-stack { align-items: center; display: flex; }
 
+/* Reserve a stable width for the brand area so changing quote length doesn't push navbar items */
+.theme-nav .navbar-brand {
+  flex: 0 0 320px; /* fixed space for logo + title + quote */
+  min-width: 220px;
+  max-width: 420px;
+  overflow: hidden;
+}
+
+/* Keep action buttons a bit further from the brand so they don't visually collide when quote changes */
+.nav-actions {
+  margin-left: 1rem; /* small gap from the left-side content */
+}
+
 a { color: var(--accent); }
 a:hover { color: var(--accent-2); }
 
@@ -193,6 +206,12 @@ a:hover { color: var(--accent-2); }
 @media (min-width: 992px) {
   .card.mb-3 { margin-bottom: 1rem; }
   .card[id^="bucket-"] { min-height: 100px; }
+}
+
+/* Responsive: on narrow screens allow normal wrapping and remove fixed brand width */
+@media (max-width: 576px) {
+  .theme-nav .navbar-brand { flex: 0 1 auto; min-width: auto; max-width: none; }
+  .nav-actions { margin-left: 0; }
 }
 
 /* Compact inline target form */

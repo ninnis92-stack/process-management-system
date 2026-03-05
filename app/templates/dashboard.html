@@ -57,7 +57,7 @@
       'EXEC_APPROVAL': 'exec-approval-required',
       'B_FINAL_REVIEW': 'final-review',
       'SENT_TO_A': 'sent-to-a',
-      'CLOSED': 'closed'
+      'CLOSED': 'closed-this-week'
     } %}
     {% for code, label, cls in [
       ('B_IN_PROGRESS', 'In progress', 'bg-primary'),
@@ -66,7 +66,7 @@
       ('EXEC_APPROVAL', 'Exec approval required', 'bg-dark'),
       ('B_FINAL_REVIEW', 'Final review', 'bg-warning text-dark'),
       ('SENT_TO_A', 'Sent to A', 'bg-success'),
-      ('CLOSED', 'Closed', 'bg-secondary')
+      ('CLOSED', 'Closed this week', 'bg-secondary')
     ] %}
       {% set anchor = bucket_links.get(code, '') %}
       <a class="badge status-pill {{ cls }} text-decoration-none" href="{{ url_for('requests.dashboard') }}#bucket-{{ anchor }}">{{ label }} · {{ status_counts.get(code, 0) }}</a>
@@ -75,15 +75,20 @@
   {% endif %}
 
   {% for label, items in buckets.items() %}
-    {% set open_items = items|selectattr('status', 'ne', 'CLOSED')|list %}
-    {% if open_items|length %}
+    {# Show closed buckets (e.g., 'Closed this week') as-is; otherwise filter out CLOSED items #}
+    {% if 'closed' in label|lower %}
+      {% set visible_items = items|list %}
+    {% else %}
+      {% set visible_items = items|selectattr('status', 'ne', 'CLOSED')|list %}
+    {% endif %}
+    {% if visible_items|length %}
       <div class="card mb-3" id="bucket-{{ label|replace(' ', '-')|lower() }}">
         <div class="card-header d-flex justify-content-between align-items-center">
           <strong>{{ label }}</strong>
-          <span class="badge status-pill text-bg-light text-dark">{{ open_items|length }} item{{ '' if open_items|length == 1 else 's' }}</span>
+          <span class="badge status-pill text-bg-light text-dark">{{ visible_items|length }} item{{ '' if visible_items|length == 1 else 's' }}</span>
         </div>
         <div class="list-group list-group-flush bucket-list">
-          {% for r in open_items %}
+          {% for r in visible_items %}
             <a class="list-group-item list-group-item-action text-reset bucket-item" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
               <div class="d-flex justify-content-between align-items-start mb-1">
                 <div class="me-2">
@@ -92,6 +97,9 @@
                 </div>
                 <div class="text-end">
                   <div><span class="badge status-pill status-default">{{ r.status }}</span></div>
+                  {% if r.last_owner_status %}
+                    <div class="mt-1"><small class="text-muted">Last by owner: <span class="badge bg-light text-dark">{{ r.last_owner_status }}</span></small></div>
+                  {% endif %}
                 </div>
               </div>
               <div class="small text-muted">C Review: {{ "Required" if r.requires_c_review else "Not required" }}</div>

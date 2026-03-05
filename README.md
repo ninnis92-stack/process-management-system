@@ -254,3 +254,32 @@ Document any exemptions in your deployment notes so reviewers understand the sec
 - No Alembic migrations; schema auto-creates in dev.
 - Guest detail page surfaces public submissions/comments only; internal notes stay hidden.
 - Placeholder verification endpoint (routes) still needs real lookup logic.
+
+## Local DB migrations (development)
+
+Small schema fixes for local development are provided in `migrations/`. The helper
+script `migrations/apply_local_sqlite_migrations.py` will locate the configured
+SQLite DB (from `config.py`), add missing columns, and recreate `audit_log` when
+necessary so `request_id` can be NULL for system-level audit entries (for example
+when an admin starts/stops impersonation).
+
+Run the helper from the project root:
+
+```bash
+# Ensure the project root is on PYTHONPATH so config imports resolve
+PYTHONPATH=. python3 migrations/apply_local_sqlite_migrations.py
+```
+
+If you'd rather recreate a clean dev DB instead of patching in-place, remove the
+local DB file (commonly `instance/app.db` or `app.db` depending on config) and run:
+
+```bash
+python3 seed.py
+```
+
+Note: `app/metrics.py` attempts to import `prometheus_client`. If that package is
+not installed the app uses a safe noop fallback; to enable Prometheus metrics run:
+
+```bash
+pip install prometheus_client
+```

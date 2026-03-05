@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Metrics{% if metrics|length == 1 %} — Dept {{ metrics[0].dept }}{% endif %}</h3>
+<p class="text-muted">Snapshot: {{ now.strftime('%Y-%m-%d %H:%M UTC') }} — {{ range_label }}</p>
+<div class="mb-3">
+  <a href="?range=daily" class="btn btn-sm btn-outline-secondary {% if range_key=='daily' %}active{% endif %}">Daily</a>
+  <a href="?range=weekly" class="btn btn-sm btn-outline-secondary {% if range_key=='weekly' %}active{% endif %}">Weekly</a>
+  <a href="?range=monthly" class="btn btn-sm btn-outline-secondary {% if range_key=='monthly' %}active{% endif %}">Monthly</a>
+  <a href="?range=yearly" class="btn btn-sm btn-outline-secondary {% if range_key=='yearly' %}active{% endif %}">Yearly</a>
+</div>
+<div class="card">
+  <div class="card-body">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th>Department</th>
+          <th class="text-end">Total requests</th>
+          <th class="text-end">Open</th>
+          <th class="text-end">Created (window)</th>
+          <th class="text-end">Closed (window)</th>
+        </tr>
+      </thead>
+        <tbody>
+          {% for m in metrics %}
+        <tr>
+          <td><strong>Dept {{ m.dept }}</strong></td>
+          <td class="text-end">{{ m.total }}</td>
+          <td class="text-end">{{ m.open }}</td>
+          <td class="text-end">{{ m.created_window }}</td>
+          <td class="text-end">{{ m.closed_window }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

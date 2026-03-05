@@ -26,7 +26,7 @@
     {% set due_badge = 'Due in ' ~ ((req.due_at - now).days) ~ 'd' if req.due_at >= now else 'Overdue' %}
     <span class="badge {{ 'bg-danger' if req.due_at < now else 'bg-info text-dark' }}">{{ due_badge }}</span>
   {% endif %}
-  {% if current_user.department in ['B','C'] %}
+  {% if current_user.department in ['A','B','C'] %}
     <span class="badge text-bg-light text-dark">Assigned: {{ assigned_user.name or assigned_user.email if assigned_user else 'Unassigned' }}</span>
     {% if (not assigned_user or assigned_user.id == current_user.id) and req.status != 'CLOSED' %}
       <form method="post" action="{{ url_for('requests.assign_self', request_id=req.id) }}" class="d-inline">
@@ -85,6 +85,7 @@
 
               <div class="mt-2 p-2 border rounded bg-light">
                 <div class="small text-muted mb-1">Edit artifact</div>
+                {% if (not req.assigned_to_user) or (req.assigned_to_user and req.assigned_to_user.id == current_user.id) %}
                 <form method="post" action="{{ url_for('requests.edit_artifact', artifact_id=a.id) }}">
                   {{ artifact_form.hidden_tag() }}
                   {{ artifact_form.artifact_type(type="hidden", value=a.artifact_type) }}
@@ -112,6 +113,9 @@
                   </div>
                   <button class="btn btn-sm btn-primary mt-2">Save</button>
                 </form>
+                {% else %}
+                  <div class="text-muted small">Only the assigned user may edit this request.</div>
+                {% endif %}
               </div>
             </li>
           {% else %}
@@ -121,6 +125,7 @@
 
         {% if current_user.department == "A" %}
           {% if not has_part_number or not has_instructions %}
+            {% if (not req.assigned_to_user) or (req.assigned_to_user and req.assigned_to_user.id == current_user.id) %}
             <form method="post" action="{{ url_for('requests.add_artifact', request_id=req.id) }}">
               {{ artifact_form.hidden_tag() }}
 
@@ -154,6 +159,9 @@
 
               <button class="btn btn-outline-primary w-100">Add Artifact</button>
             </form>
+            {% else %}
+              <div class="text-muted">Only the assigned user may add artifacts.</div>
+            {% endif %}
           {% else %}
             <div class="text-muted">Artifacts already exist. Edit only if Dept B requests changes.</div>
           {% endif %}
@@ -161,6 +169,7 @@
 
         {% if current_user.department == "B" %}
           {% if not has_part_number %}
+            {% if (not req.assigned_to_user) or (req.assigned_to_user and req.assigned_to_user.id == current_user.id) %}
             <form method="post" action="{{ url_for('requests.add_artifact', request_id=req.id) }}">
               {{ artifact_form.hidden_tag() }}
 
@@ -186,6 +195,9 @@
 
               <button class="btn btn-outline-primary w-100">Add Part Number Artifact</button>
             </form>
+            {% else %}
+              <div class="text-muted">Only the assigned user may add artifacts.</div>
+            {% endif %}
           {% else %}
             <div class="text-muted">Part Number artifact already exists. Edit/update it if needed.</div>
           {% endif %}
@@ -240,7 +252,7 @@
           <div class="small text-muted">Current</div>
           <div>{% if assignee %}{{ assignee.name or assignee.email }}{% else %}Unassigned{% endif %}</div>
         </div>
-        {% if current_user.department in ["B","C"] and assignment_form %}
+        {% if assignment_form %}
           <form method="post" action="{{ url_for('requests.assign_request', request_id=req.id) }}">
             {{ assignment_form.hidden_tag() }}
             <div class="mb-2">
@@ -253,11 +265,12 @@
       </div>
     </div>
 
-    {% if current_user.department == "B" %}
+        {% if current_user.department == "B" %}
       <div class="card shadow-sm mb-3">
         <div class="card-body">
           <h5>Method / Part (placeholder)</h5>
           <div class="small text-muted mb-2">Enter the created method ID or part number.</div>
+          {% if (not req.assigned_to_user) or (req.assigned_to_user and req.assigned_to_user.id == current_user.id) %}
           <form method="post" action="{{ url_for('requests.store_verification_placeholder', request_id=req.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-2">
@@ -274,6 +287,9 @@
             </div>
             <button class="btn btn-outline-primary w-100">Verify</button>
           </form>
+            {% else %}
+              <div class="text-muted">Only the assigned user may perform verification actions.</div>
+            {% endif %}
         </div>
       </div>
     {% endif %}
@@ -282,22 +298,29 @@
 
     <div class="card shadow-sm mb-3">
       <div class="card-body">
-        <h5>Transition (Guarded)</h5>
+        <h5>Status Update</h5>
+        <div class="small text-muted mb-2">Note: Department A may close a ticket without providing a submission. Dept A may reopen the ticket within 48 hours after closure. Dept B will be notified when a ticket is closed.</div>
         {% if transition_form.to_status.choices %}
+          {% if (not req.assigned_to_user) or (req.assigned_to_user and req.assigned_to_user.id == current_user.id) %}
           <form method="post" action="{{ url_for('requests.do_transition', request_id=req.id) }}" enctype="multipart/form-data">
             {{ transition_form.hidden_tag() }}
-            <div class="mb-2">
-              <label class="form-label">Next Status</label>
-              {{ transition_form.to_status(class="form-select") }}
+            <div class="mb-2 d-flex align-items-center">
+              <div style="flex:1">
+                <label class="form-label">Next Status</label>
+                {{ transition_form.to_status(class="form-select", id="toStatusSelect") }}
+              </div>
+              <div class="ms-2">
+                <span id="handoffHint" class="small text-muted d-none" title="Submission required when transferring a request to another department.">⚑</span>
+              </div>
             </div>
 
             <div class="mb-2">
-              <label id="submissionSummaryLabel" class="form-label">Submission Summary (required for handoffs)</label>
+              <label id="submissionSummaryLabel" class="form-label">Summary</label>
               {{ transition_form.submission_summary(class="form-control", placeholder="Short summary") }}
             </div>
             <div class="mb-2">
-              <label id="submissionDetailsLabel" class="form-label">Submission Details{% if current_user.department not in ['B', 'C'] %} (required for handoffs){% endif %}</label>
-              {{ transition_form.submission_details(class="form-control", rows="4", placeholder="What was locked in, what to review, assumptions...", required=(current_user.department not in ['B', 'C'])) }}
+              <label id="submissionDetailsLabel" class="form-label">Details</label>
+              {{ transition_form.submission_details(class="form-control", rows="4", placeholder="What was locked in, what to review, assumptions...") }}
             </div>
 
             <div class="mb-2">
@@ -319,6 +342,9 @@
 
             <button class="btn btn-primary w-100">Apply Transition</button>
           </form>
+          {% else %}
+            <div class="text-muted">Only the assigned user may apply transitions.</div>
+          {% endif %}
         {% else %}
           <div class="text-muted">No transitions available for your department at this status.</div>
         {% endif %}
@@ -347,6 +373,7 @@
           {% endfor %}
         </div>
 
+        {% if (not req.assigned_to_user) or (req.assigned_to_user and req.assigned_to_user.id == current_user.id) %}
         <form method="post" action="{{ url_for('requests.add_comment', request_id=req.id) }}">
           {{ comment_form.hidden_tag() }}
           <div class="mb-2">
@@ -359,6 +386,9 @@
           </div>
           <button class="btn btn-outline-primary w-100">Add Comment</button>
         </form>
+        {% else %}
+          <div class="text-muted">Only the assigned user may add comments on this request.</div>
+        {% endif %}
       </div>
     </div>
 
@@ -414,8 +444,8 @@
         const isHandoff = handoffTargets.indexOf(v) !== -1;
         if (summaryEl) summaryEl.required = isHandoff;
         if (detailsEl) detailsEl.required = false; // details optional for transfers
-        if (summaryLabel) summaryLabel.textContent = isHandoff ? 'Submission Summary (required for transfers)' : 'Update Summary (optional)';
-        if (detailsLabel) detailsLabel.textContent = isHandoff ? 'Submission Details (optional)' : 'Submission Details (optional)';
+          if (summaryLabel) summaryLabel.textContent = isHandoff ? 'Summary' : 'Update Summary (optional)';
+          if (detailsLabel) detailsLabel.textContent = 'Details (optional)';
       }
 
       if (toSelect) {

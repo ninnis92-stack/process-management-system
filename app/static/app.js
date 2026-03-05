@@ -109,6 +109,41 @@
   }
 })();
 
+(function initHandoffHint(){
+  document.addEventListener('DOMContentLoaded', function(){
+    try{
+      // Prefer explicit global injected variable, but fall back to reading
+      // the hidden data container injected in templates (#handoffTargetsData)
+      let handoffTargets = [];
+      if (Array.isArray(window.HANDOFF_TARGETS)) {
+        handoffTargets = window.HANDOFF_TARGETS;
+      } else {
+        const container = document.getElementById('handoffTargetsData');
+        if (container && container.dataset && container.dataset.targets) {
+          try { handoffTargets = JSON.parse(container.dataset.targets); } catch (e) { handoffTargets = []; }
+        }
+      }
+      const hintEl = document.getElementById('handoffHint');
+      if(!hintEl) return;
+      const select = document.getElementById('toStatusSelect') || document.querySelector('select[name="to_status"]');
+      if(!select) return;
+
+      function updateHint(){
+        const val = select.value;
+        if(Array.isArray(handoffTargets) && handoffTargets.indexOf(val) !== -1){
+          hintEl.classList.remove('d-none');
+        } else {
+          hintEl.classList.add('d-none');
+        }
+      }
+
+      select.addEventListener('change', updateHint);
+      // initial
+      updateHint();
+    }catch(e){ console.warn('initHandoffHint error', e); }
+  });
+})();
+
 (function initDeptMiniWindow(){
   // Provides a small interactive iframe in admin monitor to load internal pages for debugging.
   const urlInput = document.getElementById('miniUrl');
@@ -236,31 +271,31 @@
 
   // 24 pastel / muted palettes that are easy on the eyes (accent = primary, accent2 = softer shade)
   const palettes = [
-    { name: "Soft Coral", accent: "#E47D6A", accent2: "#F5E9E6" },
-    { name: "Warm Sand", accent: "#DDB892", accent2: "#FAF5EE" },
-    { name: "Moss", accent: "#A7C28C", accent2: "#F0F7ED" },
-    { name: "Sage", accent: "#8FA98A", accent2: "#EFF6EE" },
-    { name: "Muted Teal", accent: "#6FB1B1", accent2: "#EDF7F7" },
-    { name: "Sky", accent: "#7FB3D5", accent2: "#EFF8FC" },
-    { name: "Powder Blue", accent: "#9FC6E7", accent2: "#F6FBFF" },
-    { name: "Lavender", accent: "#B9A7E0", accent2: "#F6F3FB" },
-    { name: "Lilac", accent: "#C7B3D6", accent2: "#FBF8FD" },
-    { name: "Muted Pink", accent: "#E8B7C8", accent2: "#FFF5F8" },
-    { name: "Peach", accent: "#F2B091", accent2: "#FFF6F2" },
-    { name: "Butter", accent: "#F4D58D", accent2: "#FFFDF2" },
-    { name: "Pistachio", accent: "#D6E8C3", accent2: "#FBFDF4" },
-    { name: "Mint", accent: "#BFEAD6", accent2: "#F9FFFB" },
-    { name: "Seafoam", accent: "#9EE3C5", accent2: "#F7FFF6" },
-    { name: "Aqua", accent: "#8ED6D1", accent2: "#F4FFFE" },
-    { name: "Robin Egg", accent: "#8EC7E6", accent2: "#F5FDFF" },
-    { name: "Periwinkle", accent: "#B2C8F9", accent2: "#F8FBFF" },
-    { name: "Dusty Blue", accent: "#9BB1C8", accent2: "#F6F9FB" },
-    { name: "Slate Rose", accent: "#C9A6A6", accent2: "#FBF6F6" },
-    { name: "Tea", accent: "#C9D6B3", accent2: "#FBFDF4" },
-    { name: "Stone", accent: "#BFC8C6", accent2: "#F7F9F9" },
-    { name: "Soft Gray", accent: "#BDC3C7", accent2: "#FAFBFC" },
-    { name: "Charcoal Mist", accent: "#93A0A8", accent2: "#F1F5F6" },
-    { name: "Aurora", accent: "#0F766E", accent2: "#E6FAF8" }
+    { name: "Soft Coral", theme: "Cozy Coral", accent: "#E47D6A", accent2: "#F5E9E6" },
+    { name: "Warm Sand", theme: "Warm Morning", accent: "#DDB892", accent2: "#FAF5EE" },
+    { name: "Moss", theme: "Quiet Grove", accent: "#A7C28C", accent2: "#F0F7ED" },
+    { name: "Sage", theme: "Sage Retreat", accent: "#8FA98A", accent2: "#EFF6EE" },
+    { name: "Muted Teal", theme: "Calm Teal", accent: "#6FB1B1", accent2: "#EDF7F7" },
+    { name: "Sky", theme: "Clear Sky", accent: "#7FB3D5", accent2: "#EFF8FC" },
+    { name: "Powder Blue", theme: "Soft Powder", accent: "#9FC6E7", accent2: "#F6FBFF" },
+    { name: "Lavender", theme: "Lavender Dream", accent: "#B9A7E0", accent2: "#F6F3FB" },
+    { name: "Lilac", theme: "Lilac Haze", accent: "#C7B3D6", accent2: "#FBF8FD" },
+    { name: "Muted Pink", theme: "Blush", accent: "#E8B7C8", accent2: "#FFF5F8" },
+    { name: "Peach", theme: "Peach Sunrise", accent: "#F2B091", accent2: "#FFF6F2" },
+    { name: "Butter", theme: "Buttercream", accent: "#F4D58D", accent2: "#FFFDF2" },
+    { name: "Pistachio", theme: "Pistachio Grove", accent: "#D6E8C3", accent2: "#FBFDF4" },
+    { name: "Mint", theme: "Fresh Mint", accent: "#BFEAD6", accent2: "#F9FFFB" },
+    { name: "Seafoam", theme: "Seafoam Breeze", accent: "#9EE3C5", accent2: "#F7FFF6" },
+    { name: "Aqua", theme: "Aqua Calm", accent: "#8ED6D1", accent2: "#F4FFFE" },
+    { name: "Robin Egg", theme: "Robin's Dawn", accent: "#8EC7E6", accent2: "#F5FDFF" },
+    { name: "Periwinkle", theme: "Periwinkle Morning", accent: "#B2C8F9", accent2: "#F8FBFF" },
+    { name: "Dusty Blue", theme: "Dusty Blue", accent: "#9BB1C8", accent2: "#F6F9FB" },
+    { name: "Slate Rose", theme: "Slate Rose", accent: "#C9A6A6", accent2: "#FBF6F6" },
+    { name: "Tea", theme: "Tea Garden", accent: "#C9D6B3", accent2: "#FBFDF4" },
+    { name: "Stone", theme: "Stone Whisper", accent: "#BFC8C6", accent2: "#F7F9F9" },
+    { name: "Soft Gray", theme: "Soft Gray", accent: "#BDC3C7", accent2: "#FAFBFC" },
+    { name: "Charcoal Mist", theme: "Charcoal Mist", accent: "#93A0A8", accent2: "#F1F5F6" },
+    { name: "Aurora", theme: "Aurora", accent: "#0F766E", accent2: "#E6FAF8" }
   ];
 
   function hexToRgb(hex) {
@@ -298,7 +333,7 @@
     );
     // Update any visible vibe labels (global and department-facing)
     const vibeLabels = document.querySelectorAll('.vibeLabel, #vibeLabel');
-    vibeLabels.forEach(el => { try { el.textContent = p.name; } catch(e){} });
+    vibeLabels.forEach(el => { try { el.textContent = (p.theme || p.name); } catch(e){} });
     localStorage.setItem("vibeTheme", String(idx));
     // If user is logged in, persist preference server-side
     try{

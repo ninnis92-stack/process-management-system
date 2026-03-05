@@ -214,7 +214,8 @@ class Attachment(db.Model):
 class AuditLog(db.Model):
     """Immutable audit trail for actions on a request."""
     id = db.Column(db.Integer, primary_key=True)
-    request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False)
+    # Allow NULL for system-level audit entries not tied to a specific request
+    request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=True)
 
     actor_type = db.Column(db.String(20), nullable=False)  # user/guest/system
     actor_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)

@@ -3,10 +3,10 @@ import uuid
 import time
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, func
 
 from flask import (
-    Blueprint, render_template, redirect, request, url_for, flash, abort, send_file, current_app, jsonify
+    Blueprint, render_template, redirect, request, url_for, flash, abort, send_file, current_app, jsonify, Response
 )
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -40,6 +40,7 @@ from .permissions import (
 from .workflow import transition_allowed, owner_for_status, handoff_for_transition
 from ..services.verification import VerificationService
 from ..notifcations import notify_users, users_in_department
+from .. import metrics as metrics_module
 
 
 
@@ -111,7 +112,83 @@ def _users_in_dept(dept: str) -> List[User]:
 
 def _assignment_choices(dept: str):
     users = _users_in_dept(dept)
+    # Do not expose admin accounts as assignable choices to non-admin actors.
+    if not getattr(current_user, "is_admin", False):
+        users = [u for u in users if not getattr(u, "is_admin", False)]
     return [(-1, "Unassigned")] + [(u.id, (u.name or u.email)) for u in users]
+
+
+def _require_assigned_user(req: ReqModel):
+    """Ensure the current user is the assignee for mutating actions.
+
+    Returns a Flask response (redirect) when the request is unassigned; aborts
+    with 403 when assigned to someone else. Returns None when OK.
+    """
+    # If unassigned: instruct the caller to assign first
+    if not req.assigned_to_user_id:
+        # If this is an AJAX/XHR caller, return JSON so client JS can handle it.
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False, "error": "unassigned", "message": "Request must be assigned before performing this action."}), 409
+        # For GET requests, avoid redirect loops by returning an error status
+        if request.method == 'GET':
+            abort(409)
+        flash("Request must be assigned before performing this action.", "warning")
+        return redirect(url_for("requests.request_detail", request_id=req.id))
+
+    # If assigned to someone else: avoid raw 403 pages for normal form submits —
+    # redirect with a helpful message. For AJAX callers return JSON + 403.
+    if req.assigned_to_user_id != current_user.id:
+        other = User.query.get(req.assigned_to_user_id)
+        label = (other.name or other.email) if other else "Another user"
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False, "error": "assigned_to_other", "assigned_to": label}), 403
+        # For GET requests, avoid redirect loops by returning 403
+        if request.method == 'GET':
+            abort(403)
+        flash(f"This request is assigned to {label}.", "warning")
+        return redirect(url_for("requests.request_detail", request_id=req.id))
+
+    return None
+
+
+def _success_response(message: str, req: ReqModel, redirect_endpoint: str = "requests.request_detail"):
+    """Return JSON for AJAX callers or flash+redirect for normal requests."""
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"ok": True, "message": message}), 200
+    flash(message, "success")
+    return redirect(url_for(redirect_endpoint, request_id=req.id))
+
+
+def _last_status_by_owner_dept(req: ReqModel) -> str:
+    """Return the most recent status (to_status) changed by a user in the
+    request's current owner department. Falls back to the request's current
+    status when no matching audit entry exists.
+    """
+    entry = (
+        AuditLog.query
+        .filter_by(request_id=req.id, action_type="status_change")
+        .join(User, AuditLog.actor_user)
+        .filter(User.department == req.owner_department)
+        .order_by(AuditLog.created_at.desc())
+        .first()
+    )
+    if entry and entry.to_status:
+        return entry.to_status
+    return req.status
+
+
+def _closed_within_hours(req: ReqModel, hours: int = 48) -> bool:
+    """Return True if the request was moved to CLOSED within the last `hours` hours."""
+    entry = (
+        AuditLog.query
+        .filter_by(request_id=req.id, action_type="status_change")
+        .filter(AuditLog.to_status == "CLOSED")
+        .order_by(AuditLog.created_at.desc())
+        .first()
+    )
+    if not entry:
+        return False
+    return (datetime.utcnow() - entry.created_at) <= timedelta(hours=hours)
 
 
 
@@ -145,7 +222,12 @@ def root():
 @requests_bp.route("/dashboard")
 @login_required
 def dashboard():
+    # Default to the current user's department. Admins may pass ?as_dept=A|B|C to view other departments.
     dept = current_user.department
+    if getattr(current_user, 'is_admin', False):
+        as_dept = (request.args.get('as_dept') or '').upper()
+        if as_dept in ('A', 'B', 'C'):
+            dept = as_dept
 
     artifact_form = ArtifactForm()
 
@@ -159,29 +241,39 @@ def dashboard():
         # Allow filtering by a single status via query param `status`
         status_filter = request.args.get("status")
 
+        # Include requests that are owned by B OR that have been sent to B via a Submission
+        sent_to_b_subq = db.session.query(Submission.request_id).filter(Submission.to_department == "B").subquery()
+        base_b_raw = ReqModel.query.filter(or_(ReqModel.owner_department == "B", ReqModel.id.in_(sent_to_b_subq)))
+        base_b = base_b_raw
+        # cutoff for 'closed this week' — start of current week (Monday 00:00 UTC)
+        now = datetime.utcnow()
+        closed_cutoff = datetime(now.year, now.month, now.day) - timedelta(days=now.weekday())
+
         # Status bar counts for Dept B (owner_department == "B")
         status_counts = {
-            "B_IN_PROGRESS": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B", ReqModel.status == "B_IN_PROGRESS"
+            "B_IN_PROGRESS": _exclude_old_closed(base_b.filter(
+                ReqModel.status == "B_IN_PROGRESS"
             )).count(),
-            "WAITING_ON_A_RESPONSE": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B", ReqModel.status == "WAITING_ON_A_RESPONSE"
+            "WAITING_ON_A_RESPONSE": _exclude_old_closed(base_b.filter(
+                ReqModel.status == "WAITING_ON_A_RESPONSE"
             )).count(),
-            "PENDING_C_REVIEW": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B", ReqModel.status == "PENDING_C_REVIEW"
+            "PENDING_C_REVIEW": _exclude_old_closed(base_b.filter(
+                ReqModel.status == "PENDING_C_REVIEW"
             )).count(),
-            "EXEC_APPROVAL": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B", ReqModel.status == "EXEC_APPROVAL"
+            "EXEC_APPROVAL": _exclude_old_closed(base_b.filter(
+                ReqModel.status == "EXEC_APPROVAL"
             )).count(),
-            "B_FINAL_REVIEW": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B", ReqModel.status == "B_FINAL_REVIEW"
+            "B_FINAL_REVIEW": _exclude_old_closed(base_b.filter(
+                ReqModel.status == "B_FINAL_REVIEW"
             )).count(),
-            "SENT_TO_A": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B", ReqModel.status == "SENT_TO_A"
+            "SENT_TO_A": _exclude_old_closed(base_b.filter(
+                ReqModel.status == "SENT_TO_A"
             )).count(),
-            "CLOSED": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B", ReqModel.status == "CLOSED"
-            )).count(),
+            # Closed this week (reset every 7 days)
+            "CLOSED": base_b.filter(
+                ReqModel.status == "CLOSED",
+                ReqModel.updated_at >= closed_cutoff,
+            ).count(),
         }
 
         # Semantic status filters for Dept B dashboard
@@ -201,119 +293,108 @@ def dashboard():
             "EXEC_APPROVAL": "Requires executive approval",
             "SENT_TO_A": "Sent to A",
             "All": "All (B)",
+            "CLOSED": "Closed this week",
         }
 
         # Build buckets based on the selected semantic filter, otherwise show default buckets
         if status_filter:
             sf = status_filter
             if sf == "in_progress":
-                items = _exclude_old_closed(ReqModel.query.filter(
-                    ReqModel.owner_department == "B",
+                items = base_b.filter(
                     ReqModel.status == "B_IN_PROGRESS",
-                )).order_by(ReqModel.updated_at.desc()).all()
+                ).order_by(ReqModel.updated_at.desc()).all()
             elif sf == "method_created":
                 # Requests with an 'instructions' artifact
-                items = _exclude_old_closed(ReqModel.query.join(Artifact).filter(
-                    ReqModel.owner_department == "B",
+                items = base_b.join(Artifact).filter(
                     Artifact.artifact_type == "instructions",
-                )).order_by(ReqModel.updated_at.desc()).distinct().all()
+                ).order_by(ReqModel.updated_at.desc()).distinct().all()
             elif sf == "part_number_created":
                 # Requests with a part_number artifact that has any part number filled
-                items = _exclude_old_closed(ReqModel.query.join(Artifact).filter(
-                    ReqModel.owner_department == "B",
+                items = base_b.join(Artifact).filter(
                     Artifact.artifact_type == "part_number",
                     (Artifact.target_part_number.isnot(None)) | (Artifact.donor_part_number.isnot(None)),
-                )).order_by(ReqModel.updated_at.desc()).distinct().all()
+                ).order_by(ReqModel.updated_at.desc()).distinct().all()
             elif sf == "under_review_by_department_c":
-                items = _exclude_old_closed(ReqModel.query.filter(
-                    ReqModel.owner_department == "B",
+                items = base_b.filter(
                     ReqModel.status == "PENDING_C_REVIEW",
-                )).order_by(ReqModel.updated_at.desc()).all()
+                ).order_by(ReqModel.updated_at.desc()).all()
             elif sf == "waiting_on_department_a":
-                items = _exclude_old_closed(ReqModel.query.filter(
-                    ReqModel.owner_department == "B",
+                items = base_b.filter(
                     ReqModel.status == "WAITING_ON_A_RESPONSE",
-                )).order_by(ReqModel.updated_at.desc()).all()
+                ).order_by(ReqModel.updated_at.desc()).all()
             elif sf == "under_final_review":
-                items = _exclude_old_closed(ReqModel.query.filter(
-                    ReqModel.owner_department == "B",
+                items = base_b.filter(
                     ReqModel.status == "B_FINAL_REVIEW",
-                )).order_by(ReqModel.updated_at.desc()).all()
+                ).order_by(ReqModel.updated_at.desc()).all()
             elif sf == "exec_approval":
-                items = _exclude_old_closed(ReqModel.query.filter(
-                    ReqModel.owner_department == "B",
+                items = base_b.filter(
                     ReqModel.status == "EXEC_APPROVAL",
-                )).order_by(ReqModel.updated_at.desc()).all()
+                ).order_by(ReqModel.updated_at.desc()).all()
             elif sf == "request_denied":
-                items = _exclude_old_closed(ReqModel.query.filter(
-                    ReqModel.owner_department == "B",
+                items = base_b.filter(
                     ReqModel.status == "CLOSED",
-                )).order_by(ReqModel.updated_at.desc()).all()
+                ).order_by(ReqModel.updated_at.desc()).all()
             else:
                 # fallback: treat as raw status code
-                items = _exclude_old_closed(ReqModel.query.filter(
-                    ReqModel.owner_department == "B",
+                items = base_b.filter(
                     ReqModel.status == status_filter,
-                )).order_by(ReqModel.updated_at.desc()).all()
+                ).order_by(ReqModel.updated_at.desc()).all()
 
             label = STATUS_LABELS.get(status_filter, status_filter)
             buckets = {label: items}
         else:
             buckets = {
-            "New from A": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B",
+            "New from A": base_b.filter(
                 ReqModel.status == "NEW_FROM_A",
-            )).order_by(ReqModel.updated_at.desc()).all(),
+            ).order_by(ReqModel.updated_at.desc()).all(),
 
-            "In progress by Department B": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B",
+            "In progress by Department B": base_b.filter(
                 ReqModel.status == "B_IN_PROGRESS",
-            )).order_by(ReqModel.updated_at.desc()).all(),
+            ).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Pending review from Department A": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B",
+            "Pending review from Department A": base_b.filter(
                 ReqModel.status == "WAITING_ON_A_RESPONSE",
-            )).order_by(ReqModel.updated_at.desc()).all(),
+            ).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Needs changes": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B",
+            "Needs changes": base_b.filter(
                 ReqModel.status == "C_NEEDS_CHANGES",
-            )).order_by(ReqModel.updated_at.desc()).all(),
+            ).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Exec approval required": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B",
+            "Exec approval required": base_b.filter(
                 ReqModel.status == "EXEC_APPROVAL",
-            )).order_by(ReqModel.updated_at.desc()).all(),
+            ).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Approved by C": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B",
+            "Approved by C": base_b.filter(
                 ReqModel.status == "C_APPROVED",
-            )).order_by(ReqModel.updated_at.desc()).all(),
+            ).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Final review": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B",
+            "Final review": base_b.filter(
                 ReqModel.status == "B_FINAL_REVIEW",
-            )).order_by(ReqModel.updated_at.desc()).all(),
+            ).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Sent to A": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B",
+            "Sent to A": base_b.filter(
                 ReqModel.status == "SENT_TO_A",
-            )).order_by(ReqModel.updated_at.desc()).all(),
+            ).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Under review by Department C": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B",
+            "Under review by Department C": base_b.filter(
                 ReqModel.status == "PENDING_C_REVIEW",
-            )).order_by(ReqModel.updated_at.desc()).all(),
+            ).order_by(ReqModel.updated_at.desc()).all(),
 
-            "Closed": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B",
+            "Closed this week": base_b.filter(
                 ReqModel.status == "CLOSED",
-            )).order_by(ReqModel.updated_at.desc()).all(),
+                ReqModel.updated_at >= closed_cutoff,
+            ).order_by(ReqModel.updated_at.desc()).all(),
 
-            "All (B)": _exclude_old_closed(ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-            )).order_by(ReqModel.updated_at.desc()).all(),
+            "All (B)": base_b.order_by(ReqModel.updated_at.desc()).all(),
         }
+        # Annotate each request with the last status set by the current owner dept
+        for name, reqs in buckets.items():
+            for r in reqs:
+                try:
+                    r.last_owner_status = _last_status_by_owner_dept(r)
+                except Exception:
+                    r.last_owner_status = r.status
+
         return render_template("dashboard.html", mode="B", buckets=buckets, status_counts=status_counts, now=datetime.utcnow(), artifact_form=artifact_form)
 
     if dept == "C":
@@ -374,9 +455,116 @@ def search_requests():
         else:
             qry = qry.filter(or_(*filters))
 
-        results = qry.distinct().order_by(ReqModel.updated_at.desc()).limit(50).all()
+    return render_template('search.html', results=qry.order_by(ReqModel.updated_at.desc()).all(), q=q)
 
-    return render_template("search.html", q=q, results=results, now=datetime.utcnow())
+
+@requests_bp.route('/metrics/ui')
+@login_required
+def metrics_ui():
+    """Simple DB-backed metrics UI: counts per owner department and recent activity."""
+    # Accept a `range` parameter: daily, weekly, monthly, yearly (defaults to weekly)
+    r = (request.args.get('range') or 'weekly').lower()
+    now = datetime.utcnow()
+    if r == 'daily':
+        cutoff = datetime(now.year, now.month, now.day)
+        label = 'Daily (since today 00:00 UTC)'
+    elif r == 'monthly':
+        cutoff = datetime(now.year, now.month, 1)
+        label = 'Monthly (since start of month)'
+    elif r == 'yearly':
+        cutoff = datetime(now.year, 1, 1)
+        label = 'Yearly (since start of year)'
+    else:
+        # weekly (default): start of current week (Monday 00:00 UTC)
+        cutoff = datetime(now.year, now.month, now.day) - timedelta(days=now.weekday())
+        label = 'Weekly (since start of week)'
+
+    # Total requests by owner department
+    totals = dict(db.session.query(ReqModel.owner_department, func.count(ReqModel.id)).group_by(ReqModel.owner_department).all())
+
+    # Open requests (not CLOSED) by owner dept
+    opens = dict(db.session.query(ReqModel.owner_department, func.count(ReqModel.id)).filter(ReqModel.status != 'CLOSED').group_by(ReqModel.owner_department).all())
+
+    # Requests created in the selected window by owner dept
+    created_window = dict(db.session.query(ReqModel.owner_department, func.count(ReqModel.id)).filter(ReqModel.created_at >= cutoff).group_by(ReqModel.owner_department).all())
+
+    # Requests closed in the selected window by owner dept
+    closed_window = dict(db.session.query(ReqModel.owner_department, func.count(ReqModel.id)).filter(ReqModel.status == 'CLOSED', ReqModel.updated_at >= cutoff).group_by(ReqModel.owner_department).all())
+
+    # Determine which departments the current user may view
+    if getattr(current_user, 'is_admin', False):
+        depts = ['A', 'B', 'C']
+    else:
+        depts = [current_user.department]
+    metrics = []
+    for d in depts:
+        metrics.append({
+            'dept': d,
+            'total': totals.get(d, 0),
+            'open': opens.get(d, 0),
+            'created_window': created_window.get(d, 0),
+            'closed_window': closed_window.get(d, 0),
+        })
+
+    return render_template('metrics.html', metrics=metrics, now=now, cutoff=cutoff, range_label=label, range_key=r)
+    
+
+
+@requests_bp.route('/metrics')
+def metrics():
+    """Prometheus metrics exposition endpoint."""
+    try:
+        payload, content_type = metrics_module.metrics_output()
+        return Response(payload, content_type=content_type)
+    except Exception:
+        current_app.logger.exception('Failed to generate Prometheus metrics')
+        abort(500)
+
+
+@requests_bp.route('/metrics/json')
+def metrics_json():
+    """Machine-friendly JSON metrics for external integrations."""
+    try:
+        cutoff = datetime.utcnow() - timedelta(days=7)
+
+        totals = dict(db.session.query(ReqModel.owner_department, func.count(ReqModel.id)).group_by(ReqModel.owner_department).all())
+        opens = dict(db.session.query(ReqModel.owner_department, func.count(ReqModel.id)).filter(ReqModel.status != 'CLOSED').group_by(ReqModel.owner_department).all())
+        created_week = dict(db.session.query(ReqModel.owner_department, func.count(ReqModel.id)).filter(ReqModel.created_at >= cutoff).group_by(ReqModel.owner_department).all())
+        closed_week = dict(db.session.query(ReqModel.owner_department, func.count(ReqModel.id)).filter(ReqModel.status == 'CLOSED', ReqModel.updated_at >= cutoff).group_by(ReqModel.owner_department).all())
+
+        # Support `range` param for JSON endpoint as well
+        r = (request.args.get('range') or 'weekly').lower()
+        now = datetime.utcnow()
+        if r == 'daily':
+            cutoff = datetime(now.year, now.month, now.day)
+        elif r == 'monthly':
+            cutoff = datetime(now.year, now.month, 1)
+        elif r == 'yearly':
+            cutoff = datetime(now.year, 1, 1)
+        else:
+            cutoff = datetime(now.year, now.month, now.day) - timedelta(days=now.weekday())
+
+        created_window = dict(db.session.query(ReqModel.owner_department, func.count(ReqModel.id)).filter(ReqModel.created_at >= cutoff).group_by(ReqModel.owner_department).all())
+        closed_window = dict(db.session.query(ReqModel.owner_department, func.count(ReqModel.id)).filter(ReqModel.status == 'CLOSED', ReqModel.updated_at >= cutoff).group_by(ReqModel.owner_department).all())
+
+        payload = {
+            'now': now.isoformat() + 'Z',
+            'cutoff': cutoff.isoformat() + 'Z',
+            'range': r,
+            'by_dept': {},
+        }
+        for d in ('A', 'B', 'C'):
+            payload['by_dept'][d] = {
+                'total': totals.get(d, 0),
+                'open': opens.get(d, 0),
+                'created_window': created_window.get(d, 0),
+                'closed_window': closed_window.get(d, 0),
+            }
+        return jsonify(payload)
+    except Exception:
+        current_app.logger.exception('Failed to render JSON metrics')
+        abort(500)
+    
 
 
 @requests_bp.route("/requests/new", methods=["GET", "POST"])
@@ -445,6 +633,12 @@ def request_new():
         )
 
         db.session.commit()
+        try:
+            # Prometheus: increment created counter and refresh owner gauge
+            metrics_module.requests_created_total.labels(dept=req.owner_department).inc()
+            metrics_module.update_owner_gauge(db.session, ReqModel)
+        except Exception:
+            current_app.logger.exception('Failed to update metrics on request creation')
 
         flash(f"Request #{req.id} submitted successfully.", "success")
         return redirect(url_for("requests.request_detail", request_id=req.id))
@@ -459,11 +653,16 @@ def request_detail(request_id: int):
     if not can_view_request(req):
         abort(403)
 
+    # Viewing the request should not be blocked by assignment checks so that
+    # Dept C users can inspect B-owned requests that are pending C review
+    # and assign them within the UI. Mutating endpoints still enforce
+    # assignment via `_require_assigned_user`.
+
     now = datetime.utcnow()
     next_hint = None
     if current_user.department == "A":
         if req.status == "SENT_TO_A":
-            next_hint = "Review the handoff and either reopen or close it out."
+            next_hint = "Review the handoff and either request review from Dept B or close it out."
         elif req.status == "CLOSED":
             next_hint = "Closed — you can reopen if something’s off."
     elif current_user.department == "B":
@@ -503,15 +702,16 @@ def request_detail(request_id: int):
     if dept == "A":
         possible = []
         label_map = {
-            "B_IN_PROGRESS": "Reopen ticket",
-            "CLOSED": "Closed ticket approved",
+            "B_IN_PROGRESS": "Request review from Department B",
+            "CLOSED": "Close ticket",
         }
         if req.status == "SENT_TO_A":
             for to in ("B_IN_PROGRESS", "CLOSED"):
                 if is_transition_valid_for_request(req, dept, req.status, to):
                     possible.append((to, label_map[to]))
         elif req.status == "CLOSED":
-            if is_transition_valid_for_request(req, dept, req.status, "B_IN_PROGRESS"):
+            # Allow Dept A to reopen only within 48 hours of closure.
+            if _closed_within_hours(req, hours=48) and is_transition_valid_for_request(req, dept, req.status, "B_IN_PROGRESS"):
                 possible.append(("B_IN_PROGRESS", label_map["B_IN_PROGRESS"]))
         transition_form.to_status.choices = possible
     elif dept == "B":
@@ -543,7 +743,20 @@ def request_detail(request_id: int):
     donor_form = DonorOnlyForm()
 
     assignment_form = None
-    if current_user.department in ("B", "C") and req.owner_department == current_user.department:
+    # Dept B may assign requests they own. Dept C should be able to assign
+    # requests that are currently awaiting C review so they can claim work.
+    # Dept A should be able to assign requests that are currently owned by Dept A.
+    if current_user.department == "B" and req.owner_department == "B":
+        assignment_form = AssignmentForm()
+        assignment_form.assignee.choices = _assignment_choices(current_user.department)
+        assignment_form.assignee.data = req.assigned_to_user_id or -1
+    elif current_user.department == "C" and req.status == "PENDING_C_REVIEW" and req.requires_c_review:
+        # Show an assignment UI scoped to Dept C users so they can take ownership
+        assignment_form = AssignmentForm()
+        assignment_form.assignee.choices = _assignment_choices(current_user.department)
+        assignment_form.assignee.data = req.assigned_to_user_id or -1
+    elif current_user.department == "A" and req.owner_department == "A":
+        # Dept A assignment UI
         assignment_form = AssignmentForm()
         assignment_form.assignee.choices = _assignment_choices(current_user.department)
         assignment_form.assignee.data = req.assigned_to_user_id or -1
@@ -580,7 +793,7 @@ def request_detail(request_id: int):
 @login_required
 def assign_self(request_id: int):
     req = ReqModel.query.get_or_404(request_id)
-    if current_user.department not in ("B", "C"):
+    if current_user.department not in ("A", "B", "C"):
         abort(403)
     if not can_view_request(req):
         abort(403)
@@ -621,6 +834,13 @@ def assign_self(request_id: int):
         db.session.add(c)
 
     db.session.commit()
+    try:
+        # Prometheus: assignment made
+        metrics_module.assignment_changes_total.labels(dept=current_user.department, action='assigned').inc()
+        metrics_module.update_owner_gauge(db.session, ReqModel)
+    except Exception:
+        current_app.logger.exception('Failed to update metrics on assignment')
+
     flash("Assigned to you.", "success")
     return redirect(url_for("requests.request_detail", request_id=request_id))
 
@@ -674,6 +894,14 @@ def request_artifact_edit(artifact_id: int):
     if not can_view_request(req):
         abort(403)
 
+    rv = _require_assigned_user(req)
+    if rv:
+        return rv
+
+    rv = _require_assigned_user(req)
+    if rv:
+        return rv
+
     # Only internal departments should request edits
     if current_user.department not in ("A", "B", "C"):
         abort(403)
@@ -720,6 +948,10 @@ def store_verification_placeholder(request_id: int):
 
     if current_user.department != "B":
         abort(403)
+
+    rv = _require_assigned_user(req)
+    if rv:
+        return rv
 
     created_method = (request.form.get("created_method") or "").strip()
     created_part = (request.form.get("created_part_number") or "").strip()
@@ -842,6 +1074,10 @@ def set_artifact_donor(artifact_id: int):
     if current_user.department != "B":
         abort(403)
 
+    rv = _require_assigned_user(req)
+    if rv:
+        return rv
+
     donor = (request.form.get("donor_part_number") or "").strip() or None
     a.donor_part_number = donor
     _log(req, "artifact_updated", note=f"Donor updated to: {donor}")
@@ -863,8 +1099,7 @@ def set_artifact_donor(artifact_id: int):
         current_app.logger.exception("Failed to queue donor notifications")
 
     db.session.commit()
-    flash("Donor part number updated.", "success")
-    return redirect(url_for("requests.request_detail", request_id=req.id))
+    return _success_response("Donor part number updated.", req)
 
 
 @requests_bp.route("/artifacts/<int:artifact_id>/set_target", methods=["POST"])
@@ -875,6 +1110,10 @@ def set_artifact_target(artifact_id: int):
     req = a.request
     if not can_view_request(req):
         abort(403)
+
+    rv = _require_assigned_user(req)
+    if rv:
+        return rv
 
     # Allow Dept A/B to quickly set a target from the dashboard
     if current_user.department not in ("A", "B"):
@@ -905,9 +1144,7 @@ def set_artifact_target(artifact_id: int):
         current_app.logger.exception("Failed to queue notifications for artifact target change")
 
     db.session.commit()
-    flash("Target part number updated.", "success")
-    # Return to the request detail for context
-    return redirect(url_for("requests.request_detail", request_id=req.id))
+    return _success_response("Target part number updated.", req)
 
 
 @requests_bp.route("/artifacts/<int:artifact_id>/edit", methods=["POST"])
@@ -972,8 +1209,7 @@ def edit_artifact(artifact_id: int):
         current_app.logger.exception('Failed to queue artifact edit notifications')
 
     db.session.commit()
-    flash("Artifact updated.", "success")
-    return redirect(url_for("requests.request_detail", request_id=req.id))
+    return _success_response("Artifact updated.", req)
 
 
 @requests_bp.route("/requests/<int:request_id>/artifact", methods=["POST"])
@@ -982,6 +1218,10 @@ def add_artifact(request_id: int):
     req = ReqModel.query.get_or_404(request_id)
     if not can_view_request(req):
         abort(403)
+
+    rv = _require_assigned_user(req)
+    if rv:
+        return rv
 
     form = ArtifactForm()
     dept = current_user.department
@@ -1007,9 +1247,7 @@ def add_artifact(request_id: int):
 
     _log(req, "artifact_added", note=f"Artifact added: {a.artifact_type}")
     db.session.commit()
-
-    flash("Artifact added.", "success")
-    return redirect(url_for("requests.request_detail", request_id=req.id))
+    return _success_response("Artifact added.", req)
 
 
 def _validate_files(files) -> list:
@@ -1097,7 +1335,9 @@ def do_transition(request_id: int):
 
     from_status = req.status
 
-    # If handoff, create submission (+ attachments), notify receiving dept
+    # Determine whether we should create a submission record. Create one when
+    # this is a handoff (cross-department transfer) OR when the actor provided
+    # a summary/details or attachments for this status update.
     handoff = handoff_for_transition(req.status, to_status)
     # If no explicit handoff rule exists but the owner department implied by the
     # target status differs from the current owner, treat this as a transfer
@@ -1106,15 +1346,41 @@ def do_transition(request_id: int):
         target_owner = owner_for_status(to_status)
         if target_owner and target_owner != req.owner_department:
             handoff = (req.owner_department, target_owner)
+
+    create_submission = False
+    from_dept = None
+    to_dept = None
+    submission_summary_text = None
     if handoff:
-        # Require submission content only when the handoff crosses departments
         from_dept, to_dept = handoff
+        create_submission = True
+    else:
+        # If owner would change, treat as implicit handoff
+        target_owner = owner_for_status(to_status)
+        if target_owner and target_owner != req.owner_department:
+            from_dept = req.owner_department
+            to_dept = target_owner
+            create_submission = True
+        else:
+            # If user supplied summary/details or files, create a submission record
+            has_summary = bool((form.submission_summary.data or "").strip())
+            has_details = bool((form.submission_details.data or "").strip())
+            has_files = bool(form.files.data and any(f and f.filename for f in form.files.data))
+            if has_summary or has_details or has_files:
+                from_dept = req.owner_department
+                to_dept = owner_for_status(to_status) or req.owner_department
+                create_submission = True
+
+    if create_submission:
+        # Require submission content only when the handoff crosses departments
         require_submission = (from_dept != to_dept)
 
+        # Allow Dept A to close without providing a submission packet.
         if require_submission:
-            if not form.submission_summary.data:
-                flash("Submission Summary is required when transferring a request to another department.", "danger")
-                return redirect(url_for("requests.request_detail", request_id=req.id))
+            if not (dept == "A" and to_status == "CLOSED"):
+                if not form.submission_summary.data:
+                    flash("Submission Summary is required when transferring a request to another department.", "danger")
+                    return redirect(url_for("requests.request_detail", request_id=req.id))
 
         try:
             validated = _validate_files(form.files.data)
@@ -1137,6 +1403,7 @@ def do_transition(request_id: int):
         )
         db.session.add(sub)
         db.session.flush()
+        submission_summary_text = sub.summary or None
 
         # attachments
         for f, size in validated:
@@ -1155,33 +1422,72 @@ def do_transition(request_id: int):
 
         _log(req, "submission_created", note=f"Submission packet created ({from_dept}→{to_dept}).")
 
-        # Set the request status/owner before notifying recipients so the receiving
-        # department has permission to view the request when they click the notification.
-        req.status = to_status
-        req.owner_department = owner_for_status(to_status)
+        # If this was an explicit handoff, set the request status/owner before notifying recipients
+        if handoff:
+            req.status = to_status
+            req.owner_department = owner_for_status(to_status)
 
-        recipients = [u for u in _users_in_dept(to_dept) if u.id != current_user.id]
-        notify_users(
-            recipients,
-            title=f"New handoff: {from_dept} → {to_dept} (Request #{req.id})",
-            body=sub.summary,
-            url=url_for("requests.request_detail", request_id=req.id),
-            ntype="handoff",
-            request_id=req.id,
-        )
+        # Notify receiving dept only for explicit handoffs
+        if handoff:
+            recipients = [u for u in _users_in_dept(to_dept) if u.id != current_user.id]
+            notify_users(
+                recipients,
+                title=f"New handoff: {from_dept} → {to_dept} (Request #{req.id})",
+                body=sub.summary,
+                url=url_for("requests.request_detail", request_id=req.id),
+                ntype="handoff",
+                request_id=req.id,
+            )
 
     # Update request status and owner
     req.status = to_status
     req.owner_department = owner_for_status(to_status)
     _log(req, "status_change", note=f"Status changed by Dept {dept}.", from_status=from_status, to_status=to_status)
 
+    # Prometheus: record transition
+    try:
+        metrics_module.request_transitions_total.labels(from_status=from_status or "", to_status=to_status or "", dept=dept).inc()
+    except Exception:
+        current_app.logger.exception('Failed to record transition metric')
+
+    # If Dept B is sending the request to Dept A, clear any assignment so
+    # Dept A can decide to close or reopen/request review. Record an audit
+    # entry and notify the previous assignee (if any).
+    if dept == "B" and to_status == "SENT_TO_A":
+        if req.assigned_to_user_id:
+            previous = req.assigned_to_user
+            prev_label = (previous.name or previous.email) if previous else "Unassigned"
+            req.assigned_to_user = None
+            _log(req, "assignment_changed", note=f"Assignment cleared as request sent to Dept A: {prev_label}")
+            try:
+                if previous and getattr(previous, "is_active", True):
+                    notify_users([
+                        previous
+                    ],
+                    title=f"Assignment cleared on Request #{req.id}",
+                    body=(f"Your assignment was cleared because the request was sent to Department A."),
+                    url=url_for("requests.request_detail", request_id=req.id),
+                    ntype="assignment_cleared",
+                    request_id=req.id,
+                    )
+                # Prometheus: assignment cleared
+                try:
+                    metrics_module.assignment_changes_total.labels(dept='B', action='cleared').inc()
+                except Exception:
+                    current_app.logger.exception('Failed to record assignment cleared metric')
+            except Exception:
+                current_app.logger.exception("Failed to notify previous assignee about cleared assignment")
+
     # Notify new owner dept (with custom messaging for Dept A actions)
     owner_recipients = [u for u in _users_in_dept(req.owner_department) if u.id != current_user.id]
+    # Notify new owner dept (with custom messaging for Dept A actions)
+    owner_recipients = [u for u in _users_in_dept(req.owner_department) if u.id != current_user.id]
+    body_text = submission_summary_text or req.title
     if dept == "A" and to_status == "CLOSED":
         notify_users(
             owner_recipients,
             title=f"Request #{req.id} approved by Dept A",
-            body=req.title,
+            body=body_text,
             url=url_for("requests.request_detail", request_id=req.id),
             ntype="status_change",
             request_id=req.id,
@@ -1190,7 +1496,7 @@ def do_transition(request_id: int):
         notify_users(
             owner_recipients,
             title=f"Request #{req.id} reopened by Dept A",
-            body=req.title,
+            body=body_text,
             url=url_for("requests.request_detail", request_id=req.id),
             ntype="status_change",
             request_id=req.id,
@@ -1199,7 +1505,7 @@ def do_transition(request_id: int):
         notify_users(
             owner_recipients,
             title=f"Request #{req.id} moved to {req.status}",
-            body=req.title,
+            body=body_text,
             url=url_for("requests.request_detail", request_id=req.id),
             ntype="status_change",
             request_id=req.id,
@@ -1229,9 +1535,16 @@ def assign_request(request_id: int):
     req = ReqModel.query.get_or_404(request_id)
     if not can_view_request(req):
         abort(403)
-    if current_user.department not in ("B", "C"):
+    if current_user.department not in ("A", "B", "C"):
         abort(403)
-    if req.owner_department != current_user.department:
+    # Dept B may assign requests they own. Dept C may assign requests that
+    # are awaiting C review so C users can claim/assign them locally. Dept A
+    # may assign requests it owns when the request is currently owned by A.
+    if not (
+        (current_user.department == "B" and req.owner_department == "B") or
+        (current_user.department == "C" and req.status == "PENDING_C_REVIEW" and req.requires_c_review) or
+        (current_user.department == "A" and req.owner_department == "A")
+    ):
         abort(403)
 
     form = AssignmentForm()
@@ -1284,6 +1597,13 @@ def assign_request(request_id: int):
 
     db.session.commit()
     flash("Assignment updated.", "success")
+    try:
+        # Prometheus: assignment changed
+        metrics_module.assignment_changes_total.labels(dept=current_user.department, action='assigned' if new_assignee else 'cleared').inc()
+        metrics_module.update_owner_gauge(db.session, ReqModel)
+    except Exception:
+        current_app.logger.exception('Failed to update metrics on assignment change')
+
     return redirect(url_for("requests.request_detail", request_id=req.id))
 
 
@@ -1296,6 +1616,10 @@ def toggle_c_review(request_id: int):
         abort(403)
     if not can_view_request(req):
         abort(403)
+
+    rv = _require_assigned_user(req)
+    if rv:
+        return rv
 
     if req.status not in ("NEW_FROM_A", "B_IN_PROGRESS"):
         flash("C review can only be toggled while the request is NEW_FROM_A or B_IN_PROGRESS.", "danger")
