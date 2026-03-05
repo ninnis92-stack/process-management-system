@@ -182,7 +182,22 @@ def external_new():
         # banner can render the confirmation and the form stays cleared.
         return redirect(url_for('external.external_new', created_req_id=req.id, guest_email=req.guest_email, tracking_link=link))
 
-    return render_template("external_new.html", form=form)
+    # If redirected after a successful POST, support showing the confirmation
+    # banner by accepting query params and creating a small object for the
+    # template to consume. This keeps the PRG pattern and ensures a refresh
+    # results in a fresh form.
+    created_req = None
+    tracking_link = None
+    if request.method == 'GET' and request.args.get('created_req_id'):
+        try:
+            cid = int(request.args.get('created_req_id'))
+        except Exception:
+            cid = None
+        if cid:
+            created_req = SimpleNamespace(id=cid, guest_email=request.args.get('guest_email'))
+            tracking_link = request.args.get('tracking_link')
+
+    return render_template("external_new.html", form=form, created_req=created_req, guest_email=(created_req.guest_email if created_req else None), tracking_link=tracking_link)
 
 
 @external_bp.route("/dashboard", methods=["GET", "POST"])
@@ -239,20 +254,7 @@ def external_detail(token: str):
         )
         db.session.add(c)
         _log(req, "comment_added", note="Guest added a public comment.", actor_label=req.guest_email)
-            # If redirected after a successful POST, support showing the confirmation
-            # banner by accepting query params and creating a small object for the
-            # template to consume. This keeps the PRG pattern and ensures a refresh
-            # results in a fresh form.
-            created_req = None
-            tracking_link = None
-            if request.method == 'GET' and request.args.get('created_req_id'):
-                try:
-                    cid = int(request.args.get('created_req_id'))
-                except Exception:
-                    cid = None
-                if cid:
-                    created_req = SimpleNamespace(id=cid, guest_email=request.args.get('guest_email'))
-                    tracking_link = request.args.get('tracking_link')
+        
         db.session.commit()
         flash("Comment added.", "success")
         return redirect(url_for("external.external_detail", token=token))
