@@ -84,11 +84,9 @@ def can_add_artifact(req: ReqModel, dept: str, artifact_type: str) -> bool:
 
 
 def can_edit_artifact(req: ReqModel, artifact: Artifact, dept: str) -> bool:
-    if dept == "B":
-        return artifact.artifact_type == "part_number"
-    if dept == "A":
-        return artifact.edit_requested is True
-    return False
+    # Allow all departments to edit artifacts (UI will present form to any dept).
+    # Specific validation rules (e.g., donor-only edits) are enforced in the route if needed.
+    return True
 
 
 def _log(req: ReqModel, action_type: str, note: Optional[str] = None,
@@ -900,7 +898,8 @@ def edit_artifact(artifact_id: int):
     # Allow Dept B to update part_number artifacts, and Dept A to perform edits only
     # when an edit was explicitly requested (can_edit_artifact enforces this policy).
     dept = current_user.department
-    if dept not in ("A", "B"):
+    # Allow any department to edit artifacts
+    if dept not in ("A", "B", "C"):
         abort(403)
 
     if not can_edit_artifact(req, a, dept):
@@ -911,21 +910,40 @@ def edit_artifact(artifact_id: int):
         flash("Artifact edit failed validation.", "danger")
         return redirect(url_for("requests.request_detail", request_id=req.id))
 
-    # If Dept A is editing donor, require that this was requested by another dept (edit_requested)
+    # Accept edits from any department. Record the incoming values.
     new_donor = (form.donor_part_number.data or "").strip() or None
-    if dept == "A" and (new_donor != (a.donor_part_number or None)) and not a.edit_requested:
-        abort(403)
 
     a.donor_part_number = new_donor
     a.target_part_number = (form.target_part_number.data or "").strip() or None
     a.no_donor_reason = (form.no_donor_reason.data or "").strip() or None
     a.instructions_url = (form.instructions_url.data or "").strip() or None
 
-    # clear edit request flag when edited by Dept A
-    if dept == "A":
-        a.edit_requested = False
+    # clear edit request flag when edited by any department
+    a.edit_requested = False
 
     _log(req, "artifact_edited", note=f"Artifact edited by Dept {dept}: {a.artifact_type}")
+
+    # Notify involved departments (owner and creator) about the change
+    try:
+        users = []
+        # owner department
+        if req.owner_department:
+            users.extend(users_in_department(req.owner_department))
+        # creator department (if different)
+        creator_dept = req.created_by_department
+        if creator_dept and creator_dept != req.owner_department:
+            users.extend(users_in_department(creator_dept))
+        # dedupe and exclude the acting user
+        uniq = {u.id: u for u in users}.values()
+        recipients = [u for u in uniq if u.id != current_user.id]
+        if recipients:
+            title = f"Artifact updated on Request #{req.id}"
+            body = f"{current_user.email} edited the {a.artifact_type} artifact on Request #{req.id}."
+            url = url_for('requests.request_detail', request_id=req.id)
+            notify_users(recipients, title=title, body=body, url=url, ntype='artifact_edited', request_id=req.id)
+    except Exception:
+        current_app.logger.exception('Failed to queue artifact edit notifications')
+
     db.session.commit()
     flash("Artifact updated.", "success")
     return redirect(url_for("requests.request_detail", request_id=req.id))
