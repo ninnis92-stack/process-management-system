@@ -336,3 +336,20 @@ not installed the app uses a safe noop fallback; to enable Prometheus metrics ru
 ```bash
 pip install prometheus_client
 ```
+
+## Presentation / Deployment Notes
+
+- Fix applied: password hashing now uses a compatible method (`pbkdf2:sha256`) to avoid runtime failures on platforms missing `hashlib.scrypt`.
+- Remote helper: `scripts/remote_create_tables.py` can be run inside a deployed container to create DB tables when using SQLite (example: `flyctl ssh console -a <app> --command "python3 /app/scripts/remote_create_tables.py"`).
+- Seeding: the demo data is seeded with `seed.py`. For the live demo the following accounts were created:
+  - `a@example.com` / `password123` (Dept A)
+  - `b@example.com` / `password123` (Dept B)
+  - `c@example.com` / `password123` (Dept C)
+  - `admin@example.com` / `admin123` (admin)
+
+- Recommended demo flow:
+  1. Visit the deployed app URL.
+  2. Sign in as `a@example.com` to show Dept A views.
+  3. Use `admin@example.com` to open the Admin Monitor and demonstrate impersonation / department switching.
+
+Note: For production use a managed Postgres instance and run migrations via Alembic/Flask-Migrate; avoid relying on `AUTO_CREATE_DB` in production.
