@@ -92,13 +92,13 @@
   transition: opacity 0.35s ease, transform 0.35s ease;
 }
 
-/* Keep the navbar stable regardless of quote length by fixing motivation height */
+/* Keep the navbar stable regardless of quote length; allow small flex so
+   narrow/tall phones (foldables) don't clip the bottom of the quote. */
 #motivation {
-  /* Reserve two lines of text consistently so the navbar doesn't reflow */
-  height: 2.4rem;
+  /* Reserve space for ~2 lines but allow slight expansion to avoid clipping */
   min-height: 2.4rem;
-  max-height: 2.4rem;
-  overflow: hidden;
+  max-height: 3.2rem;
+  overflow: visible; /* allow the quote to render without being cut off */
 }
 
 /* Ensure brand area centers vertically and doesn't cause navbar resizing */
