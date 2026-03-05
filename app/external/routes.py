@@ -7,6 +7,7 @@ from ..extensions import db
 from sqlalchemy.exc import OperationalError
 from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Notification
 from ..notifcations import notify_users, users_in_department
+from werkzeug.routing import BuildError
 from .forms import ExternalNewRequestForm, ExternalCommentForm, GuestLookupForm
 
 external_bp = Blueprint("external", __name__, url_prefix="/external")
@@ -97,11 +98,20 @@ def external_new():
                 raise
 
         dept_users = users_in_department(req.owner_department)
+        # Build the internal request detail URL defensively — if the request
+        # id is not available for any reason, avoid raising a BuildError which
+        # would turn into a 500 for the guest submitter. Fall back to None.
+        try:
+            internal_url = url_for("requests.request_detail", request_id=req.id)
+        except BuildError:
+            current_app.logger.warning("Could not build internal request_detail URL for Request id=%s", req.id)
+            internal_url = None
+
         notify_users(
             dept_users,
             title=f"New guest request submitted (Request #{req.id})",
             body=req.title,
-            url=url_for("requests.request_detail", request_id=req.id),
+            url=internal_url,
             ntype="new_request",
             request_id=req.id,
         )
