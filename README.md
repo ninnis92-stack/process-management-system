@@ -221,6 +221,40 @@ docker compose run --rm web flask db migrate -m "initial models"
 docker compose run --rm web flask db upgrade
 ```
 
+## Seeding test users
+
+To populate the database with sample users and requests for testing, you can run the included `seed.py` script.
+
+Locally (recommended for development):
+
+```bash
+# Point to your dev or staging database, then run the seeder
+export DATABASE_URL='sqlite:///instance/app.db'
+PYTHONPATH=. python3 seed.py
+```
+
+On Fly (run inside the deployed container):
+
+1. Ensure the app's `DATABASE_URL` secret points to a writable database and that the app machines are running.
+2. Run the seed script on a live machine:
+
+```bash
+flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command "cd /app && python3 seed.py"
+```
+
+Or open an interactive shell and run it manually:
+
+```bash
+flyctl ssh console -a process-management-prototype-lingering-bush-6175
+cd /app
+python3 seed.py
+```
+
+Notes:
+- Running the seed on a production database will create test users and sample data — use a staging DB if you don't want test data in production.
+- If you prefer not to SSH into the machine, run `seed.py` locally against the remote DB by exporting `DATABASE_URL` and running the script from your workstation.
+
+
 Notes:
 - The repository contains a minimal `migrations/` scaffold with an empty `0001_initial.py` that
   you can stamp as head if your DB already matches the models; prefer generating and reviewing
