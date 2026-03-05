@@ -58,7 +58,6 @@
             {% if current_user.is_admin %}
               <form method="get" action="{{ url_for('requests.dashboard') }}" class="m-0 d-inline" id="admin-dept-view-form">
                 <select name="as_dept" onchange="this.form.submit()" class="form-select form-select-sm text-dark" style="display:inline-block; width:auto; margin-right:8px;">
-                  <option value="" {% if not request.args.get('as_dept') %}selected{% endif %}>View</option>
                   <option value="A" {% if request.args.get('as_dept')=='A' %}selected{% endif %}>Dept A</option>
                   <option value="B" {% if request.args.get('as_dept')=='B' %}selected{% endif %}>Dept B</option>
                   <option value="C" {% if request.args.get('as_dept')=='C' %}selected{% endif %}>Dept C</option>

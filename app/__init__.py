@@ -49,7 +49,8 @@ def create_app():
                 click.echo(f"User {email_n} already exists; updating department/name/password")
                 existing.department = department.upper()
                 existing.name = name or existing.name
-                existing.password_hash = generate_password_hash(password)
+                # Avoid relying on environment-specific default hash methods (e.g. scrypt)
+                existing.password_hash = generate_password_hash(password, method="pbkdf2:sha256")
                 existing.is_active = True
                 db.session.commit()
                 return
@@ -57,7 +58,8 @@ def create_app():
                 email=email_n,
                 name=name,
                 department=department.upper(),
-                password_hash=generate_password_hash(password),
+                # Use a compatible hashing method across runtimes
+                password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
                 is_active=True,
             )
             db.session.add(u)

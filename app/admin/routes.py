@@ -57,7 +57,7 @@ def create_user():
             existing.name = name or existing.name
             existing.department = dept
             if form.password.data:
-                existing.password_hash = generate_password_hash(pw)
+                existing.password_hash = generate_password_hash(pw, method="pbkdf2:sha256")
             existing.is_active = is_active
             db.session.commit()
             flash(f"Updated user {email}.", "success")
@@ -67,7 +67,7 @@ def create_user():
             email=email,
             name=name,
             department=dept,
-            password_hash=generate_password_hash(pw),
+            password_hash=generate_password_hash(pw, method="pbkdf2:sha256"),
             is_active=is_active,
         )
         db.session.add(u)
@@ -95,7 +95,7 @@ def edit_user(user_id: int):
         u.name = form.name.data.strip() if form.name.data else None
         u.department = form.department.data
         if form.password.data:
-            u.password_hash = generate_password_hash(form.password.data)
+            u.password_hash = generate_password_hash(form.password.data, method="pbkdf2:sha256")
         u.is_active = bool(form.is_active.data)
         # Keep existing is_admin unless explicitly changed elsewhere
         db.session.commit()
