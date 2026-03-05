@@ -136,7 +136,7 @@
 
 (function initTheme() {
   const btn = document.getElementById("vibeBtn");
-  if (!btn) return;
+  const deptVibeBtn = document.getElementById('vibeBtnDept');
 
   // 24 pastel / muted palettes that are easy on the eyes (accent = primary, accent2 = softer shade)
   const palettes = [
@@ -211,20 +211,14 @@
   const startIdx = Number.isFinite(stored) ? stored % palettes.length : (dailySeed % palettes.length);
   applyTheme(startIdx);
 
-  btn.addEventListener("click", () => {
+  // Attach click handlers to whichever vibe buttons are present (global navbar and/or department view)
+  function advanceVibe() {
     const next = ((Number(localStorage.getItem("vibeTheme")) || 0) + 1) % palettes.length;
     applyTheme(next);
-  });
-
-  // If a department-facing vibe button exists (on admin department views), forward clicks to the global handler
-  const deptVibeBtn = document.getElementById('vibeBtnDept');
-  if (deptVibeBtn) {
-    deptVibeBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      // Trigger the same theme advance as the main button
-      btn.click();
-    });
   }
+
+  if (btn) btn.addEventListener("click", advanceVibe);
+  if (deptVibeBtn) deptVibeBtn.addEventListener('click', (e) => { e.preventDefault(); advanceVibe(); });
 })();
 
 (function initSearchHelpers() {
