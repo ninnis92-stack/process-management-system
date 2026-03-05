@@ -160,8 +160,8 @@ def external_new():
             body=f"Thanks for submitting your request. Your request number is #{req.id}.\n\nTrack it here: {link}\n",
         )
         flash(f"Request #{req.id} submitted successfully. You can use this page to track updates.", "success")
-            # Render the submission page with the tracking link so the modal can show it
-            return render_template("external_new.html", form=form, created_req=req, guest_email=req.guest_email, tracking_link=link)
+        # Render the submission page with the tracking link so the modal can show it
+        return render_template("external_new.html", form=form, created_req=req, guest_email=req.guest_email, tracking_link=link)
 
     return render_template("external_new.html", form=form)
 
