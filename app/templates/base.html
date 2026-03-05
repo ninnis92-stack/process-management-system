@@ -139,11 +139,14 @@
     {% if tracking_link and created_req %}
       <div class="mb-3">
         <div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
-          <div class="text-truncate pe-3" style="max-width:85%;">
-            <a id="topTrackingLink" href="{{ tracking_link }}" target="_blank" rel="noopener">{{ tracking_link }}</a>
+          <div class="me-3" style="min-width:0;">
+            <div class="text-truncate" style="max-width:75%;">
+              <a id="topTrackingLink" href="{{ tracking_link }}" target="_blank" rel="noopener">{{ tracking_link }}</a>
+            </div>
+            <div class="small text-muted">Save this link or your request number to view updates on the Guest Dashboard. Use the Copy button to save the link.</div>
           </div>
-          <div class="btn-group ms-2" role="group">
-            <button class="btn btn-sm btn-outline-light" type="button" onclick="copyTextFromString('{{ tracking_link }}', this)">Copy</button>
+          <div class="d-flex align-items-center ms-2">
+            <button class="btn btn-sm btn-light text-dark" type="button" onclick="copyTextFromString('{{ tracking_link }}', this)" aria-label="Copy tracking link">Copy</button>
           </div>
         </div>
       </div>
