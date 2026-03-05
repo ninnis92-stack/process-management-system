@@ -22,7 +22,9 @@ primary_region = 'ord'
 [processes]
 # Tuned for small shared-cpu instances: 3 workers, 4 threads each.
 # Adjust `-w` and `--threads` for your target machine size and workload.
-  web = "gunicorn -w 3 --threads 4 -k gthread -b 0.0.0.0:$PORT run:app"
+  # Bind to the internal port (8080) so Fly's launcher doesn't try to parse a
+  # literal '$PORT' in the process command.
+  web = "gunicorn -w 3 --threads 4 -k gthread -b 0.0.0.0:8080 run:app"
 
 [[vm]]
   memory = '1gb'
