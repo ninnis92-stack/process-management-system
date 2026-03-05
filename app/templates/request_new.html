@@ -82,4 +82,39 @@
     </form>
   </div>
 </div>
+
+    {% if created_req %}
+      <!-- Confirmation modal shown after successful submission -->
+      <div class="modal fade" id="createdModal" tabindex="-1" aria-labelledby="createdModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="createdModalLabel">Request Submitted</h5>
+            </div>
+            <div class="modal-body">
+              <p>Your request has been logged.</p>
+              <p><strong>Request number:</strong> #{{ created_req.id }}</p>
+              <p><strong>Submitted using email:</strong> {{ user_email }}</p>
+              <p>You can use this email and the request number to look up the request in the Guest Dashboard. A confirmation email will be sent when SSO/email is enabled.</p>
+            </div>
+            <div class="modal-footer">
+              <a href="{{ url_for('requests.request_detail', request_id=created_req.id) }}" class="btn btn-secondary">View Request</a>
+              <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        (function(){
+          // Wait for Bootstrap to be available then show the modal
+          try {
+            var m = new bootstrap.Modal(document.getElementById('createdModal'));
+            m.show();
+          } catch (e) {
+            console.warn('Could not show createdModal', e);
+          }
+        })();
+      </script>
+    {% endif %}
 {% endblock %}

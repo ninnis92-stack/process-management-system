@@ -653,7 +653,11 @@ def request_new():
             current_app.logger.exception('Failed to update metrics on request creation')
 
         flash(f"Request #{req.id} submitted successfully.", "success")
-        return redirect(url_for("requests.request_detail", request_id=req.id))
+        # Instead of redirecting immediately, re-render the New Request page
+        # and surface a confirmation modal that shows the created request id
+        # and the submitting user's email so they can note it for guest access.
+        from .forms import NewRequestForm as _NewRequestForm
+        return render_template("request_new.html", form=_NewRequestForm(), created_req=req, user_email=current_user.email)
 
     return render_template("request_new.html", form=form)
 
