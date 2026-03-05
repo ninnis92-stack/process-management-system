@@ -139,13 +139,20 @@
     {% if tracking_link and created_req %}
       <div class="mb-3">
         <div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
-          <div class="me-3" style="min-width:0;">
-            <div class="text-truncate" style="max-width:75%;">
+          <div class="me-3 d-flex flex-column" style="min-width:0; max-width:72%;">
+            <div class="d-flex align-items-center mb-1">
+              <strong class="me-2">Request #</strong>
+              <span class="me-3">#{{ created_req.id }}</span>
+              <strong class="me-2">Email</strong>
+              <span class="text-truncate">{{ created_req.guest_email or '' }}</span>
+            </div>
+            <div class="text-truncate" style="max-width:100%;">
               <a id="topTrackingLink" href="{{ tracking_link }}" target="_blank" rel="noopener">{{ tracking_link }}</a>
             </div>
-            <div class="small text-muted">Save this link or your request number to view updates on the Guest Dashboard. Use the Copy button to save the link.</div>
+            <div class="small text-muted mt-1">Save this link or your request number to view updates on the Guest Dashboard. Use the Copy button to save the link.</div>
           </div>
-          <div class="d-flex align-items-center ms-2">
+          <div class="d-flex align-items-center ms-2 gap-2">
+            <a class="btn btn-sm btn-outline-light text-dark" href="{{ tracking_link }}" target="_blank" rel="noopener">Open Guest View</a>
             <button class="btn btn-sm btn-light text-dark" type="button" onclick="copyTextFromString('{{ tracking_link }}', this)" aria-label="Copy tracking link">Copy</button>
           </div>
         </div>
