@@ -92,6 +92,11 @@ Admin Hardening Checklist:
 - Use `SSO_REQUIRE_MFA=true` to enforce MFA for admins when your IdP reports it.
 - Audit logs are viewable at `/admin/audit` once signed-in as an admin.
 
+- Admin navbar: the top-right admin banner includes a quick department selector that
+  allows admins to view any department's dashboard (`/dashboard?as_dept=A|B|C`) without
+  starting an impersonation session. This is a view-only shortcut; to start acting-as a
+  department use the impersonation controls under the Admin UI.
+
 ## Notifications
 - Stored in DB via `Notification` model; created via `notify_users` helper in `requests_bp/routes.py`.
 - Types include status changes, nudges, and request creation; surfaced in UI banner (template logic in `base.html`).
