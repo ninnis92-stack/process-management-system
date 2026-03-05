@@ -1,5 +1,7 @@
 :root {
   --nav-bg: #0b1726;
+  --max-page-width: 1200px;
+  --container-padding: 1rem;
   --nav-text: #eef2f7;
   --accent: #79c0ff;
   --accent-2: #a78bfa;
@@ -26,7 +28,18 @@
   color: var(--body-text);
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
   font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   line-height: 1.36;
+}
+
+/* Constrain page content width for readability and center it */
+.container {
+  max-width: var(--max-page-width);
+  padding-left: var(--container-padding);
+  padding-right: var(--container-padding);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .theme-nav {
@@ -180,6 +193,8 @@ a:hover { color: var(--accent-2); }
 
 .card { background: rgba(255,255,255,0.92); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 28px rgba(15,23,42,0.08); }
 .card { border-top: 3px solid var(--accent); }
+/* Slightly more compact card spacing for small screens */
+.card { padding: 1rem; }
 .card-link-wrap { text-decoration: none; }
 .card-link-wrap:hover { text-decoration: none; }
 
@@ -244,6 +259,28 @@ canvas {
   max-width: 100%;
 }
 
+/* Make tables horizontally scrollable on small screens */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Forms inside cards should flow vertically on narrow viewports */
+.card .form-row,
+.card .form-inline {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.card .form-row .form-control,
+.card .form-inline .form-control,
+.card .form-row .form-select,
+.card .form-inline .form-select {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
 .main {
   overflow-x: hidden;
 }
@@ -275,6 +312,7 @@ canvas {
   .main.container {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
+    max-width: 100%;
   }
 
   .card {
@@ -291,6 +329,15 @@ canvas {
   .badge {
     white-space: normal;
   }
+}
+
+/* Typography/sizing tweaks for very small devices */
+@media (max-width: 420px) {
+  .brand-title { font-size: 0.95rem; }
+  .brand-quote { display: none; }
+  .nav-actions { gap: 0.25rem; }
+  .card { padding: 0.75rem; }
+  .btn { font-size: 0.85rem; }
 }
 
 @media (max-width: 576px) {
