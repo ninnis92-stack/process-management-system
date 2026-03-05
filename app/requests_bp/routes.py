@@ -149,11 +149,13 @@ def root():
 def dashboard():
     dept = current_user.department
 
+    artifact_form = ArtifactForm()
+
     if dept == "A":
         my_reqs = _exclude_old_closed(ReqModel.query.filter_by(
             created_by_user_id=current_user.id
         )).order_by(ReqModel.updated_at.desc()).all()
-        return render_template("dashboard.html", mode="A", requests=my_reqs, now=datetime.utcnow())
+        return render_template("dashboard.html", mode="A", requests=my_reqs, now=datetime.utcnow(), artifact_form=artifact_form)
 
     if dept == "B":
         # Allow filtering by a single status via query param `status`
@@ -314,13 +316,13 @@ def dashboard():
                 ReqModel.owner_department == "B",
             )).order_by(ReqModel.updated_at.desc()).all(),
         }
-        return render_template("dashboard.html", mode="B", buckets=buckets, status_counts=status_counts, now=datetime.utcnow())
+        return render_template("dashboard.html", mode="B", buckets=buckets, status_counts=status_counts, now=datetime.utcnow(), artifact_form=artifact_form)
 
     if dept == "C":
         pending = ReqModel.query.filter_by(
             status="PENDING_C_REVIEW"
         ).order_by(ReqModel.updated_at.desc()).all()
-        return render_template("dashboard.html", mode="C", requests=pending, now=datetime.utcnow())
+        return render_template("dashboard.html", mode="C", requests=pending, now=datetime.utcnow(), artifact_form=artifact_form)
 
     abort(403)
 
@@ -661,6 +663,55 @@ def request_presence(request_id: int):
 
 
 
+@requests_bp.route("/artifacts/<int:artifact_id>/request_edit", methods=["POST"])
+@login_required
+def request_artifact_edit(artifact_id: int):
+    """Mark an artifact as edit-requested and notify the artifact owner department.
+
+    Dept B/C may request Dept A to edit donor/target values; this records the request,
+    logs an audit entry, and notifies the owning department for visibility.
+    """
+    a = Artifact.query.get_or_404(artifact_id)
+    req = a.request
+    if not can_view_request(req):
+        abort(403)
+
+    # Only internal departments should request edits
+    if current_user.department not in ("A", "B", "C"):
+        abort(403)
+
+    form = RequestArtifactEditForm()
+    if not form.validate_on_submit():
+        flash("Edit request failed validation.", "danger")
+        return redirect(url_for("requests.request_detail", request_id=req.id))
+
+    note = (form.note.data or "").strip() or None
+    a.edit_requested = True
+    a.edit_requested_note = note
+
+    # Audit log for visibility
+    _log(req, "edit_requested", note=f"Dept {current_user.department} requested edit: {note}")
+
+    # Determine which department should be notified: prefer the artifact creator dept (if present)
+    target_dept = a.created_by_department or req.owner_department
+    try:
+        notify_users(
+            users_in_department(target_dept),
+            title=f"Edit requested on Request #{req.id}",
+            body=(f"{current_user.department} requested an artifact edit: {note}" if note else f"{current_user.department} requested an artifact edit."),
+            url=url_for("requests.request_detail", request_id=req.id),
+            ntype="edit_requested",
+            request_id=req.id,
+        )
+    except Exception:
+        current_app.logger.exception("Failed to notify users about edit request")
+
+    db.session.commit()
+    flash("Edit request sent.", "success")
+    return redirect(url_for("requests.request_detail", request_id=req.id))
+
+
+
 @requests_bp.route("/requests/<int:request_id>/verification-placeholder", methods=["POST"])
 @login_required
 def store_verification_placeholder(request_id: int):
@@ -801,6 +852,43 @@ def set_artifact_donor(artifact_id: int):
     return redirect(url_for("requests.request_detail", request_id=req.id))
 
 
+@requests_bp.route("/artifacts/<int:artifact_id>/set_target", methods=["POST"])
+@login_required
+def set_artifact_target(artifact_id: int):
+    """Quick setter for a target part number from dashboard; notifies owner dept."""
+    a = Artifact.query.get_or_404(artifact_id)
+    req = a.request
+    if not can_view_request(req):
+        abort(403)
+
+    # Allow Dept A/B to quickly set a target from the dashboard
+    if current_user.department not in ("A", "B"):
+        abort(403)
+
+    target = (request.form.get("target_part_number") or "").strip() or None
+    a.target_part_number = target
+    _log(req, "artifact_updated", note=f"Target updated to: {target}")
+
+    # Notify users in the owner department that the target was set
+    try:
+        notify_users(
+            users_in_department(req.owner_department),
+            title=f"Part number updated on Request #{req.id}",
+            body=(f"Target part number set: {target} — by {current_user.email}" if target else f"Target cleared by {current_user.email}"),
+            url=url_for("requests.request_detail", request_id=req.id),
+            ntype="artifact_target_added",
+            request_id=req.id,
+        )
+    except Exception:
+        # notification failures should not block the update
+        current_app.logger.exception("Failed to queue notifications for artifact target change")
+
+    db.session.commit()
+    flash("Target part number updated.", "success")
+    # Return to the request detail for context
+    return redirect(url_for("requests.request_detail", request_id=req.id))
+
+
 @requests_bp.route("/artifacts/<int:artifact_id>/edit", methods=["POST"])
 @login_required
 def edit_artifact(artifact_id: int):
@@ -809,8 +897,13 @@ def edit_artifact(artifact_id: int):
     if not can_view_request(req):
         abort(403)
 
-    # Only Dept A may perform the edit flow here
-    if current_user.department != "A":
+    # Allow Dept B to update part_number artifacts, and Dept A to perform edits only
+    # when an edit was explicitly requested (can_edit_artifact enforces this policy).
+    dept = current_user.department
+    if dept not in ("A", "B"):
+        abort(403)
+
+    if not can_edit_artifact(req, a, dept):
         abort(403)
 
     form = ArtifactForm()
@@ -818,14 +911,21 @@ def edit_artifact(artifact_id: int):
         flash("Artifact edit failed validation.", "danger")
         return redirect(url_for("requests.request_detail", request_id=req.id))
 
-    a.donor_part_number = (form.donor_part_number.data or "").strip() or None
+    # If Dept A is editing donor, require that this was requested by another dept (edit_requested)
+    new_donor = (form.donor_part_number.data or "").strip() or None
+    if dept == "A" and (new_donor != (a.donor_part_number or None)) and not a.edit_requested:
+        abort(403)
+
+    a.donor_part_number = new_donor
     a.target_part_number = (form.target_part_number.data or "").strip() or None
     a.no_donor_reason = (form.no_donor_reason.data or "").strip() or None
     a.instructions_url = (form.instructions_url.data or "").strip() or None
-    # clear edit request flag when edited
-    a.edit_requested = False
 
-    _log(req, "artifact_edited", note=f"Artifact edited by Dept A: {a.artifact_type}")
+    # clear edit request flag when edited by Dept A
+    if dept == "A":
+        a.edit_requested = False
+
+    _log(req, "artifact_edited", note=f"Artifact edited by Dept {dept}: {a.artifact_type}")
     db.session.commit()
     flash("Artifact updated.", "success")
     return redirect(url_for("requests.request_detail", request_id=req.id))

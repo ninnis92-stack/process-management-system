@@ -139,6 +139,12 @@ git restore --source=origin/dev-scripts --worktree --staged -- dev-scripts
 
 Use these scripts only for local development and testing; they are intentionally not present on `main` to avoid accidental population of production databases.
 
+Inline target setting & donor edit rules
+- Dept B dashboard now supports a quick inline "Set target" control for requests where a part-number artifact exists but the target is empty. When a target is set from the dashboard the app records the change and sends an in-app/email notification to the department currently owning the request (`owner_department`).
+- Dept A may only edit a submitted donor part number when Dept B has explicitly requested an edit (the `edit_requested` flag). This prevents accidental overwrites; Dept B can edit part-number artifacts directly from their UI.
+
+- When any department requests an artifact edit (via the request-edit control), the app records an audit entry and sends an in-app/email notification to the department that owns the artifact so the request is visible to the right people. Dept A will see an edit form only after such a request.
+
 Debugging: interactive mini-window and debug workspace
 - The Admin Monitor now includes an interactive "mini-window" that loads any internal path (for example `/dashboard`, `/requests/123`) inside an iframe for quick debugging. Controls: `Load`, `Refresh`, `Open in new tab`, `Open Debug Workspace`.
 - The "Open Debug Workspace" opens a dedicated debug page at `/admin/debug_workspace?path=...` that embeds the requested internal path and shows guidance. Note: the debug workspace uses the same browser session and database as your current admin session — to get true session isolation, open the debug workspace in a Private/Incognito window or use a separate browser profile.
@@ -200,6 +206,22 @@ Notes:
 - The repository contains a minimal `migrations/` scaffold with an empty `0001_initial.py` that
   you can stamp as head if your DB already matches the models; prefer generating and reviewing
   migrations in the environment that matches your target DB (SQLite vs Postgres differences).
+  
+  Note: a recent change introduced a per-user `vibe_index` column to persist the UI "vibe" (theme)
+  preference. An Alembic revision has been added at `migrations/versions/0005_add_vibe_index.py`.
+
+  - To apply the migration with Alembic/Flask-Migrate:
+
+  ```bash
+  export FLASK_APP=run.py
+  flask db upgrade
+  ```
+
+  - If you need a quick one-off fix for a local SQLite DB (dev), run:
+
+  ```bash
+  sqlite3 instance/app.db "ALTER TABLE user ADD COLUMN vibe_index INTEGER DEFAULT 0;"
+  ```
 - RQ is optional; the app falls back to a safe thread-based sender when RQ is not enabled.
 - For production, replace the thread fallback with a reliable worker process (RQ/Celery) and
   ensure migrations are part of your deployment pipeline.

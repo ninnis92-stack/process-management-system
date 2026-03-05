@@ -300,9 +300,29 @@
     const vibeLabels = document.querySelectorAll('.vibeLabel, #vibeLabel');
     vibeLabels.forEach(el => { try { el.textContent = p.name; } catch(e){} });
     localStorage.setItem("vibeTheme", String(idx));
+    // If user is logged in, persist preference server-side
+    try{
+      if(isUserLoggedIn()){
+        fetch('/auth/vibe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ vibe_index: idx }) }).catch(()=>{});
+      }
+    }catch(e){}
+  }
+  // If page opts out of vibe (no-vibe class), skip theme application
+  if(document.body.classList.contains('no-vibe')) return;
+
+  function isUserLoggedIn() {
+    if (typeof window.USER_LOGGED_IN !== 'undefined') return !!window.USER_LOGGED_IN;
+    return document.body.dataset.userLoggedIn === '1';
   }
 
-  const stored = Number(localStorage.getItem("vibeTheme"));
+  function getUserVibeIndex() {
+    if (typeof window.USER_VIBE_INDEX !== 'undefined' && window.USER_VIBE_INDEX !== null) return Number(window.USER_VIBE_INDEX);
+    if (typeof document.body.dataset.userVibe !== 'undefined' && document.body.dataset.userVibe !== '') return Number(document.body.dataset.userVibe);
+    return null;
+  }
+
+  const userVibe = getUserVibeIndex();
+  const stored = (userVibe !== null && !Number.isNaN(userVibe)) ? userVibe : Number(localStorage.getItem("vibeTheme"));
   const dailySeed = (new Date()).getUTCDate() + (new Date()).getUTCMonth() * 31;
   const startIdx = Number.isFinite(stored) ? stored % palettes.length : (dailySeed % palettes.length);
   applyTheme(startIdx);

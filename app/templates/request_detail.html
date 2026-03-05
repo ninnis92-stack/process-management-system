@@ -120,6 +120,8 @@
                     <button class="btn btn-sm btn-primary mt-2">Edit Artifact (opens edit flow)</button>
                   </form>
                 </div>
+              {% elif current_user.department == "A" and not a.edit_requested %}
+                <div class="mt-2 small text-muted">Donor edits are locked — you may only change the donor part number after another department requests an edit.</div>
               {% endif %}
 
               {% if current_user.department == "B" and a.artifact_type == "part_number" %}
@@ -147,6 +149,19 @@
                     <button class="btn btn-sm btn-outline-primary">Save Part Number</button>
                   </form>
                 </div>
+                {% endif %}
+
+                {# Request edit from Dept A (visible to B and C) #}
+                {% if current_user.department in ['B','C'] %}
+                  <form method="post" action="{{ url_for('requests.request_artifact_edit', artifact_id=a.id) }}" class="mt-2">
+                    {{ request_edit_form.hidden_tag() }}
+                    <div class="mb-2">
+                      <label class="form-label small">Request edit from Dept A (note)</label>
+                      {{ request_edit_form.note(class="form-control form-control-sm", placeholder="Explain the change you're requesting") }}
+                    </div>
+                    <button class="btn btn-sm btn-outline-warning">Request Edit</button>
+                  </form>
+                {% endif %}
               {% endif %}
             </li>
           {% else %}

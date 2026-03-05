@@ -59,6 +59,8 @@ class User(db.Model, UserMixin):
     # Optional TOTP 2FA for local accounts
     totp_secret = db.Column(db.String(64), nullable=True)
     totp_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    # Optional per-user vibe/theme preference (index into palettes)
+    vibe_index = db.Column(db.Integer, nullable=True, default=0)
 
 class Notification(db.Model):
     """In-app notification with optional deep link and dedupe key."""

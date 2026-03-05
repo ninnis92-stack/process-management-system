@@ -195,3 +195,26 @@ def totp_verify():
 
     flash('Invalid code.', 'danger')
     return render_template('totp_verify.html')
+
+
+@auth_bp.route('/vibe', methods=['POST'])
+@login_required
+def set_vibe():
+    """Persist per-user vibe/theme index (expects form or JSON 'vibe_index')."""
+    try:
+        v = None
+        if flask_request.is_json:
+            data = flask_request.get_json()
+            v = int(data.get('vibe_index'))
+        else:
+            v = int(flask_request.form.get('vibe_index'))
+    except Exception:
+        return ("Invalid payload", 400)
+
+    if v is None:
+        return ("Missing vibe_index", 400)
+
+    u = User.query.get(current_user.id)
+    u.vibe_index = max(0, int(v))
+    db.session.commit()
+    return ({'ok': True}, 200)
