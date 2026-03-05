@@ -69,7 +69,7 @@
       ('CLOSED', 'Closed', 'bg-secondary')
     ] %}
       {% set anchor = bucket_links.get(code, '') %}
-      <a class="badge {{ cls }} text-decoration-none" href="{{ url_for('requests.dashboard') }}#bucket-{{ anchor }}">{{ label }}: {{ status_counts.get(code, 0) }}</a>
+      <a class="badge status-pill {{ cls }} text-decoration-none" href="{{ url_for('requests.dashboard') }}#bucket-{{ anchor }}">{{ label }} · {{ status_counts.get(code, 0) }}</a>
     {% endfor %}
   </div>
   {% endif %}
@@ -80,27 +80,29 @@
       <div class="card mb-3" id="bucket-{{ label|replace(' ', '-')|lower() }}">
         <div class="card-header d-flex justify-content-between align-items-center">
           <strong>{{ label }}</strong>
-          <span class="badge text-bg-light text-dark">{{ open_items|length }} item{{ '' if open_items|length == 1 else 's' }}</span>
+          <span class="badge status-pill text-bg-light text-dark">{{ open_items|length }} item{{ '' if open_items|length == 1 else 's' }}</span>
         </div>
-        <div class="list-group list-group-flush">
+        <div class="list-group list-group-flush bucket-list">
           {% for r in open_items %}
-            <a class="list-group-item list-group-item-action text-reset" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
-              <div class="d-flex justify-content-between">
-                <strong>#{{ r.id }} · {{ r.title }}</strong>
-                <span class="badge text-bg-secondary">{{ r.status }}</span>
+            <a class="list-group-item list-group-item-action text-reset bucket-item" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
+              <div class="d-flex justify-content-between align-items-start mb-1">
+                <div class="me-2">
+                  <div class="fw-semibold">#{{ r.id }} · {{ r.title }}</div>
+                  <div class="small text-muted">{{ r.pricebook_display }} · {{ r.priority }} · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}</div>
+                </div>
+                <div class="text-end">
+                  <div><span class="badge status-pill status-default">{{ r.status }}</span></div>
+                </div>
               </div>
-              <small class="text-muted">
-                {{ r.pricebook_display }} · {{ r.priority }} · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}
-                · C Review: {{ "Required" if r.requires_c_review else "Not required" }}
-              </small>
-              </a>
+              <div class="small text-muted">C Review: {{ "Required" if r.requires_c_review else "Not required" }}</div>
+            </a>
 
               {% set art = r.artifacts|selectattr('artifact_type','equalto','part_number')|list|first %}
               {% if art and not art.target_part_number %}
-                <form method="post" action="{{ url_for('requests.set_artifact_target', artifact_id=art.id) }}" class="d-flex gap-2 mt-1">
+                <form method="post" action="{{ url_for('requests.set_artifact_target', artifact_id=art.id) }}" class="d-flex gap-2 mt-2 align-items-center">
                   {{ artifact_form.hidden_tag() }}
-                  {{ artifact_form.target_part_number(class="form-control form-control-sm", value="") }}
-                  <button class="btn btn-sm btn-primary">Set target</button>
+                  {{ artifact_form.target_part_number(class="form-control form-control-sm", value="", placeholder="Target part #") }}
+                  <button class="btn btn-sm btn-primary">Set</button>
                 </form>
               {% endif %}
           {% else %}

@@ -169,6 +169,24 @@ a:hover { color: var(--accent-2); }
 .status-closed { background: #f2f4f6; color: #495057; }
 .status-default { background: #f1f3f5; color: #495057; }
 
+/* Dashboard bucket tweaks */
+.status-pill { border-radius: 999px; padding: 6px 10px; font-weight: 600; font-size: 0.85rem; }
+.bucket-list .list-group-item { padding: 12px 16px; border-left: none; border-right: none; border-radius: 0; }
+.bucket-item { display: block; }
+.bucket-item:hover { background: rgba(11,97,238,0.03); }
+.bucket-list .small.text-muted { margin-top: 6px; display: block; }
+.d-flex.flex-wrap.gap-2.mb-3 a.status-pill { text-decoration: none; color: inherit; }
+
+/* Make bucket cards arrange nicely on wide screens */
+@media (min-width: 992px) {
+  .card.mb-3 { margin-bottom: 1rem; }
+  .card[id^="bucket-"] { min-height: 100px; }
+}
+
+/* Compact inline target form */
+.card .form-control-sm { min-width: 160px; }
+.card .btn-sm { padding: 0.28rem 0.6rem; }
+
 .paste-zone { border: 2px dashed #bbb; border-radius: 10px; padding: 12px; background: #fff; color: #555; outline: none; }
 .paste-zone-hover { border-color: #0d6efd; background: #f6faff; }
 .preview-img, a.thumb img { width: 90px; height: 90px; object-fit: cover; border-radius: 10px; border: 1px solid #ddd; }
