@@ -94,8 +94,9 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data.strip().lower()).first()
         if not user or not user.is_active or not check_password_hash(user.password_hash, form.password.data):
-            flash("Invalid credentials.", "danger")
-            return render_template("login.html", form=form)
+            # Add a form-level error so the template can display it near the fields
+            form.password.errors.append("Invalid email or password")
+            return render_template("login.html", form=form), 401
 
         # If user has TOTP enabled, require TOTP verification before completing login
         if getattr(user, 'totp_enabled', False):
