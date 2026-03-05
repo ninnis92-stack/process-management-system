@@ -133,25 +133,7 @@ def create_app():
                 current_user.act_as_label = f"Acting as Dept {imp_dept}"
             except Exception:
                 pass
-
-        # Track the last successfully rendered GET URL in the session so that
-        # when the DB is temporarily unavailable we can redirect users back to
-        # the last working page instead of showing a persistent 503 on refresh.
-        from flask import session as _session, request as _request
-
-        @app.after_request
-        def _store_last_good(response):
-            try:
-                # Only store successful GET responses (status < 400).
-                if _request.method == 'GET' and response.status_code < 400:
-                    try:
-                        _session['last_good_url'] = _request.url
-                    except Exception:
-                        # Session may be unavailable in some contexts; ignore.
-                        pass
-            except Exception:
-                pass
-            return response
+        return
 
     from .auth.routes import auth_bp
     from .requests_bp.routes import requests_bp
@@ -166,6 +148,25 @@ def create_app():
     app.register_blueprint(notifications_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(integrations_bp)
+
+    # Track the last successfully rendered GET URL in the session so that
+    # when the DB is temporarily unavailable we can redirect users back to
+    # the last working page instead of showing a persistent 503 on refresh.
+    from flask import session as _session, request as _request
+
+    @app.after_request
+    def _store_last_good(response):
+        try:
+            # Only store successful GET responses (status < 400).
+            if _request.method == 'GET' and response.status_code < 400:
+                try:
+                    _session['last_good_url'] = _request.url
+                except Exception:
+                    # Session may be unavailable in some contexts; ignore.
+                    pass
+        except Exception:
+            pass
+        return response
 
     # DEV ONLY: auto-create tables
     if os.getenv("AUTO_CREATE_DB", "True") == "True":
