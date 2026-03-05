@@ -116,6 +116,10 @@ a:hover { color: var(--accent-2); }
 .nav-actions { flex-wrap: wrap; }
 .nav-actions .badge, .nav-actions .btn { margin-bottom: 0.25rem; }
 
+/* Mini interactive window used on admin monitor */
+.mini-window-card { background: var(--surface); padding: 8px; border-radius: 10px; box-shadow: 0 6px 18px rgba(10,14,20,0.06); border: 1px solid var(--border); }
+.mini-window-card iframe { border-radius: 8px; }
+
 .main { min-height: calc(100vh - 120px); }
 
 .notif-btn { transition: transform .15s ease, box-shadow .15s ease; border-color: rgba(255,255,255,0.4); color: var(--nav-text); }

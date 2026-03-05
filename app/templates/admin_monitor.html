@@ -45,10 +45,17 @@
   <div class="col-md-8">
     <div class="card mb-3">
       <div class="card-body">
-        <h5>Department view</h5>
-        <div>
-          {{ dashboard_html|safe }}
+        <h5>Department view (interactive mini window)</h5>
+        <div class="mb-2 d-flex gap-2 align-items-center">
+          <input id="miniUrl" class="form-control form-control-sm" type="text" placeholder="Enter path or URL (e.g. /dashboard or /requests/1)" value="/dashboard?dept={{ dept }}" />
+          <button id="miniLoad" class="btn btn-sm btn-primary">Load</button>
+          <button id="miniRefresh" class="btn btn-sm btn-outline-secondary">Refresh</button>
+          <button id="miniOpen" class="btn btn-sm btn-outline-secondary">Open in new tab</button>
         </div>
+        <div class="mini-window-card">
+          <iframe id="deptMiniWin" src="/dashboard?dept={{ dept }}" title="Department mini view" sandbox="allow-same-origin allow-forms allow-scripts allow-popups" style="width:100%; height:480px; border:1px solid var(--border); border-radius:8px;"></iframe>
+        </div>
+        <div class="mt-2 small text-muted">The mini window loads any internal path for debugging; actions performed here will run against the current database and session.</div>
       </div>
     </div>
   </div>

@@ -109,6 +109,45 @@
   }
 })();
 
+(function initDeptMiniWindow(){
+  // Provides a small interactive iframe in admin monitor to load internal pages for debugging.
+  const urlInput = document.getElementById('miniUrl');
+  const loadBtn = document.getElementById('miniLoad');
+  const refreshBtn = document.getElementById('miniRefresh');
+  const openBtn = document.getElementById('miniOpen');
+  const iframe = document.getElementById('deptMiniWin');
+  if(!iframe || !urlInput) return;
+
+  function normalizePath(v){
+    v = (v||'').trim();
+    if(!v) return '/dashboard';
+    // If value looks like a path (starts with /) keep it; else, try to treat it as absolute URL
+    return v.startsWith('/') ? v : v;
+  }
+
+  if(loadBtn){
+    loadBtn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      iframe.src = normalizePath(urlInput.value);
+    });
+  }
+
+  if(refreshBtn){
+    refreshBtn.addEventListener('click', (e)=>{ e.preventDefault(); iframe.contentWindow.location.reload(); });
+  }
+
+  if(openBtn){
+    openBtn.addEventListener('click', (e)=>{ e.preventDefault(); const href = normalizePath(urlInput.value); window.open(href, '_blank'); });
+  }
+
+  // If admin monitor dept quick links are clicked, update the mini window
+  document.querySelectorAll('a[href^="?dept="]').forEach(a=>{
+    a.addEventListener('click', (ev)=>{
+      try{ const q = new URL(a.href, window.location.href); const dept = q.searchParams.get('dept'); if(dept){ const src = `/dashboard?dept=${dept}`; iframe.src = src; if(urlInput) urlInput.value = src; } }catch(e){}
+    });
+  });
+})();
+
 // Attach CSRF token from meta to fetch POST/PUT/DELETE requests automatically
 (function attachCsrfToFetch(){
   const meta = document.querySelector('meta[name="csrf-token"]');
