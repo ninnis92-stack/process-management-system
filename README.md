@@ -123,6 +123,22 @@ Admin Hardening Checklist:
 - Run `python3 seed.py` to seed sample data.
 - Server entrypoint: `run.py` (Flask), Docker***REMOVED***le provided; Fly/Vercel con***REMOVED***gs included for deployment experiments.
 
+Dev-only smoke-test scripts
+- Smoke-test helper scripts (creating sample requests, populating UI buckets, and a webhook sender) have been moved out of the main `scripts/` folder and restored on a dedicated branch and folder: `dev-scripts/` on the `dev-scripts` branch. This keeps `main` clean for deployments.
+- To use them locally, either check out the `dev-scripts` branch or copy the `dev-scripts/` folder into your working tree:
+
+```bash
+# checkout the branch containing dev helpers
+git fetch origin dev-scripts:dev-scripts
+git checkout dev-scripts
+
+# or copy ***REMOVED***les into your current branch
+git checkout main
+git restore --source=origin/dev-scripts --worktree --staged -- dev-scripts
+```
+
+Use these scripts only for local development and testing; they are intentionally not present on `main` to avoid accidental population of production databases.
+
 ## Migrations, Background Workers, and Docker Compose
 
 This section summarizes the recommended steps for managing schema migrations,
