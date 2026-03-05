@@ -81,9 +81,14 @@ def external_new():
             db.session.flush()  # req.id available now
         except OperationalError as err:
             # In some deploys (SQLite on multiple instances) tables may be
-            # missing on a newly started machine. Attempt to create tables
+            # missing on a newly started machine. Session is marked for
+            # rollback after a failed flush — rollback first, create tables
             # and retry once so guest submissions succeed on fresh instances.
-            current_app.logger.warning("Flush failed; attempting create_all and retry: %s", err)
+            current_app.logger.warning("Flush failed; rolling back, attempting create_all and retry: %s", err)
+            try:
+                db.session.rollback()
+            except Exception:
+                current_app.logger.exception("Failed to rollback session after flush error")
             try:
                 db.create_all()
                 db.session.flush()
