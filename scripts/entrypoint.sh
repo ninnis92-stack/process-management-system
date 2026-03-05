@@ -25,6 +25,17 @@ if [ "${AUTO_CREATE_DB:-1}" != "0" ]; then
   fi
 fi
 
+# After ensuring tables are created, wait for the DB to be responsive.
+# This gives a clear readiness signal before starting the web server.
+DB_READY_TIMEOUT=${DB_READY_TIMEOUT:-30}
+DB_READY_INTERVAL=${DB_READY_INTERVAL:-1}
+echo "Waiting up to ${DB_READY_TIMEOUT}s for DB readiness..."
+if python3 scripts/wait_for_db_ready.py --timeout "$DB_READY_TIMEOUT" --interval "$DB_READY_INTERVAL"; then
+  echo "DB is responsive"
+else
+  echo "Warning: DB did not become responsive within ${DB_READY_TIMEOUT}s"
+fi
+
 # Optional seeding on boot when SEED_ON_BOOT=1
 if [ "${SEED_ON_BOOT:-0}" = "1" ]; then
   echo "SEED_ON_BOOT=1: running seed.py (best-effort)"

@@ -163,4 +163,36 @@ def create_app():
         # If SQLAlchemy isn't available for some reason, skip installing the handler.
         pass
 
+    # Friendly handling for expired/invalid CSRF tokens (common during prototyping).
+    try:
+        from flask_wtf.csrf import CSRFError
+        from flask import flash, redirect, url_for
+
+        @app.errorhandler(CSRFError)
+        def _handle_csrf_error(err):
+            app.logger.warning("CSRF error handled: %s", err)
+            # Inform the user and redirect to login where a fresh token will be issued
+            flash("Session expired or invalid form submission — please try again.", "warning")
+            return redirect(url_for("auth.login"))
+    except Exception:
+        pass
+    except Exception:
+        # If SQLAlchemy isn't available for some reason, skip installing the handler.
+        pass
+
+    # Lightweight health endpoint used by readiness probes. Returns 200 when
+    # the DB responds to a trivial query, otherwise 503.
+    from flask import jsonify
+
+    @app.route("/health")
+    def _health():
+        try:
+            # Simple DB check — if this raises, the DB/tables are likely not ready.
+            from sqlalchemy import text
+            db.session.execute(text("SELECT 1"))
+            return (jsonify({"status": "ok"}), 200)
+        except Exception as e:
+            app.logger.warning("Health check failed: %s", e)
+            return (jsonify({"status": "unhealthy"}), 503)
+
     return app
