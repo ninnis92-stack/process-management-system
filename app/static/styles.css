@@ -112,6 +112,10 @@ a:hover { color: var(--accent-2); }
 .nav-actions .btn { border-radius: 999px; padding-inline: 0.85rem; font-weight: 600; border-color: rgba(255,255,255,0.35); }
 .nav-actions .btn:hover { border-color: rgba(255,255,255,0.6); }
 
+/* Allow nav actions (right-side buttons) to wrap on small screens to avoid overflow */
+.nav-actions { flex-wrap: wrap; }
+.nav-actions .badge, .nav-actions .btn { margin-bottom: 0.25rem; }
+
 .main { min-height: calc(100vh - 120px); }
 
 .notif-btn { transition: transform .15s ease, box-shadow .15s ease; border-color: rgba(255,255,255,0.4); color: var(--nav-text); }

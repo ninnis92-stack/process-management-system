@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <h3 class="mb-3">Admin Monitor — Dept {{ dept }}</h3>
-<div class="mb-3 d-flex gap-2">
-  <a class="btn btn-outline-primary" href="?dept=A">View Dept A</a>
-  <a class="btn btn-outline-primary" href="?dept=B">View Dept B</a>
-  <a class="btn btn-outline-primary" href="?dept=C">View Dept C</a>
+<div class="mb-3 d-flex gap-2 flex-wrap align-items-center">
+  <a class="btn btn-sm btn-outline-primary" href="?dept=A">View Dept A</a>
+  <a class="btn btn-sm btn-outline-primary" href="?dept=B">View Dept B</a>
+  <a class="btn btn-sm btn-outline-primary" href="?dept=C">View Dept C</a>
+  <!-- Department-facing vibe button mirrors global vibe control and keeps layout compact -->
+  <button id="vibeBtnDept" class="btn btn-sm btn-outline-secondary">Vibe · <span class="vibeLabel">—</span></button>
 </div>
 
 <div class="row g-3">

@@ -200,8 +200,9 @@
       "--page-bg",
       `radial-gradient(circle at 20% 20%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.10), transparent 30%), radial-gradient(circle at 80% 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.06), transparent 28%), #fbfcfe`
     );
-    const vibeLabel = document.getElementById("vibeLabel");
-    if (vibeLabel) vibeLabel.textContent = p.name;
+    // Update any visible vibe labels (global and department-facing)
+    const vibeLabels = document.querySelectorAll('.vibeLabel, #vibeLabel');
+    vibeLabels.forEach(el => { try { el.textContent = p.name; } catch(e){} });
     localStorage.setItem("vibeTheme", String(idx));
   }
 
@@ -214,6 +215,16 @@
     const next = ((Number(localStorage.getItem("vibeTheme")) || 0) + 1) % palettes.length;
     applyTheme(next);
   });
+
+  // If a department-facing vibe button exists (on admin department views), forward clicks to the global handler
+  const deptVibeBtn = document.getElementById('vibeBtnDept');
+  if (deptVibeBtn) {
+    deptVibeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      // Trigger the same theme advance as the main button
+      btn.click();
+    });
+  }
 })();
 
 (function initSearchHelpers() {
