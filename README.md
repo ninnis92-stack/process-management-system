@@ -353,3 +353,5 @@ pip install prometheus_client
   3. Use `admin@example.com` to open the Admin Monitor and demonstrate impersonation / department switching.
 
 Note: For production use a managed Postgres instance and run migrations via Alembic/Flask-Migrate; avoid relying on `AUTO_CREATE_DB` in production.
+
+- Policy change (assignment): Department A users may no longer self-assign a request until Department B has processed it and explicitly sent it back to Department A. This enforces the demo workflow where Dept B handles initial review/work and returns the request to Dept A before A can claim it.

@@ -811,6 +811,17 @@ def assign_self(request_id: int):
         flash("Cannot assign a closed request.", "warning")
         return redirect(url_for("requests.request_detail", request_id=request_id))
 
+    # Enforce: Department A users may not self-assign a request until it
+    # has been processed by Department B and explicitly sent back to A.
+    # Allow if the request is already owned by A (owner_department == 'A')
+    # or if there's a recorded Submission from B -> A.
+    if current_user.department == "A" and not (req.owner_department == "A" or _was_sent_back_to_a(req)):
+        flash(
+            "Department A may only assign requests to themselves after Dept B has processed and returned the request.",
+            "warning",
+        )
+        return redirect(url_for("requests.request_detail", request_id=request_id))
+
     if req.assigned_to_user_id and req.assigned_to_user_id != current_user.id:
         flash("This request is already assigned.", "warning")
         return redirect(url_for("requests.request_detail", request_id=request_id))
@@ -860,6 +871,16 @@ def _clean_presence():
         _presence[rid] = {uid: info for uid, info in _presence[rid].items() if info.get("ts", 0) >= cutoff}
         if not _presence[rid]:
             _presence.pop(rid, None)
+
+
+def _was_sent_back_to_a(req: ReqModel) -> bool:
+    """Return True if this request has been handed back from Dept B to Dept A.
+
+    This is used to prevent the original Dept A submitter from assigning
+    themselves to their own request until it has been processed by Dept B
+    and explicitly returned to Dept A.
+    """
+    return Submission.query.filter_by(request_id=req.id, from_department="B", to_department="A").count() > 0
 
 
 @requests_bp.route("/requests/<int:request_id>/presence", methods=["GET", "POST"])
