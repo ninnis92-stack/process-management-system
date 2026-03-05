@@ -1,42 +1,9 @@
-PY=python3
-PIP=$(PY) -m pip
-REQ=requirements.txt
-FLY_APP ?= process-management-prototype-lingering-bush-6175
-
-.PHONY: install run seed migrate deploy test
-
-install:
-	$(PIP) install --upgrade pip
-	$(PIP) install -r $(REQ)
-
-run:
-	$(PY) run.py
-
-seed:
-	$(PY) seed.py
-
-migrate:
-	@echo "Running alembic upgrade head (requires alembic configured)"
-	alembic upgrade head
-
-deploy:
-	@git push origin HEAD
-	@echo "Deploying to Fly app: $(FLY_APP)"
-	@flyctl deploy -a $(FLY_APP)
-
-deploy-safe:
-	@echo "Running tests before deploy"
-	@make test
-	@echo "Tests passed — deploying"
-	@make deploy
-
-test:
-	pytest -q
 PYTHON?=python3
 PIP?=pip
 VENV?=.venv
+FLY_APP ?= process-management-prototype-lingering-bush-6175
 
-.PHONY: help venv install test run seed db-init db-migrate db-upgrade db-stamp worker compose-up compose-down
+.PHONY: help venv install test run seed migrate deploy deploy-safe db-init db-migrate db-upgrade db-stamp worker compose-up compose-down
 
 help:
 	@echo "Makefile commands:"
@@ -45,6 +12,9 @@ help:
 	@echo "  make test           # run pytest"
 	@echo "  make run            # run the local Flask dev server"
 	@echo "  make seed           # seed sample data"
+	@echo "  make migrate        # run alembic upgrade head"
+	@echo "  make deploy         # push and deploy to Fly.io"
+	@echo "  make deploy-safe    # run tests then deploy"
 	@echo "  make db-init        # initialize alembic migrations (one-time)"
 	@echo "  make db-migrate     # autogenerate a migration (requires FLASK_APP)"
 	@echo "  make db-upgrade     # apply migrations to the configured DB"
@@ -67,6 +37,21 @@ run:
 
 seed:
 	$(VENV)/bin/$(PYTHON) seed.py
+
+migrate:
+	@echo "Running alembic upgrade head (requires alembic configured)"
+	alembic upgrade head
+
+deploy:
+	@git push origin HEAD
+	@echo "Deploying to Fly app: $(FLY_APP)"
+	@flyctl deploy -a $(FLY_APP)
+
+deploy-safe:
+	@echo "Running tests before deploy"
+	@make test
+	@echo "Tests passed — deploying"
+	@make deploy
 
 db-init:
 	@echo "Run this only once to create migrations/ (installs required)"
