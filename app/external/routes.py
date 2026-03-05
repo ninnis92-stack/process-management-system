@@ -1,6 +1,7 @@
 import smtplib
 from email.message import EmailMessage
 from flask import Blueprint, render_template, redirect, url_for, flash, abort, current_app
+from sqlalchemy import func
 
 from ..extensions import db
 from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Notification
