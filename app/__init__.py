@@ -28,7 +28,11 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     # Allow runtime override of DB URL so tests can monkeypatch env before calling create_app()
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", app.config.get("SQLALCHEMY_DATABASE_URI"))
+    db_url = os.getenv("DATABASE_URL", app.config.get("SQLALCHEMY_DATABASE_URI"))
+    # Normalize legacy `postgres://` scheme to SQLAlchemy-compatible `postgresql://`
+    if isinstance(db_url, str) and db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 
     @app.cli.command("notify-due")
     def notify_due():
