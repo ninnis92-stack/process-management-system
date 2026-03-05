@@ -1,0 +1,18 @@
+name: Build devcontainer image for Codespaces
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build-devcontainer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build devcontainer image
+        uses: devcontainers/ci@v0.2
+        with:
+          working-directory: '.'
+          image-name: process-management-prototype/devcontainer:latest
+          action: 'build'
