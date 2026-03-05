@@ -11,6 +11,7 @@ from ..models import User
 from ..extensions import db
 from .sso import oauth
 from .sso import token_has_mfa
+from sqlalchemy.exc import OperationalError
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -92,7 +93,11 @@ def sso_callback():
 def login():
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data.strip().lower()).first()
+        try:
+            user = User.query.filter_by(email=form.email.data.strip().lower()).first()
+        except OperationalError as err:
+            current_app.logger.exception("Database unavailable during login")
+            return ("Service temporarily unavailable — database initializing. Please try again shortly.", 503)
         if not user or not user.is_active or not check_password_hash(user.password_hash, form.password.data):
             # Add a form-level error so the template can display it near the fields
             form.password.errors.append("Invalid email or password")
