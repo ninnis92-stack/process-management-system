@@ -24,6 +24,12 @@ deploy:
 	@echo "Deploying to Fly app: $(FLY_APP)"
 	@flyctl deploy -a $(FLY_APP)
 
+deploy-safe:
+	@echo "Running tests before deploy"
+	@make test
+	@echo "Tests passed — deploying"
+	@make deploy
+
 test:
 	pytest -q
 PYTHON?=python3
