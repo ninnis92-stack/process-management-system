@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Add Field to {{ template.name }}</h2>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">{{ form.name.label }}{{ form.name(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.label.label }}{{ form.label(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.field_type.label }}{{ form.field_type(class_='form-select') }}</div>
+  <div class="mb-3">{{ form.required() }} {{ form.required.label }}</div>
+  <div class="mb-3">{{ form.hint.label }}{{ form.hint(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.order.label }}{{ form.order(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.options_csv.label }}{{ form.options_csv(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.verification_json.label }}{{ form.verification_json(class_='form-control', rows=4) }}</div>
+  <button class="btn btn-primary">Add Field</button>
+</form>
+{% endblock %}

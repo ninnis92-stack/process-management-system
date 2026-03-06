@@ -9,7 +9,7 @@ Keep the send path idempotent and non-blocking from request handlers.
 """
 
 from .extensions import db
-from .models import Notification, User
+from .models import Notification, User, SpecialEmailConfig
 from flask import current_app
 from threading import Thread
 
@@ -127,21 +127,36 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
 
 
 def notify_users(users, title, body=None, url=None, ntype="generic", request_id=None):
-    # Persist in-app notifications
+    # Decide whether to persist in-app notifications per-recipient.
+    # If the app's EmailService is enabled and an email address exists for
+    # a recipient, prefer sending email and skip creating an in-app row for
+    # that recipient. This prevents duplicate delivery paths once email
+    # integration is active. Users without email addresses will still
+    # receive in-app notifications.
     recipients_map = {}
+    try:
+        svc = EmailService()
+        email_enabled = bool(getattr(svc, "enabled", False))
+    except Exception:
+        email_enabled = False
+
     for u in users:
-        db.session.add(
-            Notification(
-                user_id=u.id,
-                request_id=request_id,
-                type=ntype,
-                title=title,
-                body=body,
-                url=url,
-            )
-        )
-        if getattr(u, "email", None):
+        has_email = bool(getattr(u, "email", None))
+        if email_enabled and has_email:
+            # collect for email send but do not create DB Notification row
             recipients_map[u.email] = u.id
+        else:
+            # fallback: persist in-app notification
+            db.session.add(
+                Notification(
+                    user_id=u.id,
+                    request_id=request_id,
+                    type=ntype,
+                    title=title,
+                    body=body,
+                    url=url,
+                )
+            )
 
     # Fire-and-forget email notifications (non-blocking). Email sending is optional/config-driven
     if recipients_map:
@@ -151,3 +166,50 @@ def notify_users(users, title, body=None, url=None, ntype="generic", request_id=
         _send_emails_async(recipients_map, subject, text_body, html=html_body, request_id=request_id)
 
     # ✅ do NOT commit here; commit happens in the route after all writes
+
+
+def send_request_form_autoresponder(sender_email: str) -> bool:
+    """Send the configured autoresponder to `sender_email` if feature enabled.
+
+    Returns True if an attempt was made (or successfully logged), False otherwise.
+    """
+    try:
+        cfg = SpecialEmailConfig.get()
+    except Exception:
+        return False
+
+    if not cfg or not cfg.enabled:
+        return False
+
+    # Build a subject-line friendly template listing form fields
+    fields = [
+        "title=<TITLE>",
+        "request_type=part_number|instructions|both",
+        "donor_part_number=<DONOR>",
+        "target_part_number=<TARGET>",
+        "no_donor_reason=unknown|needs_create",
+        "sales_list=in_pricebook|not_in_pricebook|unknown",
+        "price_book_number=<NUMBER>",
+        "due_at=YYYY-mm-ddTHH:MM",
+        "description=<SHORT TEXT>",
+        "priority=low|medium|high",
+    ]
+    fields_for_subject = ";".join(fields)
+
+    # Use configured first message, falling back to a default helper message
+    if cfg.request_form_first_message and isinstance(cfg.request_form_first_message, str) and cfg.request_form_first_message.strip():
+        body = cfg.request_form_first_message
+    else:
+        body = (
+            "Thanks for contacting the request form inbox. To open a request by email, reply with a subject line formatted like:\n"
+            "title=<TITLE>;<...fields as below...>"
+        )
+
+    # Replace placeholder if present
+    body = body.replace("{fields_for_subject}", fields_for_subject)
+
+    # Send the autoresponder (non-blocking)
+    recipients_map = {sender_email: None}
+    subject = "Request form: instructions to submit via subject"
+    _send_emails_async(recipients_map, subject, body)
+    return True

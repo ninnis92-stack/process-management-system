@@ -62,10 +62,23 @@ assignment_changes_total = Counter(
     ['dept', 'action']
 )
 
+# New metrics
+requests_closed_before_due_total = Counter(
+    'app_requests_closed_before_due_total',
+    'Requests closed on or before due date',
+    ['dept']
+)
+
 # Gauges
 requests_by_owner = Gauge(
     'app_requests_by_owner',
     'Current requests by owner department',
+    ['dept']
+)
+
+requests_overdue_by_owner = Gauge(
+    'app_requests_overdue_by_owner',
+    'Current requests overdue (past due date) by owner department',
     ['dept']
 )
 
@@ -106,3 +119,24 @@ def update_owner_gauge(session, ReqModel):
     for d in ('A', 'B', 'C'):
         if d not in counts:
             requests_by_owner.labels(dept=d).set(0)
+
+    # Also update overdue counts: requests where due_at is set, due_at < now, and not CLOSED
+    try:
+        from datetime import datetime
+        func = __import__('sqlalchemy').func
+        overdue_counts = dict(
+            session.query(ReqModel.owner_department, func.count(ReqModel.id))
+            .filter(ReqModel.due_at != None)
+            .filter(ReqModel.due_at < datetime.utcnow())
+            .filter(ReqModel.status != 'CLOSED')
+            .group_by(ReqModel.owner_department)
+            .all()
+        )
+        for d, v in overdue_counts.items():
+            requests_overdue_by_owner.labels(dept=d).set(v)
+        for d in ('A', 'B', 'C'):
+            if d not in overdue_counts:
+                requests_overdue_by_owner.labels(dept=d).set(0)
+    except Exception:
+        # Do not let metrics failures affect app
+        pass

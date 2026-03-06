@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{% if template %}Edit Template{% else %}New Template{% endif %}</h2>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">
+    {{ form.name.label }}
+    {{ form.name(class_='form-control') }}
+  </div>
+  <div class="mb-3">
+    {{ form.description.label }}
+    {{ form.description(class_='form-control', rows=3) }}
+  </div>
+  <button class="btn btn-primary">Save</button>
+</form>
+
+{% if template %}
+  <hr/>
+  <h4>Fields</h4>
+  <a class="btn btn-sm btn-outline-success" href="{{ url_for('admin.form_field_new', template_id=template.id) }}">Add Field</a>
+  <ul class="list-group mt-2">
+  {% for f in fields %}
+    <li class="list-group-item">
+      <strong>{{ f.label }}</strong> <small class="text-muted">({{ f.field_type }})</small>
+      {% if f.required %} <span class="badge bg-warning text-dark">required</span>{% endif %}
+    </li>
+  {% else %}
+    <li class="list-group-item">No fields yet.</li>
+  {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

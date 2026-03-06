@@ -48,31 +48,14 @@
     </div>
   </div>
 
-  {% if status_counts %}
   <div class="d-flex flex-wrap gap-2 mb-3">
-    {% set bucket_links = {
-      'B_IN_PROGRESS': 'in-progress-by-department-b',
-      'WAITING_ON_A_RESPONSE': 'pending-review-from-department-a',
-      'PENDING_C_REVIEW': 'under-review-by-department-c',
-      'EXEC_APPROVAL': 'exec-approval-required',
-      'B_FINAL_REVIEW': 'final-review',
-      'SENT_TO_A': 'sent-to-a',
-      'CLOSED': 'closed-this-week'
-    } %}
-    {% for code, label, cls in [
-      ('B_IN_PROGRESS', 'In progress', 'bg-primary'),
-      ('WAITING_ON_A_RESPONSE', 'Pending review from Department A', 'bg-warning text-dark'),
-      ('PENDING_C_REVIEW', 'Under C review', 'bg-info text-dark'),
-      ('EXEC_APPROVAL', 'Exec approval required', 'bg-dark'),
-      ('B_FINAL_REVIEW', 'Final review', 'bg-warning text-dark'),
-      ('SENT_TO_A', 'Sent to A', 'bg-success'),
-      ('CLOSED', 'Closed this week', 'bg-secondary')
-    ] %}
-      {% set anchor = bucket_links.get(code, '') %}
-      <a class="badge status-pill {{ cls }} text-decoration-none" href="{{ url_for('requests.dashboard') }}#bucket-{{ anchor }}">{{ label }} · {{ status_counts.get(code, 0) }}</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('requests.dashboard') }}">All</a>
+    {% for b in bucket_list %}
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('requests.dashboard', bucket_id=b.id) }}">{{ b.name }}{% if status_counts.get(b.id) is not none %} · {{ status_counts.get(b.id) }}{% endif %}</a>
+    {% else %}
+      <span class="text-muted">No buckets configured.</span>
     {% endfor %}
   </div>
-  {% endif %}
 
   {% for label, items in buckets.items() %}
     {# Show closed buckets (e.g., 'Closed this week') as-is; otherwise filter out CLOSED items #}

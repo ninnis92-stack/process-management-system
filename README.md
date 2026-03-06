@@ -2,6 +2,8 @@
 
 A small prototype app.
 
+Administration: see `docs/ADMIN.md` for notes about the admin-managed Departments and SiteConfig (banner + rolling quotes). Tests covering these features live at `tests/test_admin_site_config.py`.
+
 ## Deployment & seeding (Fly.io)
 
 Quick steps to deploy and ensure the demo users and DB are created on Fly:
@@ -58,10 +60,54 @@ flask db migrate -m "add is_admin to user"
 flask db upgrade
 ```
 
+## Scheduling & Nudges
+
+- Automated nudges for high-priority requests: enable from the Admin -> Special Emails page (`High-priority nudges`). Set the reminder interval in hours (default 24).
+- A small cron example is provided at `scripts/cron_examples.sh` showing how to run the nudge sender hourly and refresh Prometheus gauges periodically. Adjust paths and virtualenv activation to match your environment or use your platform's scheduler.
+- Run nudges manually for testing:
+
+```bash
+FLASK_APP=app flask notify-nudges
+```
+
+- Refresh metrics (owner counts and overdue gauge):
+
+```bash
+python3 -c "from app import create_app; from app.metrics import update_owner_gauge; from app.extensions import db; app=create_app(); ctx=app.app_context(); ctx.push(); from app.models import Request as ReqModel; update_owner_gauge(db.session, ReqModel); ctx.pop()"
+```
+
+These hooks are safe to run in development and can be scheduled by your host (cron, Fly scheduled jobs, Heroku Scheduler, etc.).
+
 If you prefer not to use Flask-Migrate, you can apply the SQL directly for SQLite:
 
 ```bash
 sqlite3 instance/dev.sqlite3 "ALTER TABLE user ADD COLUMN is_admin INTEGER DEFAULT 0;"
+```
+
+Debug workspace cleanup (cron example)
+-----------------------------------
+
+To periodically remove old admin-created debug requests (`is_debug=True`) you can schedule a simple maintenance job. Below is an example cron entry that runs a small Flask one-liner to delete debug requests older than 7 days. Adjust the venv activation and working directory to match your host.
+
+```cron
+# Run nightly at 03:30 UTC: delete debug requests older than 7 days
+30 3 * * * cd /path/to/process-management-prototype && /path/to/venv/bin/python3 - <<'PY'
+from app import create_app
+from app.extensions import db
+from app.models import Request
+from datetime import datetime, timedelta
+app = create_app()
+with app.app_context():
+  cutoff = datetime.utcnow() - timedelta(days=7)
+  old = Request.query.filter(Request.is_debug==True, Request.created_at < cutoff).all()
+  for r in old:
+    db.session.delete(r)
+  db.session.commit()
+  print(f"Deleted {len(old)} debug requests")
+PY
+```
+
+If you prefer using the HTTP endpoint, you can call the admin-only `/admin/debug/cleanup` endpoint, but ensure you authenticate the call (for example with a short-lived admin API token or a script that runs inside the app context). The endpoint requires `confirm=true` and accepts an optional `days` parameter.
 
 TOTP 2FA (local accounts):
 
@@ -189,6 +235,20 @@ Admin Hardening Checklist:
 - Stored in DB via `Notification` model; created via `notify_users` helper in `requests_bp/routes.py`.
 - Types include status changes, nudges, and request creation; surfaced in UI banner (template logic in `base.html`).
 
+Behavior notes:
+- Clicking the notifications icon in the header now marks all unread notifications as read and clears the red badge immediately (endpoint: `POST /notifications/mark_all_read`).
+- When email delivery is enabled (configure `EMAIL_ENABLED` and SMTP settings), recipients with an email address will receive email messages instead of creating duplicate in‑app `Notification` rows. This prevents duplicate delivery paths once your mailer is active.
+- SSO-linked users are treated the same: if email integration is active, a notification that would previously have been an in‑app event will instead attempt to send an email to the user's registered address.
+
+Testing locally:
+- A small test script is available at `scripts/notify_test.py` to exercise `notify_users()` with `EMAIL_ENABLED` toggled. Run with:
+
+```bash
+PYTHONPATH=. python3 scripts/notify_test.py
+```
+
+This script will create temporary test users and print counts of in‑app `Notification` rows created when email is disabled vs enabled.
+
 ## Search & Filtering
 - Search endpoint `/search` (title/description/id) scoped by department access.
 - Dept B dashboard shows status buckets and semantic filters (in progress, C review, final review, etc.). Closed items >24h are hidden.
@@ -215,6 +275,80 @@ Admin Hardening Checklist:
 ## Dev Notes
 - Run `python3 seed.py` to seed sample data.
 - Server entrypoint: `run.py` (Flask), Dockerfile provided; Fly/Vercel configs included for deployment experiments.
+
+## Local testing & new features
+
+This project now includes an admin-managed "Special Emails" feature, an inbound-mail webhook, and a safe inventory integration skeleton. These are all optional and safe for prototype use — nothing is enabled by default.
+
+- Admin UI: visit `/admin/special_emails` (admin only) to toggle the request-by-email feature, set the Help Email and Request Form Email, and edit the initial autoresponder message.
+
+- Autoresponder: when enabled the app will send a reply to senders of the Request Form Email explaining how to submit requests by composing a subject line. The autoresponder uses the same EmailService used elsewhere (logs messages when `EMAIL_ENABLED` is false).
+
+- Inbound mail webhook: a signed endpoint is available at `/integrations/inbound-mail` (CSRF-exempt). It expects a HMAC-SHA256 signature in the `X-Webhook-Signature` header. Example (bash):
+
+```bash
+# Replace these values for local testing
+export WEBHOOK_SHARED_SECRET=your_test_secret
+payload='{"from":"tester@example.com","subject":"title=Test;donor_part_number=ABC123"}'
+sig=$(printf "%s" "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SHARED_SECRET" | sed 's/^.* //')
+
+curl -v \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Signature: $sig" \
+  -d "$payload" \
+  http://localhost:8080/integrations/inbound-mail
+```
+
+The handler will parse semicolon-separated `key=value` pairs from the subject and (optionally) call the `InventoryService` to validate part numbers or sales list numbers. By default `InventoryService` is disabled and returns `null`/`None` for checks.
+
+- Inventory skeleton: configuration keys are `INVENTORY_ENABLED` and `INVENTORY_DSN`. The implementation lives at `app/services/inventory.py`. When `INVENTORY_ENABLED` is false the service is a no-op, so current behavior is unchanged. To integrate later, implement `_client` using your DSN and return True/False from `validate_part_number()` / `validate_sales_list_number()`.
+
+### Migrations / Alembic notes
+
+Two migration files for the new `special_email_config` table are included under `migrations/versions/`:
+
+- `0006_add_special_email_config.py` (hand-crafted)
+- `0007_autogen_add_special_email_config.py` (autogenerate-style)
+
+Do not run both of these in the same release sequence — they'll attempt to create the same table twice and conflict. Recommended options:
+
+- Development/autogenerate workflow (preferred): install Alembic/Flask-Migrate, remove or ignore `0006_*`, then run `alembic upgrade head` (or `flask db upgrade`) to apply the autogen migration.
+- Handcrafted workflow: keep `0006_*` and do not run `0007_*`; run `alembic upgrade head` (or use `db.create_all()` for local dev convenience).
+
+Quick local steps to test everything without altering remote deployments:
+
+```bash
+# create & activate venv, install deps
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install alembic Flask-Migrate  # optional for migrations
+
+# Option A: fast local (convenience)
+export AUTO_CREATE_DB=true
+python3 run.py
+
+# Option B: apply Alembic migrations locally (recommended if using migrations)
+export FLASK_APP=run.py
+flask db upgrade      # or: alembic upgrade head
+python3 run.py
+```
+
+### Trigger autoresponder manually (dev)
+
+You can trigger the autoresponder from a Flask shell for testing:
+
+```bash
+python3 - <<'PY'
+from app import create_app
+with create_app().app_context():
+    from app.notifcations import send_request_form_autoresponder
+    send_request_form_autoresponder('you@example.com')
+    print('Queued autoresponder')
+PY
+```
+
+If you'd like, I can delete the handcrafted migration or the autogen file and then run `alembic upgrade head` here locally; tell me which migration you prefer to keep and I'll apply it and update the README accordingly.
 
 Dev-only smoke-test scripts
 - Smoke-test helper scripts (creating sample requests, populating UI buckets, and a webhook sender) have been moved out of the main `scripts/` folder and restored on a dedicated branch and folder: `dev-scripts/` on the `dev-scripts` branch. This keeps `main` clean for deployments.

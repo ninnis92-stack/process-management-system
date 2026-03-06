@@ -39,6 +39,11 @@ def create_app():
         from .notifications.due import send_due_soon_notifications
         send_due_soon_notifications(current_app, hours=24)
 
+    @app.cli.command("notify-nudges")
+    def notify_nudges():
+        from .notifications.due import send_high_priority_nudges
+        send_high_priority_nudges(current_app)
+
     @app.cli.command("create-user")
     @click.option("--email", required=True, help="User email")
     @click.option("--name", default=None, help="Display name")
@@ -148,6 +153,46 @@ def create_app():
     app.register_blueprint(notifications_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(integrations_bp)
+
+    # Provide active theme CSS and logo URL to templates
+    @app.context_processor
+    def _theme_context():
+        try:
+            from .models import AppTheme
+            from .models import SiteConfig
+            from flask import url_for
+            t = AppTheme.query.filter_by(active=True).first()
+            css = t.css if t and t.css else ''
+            logo = None
+            if t and t.logo_filename:
+                try:
+                    # if stored value is an external URL, use it directly
+                    if t.logo_filename.startswith('http'):
+                        logo = t.logo_filename
+                    else:
+                        logo = url_for('static', filename=t.logo_filename)
+                except Exception:
+                    logo = None
+            if not logo:
+                logo = current_app.config.get('LOGO_URL')
+            # site config (singleton)
+            try:
+                cfg = SiteConfig.get()
+                banner_html = cfg.banner_html or ''
+                rolling_quotes_enabled = bool(cfg.rolling_quotes_enabled)
+                rolling_quotes = cfg.rolling_quotes or []
+            except Exception:
+                banner_html = ''
+                rolling_quotes_enabled = False
+                rolling_quotes = []
+
+            return dict(active_theme_css=css, theme_logo_url=logo,
+                        site_banner_html=banner_html,
+                        rolling_quotes_enabled=rolling_quotes_enabled,
+                        rolling_quotes=rolling_quotes)
+        except Exception:
+            return dict(active_theme_css='', theme_logo_url=current_app.config.get('LOGO_URL'),
+                        site_banner_html='', rolling_quotes_enabled=False, rolling_quotes=[])
 
     # Track the last successfully rendered GET URL in the session so that
     # when the DB is temporarily unavailable we can redirect users back to

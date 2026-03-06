@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{% if bucket %}Edit Bucket: {{ bucket.name }}{% else %}New Bucket{% endif %}</h2>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">{{ form.name.label }}{{ form.name(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.department_id.label }}{{ form.department_id(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.department_name.label }}{{ form.department_name(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.order.label }}{{ form.order(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.active() }} {{ form.active.label }}</div>
+  <button class="btn btn-primary">Save</button>
+</form>
+
+{% if bucket %}
+  <hr/>
+  <h4>Statuses in this bucket</h4>
+  <a class="btn btn-sm btn-outline-success" href="{{ url_for('admin.bucket_status_new', bucket_id=bucket.id) }}">Add Status</a>
+  <ul class="list-group mt-2">
+  {% for s in statuses %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <div>{{ s.status_code }}</div>
+      <div>
+        <form method="post" action="{{ url_for('admin.bucket_status_delete', bucket_id=bucket.id, status_id=s.id) }}" style="display:inline" onsubmit="return confirm('Delete status?');">
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </div>
+    </li>
+  {% else %}
+    <li class="list-group-item">No statuses yet.</li>
+  {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

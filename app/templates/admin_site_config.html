@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Site Configuration</h2>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">{{ form.banner_html.label }}{{ form.banner_html(class_='form-control', rows=4) }}</div>
+  <div class="mb-3">{{ form.rolling_enabled() }} {{ form.rolling_enabled.label }}</div>
+  <div class="mb-3">{{ form.rolling_csv.label }}{{ form.rolling_csv(class_='form-control', rows=6) }}
+    <small class="form-text text-muted">Enter one quote per line.</small>
+  </div>
+  <button class="btn btn-primary">Save</button>
+</form>
+{% endblock %}

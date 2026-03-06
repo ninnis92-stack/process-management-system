@@ -2,6 +2,8 @@ from flask import Blueprint, jsonify, redirect, url_for, request
 from flask_login import login_required, current_user
 from ..extensions import db
 from ..models import Notification
+from sqlalchemy import or_
+from datetime import datetime, timedelta
 
 notifications_bp = Blueprint("notifications", __name__, url_prefix="/notifications")
 
@@ -14,7 +16,18 @@ def unread_count():
 @notifications_bp.get("/latest")
 @login_required
 def latest():
-    items = Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).limit(10).all()
+    # Only return notifications that are unread, or were read today.
+    # Notifications marked read before start of today will no longer appear
+    # in the dropdown.
+    start_of_today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    items = (
+        Notification.query
+        .filter(Notification.user_id == current_user.id)
+        .filter(or_(Notification.is_read == False, Notification.read_at >= start_of_today))
+        .order_by(Notification.created_at.desc())
+        .limit(10)
+        .all()
+    )
     return jsonify([{
         "id": n.id,
         "title": n.title,
@@ -29,5 +42,15 @@ def latest():
 def mark_read(notif_id: int):
     n = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
     n.is_read = True
+    n.read_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+@notifications_bp.post("/mark_all_read")
+@login_required
+def mark_all_read():
+    # Mark all unread notifications for current user as read
+    Notification.query.filter_by(user_id=current_user.id, is_read=False).update({"is_read": True, "read_at": datetime.utcnow()})
     db.session.commit()
     return jsonify({"ok": True})
