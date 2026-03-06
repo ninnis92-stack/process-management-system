@@ -1,7 +1,7 @@
 from app import create_app
 from flask import jsonify, request
 from app.models import FormTemplate, FormField, FormFieldOption, VerificationRule, IntegrationKey
-from app.extensions import db
+from app.extensions import db, get_or_404
 from datetime import datetime
 
 app = create_app()
@@ -36,7 +36,7 @@ def api_template_verify(template_id: int):
 	if not ik:
 		return jsonify({'ok': False, 'error': 'auth_required'}), 401
 
-	t = FormTemplate.query.get_or_404(template_id)
+	t = get_or_404(FormTemplate, template_id)
 	data = request.get_json() or {}
 	results = {}
 	for f in t.fields:

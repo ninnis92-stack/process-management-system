@@ -125,3 +125,24 @@ def init_sentry(app):
 
 
 __all__ = ["db", "login_manager", "migrate", "init_sentry", "cache", "init_redis_client", "redis_client"]
+
+
+def get_or_404(model, id_):
+	"""Convenience wrapper to replace deprecated ``Model.query.get_or_404``.
+
+	Uses the session-level ``db.session.get(model, id)`` API and aborts with
+	a 404 if the object is not found. This keeps callsites tiny and avoids
+	depending on the legacy Query.get_or_404 behavior.
+	"""
+	try:
+		from flask import abort
+	except Exception:
+		abort = None
+	obj = db.session.get(model, id_)
+	if obj is None:
+		if abort:
+			abort(404)
+		raise LookupError("Not found")
+	return obj
+
+__all__.append("get_or_404")

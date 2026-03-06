@@ -21,7 +21,7 @@ from flask import (
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
-from ..extensions import db
+from ..extensions import db, get_or_404
 from ..models import (
     Request as ReqModel,
     Comment,
@@ -1243,7 +1243,7 @@ def request_new():
 @requests_bp.route("/requests/<int:request_id>")
 @login_required
 def request_detail(request_id: int):
-    req = ReqModel.query.get_or_404(request_id)
+    req = get_or_404(ReqModel, request_id)
     if not can_view_request(req):
         abort(403)
 
@@ -1418,7 +1418,7 @@ def request_detail(request_id: int):
 @requests_bp.route("/requests/<int:request_id>/assign_self", methods=["POST"])
 @login_required
 def assign_self(request_id: int):
-    req = ReqModel.query.get_or_404(request_id)
+    req = get_or_404(ReqModel, request_id)
     if current_user.department not in ("A", "B", "C"):
         abort(403)
     if not can_view_request(req):
@@ -1485,7 +1485,7 @@ def assign_self(request_id: int):
 @requests_bp.route('/requests/<int:request_id>/reject', methods=['POST'])
 @login_required
 def reject_request(request_id: int):
-    req = ReqModel.query.get_or_404(request_id)
+    req = get_or_404(ReqModel, request_id)
     if not can_view_request(req):
         abort(403)
 
@@ -1582,7 +1582,7 @@ def _was_sent_back_to_a(req: ReqModel) -> bool:
 @requests_bp.route("/requests/<int:request_id>/presence", methods=["GET", "POST"])
 @login_required
 def request_presence(request_id: int):
-    req = ReqModel.query.get_or_404(request_id)
+    req = get_or_404(ReqModel, request_id)
     if not can_view_request(req):
         abort(403)
 
@@ -1615,7 +1615,7 @@ def request_artifact_edit(artifact_id: int):
     Dept B/C may request Dept A to edit donor/target values; this records the request,
     logs an audit entry, and notifies the owning department for visibility.
     """
-    a = Artifact.query.get_or_404(artifact_id)
+    a = get_or_404(Artifact, artifact_id)
     req = a.request
     if not can_view_request(req):
         abort(403)
@@ -1668,7 +1668,7 @@ def request_artifact_edit(artifact_id: int):
 @login_required
 def store_verification_placeholder(request_id: int):
     # Temporary logging endpoint; once integration is available, this should look up the method/part in the source system before persisting.
-    req = ReqModel.query.get_or_404(request_id)
+    req = get_or_404(ReqModel, request_id)
     if not can_view_request(req):
         abort(403)
 
@@ -1741,7 +1741,7 @@ def store_verification_placeholder(request_id: int):
 @requests_bp.route("/requests/<int:request_id>/comment", methods=["POST"])
 @login_required
 def add_comment(request_id: int):
-    req = ReqModel.query.get_or_404(request_id)
+    req = get_or_404(ReqModel, request_id)
     if not can_view_request(req):
         abort(403)
 
@@ -1792,7 +1792,7 @@ def add_comment(request_id: int):
 @requests_bp.route("/artifacts/<int:artifact_id>/set_donor", methods=["POST"])
 @login_required
 def set_artifact_donor(artifact_id: int):
-    a = Artifact.query.get_or_404(artifact_id)
+    a = get_or_404(Artifact, artifact_id)
     req = a.request
     if not can_view_request(req):
         abort(403)
@@ -1832,7 +1832,7 @@ def set_artifact_donor(artifact_id: int):
 @login_required
 def set_artifact_target(artifact_id: int):
     """Quick setter for a target part number from dashboard; notifies owner dept."""
-    a = Artifact.query.get_or_404(artifact_id)
+    a = get_or_404(Artifact, artifact_id)
     req = a.request
     if not can_view_request(req):
         abort(403)
@@ -1876,7 +1876,7 @@ def set_artifact_target(artifact_id: int):
 @requests_bp.route("/artifacts/<int:artifact_id>/edit", methods=["POST"])
 @login_required
 def edit_artifact(artifact_id: int):
-    a = Artifact.query.get_or_404(artifact_id)
+    a = get_or_404(Artifact, artifact_id)
     req = a.request
     if not can_view_request(req):
         abort(403)
@@ -1941,7 +1941,7 @@ def edit_artifact(artifact_id: int):
 @requests_bp.route("/requests/<int:request_id>/artifact", methods=["POST"])
 @login_required
 def add_artifact(request_id: int):
-    req = ReqModel.query.get_or_404(request_id)
+    req = get_or_404(ReqModel, request_id)
     if not can_view_request(req):
         abort(403)
 
@@ -2001,7 +2001,7 @@ def _validate_files(files) -> list:
 @requests_bp.route("/requests/<int:request_id>/transition", methods=["POST"])
 @login_required
 def do_transition(request_id: int):
-    req = ReqModel.query.get_or_404(request_id)
+    req = get_or_404(ReqModel, request_id)
     if not can_view_request(req):
         abort(403)
 
@@ -2348,7 +2348,7 @@ def do_transition(request_id: int):
 @requests_bp.route("/requests/<int:request_id>/assign", methods=["POST"])
 @login_required
 def assign_request(request_id: int):
-    req = ReqModel.query.get_or_404(request_id)
+    req = get_or_404(ReqModel, request_id)
     if not can_view_request(req):
         abort(403)
     if current_user.department not in ("A", "B", "C"):
@@ -2426,7 +2426,7 @@ def assign_request(request_id: int):
 @requests_bp.route("/requests/<int:request_id>/toggle_c_review", methods=["POST"])
 @login_required
 def toggle_c_review(request_id: int):
-    req = ReqModel.query.get_or_404(request_id)
+    req = get_or_404(ReqModel, request_id)
 
     if current_user.department != "B":
         abort(403)
@@ -2463,7 +2463,7 @@ def toggle_c_review(request_id: int):
 @requests_bp.route("/attachments/<int:attachment_id>")
 @login_required
 def download_attachment(attachment_id: int):
-    att = Attachment.query.get_or_404(attachment_id)
+    att = get_or_404(Attachment, attachment_id)
     req = att.submission.request
 
     if not can_view_request(req):
@@ -2484,7 +2484,7 @@ def download_attachment(attachment_id: int):
 @requests_bp.route("/requests/<int:request_id>/upload_screenshots", methods=["POST"])
 @login_required
 def upload_screenshots(request_id: int):
-    req = ReqModel.query.get_or_404(request_id)
+    req = get_or_404(ReqModel, request_id)
     if not can_view_request(req):
         abort(403)
 

@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, current_
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 
-from ..extensions import db
+from ..extensions import db, get_or_404
 from ..models import User
 from .forms import AdminCreateUserForm, SiteConfigForm, DepartmentForm, SSOAssignForm
 from .forms import NotificationRetentionForm
@@ -101,7 +101,7 @@ def edit_user(user_id: int):
         flash("Access denied.", "danger")
         return redirect(url_for("requests.dashboard"))
 
-    u = User.query.get_or_404(user_id)
+    u = get_or_404(User, user_id)
     form = AdminCreateUserForm(obj=u)
     # don't prefill password
     form.password.data = None
@@ -132,7 +132,7 @@ def delete_user(user_id: int):
         flash("You cannot delete your own account.", "warning")
         return redirect(url_for("admin.list_users"))
 
-    u = User.query.get_or_404(user_id)
+    u = get_or_404(User, user_id)
     db.session.delete(u)
     db.session.commit()
     flash(f"Deleted user {u.email}.", "success")
@@ -153,7 +153,7 @@ def impersonate_user(user_id: int):
         flash('Cannot impersonate yourself.', 'warning')
         return redirect(url_for('admin.list_users'))
 
-    target = User.query.get_or_404(user_id)
+    target = get_or_404(User, user_id)
     if not target.is_active:
         flash('Cannot impersonate an inactive user.', 'warning')
         return redirect(url_for('admin.list_users'))
@@ -512,7 +512,7 @@ def edit_workflow(wf_id: int):
     if not _is_admin_user():
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
-    wf = Workflow.query.get_or_404(wf_id)
+    wf = get_or_404(Workflow, wf_id)
     form = WorkflowForm(obj=wf)
     # prefill spec_json
     if flask_request.method == 'GET' and wf.spec is not None:
@@ -548,7 +548,7 @@ def delete_workflow(wf_id: int):
     if not _is_admin_user():
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
-    wf = Workflow.query.get_or_404(wf_id)
+    wf = get_or_404(Workflow, wf_id)
     db.session.delete(wf)
     db.session.commit()
     flash('Workflow deleted.', 'success')
@@ -596,7 +596,7 @@ def edit_template_fields(template_id: int):
     if not _is_admin_user():
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
-    t = FormTemplate.query.get_or_404(template_id)
+    t = get_or_404(FormTemplate, template_id)
     # Handle simple bulk update: inputs named field_<id>_label, field_<id>_required
     if flask_request.method == 'POST':
         for f in t.fields:
@@ -628,7 +628,7 @@ def edit_field_verification(field_id: int):
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
 
-    f = FormField.query.get_or_404(field_id)
+    f = get_or_404(FormField, field_id)
     # pick latest mapping if multiple
     fv = FieldVerification.query.filter_by(field_id=f.id).order_by(FieldVerification.created_at.desc()).first()
     form = FieldVerificationForm()
@@ -888,7 +888,7 @@ def delete_assignment(assignment_id: int):
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
 
-    a = DepartmentFormAssignment.query.get_or_404(assignment_id)
+    a = get_or_404(DepartmentFormAssignment, assignment_id)
     db.session.delete(a)
     db.session.commit()
     flash('Assignment removed.', 'success')
@@ -903,7 +903,7 @@ def email_routing_edit(rid: int):
         return redirect(url_for('requests.dashboard'))
 
     from ..models import EmailRouting
-    r = EmailRouting.query.get_or_404(rid)
+    r = get_or_404(EmailRouting, rid)
     from .forms import EmailRoutingForm
     form = EmailRoutingForm(obj=r)
     if form.validate_on_submit():
@@ -923,7 +923,7 @@ def email_routing_delete(rid: int):
         return redirect(url_for('requests.dashboard'))
 
     from ..models import EmailRouting
-    r = EmailRouting.query.get_or_404(rid)
+    r = get_or_404(EmailRouting, rid)
     db.session.delete(r)
     db.session.commit()
     flash('Email routing mapping deleted.', 'success')
@@ -1047,7 +1047,7 @@ def edit_status_option(opt_id: int):
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
     from .forms import StatusOptionForm
-    opt = StatusOption.query.get_or_404(opt_id)
+    opt = get_or_404(StatusOption, opt_id)
     form = StatusOptionForm(obj=opt)
     if form.validate_on_submit():
         opt.code = form.code.data.strip()
@@ -1068,7 +1068,7 @@ def delete_status_option(opt_id: int):
     if not _is_admin_user():
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
-    opt = StatusOption.query.get_or_404(opt_id)
+    opt = get_or_404(StatusOption, opt_id)
     db.session.delete(opt)
     db.session.commit()
     flash('Status option deleted.', 'success')
@@ -1155,7 +1155,7 @@ def edit_integration(int_id: int):
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
     from .forms import IntegrationConfigForm
-    ic = IntegrationConfig.query.get_or_404(int_id)
+    ic = get_or_404(IntegrationConfig, int_id)
     form = IntegrationConfigForm(obj=ic)
     if form.validate_on_submit():
         ic.department = form.department.data
@@ -1174,7 +1174,7 @@ def delete_integration(int_id: int):
     if not _is_admin_user():
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
-    ic = IntegrationConfig.query.get_or_404(int_id)
+    ic = get_or_404(IntegrationConfig, int_id)
     db.session.delete(ic)
     db.session.commit()
     flash('Integration removed.', 'success')
@@ -1206,7 +1206,7 @@ def delete_dept_editor(de_id: int):
     if not _is_admin_user():
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
-    de = DepartmentEditor.query.get_or_404(de_id)
+    de = get_or_404(DepartmentEditor, de_id)
     db.session.delete(de)
     db.session.commit()
     flash('Department editor removed.', 'success')
@@ -1235,7 +1235,7 @@ def edit_department(dept_id: int):
     if not _is_admin_user():
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
-    d = Department.query.get_or_404(dept_id)
+    d = get_or_404(Department, dept_id)
     form = DepartmentForm(obj=d)
     if form.validate_on_submit():
         d.code = form.code.data.upper()
@@ -1254,7 +1254,7 @@ def delete_department(dept_id: int):
     if not _is_admin_user():
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
-    d = Department.query.get_or_404(dept_id)
+    d = get_or_404(Department, dept_id)
     db.session.delete(d)
     db.session.commit()
     flash('Department deleted.', 'success')
