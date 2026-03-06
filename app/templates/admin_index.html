@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>Admin Console</h2>
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Users</h5>
+          <p class="card-text">Total users: <strong>{{ total_users }}</strong></p>
+          <a class="btn btn-primary" href="{{ url_for('admin.list_users') }}">Manage Users</a>
+          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.assign_sso') }}">Assign SSO Emails</a>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Departments</h5>
+          <p class="card-text">Total departments: <strong>{{ total_depts }}</strong></p>
+          <a class="btn btn-primary" href="{{ url_for('admin.list_departments') }}">Manage Departments</a>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Site</h5>
+          <p class="card-text">Site config and rolling quotes</p>
+          <a class="btn btn-primary" href="{{ url_for('admin.site_config') }}">Edit Site Config</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Monitoring & Audit</h5>
+          <p class="card-text">Audit entries: <strong>{{ total_audit }}</strong></p>
+          <a class="btn btn-primary" href="{{ url_for('admin.monitor') }}">Monitor Dashboards</a>
+          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.audit') }}">View Audit</a>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Debug</h5>
+          <p class="card-text">Open the debug workspace or mini-window for internal pages.</p>
+          <a class="btn btn-primary" href="{{ url_for('admin.monitor') }}">Open Monitor</a>
+          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.debug_workspace') }}">Debug Workspace</a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

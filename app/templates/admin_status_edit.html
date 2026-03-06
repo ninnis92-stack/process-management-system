@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h2>{{ 'Edit' if opt else 'New' }} Status Option</h2>
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+      {{ form.code.label }}
+      {{ form.code(class_='form-control') }}
+    </div>
+    <div class="mb-3">
+      {{ form.label.label }}
+      {{ form.label(class_='form-control') }}
+    </div>
+    <div class="mb-3">
+      {{ form.target_department.label }}
+      {{ form.target_department(class_='form-select') }}
+    </div>
+    <div class="form-check">
+      {{ form.notify_enabled() }} {{ form.notify_enabled.label }}
+    </div>
+    <div class="form-check">
+      {{ form.notify_on_transfer_only() }} {{ form.notify_on_transfer_only.label }}
+    </div>
+    <div class="mt-3">
+      <button class="btn btn-primary" type="submit">Save</button>
+      <a href="{{ url_for('admin.list_status_options') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

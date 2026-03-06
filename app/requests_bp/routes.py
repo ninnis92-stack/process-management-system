@@ -221,6 +221,15 @@ def is_transition_valid_for_request(req: ReqModel, dept: str, from_status: str, 
     if (not req.requires_c_review) and to_status == "PENDING_C_REVIEW":
         return False
 
+    # Allow UNDER_REVIEW only for non-sales-list items or when coming back from C approval
+    if to_status == "UNDER_REVIEW":
+        # If this transition is after C approval (C -> B), allow regardless of sales list
+        if from_status == "C_APPROVED":
+            return True
+        # Otherwise, only allow if the request is NOT on the sales list
+        if getattr(req, 'pricebook_status', None) == 'in_pricebook':
+            return False
+
     return True
 
 
@@ -998,12 +1007,14 @@ def request_detail(request_id: int):
         transition_form.to_status.choices = possible
     elif dept == "B":
         possible = []
-        for to in ("B_IN_PROGRESS", "WAITING_ON_A_RESPONSE", "PENDING_C_REVIEW", "C_APPROVED", "C_NEEDS_CHANGES",
+        for to in ("B_IN_PROGRESS", "UNDER_REVIEW", "WAITING_ON_A_RESPONSE", "PENDING_C_REVIEW", "C_APPROVED", "C_NEEDS_CHANGES",
                    "B_FINAL_REVIEW", "EXEC_APPROVAL", "SENT_TO_A", "CLOSED"):
             if to == "WAITING_ON_A_RESPONSE":
                 label = "Pending review from Department A"
             elif to == "B_IN_PROGRESS":
                 label = "In progress by Department B"
+            elif to == "UNDER_REVIEW":
+                label = "Under review"
             elif to == "PENDING_C_REVIEW":
                 label = "Under review by Department C"
             elif to == "EXEC_APPROVAL":
@@ -1835,8 +1846,6 @@ def do_transition(request_id: int):
 
     # Notify new owner dept (with custom messaging for Dept A actions)
     owner_recipients = [u for u in _users_in_dept(req.owner_department) if u.id != current_user.id]
-    # Notify new owner dept (with custom messaging for Dept A actions)
-    owner_recipients = [u for u in _users_in_dept(req.owner_department) if u.id != current_user.id]
     body_text = submission_summary_text or req.title
     if dept == "A" and to_status == "CLOSED":
         notify_users(
@@ -1857,14 +1866,32 @@ def do_transition(request_id: int):
             request_id=req.id,
         )
     else:
-        notify_users(
-            owner_recipients,
-            title=f"Request #{req.id} moved to {req.status}",
-            body=body_text,
-            url=url_for("requests.request_detail", request_id=req.id),
-            ntype="status_change",
-            request_id=req.id,
-        )
+        # Respect admin-configured StatusOption notification controls.
+        send_notification = True
+        try:
+            from ..models import StatusOption
+            opt = StatusOption.query.filter_by(code=to_status).first()
+            if opt:
+                if not opt.notify_enabled:
+                    send_notification = False
+                elif opt.notify_on_transfer_only:
+                    # Only notify when ownership actually changes (handoff or inferred owner change)
+                    prev_owner = owner_for_status(from_status) if from_status else None
+                    new_owner = owner_for_status(to_status)
+                    if prev_owner == new_owner:
+                        send_notification = False
+        except Exception:
+            opt = None
+
+        if send_notification:
+            notify_users(
+                owner_recipients,
+                title=f"Request #{req.id} moved to {req.status}",
+                body=body_text,
+                url=url_for("requests.request_detail", request_id=req.id),
+                ntype="status_change",
+                request_id=req.id,
+            )
 
     # Notify creator (if exists, and not actor)
     if req.created_by_user_id and req.created_by_user_id != current_user.id:

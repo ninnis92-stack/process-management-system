@@ -3,127 +3,87 @@
 <h3 class="mb-3">New Request (Dept A)</h3>
 
 <div class="card shadow-sm">
-    <div class="card-body">
-    {% set has_file = false %}
-    {% if template_spec %}
-      {% for f in template_spec %}
-        {% if f.field_type == 'file' %}
-          {% set has_file = true %}
-        {% endif %}
-      {% endfor %}
-    {% endif %}
-    <form method="post" {% if has_file %}enctype="multipart/form-data"{% endif %}>
+  <div class="card-body">
+    <form method="post">
       {{ form.hidden_tag() }}
 
-      {% if template and template_spec %}
-        {# Render dynamic template fields provided by `template_spec` #}
-        {% for f in template_spec %}
-          <div class="mb-3">
-            <label class="form-label">{{ f.label }}{% if f.required %} *{% endif %}</label>
-            {% if f.field_type == 'text' %}
-              <input name="{{ f.name }}" class="form-control" />
-            {% elif f.field_type == 'textarea' %}
-              <textarea name="{{ f.name }}" class="form-control" rows="4"></textarea>
-            {% elif f.field_type in ['select','radio'] %}
-              <select name="{{ f.name }}" class="form-select">
-                <option value="">— select —</option>
-                {% for o in f.options %}
-                  <option value="{{ o.value }}">{{ o.label }}</option>
-                {% endfor %}
-              </select>
-            {% elif f.field_type == 'checkbox' %}
-              <input type="checkbox" name="{{ f.name }}" value="1" />
-            {% elif f.field_type == 'date' %}
-              <input type="date" name="{{ f.name }}" class="form-control" />
-            {% elif f.field_type == 'file' %}
-              <input type="file" name="{{ f.name }}" class="form-control" />
-            {% else %}
-              <input name="{{ f.name }}" class="form-control" />
-            {% endif %}
-            {% if f.hint %}<div class="form-text">{{ f.hint }}</div>{% endif %}
-          </div>
-        {% endfor %}
-        <button class="btn btn-primary w-100" type="submit">Submit Request</button>
-      {% else %}
-        {# Fallback: legacy WTForm rendering #}
-        {% if form.errors %}
-          <div class="alert alert-danger">
-            <strong>Please fix:</strong>
-            <ul class="mb-0">
-              {% for field, errs in form.errors.items() %}
-                {% for e in errs %}
-                  <li>{{ field }}: {{ e }}</li>
-                {% endfor %}
+      {% if form.errors %}
+        <div class="alert alert-danger">
+          <strong>Please fix:</strong>
+          <ul class="mb-0">
+            {% for field, errs in form.errors.items() %}
+              {% for e in errs %}
+                <li>{{ field }}: {{ e }}</li>
               {% endfor %}
-            </ul>
-          </div>
-        {% endif %}
-
-        <div class="row">
-          <div class="col-md-6 mb-3">
-            <label class="form-label">Donor Part Number</label>
-            {{ form.donor_part_number(class="form-control") }}
-            <div class="form-text">
-              Required for Method, and required for Both.
-            </div>
-          </div>
-
-          <div class="col-md-6 mb-3">
-            <label class="form-label">Target Part Number</label>
-            {{ form.target_part_number(class="form-control") }}
-            <div class="form-text">
-              Required for Method. Optional for Part Number / Both at submission (can be filled later).
-            </div>
-          </div>
-
-          <div class="col-md-6 mb-3">
-            <label class="form-label">If no donor, reason</label>
-            {{ form.no_donor_reason(class="form-select") }}
-            <div class="form-text">
-              Only used for Part Number requests when the part number needs to be created.
-            </div>
-          </div>
+            {% endfor %}
+          </ul>
         </div>
-
-        <div class="mb-3">
-          <label class="form-label">Title</label>
-          {{ form.title(class="form-control") }}
-        </div>
-
-        <div class="row">
-          <div class="col-md-4 mb-3">
-            <label class="form-label">Request Type</label>
-            {{ form.request_type(class="form-select") }}
-          </div>
-
-          <div class="col-md-4 mb-3">
-            <label class="form-label">Priority</label>
-            {{ form.priority(class="form-select") }}
-          </div>
-
-          <div class="col-md-4 mb-3">
-            <label class="form-label">Sales List</label>
-            {{ form.pricebook_status(class="form-select") }}
-            <div class="mt-2">
-              <label class="form-label">Price Book Number</label>
-              {{ form.pricebook_number(class="form-control") }}
-              <div class="form-text">Required when a Sales List selection is provided.</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">Due Date (48+ hours minimum)</label>
-          {{ form.due_at(class="form-control", type="datetime-local") }}
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">Description</label>
-          {{ form.description(class="form-control", rows="6") }}
-        </div>
-
-        <button class="btn btn-primary w-100" type="submit">Submit Request</button>
       {% endif %}
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Donor Part Number</label>
+          {{ form.donor_part_number(class="form-control") }}
+          <div class="form-text">
+            Required for Method, and required for Both.
+          </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Target Part Number</label>
+          {{ form.target_part_number(class="form-control") }}
+          <div class="form-text">
+            Required for Method. Optional for Part Number / Both at submission (can be filled later).
+          </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">If no donor, reason</label>
+          {{ form.no_donor_reason(class="form-select") }}
+          <div class="form-text">
+            Only used for Part Number requests when the part number needs to be created.
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Title</label>
+        {{ form.title(class="form-control") }}
+      </div>
+
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Request Type</label>
+          {{ form.request_type(class="form-select") }}
+        </div>
+
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Priority</label>
+          {{ form.priority(class="form-select") }}
+        </div>
+
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Sales List</label>
+          {{ form.pricebook_status(class="form-select") }}
+        </div>
+        <div class="col-md-12 mb-3">
+          <label class="form-label">Sales list reference</label>
+          {{ form.sales_list_reference(class="form-control") }}
+          <div class="form-text">If you selected "On the sales list", provide the sales list SKU or reference.</div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Due Date (48+ hours minimum)</label>
+        {{ form.due_at(class="form-control", type="datetime-local") }}
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        {{ form.description(class="form-control", rows="6") }}
+      </div>
+
+      <button class="btn btn-primary w-100" type="submit">Submit Request</button>
     </form>
   </div>
 </div>
@@ -152,13 +112,10 @@
 
       <script>
         (function(){
+          // Wait for Bootstrap to be available then show the modal
           try {
-            if (typeof safeShowModal === 'function') {
-              safeShowModal('createdModal');
-            } else {
-              var m = new bootstrap.Modal(document.getElementById('createdModal'));
-              m.show();
-            }
+            var m = new bootstrap.Modal(document.getElementById('createdModal'));
+            m.show();
           } catch (e) {
             console.warn('Could not show createdModal', e);
           }

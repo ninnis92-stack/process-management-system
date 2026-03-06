@@ -8,9 +8,6 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-  {% if active_theme_css %}
-  <style id="active-theme-css">{{ active_theme_css|safe }}</style>
-  {% endif %}
 </head>
 <body class="{% block body_class %}theme-body top-nav-layout{% endblock %}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}">
   <a href="#content" class="skip-link">Skip to content</a>
@@ -19,30 +16,16 @@
   <nav class="navbar theme-nav navbar-expand-lg navbar-dark">
     <div class="container-fluid">
       <a class="navbar-brand d-flex align-items-center brand-stack" href="{{ url_for('requests.dashboard') }}">
-        {% if theme_logo_url %}
-          <img src="{{ theme_logo_url }}" alt="FreshProcess logo" class="brand-logo-img" style="height:40px; margin-right:10px;" />
+        {% if config.LOGO_URL %}
+          <img src="{{ config.LOGO_URL }}" alt="FreshProcess logo" class="brand-logo-img" style="height:40px; margin-right:10px;" />
         {% else %}
           <div class="logo-fallback" style="width:40px;height:40px; font-size:0.9rem; margin-right:10px;" aria-hidden="true"></div>
         {% endif %}
         <div>
           <div class="brand-title">FreshProcess</div>
-          <div id="motivation" class="brand-quote" aria-live="polite">
-            {% if site_banner_html %}
-              {{ site_banner_html|safe }}
-            {% elif rolling_quotes_enabled and rolling_quotes %}
-              {{ rolling_quotes[0] }}
-            {% else %}
-              Loading inspiration…
-            {% endif %}
-          </div>
+          <div id="motivation" class="brand-quote" aria-live="polite">Loading inspiration…</div>
         </div>
       </a>
-
-      {% if site_banner_html %}
-        <div class="navbar-banner ms-3">
-          {{ site_banner_html|safe }}
-        </div>
-      {% endif %}
 
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -56,8 +39,7 @@
               <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('requests.request_new') else '' }}" href="{{ url_for('requests.request_new') }}">New Request</a></li>
             {% endif %}
             {% if current_user.is_admin %}
-              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin') else '' }}" href="{{ url_for('admin.monitor') }}">Admin</a></li>
-              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin.special_emails') else '' }}" href="{{ url_for('admin.special_emails') }}">Special Emails</a></li>
+              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin') else '' }}" href="{{ url_for('admin.index') }}">Admin</a></li>
             {% endif %}
           {% endif %}
           <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('external.external_dashboard') else '' }}" href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a></li>
@@ -197,87 +179,6 @@
         console.warn('Copy failed', e);
       }
     }
-  </script>
-
-  <script>
-    // Rolling quotes rotation (admin-configurable)
-    try{
-      const rollingEnabled = {{ 'true' if rolling_quotes_enabled else 'false' }};
-      const rollingQuotes = {{ rolling_quotes|tojson }};
-      if(rollingEnabled && Array.isArray(rollingQuotes) && rollingQuotes.length){
-        let idx = 0;
-        const mot = document.getElementById('motivation');
-        setInterval(() => {
-          try{
-            idx = (idx + 1) % rollingQuotes.length;
-            if(mot) mot.innerText = rollingQuotes[idx];
-          }catch(e){}
-        }, 4000);
-      }
-    }catch(e){}
-  </script>
-
-  <script>
-    // Small defensive fix: if a modal backdrop remains but no modal is shown,
-    // remove the backdrop so it doesn't block interaction. This handles
-    // stray/backdrop-only states that can happen when a modal is created
-    // but not fully shown due to script errors or timing races.
-    document.addEventListener('DOMContentLoaded', function(){
-      try{
-        function cleanupOverlays(){
-          try{
-            // remove any bootstrap backdrops
-            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-
-            // hide any modals that might be stuck
-            document.querySelectorAll('.modal').forEach(m => {
-              try{ m.classList.remove('show'); m.style.display = 'none'; m.setAttribute('aria-hidden','true'); }catch(e){}
-            });
-
-            // remove modal-open class and inline page padding (left by bootstrap)
-            document.body.classList.remove('modal-open');
-            if(document.body.style && document.body.style.paddingRight) document.body.style.paddingRight = '';
-
-            // Defensive: find any element that covers most of the viewport and looks like an overlay
-            const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-            const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-            document.querySelectorAll('body *').forEach(el => {
-              try{
-                const r = el.getBoundingClientRect();
-                if(r.width >= vw * 0.95 && r.height >= vh * 0.95){
-                  const cs = window.getComputedStyle(el);
-                  const bg = cs.backgroundColor || '';
-                  const pointer = cs.pointerEvents || '';
-                  // if semi-transparent background or solid dark overlay and it intercepts pointer events
-                  if((bg && bg !== 'rgba(0, 0, 0, 0)' && (bg.indexOf('rgba') !== -1 || bg.indexOf('rgb') !== -1)) && pointer !== 'none'){
-                    el.style.display = 'none';
-                  }
-                }
-              }catch(e){}
-            });
-          }catch(e){ console.warn('cleanupOverlays error', e); }
-        }
-
-        // Run immediately to clear any existing stray overlay
-        cleanupOverlays();
-
-        // If a backdrop is clicked, clean up (helps recover from stuck states)
-        document.addEventListener('click', function(e){
-          try{
-            if(e.target && e.target.classList && (e.target.classList.contains('modal-backdrop') || e.target.classList.contains('modal'))){
-              cleanupOverlays();
-            }
-          }catch(_){}
-        }, true);
-
-        // Allow pressing Escape to clear overlays
-        document.addEventListener('keydown', function(e){ if(e.key === 'Escape') cleanupOverlays(); });
-
-        // Watch for DOM changes and clean up if overlay appears without an active modal
-        const obs = new MutationObserver(cleanupOverlays);
-        obs.observe(document.body, { childList: true, subtree: true });
-      }catch(e){ console.warn('modal-backdrop-fix error', e); }
-    });
   </script>
 </body>
 </html>

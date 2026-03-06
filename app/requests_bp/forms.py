@@ -1,7 +1,7 @@
 from dataclasses import field
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, TextAreaField, SelectField, MultipleFileField, BooleanField, HiddenField
+from wtforms import StringField, TextAreaField, SelectField, MultipleFileField, BooleanField
 from wtforms.fields import DateTimeLocalField
 from wtforms.validators import DataRequired, Length, Optional, URL, ValidationError
 from datetime import datetime, timedelta
@@ -35,13 +35,13 @@ class NewRequestForm(FlaskForm):
     pricebook_status = SelectField(
     "Sales List",
     choices=[
-        ("in_pricebook", "On sales list"),
-        ("not_in_pricebook", "Not on sales list"),
+        ("in_pricebook", "On the sales list"),
+        ("not_in_pricebook", "Not on the sales list"),
         ("unknown", "Unknown / needs check"),
     ],
     validators=[DataRequired()],
     )
-    pricebook_number = StringField("Price Book Number", validators=[Optional(), Length(max=80)])
+    sales_list_reference = StringField("Sales list reference (required if on the sales list)", validators=[Optional(), Length(max=200)])
     description = TextAreaField("Description", validators=[Optional()])
     priority = SelectField("Priority", choices=[
         ("low", "Low"),
@@ -55,6 +55,17 @@ class NewRequestForm(FlaskForm):
     def validate(self, extra_validators=None):
         ok = super().validate(extra_validators=extra_validators)
         if not ok:
+            return False
+
+        # Enforce sales_list_reference when Sales List == on the sales list
+        try:
+            price_sel = (self.pricebook_status.data or "").strip()
+        except Exception:
+            price_sel = None
+        ref = (getattr(self, 'sales_list_reference', None).data or "").strip() if getattr(self, 'sales_list_reference', None) else ""
+        if price_sel == 'in_pricebook' and not ref:
+            if getattr(self, 'sales_list_reference', None):
+                self.sales_list_reference.errors.append("Sales list reference is required when item is on the sales list.")
             return False
 
         req_type = (self.request_type.data or "").strip()
@@ -93,12 +104,9 @@ class NewRequestForm(FlaskForm):
             if donor and reason:
                 self.no_donor_reason.errors.append("Clear the reason if you provide a donor part number.")
                 return False
-        # If a Sales List selection is present, require a Price Book Number
-        if (self.pricebook_status.data or "").strip() and not (self.pricebook_number.data or "").strip():
-            self.pricebook_number.errors.append("Price Book Number is required when Sales List selection is provided.")
-            return False
 
         return True
+        
 
 class CommentForm(FlaskForm):
     visibility_scope = SelectField("Visibility", choices=[], validators=[DataRequired()])
@@ -202,7 +210,6 @@ class TransitionForm(FlaskForm):
     submission_details = TextAreaField("Submission Details")
     files = MultipleFileField("Attachments (images only)")
     requires_c_review = BooleanField("Requires C Review", validators=[Optional()])
-    force_send_to_a = HiddenField("Force send to A", default='0')
 
 class ToggleCReviewForm(FlaskForm):
     reason = TextAreaField("Reason (required)", validators=[DataRequired()])

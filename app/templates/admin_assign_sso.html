@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>Assign SSO-linked Emails to Department</h2>
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+      {{ form.emails.label(class_='form-label') }}
+      {{ form.emails(class_='form-control', rows=8, placeholder='one email per line') }}
+      <div class="form-text">Only registered users with SSO linkage will be assigned.</div>
+    </div>
+    <div class="mb-3">
+      {{ form.department.label(class_='form-label') }}
+      {{ form.department(class_='form-select') }}
+    </div>
+    <button class="btn btn-primary">Assign</button>
+  </form>
+{% endblock %}

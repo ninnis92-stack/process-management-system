@@ -22,7 +22,7 @@ class Config:
     OIDC_SCOPES = os.getenv("OIDC_SCOPES", "openid email profile")
     SSO_FALLBACK_LOCAL = os.getenv("SSO_FALLBACK_LOCAL", "True") == "True"
 
-    # Uploads (note: not durable on Vercel)
+    # Uploads (ensure upload folder is durable in production)
     _default_upload_folder = os.path.join(BASE_DIR, "uploads")
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024
     ALLOWED_IMAGE_MIMES = {"image/png", "image/jpeg", "image/webp"}
