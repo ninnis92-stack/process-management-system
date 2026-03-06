@@ -752,7 +752,23 @@ def special_email():
         cfg = None
 
     form = SpecialEmailConfigForm()
-    sso_users = User.query.filter(User.sso_sub.isnot(None)).order_by(User.email.asc()).all()
+    # Defensive: previous DB errors can leave the session in an aborted state
+    # which causes subsequent queries to fail with InFailedSqlTransaction.
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
+
+    try:
+        sso_users = User.query.filter(User.sso_sub.isnot(None)).order_by(User.email.asc()).all()
+    except Exception:
+        current_app.logger.exception('Failed querying SSO users for special_email admin page')
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        sso_users = []
+
     form.request_form_user_id.choices = [(0, '-- None --')] + [(u.id, f"{u.email} (Dept {u.department})") for u in sso_users]
     if flask_request.method == 'GET' and cfg:
         form.enabled.data = bool(getattr(cfg, 'enabled', False))
