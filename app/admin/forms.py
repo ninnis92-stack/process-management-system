@@ -108,6 +108,12 @@ class SpecialEmailConfigForm(FlaskForm):
     submit = SubmitField("Save")
 
 
+class EmailRoutingForm(FlaskForm):
+    recipient_email = StringField("Recipient email", validators=[DataRequired(), Email(), Length(max=255)])
+    department_code = SelectField("Department", choices=[("A", "A"), ("B", "B"), ("C", "C")], validators=[DataRequired()])
+    submit = SubmitField("Save Mapping")
+
+
 class FeatureFlagsForm(FlaskForm):
     enable_notifications = BooleanField("Enable in-app notifications", default=True)
     enable_nudges = BooleanField("Enable automated nudges", default=True)

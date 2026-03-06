@@ -570,3 +570,31 @@ class NotificationRetention(db.Model):
                         except Exception:
                                 db.session.rollback()
                 return cfg
+
+
+class EmailRouting(db.Model):
+    """Admin-managed mappings from received mailbox/email to department handlers.
+
+    Multiple rows may exist for the same `recipient_email` to indicate that
+    more than one department can handle requests sent to that address. The
+    inbound webhook will consult this table to decide which department should
+    own a newly-created Request when an email arrives.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    recipient_email = db.Column(db.String(255), nullable=False, index=True)
+    department_code = db.Column(db.String(2), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @classmethod
+    def for_recipient(cls, recipient: str):
+        if not recipient:
+            return []
+        try:
+            # Match exact or substring to allow mailbox aliases/fwd rules
+            like_val = f"%{recipient.strip().lower()}%"
+            return cls.query.filter(db.func.lower(cls.recipient_email).like(like_val)).all()
+        except Exception:
+            try:
+                return cls.query.filter_by(recipient_email=recipient.strip().lower()).all()
+            except Exception:
+                return []

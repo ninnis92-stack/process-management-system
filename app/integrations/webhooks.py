@@ -9,7 +9,7 @@ from app import csrf
 from flask_wtf.csrf import generate_csrf
 from ..extensions import db
 from ..models import SpecialEmailConfig, User, Request as ReqModel, REQUEST_TYPES, PRIORITIES
-from ..models import DepartmentFormAssignment, FormTemplate
+from ..models import DepartmentFormAssignment, FormTemplate, EmailRouting
 from .. import notifcations as notifications
 from ..services.inventory import InventoryService
 
@@ -350,6 +350,26 @@ def inbound_mail():
             title = (parsed.get('title') or '').strip() or f"Email request from {sender}"
             description = (parsed.get('description') or '').strip() or body or "Submitted via inbound email."
 
+            # Determine owner department using admin-defined EmailRouting when present.
+            owner_dept = 'B'
+            try:
+                mappings = EmailRouting.for_recipient(recipient)
+            except Exception:
+                mappings = []
+
+            if mappings:
+                mapped_codes = [ (m.department_code or '').upper().strip() for m in mappings if m.department_code ]
+                # If the sender is a recognized SSO user and their department is
+                # allowed for this recipient, prefer it; otherwise pick the first
+                # mapped department as the owner.
+                if recognized_sso and user and getattr(user, 'department', None) and user.department.upper() in mapped_codes:
+                    owner_dept = user.department.upper()
+                else:
+                    owner_dept = mapped_codes[0] if mapped_codes else owner_dept
+            else:
+                # Fallback to configured request form department or B
+                owner_dept = (getattr(cfg, 'request_form_department', 'B') or 'B').strip().upper()
+
             req = ReqModel(
                 title=title,
                 request_type=req_type,
@@ -358,7 +378,7 @@ def inbound_mail():
                 description=description,
                 priority=prio,
                 status='NEW_FROM_A',
-                owner_department='B',
+                owner_department=owner_dept,
                 submitter_type='user' if recognized_sso else 'guest',
                 created_by_user_id=(user.id if recognized_sso else None),
                 guest_email=(None if recognized_sso else sender_norm),

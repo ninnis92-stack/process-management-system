@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Email Routing Mappings</h2>
+<p><a class="btn btn-primary" href="{{ url_for('admin.email_routing_new') }}">New mapping</a></p>
+<table class="table table-striped">
+  <thead>
+    <tr><th>Recipient</th><th>Department</th><th>Created</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.recipient_email }}</td>
+      <td>{{ r.department_code }}</td>
+      <td>{{ r.created_at }}</td>
+      <td>
+        <a class="btn btn-sm btn-secondary" href="{{ url_for('admin.email_routing_edit', rid=r.id) }}">Edit</a>
+        <form style="display:inline" method="post" action="{{ url_for('admin.email_routing_delete', rid=r.id) }}">
+          <button class="btn btn-sm btn-danger" type="submit" onclick="return confirm('Delete this mapping?')">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

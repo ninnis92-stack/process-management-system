@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>{{ 'Edit' if edit else 'New' }} Email Routing</h2>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">
+    {{ form.recipient_email.label }}
+    {{ form.recipient_email(class_='form-control') }}
+  </div>
+  <div class="mb-3">
+    {{ form.department_code.label }}
+    {{ form.department_code(class_='form-select') }}
+  </div>
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn btn-secondary" href="{{ url_for('admin.email_routing_list') }}">Cancel</a>
+</form>
+{% endblock %}

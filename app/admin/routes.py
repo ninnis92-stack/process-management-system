@@ -638,6 +638,72 @@ def special_email():
         flash('Nudge / special email settings saved.', 'success')
         return redirect(url_for('admin.special_email'))
 
+
+@admin_bp.route('/email_routing')
+@login_required
+def email_routing_list():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    from ..models import EmailRouting
+    rows = EmailRouting.query.order_by(EmailRouting.recipient_email.asc()).all()
+    return render_template('admin_email_routing.html', rows=rows)
+
+
+@admin_bp.route('/email_routing/new', methods=['GET', 'POST'])
+@login_required
+def email_routing_new():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    from .forms import EmailRoutingForm
+    form = EmailRoutingForm()
+    if form.validate_on_submit():
+        from ..models import EmailRouting
+        r = EmailRouting(recipient_email=form.recipient_email.data.strip().lower(), department_code=form.department_code.data.strip().upper())
+        db.session.add(r)
+        db.session.commit()
+        flash('Email routing mapping created.', 'success')
+        return redirect(url_for('admin.email_routing_list'))
+    return render_template('admin_email_routing_form.html', form=form)
+
+
+@admin_bp.route('/email_routing/<int:rid>/edit', methods=['GET', 'POST'])
+@login_required
+def email_routing_edit(rid: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    from ..models import EmailRouting
+    r = EmailRouting.query.get_or_404(rid)
+    from .forms import EmailRoutingForm
+    form = EmailRoutingForm(obj=r)
+    if form.validate_on_submit():
+        r.recipient_email = form.recipient_email.data.strip().lower()
+        r.department_code = form.department_code.data.strip().upper()
+        db.session.commit()
+        flash('Email routing mapping updated.', 'success')
+        return redirect(url_for('admin.email_routing_list'))
+    return render_template('admin_email_routing_form.html', form=form, edit=r)
+
+
+@admin_bp.route('/email_routing/<int:rid>/delete', methods=['POST'])
+@login_required
+def email_routing_delete(rid: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    from ..models import EmailRouting
+    r = EmailRouting.query.get_or_404(rid)
+    db.session.delete(r)
+    db.session.commit()
+    flash('Email routing mapping deleted.', 'success')
+    return redirect(url_for('admin.email_routing_list'))
+
     return render_template('admin_special_email.html', form=form, cfg=cfg)
 
 
