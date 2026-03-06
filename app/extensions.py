@@ -1,8 +1,21 @@
 from importlib import import_module
 from typing import TYPE_CHECKING
+import os
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
+
+try:
+	_fc = import_module("flask_caching")
+	Cache = getattr(_fc, "Cache", None)
+except Exception:  # pragma: no cover - optional dependency
+	Cache = None
+
+_redis = None
+try:
+	import redis as _redis
+except Exception:
+	_redis = None
 
 
 if TYPE_CHECKING:
@@ -25,9 +38,45 @@ except Exception:  # pragma: no cover - optional dependency in dev
 
 db = SQLAlchemy()
 login_manager = LoginManager()
+# Cache instance (initialized in app factory if Flask-Caching is available)
+cache = Cache() if Cache is not None else None
+# Redis client (initialized in app factory if `redis` is available)
+redis_client = None
 # Instantiate migrate only when the package is present so tests/dev envs
 # without Flask-Migrate don't fail at import time.
 migrate = Migrate() if Migrate is not None else None
+
+
+def init_redis_client(app):
+	"""Initialize a redis client from `REDIS_URL` in app config.
+
+	This is optional; if `REDIS_URL` is not set or the redis package isn't
+	available, the function returns None and the app continues running.
+	"""
+	global redis_client
+	if _redis is None:
+		try:
+			app.logger.info('redis package not installed; skipping redis client init')
+		except Exception:
+			pass
+		return None
+	try:
+		url = app.config.get('REDIS_URL') or os.getenv('REDIS_URL')
+		if not url:
+			return None
+		redis_client = _redis.from_url(url, decode_responses=True)
+		try:
+			app.logger.info('Redis client initialized')
+		except Exception:
+			pass
+		return redis_client
+	except Exception:
+		try:
+			app.logger.warning('Redis client not initialized')
+		except Exception:
+			pass
+		redis_client = None
+		return None
 
 
 def init_sentry(app):
@@ -75,4 +124,4 @@ def init_sentry(app):
 		return None
 
 
-__all__ = ["db", "login_manager", "migrate", "init_sentry"]
+__all__ = ["db", "login_manager", "migrate", "init_sentry", "cache", "init_redis_client", "redis_client"]

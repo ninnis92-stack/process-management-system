@@ -8,9 +8,11 @@ from flask_login import login_user, logout_user, login_required, current_user
 
 from .forms import LoginForm
 from ..models import User
+from ..models import FeatureFlags
 from ..extensions import db
 from .sso import oauth
 from .sso import token_has_mfa
+from .sso import sso_user_is_admin
 from sqlalchemy.exc import OperationalError
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -72,6 +74,26 @@ def sso_callback():
         user.email = email
         user.name = name
 
+    # Synchronize admin privileges from organization-managed SSO settings.
+    # Non-strict mode only elevates recognized admins; strict mode mirrors the
+    # configured SSO decision on every login.
+    try:
+        flags = None
+        try:
+            flags = FeatureFlags.get()
+        except Exception:
+            flags = None
+
+        sso_sync_enabled = bool(getattr(flags, 'sso_admin_sync_enabled', current_app.config.get('SSO_ADMIN_SYNC_ENABLED', True)))
+        if sso_sync_enabled:
+            recognized_admin = sso_user_is_admin(userinfo, current_app.config, email=email)
+            if recognized_admin:
+                user.is_admin = True
+            elif current_app.config.get('SSO_ADMIN_SYNC_STRICT', False):
+                user.is_admin = False
+    except Exception:
+        current_app.logger.exception('Failed to sync SSO admin role for %s', email)
+
     db.session.commit()
 
     if not user.is_active:
@@ -79,7 +101,7 @@ def sso_callback():
 
     # If the IdP indicated MFA in the id_token, set a session flag used by admin checks
     try:
-        if token_has_mfa(userinfo):
+        if token_has_mfa(userinfo, current_app.config):
             session['sso_mfa'] = True
     except Exception:
         session.pop('sso_mfa', None)

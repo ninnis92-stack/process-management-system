@@ -15,6 +15,7 @@
         <th>Email</th>
         <th>Name</th>
         <th>Department</th>
+        <th>Admin</th>
         <th>Active</th>
         <th>Created</th>
         <th></th>
@@ -26,6 +27,7 @@
           <td>{{ u.email }}</td>
           <td>{{ u.name or '' }}</td>
           <td>{{ u.department }}</td>
+          <td>{{ 'Yes' if u.is_admin else 'No' }}</td>
           <td>{{ 'Yes' if u.is_active else 'No' }}</td>
           <td>{{ u.created_at }}</td>
           <td class="text-end">
@@ -45,7 +47,7 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="5" class="text-muted">No users.</td></tr>
+        <tr><td colspan="7" class="text-muted">No users.</td></tr>
       {% endfor %}
     </tbody>
   </table>

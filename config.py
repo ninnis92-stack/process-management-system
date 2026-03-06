@@ -21,6 +21,22 @@ class Config:
     OIDC_LOGOUT_URL = os.getenv("OIDC_LOGOUT_URL")  # optional
     OIDC_SCOPES = os.getenv("OIDC_SCOPES", "openid email profile")
     SSO_FALLBACK_LOCAL = os.getenv("SSO_FALLBACK_LOCAL", "True") == "True"
+    # Sync admin permissions from organization-managed SSO claims/groups.
+    # Example:
+    #   SSO_ADMIN_SYNC_ENABLED=True
+    #   SSO_ADMIN_CLAIM=groups
+    #   SSO_ADMIN_CLAIM_VALUES=app-admin,process-admins
+    #   SSO_ADMIN_SYNC_STRICT=True
+    SSO_ADMIN_SYNC_ENABLED = os.getenv("SSO_ADMIN_SYNC_ENABLED", "True") == "True"
+    SSO_ADMIN_SYNC_STRICT = os.getenv("SSO_ADMIN_SYNC_STRICT", "False") == "True"
+    SSO_ADMIN_CLAIM = os.getenv("SSO_ADMIN_CLAIM", "roles")
+    SSO_ADMIN_CLAIM_VALUES = [v.strip().lower() for v in os.getenv("SSO_ADMIN_CLAIM_VALUES", "admin").split(",") if v.strip()]
+    # Optional explicit SSO-admin email allow-list, in addition to ADMIN_EMAILS.
+    SSO_ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("SSO_ADMIN_EMAILS", "").split(",") if e.strip()]
+    # Optional MFA enforcement for SSO-backed admin access.
+    SSO_REQUIRE_MFA = os.getenv("SSO_REQUIRE_MFA", "False") == "True"
+    SSO_MFA_CLAIM = os.getenv("SSO_MFA_CLAIM", "amr")
+    SSO_MFA_CLAIM_VALUES = [v.strip().lower() for v in os.getenv("SSO_MFA_CLAIM_VALUES", "mfa,otp,2fa,hwk").split(",") if v.strip()]
 
     # Uploads (ensure upload folder is durable in production)
     _default_upload_folder = os.path.join(BASE_DIR, "uploads")
@@ -84,3 +100,30 @@ class Config:
     # by their department or explicitly handed off to them. Useful for
     # enforcing strict inter-department isolation in production.
     ENFORCE_DEPT_ISOLATION = os.getenv("ENFORCE_DEPT_ISOLATION", "False") == "True"
+
+    # Database engine/pool tuning for production. These values can be
+    # overridden via environment variables to suit your hosting provider.
+    # Example: set `DB_POOL_SIZE=10` and `DB_MAX_OVERFLOW=20` for moderate load.
+    DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "5"))
+    DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "10"))
+    DB_POOL_PRE_PING = os.getenv("DB_POOL_PRE_PING", "True") == "True"
+
+    # Apply engine options for SQLAlchemy (Flask-SQLAlchemy 3.x supports
+    # passing `SQLALCHEMY_ENGINE_OPTIONS` dict to control the underlying
+    # engine/pool behavior). Avoid passing pool params for SQLite (in-memory
+    # or file-based) because many pool implementations reject those args.
+    if SQLALCHEMY_DATABASE_URI and not SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
+        SQLALCHEMY_ENGINE_OPTIONS = {
+            "pool_size": DB_POOL_SIZE,
+            "max_overflow": DB_MAX_OVERFLOW,
+            "pool_pre_ping": DB_POOL_PRE_PING,
+        }
+    else:
+        SQLALCHEMY_ENGINE_OPTIONS = {}
+
+    # Redis connection URL used for caching and background queues. If not
+    # provided, the app will continue running without cache (graceful).
+    REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+
+    # Flask-Caching defaults
+    CACHE_DEFAULT_TIMEOUT = int(os.getenv("CACHE_DEFAULT_TIMEOUT", "300"))

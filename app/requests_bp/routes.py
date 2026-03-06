@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 from sqlalchemy import or_, and_, func
+from sqlalchemy.orm import selectinload
 
 from flask import (
     Blueprint, render_template, redirect, request, url_for, flash, abort, send_file, current_app, jsonify, Response, session
@@ -32,6 +33,7 @@ from ..models import (
     Notification,
     RejectRequestConfig,
 )
+from ..models import SpecialEmailConfig
 from ..models import StatusBucket, BucketStatus
 from .forms import (
     NewRequestForm,
@@ -60,6 +62,13 @@ from ..notifcations import notify_users, users_in_department
 from .. import metrics as metrics_module
 from ..services.ticketing import TicketingClient
 import json
+from functools import wraps
+
+# Optional cache import: if Flask-Caching is configured, we'll use it.
+try:
+    from ..extensions import cache
+except Exception:
+    cache = None
 
 
 
@@ -76,6 +85,185 @@ _presence: Dict[int, Dict[int, Dict[str, object]]] = {}
 def _exclude_old_closed(query):
     cutoff = datetime.utcnow() - timedelta(hours=24)
     return query.filter(or_(ReqModel.status != "CLOSED", ReqModel.updated_at >= cutoff))
+
+
+def _request_list_query(query):
+    """Apply common eager-loading for list/dashboard views."""
+    return query.options(selectinload(ReqModel.artifacts))
+
+
+def _make_cache_key(prefix: str) -> str:
+    """Create a cache key based on path, query params, and user id/department."""
+    try:
+        uid = getattr(current_user, 'id', 'anon') if getattr(current_user, 'is_authenticated', False) else 'anon'
+    except Exception:
+        uid = 'anon'
+    # Use full_path which includes query string; normalize ordering by sorting args
+    try:
+        args = '&'.join(sorted([f"{k}={v}" for k, v in request.args.items()]))
+        path = request.path
+    except Exception:
+        args = ''
+        path = ''
+    return f"{prefix}:{uid}:{path}?{args}"
+
+
+def cached_view(timeout: int = 60, prefix: str = 'view'):
+    """Decorator to cache view responses using `cache` if available.
+
+    Stores a tuple (body, status, content_type) and returns a Flask `Response`
+    when a cached entry exists. If `cache` is not configured, the view runs
+    normally.
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            key = None
+            if cache is not None:
+                try:
+                    key = _make_cache_key(prefix)
+                    cached = cache.get(key)
+                    if cached is not None:
+                        body, status, content_type = cached
+                        return Response(body, status=status, content_type=content_type)
+                except Exception:
+                    # If cache backend errors, proceed to generate fresh response
+                    pass
+
+            resp = f(*args, **kwargs)
+            try:
+                flask_resp = current_app.make_response(resp)
+                body = flask_resp.get_data(as_text=True)
+                status = flask_resp.status_code
+                content_type = flask_resp.content_type or 'text/html'
+            except Exception:
+                return resp
+
+            if cache is not None and key is not None:
+                try:
+                    cache.set(key, (body, status, content_type), timeout=timeout)
+                except Exception:
+                    pass
+
+            return flask_resp
+        return wrapped
+    return decorator
+
+
+def _resolve_verification_rule(field, latest_map):
+    v = None
+    if getattr(field, 'verification', None):
+        v = field.verification
+    else:
+        fv = latest_map.get(field.id)
+        if fv:
+            v = {
+                'type': 'external_lookup',
+                'params': {
+                    'provider': fv.provider,
+                    'external_key': fv.external_key,
+                    'options': fv.params or {},
+                }
+            }
+        else:
+            try:
+                if current_app.config.get('ENABLE_EXTERNAL_VERIFICATION') and field.name in ('donor_part_number', 'target_part_number', 'part_number', 'price_book_number', 'pricebook'):
+                    v = {'type': 'external_lookup', 'params': {'provider': 'inventory', 'external_key': field.name, 'options': {}}}
+            except Exception:
+                pass
+    return v
+
+
+def _normalize_lookup_result(raw):
+    """Normalize provider/API lookup responses to a tri-state verdict.
+
+    Returns `(ok, meta)` where `ok` is True / False / None and `meta` preserves
+    the raw details for auditing and downstream decisions.
+    """
+    if not isinstance(raw, dict):
+        return None, {'raw': raw}
+
+    details = raw.get('details') if isinstance(raw.get('details'), dict) else {}
+    numeric_keys = ('stock_count', 'available_count', 'quantity', 'qty', 'on_hand')
+    for key in numeric_keys:
+        if key in details:
+            try:
+                qty = int(details.get(key))
+                return (qty > 0), {'details': details, 'quantity': qty}
+            except Exception:
+                pass
+
+    bool_keys = ('in_stock', 'available', 'exists', 'valid', 'populated', 'found')
+    for key in bool_keys:
+        if key in details:
+            return bool(details.get(key)), {'details': details, 'matched_key': key}
+
+    if raw.get('ok') is None:
+        return None, {'reason': raw.get('reason'), 'details': details}
+    if raw.get('ok') is False and raw.get('reason') == 'error':
+        return None, {'reason': 'error', 'error': raw.get('error'), 'details': details}
+    if raw.get('ok') is False:
+        return False, {'reason': raw.get('reason'), 'details': details}
+    if raw.get('ok') is True:
+        return True, {'details': details}
+    return None, {'details': details}
+
+
+def _run_field_verification(field, rule, submission_data):
+    val = submission_data.get(field.name)
+    if rule.get('type') == 'regex':
+        pat = rule.get('pattern')
+        ok = False
+        if val is not None and pat:
+            ok = bool(re.fullmatch(pat, str(val)))
+        return {'ok': ok, 'type': 'regex', 'value': val}
+
+    if rule.get('type') != 'external_lookup':
+        return {'ok': False, 'reason': 'unknown_rule_type', 'type': rule.get('type')}
+
+    params = rule.get('params') or {}
+    provider = params.get('provider')
+    ext_key = params.get('external_key') or rule.get('external_key')
+    options = params.get('options') or {}
+
+    if val is None or str(val).strip() == '':
+        return {'ok': None, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'reason': 'empty'}
+
+    if provider == 'inventory':
+        try:
+            inv = InventoryService()
+            if ext_key in ('donor_part_number', 'target_part_number', 'part_number'):
+                if hasattr(inv, 'get_stock_count'):
+                    qty = inv.get_stock_count(str(val).strip())
+                    if qty is None:
+                        # compatibility fallback for older/dummy implementations
+                        legacy = inv.validate_part_number(str(val).strip()) if hasattr(inv, 'validate_part_number') else None
+                        if legacy is None:
+                            return {'ok': None, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'reason': 'unknown'}
+                        return {'ok': bool(legacy), 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val}
+                    return {'ok': qty > 0, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'details': {'stock_count': qty}}
+                legacy = inv.validate_part_number(str(val).strip()) if hasattr(inv, 'validate_part_number') else None
+                return {'ok': None if legacy is None else bool(legacy), 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val}
+            if ext_key in ('price_book_number', 'pricebook'):
+                res = inv.validate_sales_list_number(str(val).strip())
+                return {'ok': None if res is None else bool(res), 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val}
+            qty = inv.get_stock_count(str(val).strip())
+            return {'ok': None if qty is None else qty > 0, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'details': {'stock_count': qty} if qty is not None else {}}
+        except Exception as exc:
+            current_app.logger.exception('Inventory verification failed')
+            return {'ok': None, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'error': str(exc)}
+
+    if (params.get('model') == 'user'):
+        from ..models import User
+        found = False
+        column = params.get('column')
+        if column and val is not None:
+            found = bool(db.session.query(User).filter(getattr(User, column) == val).first())
+        return {'ok': found, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val}
+
+    raw = VerificationService().verify_lookup(provider, ext_key, val, options)
+    ok, meta = _normalize_lookup_result(raw)
+    return {'ok': ok, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, **meta}
 
 def _has_part_number_artifact(req: ReqModel) -> bool:
     return any(a.artifact_type == "part_number" for a in req.artifacts)
@@ -196,6 +384,48 @@ def _last_status_by_owner_dept(req: ReqModel) -> str:
     return req.status
 
 
+def _annotate_last_owner_statuses(buckets: Dict[str, List[ReqModel]]) -> None:
+    """Bulk-populate `last_owner_status` to avoid per-request audit queries."""
+    request_rows = []
+    for reqs in buckets.values():
+        request_rows.extend(reqs)
+
+    if not request_rows:
+        return
+
+    request_ids = []
+    owner_dept_by_id = {}
+    seen = set()
+    for req in request_rows:
+        if req.id not in seen:
+            seen.add(req.id)
+            request_ids.append(req.id)
+            owner_dept_by_id[req.id] = req.owner_department
+
+    last_status_by_request = {}
+    try:
+        rows = (
+            db.session.query(AuditLog.request_id, AuditLog.to_status, User.department)
+            .join(User, AuditLog.actor_user)
+            .filter(
+                AuditLog.request_id.in_(request_ids),
+                AuditLog.action_type == "status_change",
+            )
+            .order_by(AuditLog.request_id.asc(), AuditLog.created_at.desc())
+            .all()
+        )
+        for request_id, to_status, actor_department in rows:
+            if request_id in last_status_by_request:
+                continue
+            if owner_dept_by_id.get(request_id) == actor_department and to_status:
+                last_status_by_request[request_id] = to_status
+    except Exception:
+        last_status_by_request = {}
+
+    for req in request_rows:
+        req.last_owner_status = last_status_by_request.get(req.id, req.status)
+
+
 def _closed_within_hours(req: ReqModel, hours: int = 48) -> bool:
     """Return True if the request was moved to CLOSED within the last `hours` hours."""
     entry = (
@@ -249,6 +479,7 @@ def root():
 
 @requests_bp.route("/dashboard")
 @login_required
+@cached_view(timeout=30, prefix='dashboard')
 def dashboard():
     # Default to the current user's department. Admins may pass ?as_dept=A|B|C to view other departments.
     dept = current_user.department
@@ -261,7 +492,7 @@ def dashboard():
 
     if dept == "A":
         # Dept A should see all open requests owned by Department A
-        my_reqs = _exclude_old_closed(ReqModel.query.filter_by(
+        my_reqs = _exclude_old_closed(_request_list_query(ReqModel.query).filter_by(
             owner_department="A"
         )).order_by(ReqModel.updated_at.desc()).all()
         return render_template("dashboard.html", mode="A", requests=my_reqs, now=datetime.utcnow(), artifact_form=artifact_form)
@@ -273,7 +504,7 @@ def dashboard():
         selected_bucket_mode = False
 
         # Build base query scoped to Dept B (owned by B or explicitly sent to B)
-        base_b = scope_requests_for_department(ReqModel.query, 'B')
+        base_b = _request_list_query(scope_requests_for_department(ReqModel.query, 'B'))
         # cutoff for 'closed this week' — start of current week (Monday 00:00 UTC)
         now = datetime.utcnow()
         closed_cutoff = datetime(now.year, now.month, now.day) - timedelta(days=now.weekday())
@@ -298,13 +529,7 @@ def dashboard():
             label = b.name if b else 'Bucket'
             buckets = {label: items}
             status_counts = {}
-            # Annotate each request with the last status set by the current owner dept
-            for name, reqs in buckets.items():
-                for r in reqs:
-                    try:
-                        r.last_owner_status = _last_status_by_owner_dept(r)
-                    except Exception:
-                        r.last_owner_status = r.status
+            _annotate_last_owner_statuses(buckets)
 
             return render_template("dashboard.html", mode="B", buckets=buckets, status_counts=status_counts, now=datetime.utcnow(), artifact_form=artifact_form)
         else:
@@ -523,18 +748,12 @@ def dashboard():
 
             "All (B)": base_b.order_by(ReqModel.updated_at.desc()).all(),
         }
-        # Annotate each request with the last status set by the current owner dept
-        for name, reqs in buckets.items():
-            for r in reqs:
-                try:
-                    r.last_owner_status = _last_status_by_owner_dept(r)
-                except Exception:
-                    r.last_owner_status = r.status
+        _annotate_last_owner_statuses(buckets)
 
         return render_template("dashboard.html", mode="B", buckets=buckets, status_counts=status_counts, now=datetime.utcnow(), artifact_form=artifact_form)
 
     if dept == "C":
-        pending = ReqModel.query.filter_by(
+        pending = _request_list_query(ReqModel.query).filter_by(
             status="PENDING_C_REVIEW"
         ).order_by(ReqModel.updated_at.desc()).all()
         return render_template("dashboard.html", mode="C", requests=pending, now=datetime.utcnow(), artifact_form=artifact_form)
@@ -544,6 +763,7 @@ def dashboard():
 
 @requests_bp.route("/search")
 @login_required
+@cached_view(timeout=30, prefix='search')
 def search_requests():
     q = (request.args.get("q") or "").strip()
     dept = current_user.department
@@ -602,6 +822,7 @@ def search_requests():
 
 @requests_bp.route('/metrics/ui')
 @login_required
+@cached_view(timeout=60, prefix='metrics_ui')
 def metrics_ui():
     """Simple DB-backed metrics UI: counts per owner department and recent activity."""
     # Accept a `range` parameter: daily, weekly, monthly, yearly (defaults to weekly)
@@ -665,6 +886,16 @@ def metrics():
 
 @requests_bp.route('/metrics/json')
 def metrics_json():
+    # Metrics JSON is cached for a short interval to avoid DB pressure
+    if cache is not None:
+        try:
+            key = _make_cache_key('metrics_json')
+            cached = cache.get(key)
+            if cached is not None:
+                body, status, content_type = cached
+                return Response(body, status=status, content_type=content_type)
+        except Exception:
+            pass
     """Machine-friendly JSON metrics for external integrations."""
     try:
         cutoff = datetime.utcnow() - timedelta(days=7)
@@ -702,7 +933,13 @@ def metrics_json():
                 'created_window': created_window.get(d, 0),
                 'closed_window': closed_window.get(d, 0),
             }
-        return jsonify(payload)
+        response = jsonify(payload)
+        if cache is not None:
+            try:
+                cache.set(_make_cache_key('metrics_json'), (response.get_data(as_text=True), response.status_code, response.content_type), timeout=60)
+            except Exception:
+                pass
+        return response
     except Exception:
         current_app.logger.exception('Failed to render JSON metrics')
         abort(500)
@@ -862,6 +1099,9 @@ def request_new():
         db.session.add(a)
         _log(req, 'artifact_added', note=f'Initial artifact created at submission: {a.artifact_type}')
 
+        # Auto-reject is evaluated after dynamic field verification runs so it
+        # works for any populated field that is backed by a configured API/provider.
+
         # Notify the owner department that a request was generated
         notify_users(
             users_in_department(req.owner_department),
@@ -923,74 +1163,12 @@ def request_new():
                 latest_map = {}
 
             for f in template_fields:
-                # Determine verification rule: prefer inline `FormField.verification`,
-                # otherwise consult `latest_map` for a DB mapping.
-                v = None
-                if f.verification:
-                    v = f.verification
-                else:
-                    fv = latest_map.get(f.id)
-                    if fv:
-                        if fv.provider == 'inventory':
-                            v = {'type': 'external_lookup', 'params': {'provider': 'inventory', 'external_key': fv.external_key, 'options': fv.params or {}}}
-                        else:
-                            v = {'type': 'external_lookup', 'params': {'provider': fv.provider, 'external_key': fv.external_key, 'options': fv.params or {}}}
-                    else:
-                        # As a fallback, when external verification feature is enabled,
-                        # treat common field names as inventory lookups (keeps prototype
-                        # behavior working even if DB mapping lookup fails).
-                        try:
-                            if current_app.config.get('ENABLE_EXTERNAL_VERIFICATION') and f.name in ('donor_part_number', 'target_part_number', 'part_number', 'price_book_number', 'pricebook'):
-                                v = {'type': 'external_lookup', 'params': {'provider': 'inventory', 'external_key': f.name, 'options': {}}}
-                        except Exception:
-                            pass
-
+                v = _resolve_verification_rule(f, latest_map)
                 if not v:
                     continue
 
                 try:
-                    if v.get('type') == 'regex':
-                        pat = v.get('pattern')
-                        val = submission_data.get(f.name)
-                        ok = False
-                        if val is not None and pat:
-                            ok = bool(re.fullmatch(pat, str(val)))
-                        verification_results[f.name] = {'ok': ok, 'type': 'regex'}
-                    elif v.get('type') == 'external_lookup':
-                        params = v.get('params') or {}
-                        provider = params.get('provider')
-                        ext_key = params.get('external_key') or v.get('external_key')
-                        val = submission_data.get(f.name)
-                        ok = False
-                        if provider == 'inventory' and val is not None:
-                            try:
-                                inv = InventoryService()
-                                if ext_key in ('donor_part_number', 'target_part_number', 'part_number'):
-                                    res = inv.validate_part_number(val)
-                                elif ext_key in ('price_book_number', 'pricebook'):
-                                    res = inv.validate_sales_list_number(val)
-                                else:
-                                    res = inv.validate_part_number(val)
-                                if res is None:
-                                    ok = None
-                                else:
-                                    ok = bool(res)
-                            except Exception:
-                                current_app.logger.exception('Inventory verification failed')
-                                ok = None
-                        else:
-                            if params.get('model') == 'user':
-                                from ..models import User
-                                found = False
-                                column = params.get('column')
-                                if column and val is not None:
-                                    found = bool(db.session.query(User).filter(getattr(User, column) == val).first())
-                                ok = found
-                            else:
-                                ok = False
-                        verification_results[f.name] = {'ok': ok, 'type': 'external_lookup'}
-                    else:
-                        verification_results[f.name] = {'ok': False, 'reason': 'unknown_rule_type'}
+                    verification_results[f.name] = _run_field_verification(f, v, submission_data)
                 except Exception as e:
                     current_app.logger.exception('Verification execution failed')
                     verification_results[f.name] = {'ok': False, 'error': str(e)}
@@ -1001,6 +1179,54 @@ def request_new():
                 fs.data['_verifications'] = verification_results
                 db.session.add(fs)
                 db.session.commit()
+
+                try:
+                    cfg = SpecialEmailConfig.get()
+                except Exception:
+                    cfg = None
+
+                if cfg and getattr(cfg, 'request_form_auto_reject_oos_enabled', False):
+                    blocking_failures = []
+                    for field_name, result in verification_results.items():
+                        if result.get('type') != 'external_lookup':
+                            continue
+                        if result.get('ok') is not False:
+                            continue
+                        # Only auto-reject when a populated field was checked and the
+                        # connected software definitively reported unavailable/not found.
+                        if result.get('value') in (None, ''):
+                            continue
+                        blocking_failures.append({
+                            'field': field_name,
+                            'provider': result.get('provider'),
+                            'external_key': result.get('external_key'),
+                            'details': result.get('details'),
+                            'reason': result.get('reason'),
+                            'value': result.get('value'),
+                        })
+
+                    if blocking_failures:
+                        req.status = 'CLOSED'
+                        db.session.add(req)
+                        _log(req, 'auto_rejected_oos', note=f'Auto-rejected after provider verification failure: {blocking_failures}')
+                        db.session.commit()
+
+                        try:
+                            recipients = [req.created_by_user] if req.created_by_user_id and req.created_by_user else []
+                            if recipients:
+                                notify_users(
+                                    recipients,
+                                    title=f"Request auto-rejected #{req.id}",
+                                    body=(cfg.request_form_inventory_out_of_stock_message or "Request was auto-rejected because one or more populated fields were not available in the connected source system."),
+                                    url=url_for('requests.request_detail', request_id=req.id),
+                                    ntype='auto_reject',
+                                    request_id=req.id,
+                                )
+                        except Exception:
+                            current_app.logger.exception('Failed to send auto-reject notification')
+
+                        flash(cfg.request_form_inventory_out_of_stock_message or 'Request auto-rejected because a populated API-verified field was unavailable.', 'warning')
+                        return redirect(url_for('requests.request_detail', request_id=req.id))
         try:
             # Prometheus: increment created counter and refresh owner gauge
             metrics_module.requests_created_total.labels(dept=req.owner_department).inc()

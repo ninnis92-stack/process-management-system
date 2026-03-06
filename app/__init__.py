@@ -109,6 +109,29 @@ def create_app():
     from . import csrf as _csrf  # local import to ensure module-level var exists
     _csrf.init_app(app)
 
+    # Initialize optional caching and Redis client if available.
+    try:
+        from .extensions import cache, init_redis_client
+        try:
+            cache.init_app(app, config={
+                'CACHE_TYPE': 'redis',
+                'CACHE_REDIS_URL': app.config.get('REDIS_URL'),
+                'CACHE_DEFAULT_TIMEOUT': app.config.get('CACHE_DEFAULT_TIMEOUT', 300),
+            })
+        except Exception:
+            # If Flask-Caching isn't installed or config invalid, continue without cache.
+            try:
+                app.logger.info('Cache not initialized (missing package or config)')
+            except Exception:
+                pass
+        try:
+            init_redis_client(app)
+        except Exception:
+            pass
+    except Exception:
+        # Optional cache/redis not available; proceed.
+        pass
+
     # Initialize Flask-Migrate (Alembic) for DB migrations if available
     try:
         if migrate is not None:

@@ -32,12 +32,32 @@ class InventoryService:
           - False if part definitively does not exist
           - None if inventory connector is not configured or unknown
         """
+        # Backwards-compatible wrapper around `get_stock_count` which is
+        # more informative for integrations.
+        cnt = self.get_stock_count(part_no)
+        if cnt is None:
+            return None
+        return bool(cnt)
+
+    def get_stock_count(self, part_no: str) -> Optional[int]:
+        """Return an integer stock count for the given part number.
+
+        Returns:
+          - non-negative integer when the connector can determine stock levels
+          - 0 when out of stock
+          - None when the connector is not configured or the quantity is unknown
+
+        Default implementation returns None (unknown) so the app fails-open
+        until a real connector is wired.
+        """
         if not self.enabled or not self._client:
             return None
 
-        # Replace with real lookup logic when integrating
         try:
-            # example: query DB or call HTTP API
+            # Replace with real lookup logic when integrating. Example:
+            # resp = self._client.get(f"/parts/{quote(part_no)}")
+            # if resp.status_code == 404: return 0
+            # data = resp.json(); return int(data.get('available', 0))
             return None
         except Exception:
             return None

@@ -1,4 +1,4 @@
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from flask import current_app
 import requests
 
@@ -58,3 +58,28 @@ class VerificationService:
         # Recommend provider implement GET /validate?method=... returning JSON {valid: true/false,...}
         url = self.method_url.rstrip("/") + "/validate"
         return self._call_api(url, {"method": method_id}, self.method_token, self.method_timeout)
+
+    def verify_lookup(self, provider: str, external_key: Optional[str], value: Any, options: Optional[Dict] = None) -> Dict:
+        """Generic provider-aware lookup used by dynamic field verification.
+
+        Returns a dict with `ok` and optional `details` / `reason`.
+        The method is intentionally fail-open when a provider is disabled or
+        unavailable so submission flows can decide how strictly to act.
+        """
+        options = options or {}
+        provider_n = (provider or "").strip().lower()
+        key_n = (external_key or "").strip().lower()
+        if value is None or str(value).strip() == "":
+            return {"ok": None, "reason": "empty"}
+
+        if provider_n in ("part", "parts", "part_number"):
+            return self.verify_part_number(str(value).strip())
+        if provider_n in ("method", "instructions"):
+            return self.verify_method(str(value).strip())
+        if provider_n in ("verification", "api"):
+            kind = (options.get("kind") or key_n or "").strip().lower()
+            if "method" in kind or "instruction" in kind:
+                return self.verify_method(str(value).strip())
+            return self.verify_part_number(str(value).strip())
+
+        return {"ok": None, "reason": "unsupported_provider", "provider": provider}

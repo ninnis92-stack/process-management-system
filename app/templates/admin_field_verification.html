@@ -16,6 +16,22 @@
   <div class="mb-3">
     <label class="form-label">Params (JSON)</label>
     {{ form.params_json(class="form-control", rows=6) }}
+    <div class="form-text mt-2">
+      Use JSON to describe provider options. For generic API-backed verification,
+      the app will treat a populated field as unavailable when the provider response
+      includes one of these signals in <code>details</code>: <code>stock_count</code>,
+      <code>available_count</code>, <code>quantity</code>, <code>qty</code>, <code>on_hand</code>
+      equal to <code>0</code>, or boolean keys such as <code>in_stock</code>, <code>available</code>,
+      <code>exists</code>, <code>valid</code>, <code>populated</code>, or <code>found</code>
+      set to <code>false</code>.
+    </div>
+    <div class="alert alert-secondary mt-2 mb-0">
+      <div><strong>Example response shapes</strong></div>
+      <pre class="mb-0 mt-2">{"ok": true, "details": {"stock_count": 12}}
+{"ok": true, "details": {"available": false}}
+{"ok": true, "details": {"exists": true}}
+{"ok": false, "reason": "not_found"}</pre>
+    </div>
   </div>
   <button class="btn btn-primary">Save</button>
 </form>

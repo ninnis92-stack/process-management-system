@@ -64,6 +64,7 @@ def create_user():
         dept = form.department.data
         pw = form.password.data or "password123"
         is_active = bool(form.is_active.data)
+        is_admin = bool(form.is_admin.data)
 
         existing = User.query.filter_by(email=email).first()
         if existing:
@@ -72,6 +73,7 @@ def create_user():
             if form.password.data:
                 existing.password_hash = generate_password_hash(pw, method="pbkdf2:sha256")
             existing.is_active = is_active
+            existing.is_admin = is_admin
             db.session.commit()
             flash(f"Updated user {email}.", "success")
             return redirect(url_for("admin.list_users"))
@@ -82,6 +84,7 @@ def create_user():
             department=dept,
             password_hash=generate_password_hash(pw, method="pbkdf2:sha256"),
             is_active=is_active,
+            is_admin=is_admin,
         )
         db.session.add(u)
         db.session.commit()
@@ -110,7 +113,7 @@ def edit_user(user_id: int):
         if form.password.data:
             u.password_hash = generate_password_hash(form.password.data, method="pbkdf2:sha256")
         u.is_active = bool(form.is_active.data)
-        # Keep existing is_admin unless explicitly changed elsewhere
+        u.is_admin = bool(form.is_admin.data)
         db.session.commit()
         flash(f"Updated user {u.email}.", "success")
         return redirect(url_for("admin.list_users"))
@@ -758,6 +761,7 @@ def special_email():
         form.request_form_first_message.data = getattr(cfg, 'request_form_first_message', None)
         form.request_form_department.data = (getattr(cfg, 'request_form_department', 'A') or 'A')
         form.request_form_field_validation_enabled.data = bool(getattr(cfg, 'request_form_field_validation_enabled', False))
+        form.request_form_auto_reject_oos_enabled.data = bool(getattr(cfg, 'request_form_auto_reject_oos_enabled', False))
         form.request_form_inventory_out_of_stock_notify_enabled.data = bool(getattr(cfg, 'request_form_inventory_out_of_stock_notify_enabled', False))
         form.request_form_inventory_out_of_stock_notify_mode.data = (getattr(cfg, 'request_form_inventory_out_of_stock_notify_mode', 'email') or 'email')
         form.request_form_inventory_out_of_stock_message.data = getattr(cfg, 'request_form_inventory_out_of_stock_message', None)
@@ -788,6 +792,7 @@ def special_email():
         if cfg.request_form_department not in ('A', 'B', 'C'):
             cfg.request_form_department = 'A'
         cfg.request_form_field_validation_enabled = bool(form.request_form_field_validation_enabled.data)
+        cfg.request_form_auto_reject_oos_enabled = bool(form.request_form_auto_reject_oos_enabled.data)
         cfg.request_form_inventory_out_of_stock_notify_enabled = bool(form.request_form_inventory_out_of_stock_notify_enabled.data)
         cfg.request_form_inventory_out_of_stock_notify_mode = (form.request_form_inventory_out_of_stock_notify_mode.data or 'email').strip().lower()
         if cfg.request_form_inventory_out_of_stock_notify_mode not in ('notification', 'email', 'both'):
@@ -942,12 +947,14 @@ def feature_flags():
         form.enable_nudges.data = bool(getattr(flags, 'enable_nudges', True))
         form.allow_user_nudges.data = bool(getattr(flags, 'allow_user_nudges', False))
         form.vibe_enabled.data = bool(getattr(flags, 'vibe_enabled', True))
+        form.sso_admin_sync_enabled.data = bool(getattr(flags, 'sso_admin_sync_enabled', True))
 
     if form.validate_on_submit():
         flags.enable_notifications = bool(form.enable_notifications.data)
         flags.enable_nudges = bool(form.enable_nudges.data)
         flags.allow_user_nudges = bool(form.allow_user_nudges.data)
         flags.vibe_enabled = bool(form.vibe_enabled.data)
+        flags.sso_admin_sync_enabled = bool(form.sso_admin_sync_enabled.data)
         db.session.commit()
         flash('Feature flags updated.', 'success')
         return redirect(url_for('admin.feature_flags'))

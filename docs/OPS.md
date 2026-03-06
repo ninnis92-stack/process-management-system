@@ -41,6 +41,10 @@ Recommended secrets and env vars (non-exhaustive):
 - `SENTRY_DSN` — optional error reporting
 - `INVENTORY_DSN` — external inventory service DSN
 - `ENABLE_EXTERNAL_VERIFICATION` — toggle (true/false)
+ - `REDIS_URL` — Redis connection string for cache and background queues (e.g. `redis://:password@host:6379/0`)
+ - `DB_POOL_SIZE` — integer; SQLAlchemy pool_size override (default `5`)
+ - `DB_MAX_OVERFLOW` — integer; SQLAlchemy max_overflow override (default `10`)
+ - `DB_POOL_PRE_PING` — `True`/`False`; enable `pool_pre_ping` to avoid stale connections (default `True`)
 
 On Fly use `fly secrets set KEY=VALUE` to store secrets.
 

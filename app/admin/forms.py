@@ -13,6 +13,7 @@ class AdminCreateUserForm(FlaskForm):
     password = PasswordField("Password", validators=[Optional(), Length(min=6)])
     department = SelectField("Department", choices=[("A", "A"), ("B", "B"), ("C", "C")], validators=[DataRequired()])
     is_active = BooleanField("Active", default=True)
+    is_admin = BooleanField("Admin", default=False)
     submit = SubmitField("Create / Update User")
 
 
@@ -92,6 +93,7 @@ class SpecialEmailConfigForm(FlaskForm):
     request_form_first_message = TextAreaField("First autoresponder message", validators=[Optional(), Length(max=4000)])
     request_form_department = SelectField("SSO recognized sender department", choices=[("A", "A"), ("B", "B"), ("C", "C")], default="A")
     request_form_field_validation_enabled = BooleanField("Enable strict field verification (auto-reject invalid emails)", default=False)
+    request_form_auto_reject_oos_enabled = BooleanField("Auto-reject when a populated API-verified field is unavailable in the connected system", default=False)
     request_form_inventory_out_of_stock_notify_enabled = BooleanField("Notify requester when inventory verification returns out of stock", default=False)
     request_form_inventory_out_of_stock_notify_mode = SelectField(
         "Out-of-stock notify mode",
@@ -99,7 +101,7 @@ class SpecialEmailConfigForm(FlaskForm):
         default="email",
     )
     request_form_inventory_out_of_stock_message = TextAreaField(
-        "Out-of-stock requester message",
+        "Auto-reject requester message",
         validators=[Optional(), Length(max=4000)],
     )
     nudge_enabled = BooleanField("Enable nudges", default=False)
@@ -156,6 +158,7 @@ class FeatureFlagsForm(FlaskForm):
     enable_nudges = BooleanField("Enable automated nudges", default=True)
     allow_user_nudges = BooleanField("Allow users to push nudges to others", default=False)
     vibe_enabled = BooleanField("Show Vibe button UI", default=True)
+    sso_admin_sync_enabled = BooleanField("Allow SSO to allocate admin access from organization claims/APIs", default=True)
     submit = SubmitField("Save Flags")
 
 

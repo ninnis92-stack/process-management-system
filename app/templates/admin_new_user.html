@@ -23,6 +23,11 @@
     {{ form.is_active(class="form-check-input") }}
     <label class="form-check-label ms-2">Active</label>
   </div>
+  <div class="form-check mb-3">
+    {{ form.is_admin(class="form-check-input") }}
+    <label class="form-check-label ms-2">Admin</label>
+    <div class="form-text">Admins can always be allocated manually in the app, regardless of SSO admin sync.</div>
+  </div>
   <button class="btn btn-primary">Create / Update</button>
 </form>
 {% endblock %}

@@ -154,6 +154,59 @@ make deploy FLY_APP=process-management-prototype-lingering-bush-6175
 CI
 - A GitHub Actions workflow is included at `.github/workflows/ci.yml` which runs tests on push and pull requests to `main`.
 
+## Running in production
+
+Recommended production process using `gunicorn` with the provided `gunicorn_conf.py`:
+
+```bash
+# install deps
+pip install -r requirements.txt
+
+# run gunicorn with the config file
+gunicorn -c gunicorn_conf.py run:app
+```
+
+Recommended environment variables for production performance:
+
+- `REDIS_URL` — Redis connection string for caching and background queues
+- `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_PRE_PING` — tune SQLAlchemy engine pool
+
+The application will initialize a Redis-backed cache (if `Flask-Caching` is installed
+and `REDIS_URL` is set) and apply SQLAlchemy engine options from `Config`.
+
+Before deploying, run validation locally:
+
+```bash
+source .venv/bin/activate
+PYTHONPATH=. python -m pytest -q
+PYTHONPATH=. python scripts/ui_smoke_check.py
+```
+
+After deploying, clear any smoke/demo records if they were created remotely:
+
+```bash
+flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command "python3 -c \"from app import create_app; from app.extensions import db; from app.models import Request as R; app=create_app(); ctx=app.app_context(); ctx.push(); cnt=R.query.filter(R.title.like('SMOKE_%')).delete(synchronize_session=False); db.session.commit(); print('deleted', cnt); ctx.pop()\""
+```
+
+## Auto-reject for unavailable API-backed fields
+
+Admins can enable a special-email/request toggle that automatically closes a newly submitted request when a populated dynamic form field is verified against a connected system and that system definitively reports the value as unavailable/not found.
+
+- This is not limited to inventory.
+- It uses the field's configured verification provider/API mapping.
+- Empty fields are ignored.
+- Unknown/disabled provider responses fail open and do not auto-reject.
+
+Supported provider response signals:
+
+- Numeric availability keys in `details`: `stock_count`, `available_count`, `quantity`, `qty`, `on_hand`
+  - `0` means unavailable
+  - `> 0` means available
+- Boolean availability keys in `details`: `in_stock`, `available`, `exists`, `valid`, `populated`, `found`
+  - `false` means unavailable
+  - `true` means available
+- If a provider returns `{"ok": false, "reason": "not_found"}`, that is also treated as a definitive unavailable result.
+
 
 ## Metrics (Prometheus)
 
@@ -198,6 +251,65 @@ pip install prometheus_client
 - Local login fallback always available (`/auth/login`).
 - OIDC SSO optional: set `SSO_ENABLED=true` and provide `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI` in environment.
 - SSO init lives in `app/auth/sso.py`; routes in `app/auth/routes.py`.
+
+### Production SSO admin sync
+
+When SSO is integrated in production, the app can automatically recognize admins from organization-managed claims/groups and sync `User.is_admin` on login.
+
+This behavior is now toggleable in the app via Admin → Feature Flags:
+
+- when enabled, users may be allocated admin access from SSO claims/APIs
+- when disabled, SSO will not change admin status
+- admins can still allocate or remove admin access manually in Admin → Users
+
+### SSO + 2FA / MFA compatibility
+
+For SSO-backed admin access, MFA can be enforced and mapped from your IdP's claim format.
+
+- `SSO_REQUIRE_MFA=true`
+- `SSO_MFA_CLAIM=amr` or a nested path like `authentication.methods`
+- `SSO_MFA_CLAIM_VALUES=mfa,otp,2fa,strong-auth`
+
+Examples:
+
+```bash
+export SSO_REQUIRE_MFA=True
+export SSO_MFA_CLAIM=amr
+export SSO_MFA_CLAIM_VALUES=mfa,otp,2fa
+```
+
+or for providers with nested MFA claims:
+
+```bash
+export SSO_REQUIRE_MFA=True
+export SSO_MFA_CLAIM=authentication.methods
+export SSO_MFA_CLAIM_VALUES=strong-auth
+```
+
+Local account TOTP remains supported separately for non-SSO logins.
+
+Supported settings:
+
+- `SSO_ADMIN_SYNC_ENABLED=true`
+- `SSO_ADMIN_SYNC_STRICT=false` — when `true`, admin access is mirrored exactly from SSO on each login
+- `SSO_ADMIN_CLAIM=groups` — or nested path like `realm_access.roles`
+- `SSO_ADMIN_CLAIM_VALUES=process-admins,org-admin`
+- `SSO_ADMIN_EMAILS=admin1@example.com,admin2@example.com` — optional explicit allow-list
+
+Examples:
+
+```bash
+export SSO_ADMIN_SYNC_ENABLED=True
+export SSO_ADMIN_CLAIM=groups
+export SSO_ADMIN_CLAIM_VALUES=process-admins,org-admin
+```
+
+Or for providers that nest roles:
+
+```bash
+export SSO_ADMIN_CLAIM=realm_access.roles
+export SSO_ADMIN_CLAIM_VALUES=admin
+```
 SSO & 2FA:
 
 - The app includes a minimal OIDC integration scaffold in `app/auth/sso.py`. SSO is disabled by default. Enable it with these config values:

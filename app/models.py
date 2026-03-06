@@ -287,6 +287,10 @@ class SpecialEmailConfig(db.Model):
     request_form_inventory_out_of_stock_notify_enabled = db.Column(db.Boolean, nullable=False, default=False)
     request_form_inventory_out_of_stock_notify_mode = db.Column(db.String(20), nullable=False, default='email')
     request_form_inventory_out_of_stock_message = db.Column(db.Text, nullable=True)
+    # When True, the system will automatically close (auto-reject) incoming
+    # submissions if a populated part number is confirmed out of stock by the
+    # configured `InventoryService`. Admins may toggle this to prevent bottlenecks.
+    request_form_auto_reject_oos_enabled = db.Column(db.Boolean, nullable=False, default=False)
     nudge_enabled = db.Column(db.Boolean, nullable=False, default=False)
     nudge_interval_hours = db.Column(db.Integer, nullable=True)
     # Minimum hours after request creation before nudges may start.
@@ -317,6 +321,7 @@ class FeatureFlags(db.Model):
     enable_nudges = db.Column(db.Boolean, nullable=False, default=True)
     allow_user_nudges = db.Column(db.Boolean, nullable=False, default=False)
     vibe_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    sso_admin_sync_enabled = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     @classmethod
