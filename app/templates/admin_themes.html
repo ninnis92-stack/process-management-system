@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container my-3">
+  <h3>Themes</h3>
+  <div class="row">
+    <div class="col-md-6">
+      <form method="post" enctype="multipart/form-data" class="card p-3">
+        {{ form.hidden_tag() }}
+        <div class="mb-2">{{ form.name.label }} {{ form.name(class='form-control') }}</div>
+        <div class="mb-2">{{ form.css.label }} {{ form.css(class='form-control', rows=8) }}</div>
+        <div class="mb-2">{{ form.logo_url.label }} {{ form.logo_url(class='form-control') }}</div>
+        <div class="mb-2">{{ form.logo_upload.label }} {{ form.logo_upload(class='form-control') }}</div>
+        <div class="form-check mb-2">{{ form.active(class='form-check-input') }} <label class="form-check-label ms-2">Activate after save</label></div>
+        <div class="mb-2">{{ form.submit(class='btn btn-primary') }}</div>
+      </form>
+    </div>
+    <div class="col-md-6">
+      <div class="list-group">
+        {% for t in themes %}
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <strong>{{ t.name }}</strong>
+              {% if t.active %}<span class="badge bg-success ms-2">Active</span>{% endif %}
+              <div class="small text-muted">Created {{ t.created_at.strftime('%Y-%m-%d') }}</div>
+            </div>
+            <div>
+              <form method="post" action="{{ url_for('admin.themes_activate', theme_id=t.id) }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-primary">Activate</button>
+              </form>
+              <form method="post" action="{{ url_for('admin.themes_delete', theme_id=t.id) }}" style="display:inline" onsubmit="return confirm('Delete theme?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="list-group-item">No themes yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -3,6 +3,7 @@ from wtforms import StringField, PasswordField, SelectField, BooleanField, Submi
 from wtforms.fields import EmailField
 from wtforms.validators import DataRequired, Email, Optional, Length
 from wtforms import IntegerField
+from flask_wtf.file import FileField, FileAllowed
 
 
 class AdminCreateUserForm(FlaskForm):
@@ -35,3 +36,12 @@ class AdminSpecialEmailsForm(FlaskForm):
     ticketing_toggle = BooleanField("Enable Ticketing Integration (runtime override)", default=False)
     inventory_toggle = BooleanField("Enable Inventory Integration (runtime override)", default=False)
     submit = SubmitField("Save Special Emails")
+
+
+class ThemeForm(FlaskForm):
+    name = StringField('Theme name', validators=[DataRequired(), Length(max=120)])
+    css = TextAreaField('Custom CSS', validators=[Optional(), Length(max=20000)])
+    logo_url = StringField('Logo URL (optional)', validators=[Optional(), Length(max=255)])
+    logo_upload = FileField('Upload Logo', validators=[Optional(), FileAllowed(['png','jpg','jpeg','svg'],'Images only')])
+    active = BooleanField('Activate theme after saving', default=False)
+    submit = SubmitField('Save Theme')

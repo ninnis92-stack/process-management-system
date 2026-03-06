@@ -154,6 +154,26 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(integrations_bp)
 
+    # Provide active theme CSS and logo URL to templates
+    @app.context_processor
+    def _theme_context():
+        try:
+            from .models import AppTheme
+            from flask import url_for
+            t = AppTheme.query.filter_by(active=True).first()
+            css = t.css if t and t.css else ''
+            logo = None
+            if t and t.logo_filename:
+                try:
+                    logo = url_for('static', filename=t.logo_filename)
+                except Exception:
+                    logo = None
+            if not logo:
+                logo = current_app.config.get('LOGO_URL')
+            return dict(active_theme_css=css, theme_logo_url=logo)
+        except Exception:
+            return dict(active_theme_css='', theme_logo_url=current_app.config.get('LOGO_URL'))
+
     # Track the last successfully rendered GET URL in the session so that
     # when the DB is temporarily unavailable we can redirect users back to
     # the last working page instead of showing a persistent 503 on refresh.

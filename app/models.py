@@ -284,3 +284,20 @@ class SpecialEmailConfig(db.Model):
             except Exception:
                 db.session.rollback()
         return cfg
+
+
+class AppTheme(db.Model):
+    """Admin-manageable themes allowing CSS and optional logo for branding.
+
+    Fields:
+      - name: human friendly name
+      - css: raw CSS inserted into a <style> tag on every page when active
+      - logo_filename: optional uploaded logo filename saved under UPLOAD_FOLDER
+      - active: whether this theme is current
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    css = db.Column(db.Text, nullable=True)
+    logo_filename = db.Column(db.String(255), nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

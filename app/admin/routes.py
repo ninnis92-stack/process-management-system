@@ -6,6 +6,7 @@ from ..extensions import db
 from ..models import User
 from .forms import AdminCreateUserForm, AdminSpecialEmailsForm
 from ..models import Request as ReqModel, Artifact, Submission, SpecialEmailConfig
+from ..models import AppTheme
 from datetime import datetime, timedelta
 from flask import request as flask_request
 from ..models import Notification, AuditLog
@@ -606,6 +607,80 @@ def special_emails():
         form.nudge_interval_hours.data = cfg.nudge_interval_hours or 24
 
     return render_template('admin_special_emails.html', form=form, cfg=cfg)
+
+
+@admin_bp.route('/themes', methods=['GET', 'POST'])
+@login_required
+def themes():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    from .forms import ThemeForm
+    form = ThemeForm()
+    themes = AppTheme.query.order_by(AppTheme.created_at.desc()).all()
+
+    if form.validate_on_submit():
+        # handle uploads
+        logo_filename = None
+        upload = flask_request.files.get('logo_upload')
+        if upload and upload.filename:
+            from werkzeug.utils import secure_filename
+            fn = secure_filename(upload.filename)
+            dest = None
+            try:
+                dest = os.path.join(current_app.config.get('UPLOAD_FOLDER') or 'uploads', fn)
+                upload.save(dest)
+                logo_filename = fn
+            except Exception:
+                current_app.logger.exception('Failed to save uploaded logo')
+
+        # prefer explicit URL if provided
+        logo_url = form.logo_url.data.strip() if form.logo_url.data else None
+
+        t = AppTheme(name=form.name.data.strip(), css=form.css.data or None, logo_filename=logo_filename)
+        db.session.add(t)
+        if form.active.data:
+            # deactivate others
+            AppTheme.query.update({'active': False})
+            t.active = True
+
+        db.session.commit()
+        flash('Theme saved.', 'success')
+        return redirect(url_for('admin.themes'))
+
+    return render_template('admin_themes.html', form=form, themes=themes)
+
+
+@admin_bp.post('/themes/<int:theme_id>/activate')
+@login_required
+def themes_activate(theme_id: int):
+    if not _is_admin_user():
+        return jsonify({'ok': False, 'error': 'access_denied'}), 403
+    t = AppTheme.query.get_or_404(theme_id)
+    try:
+        AppTheme.query.update({'active': False})
+        t.active = True
+        db.session.commit()
+        return jsonify({'ok': True, 'theme_id': t.id})
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'failed'})
+
+
+@admin_bp.post('/themes/<int:theme_id>/delete')
+@login_required
+def themes_delete(theme_id: int):
+    if not _is_admin_user():
+        return jsonify({'ok': False, 'error': 'access_denied'}), 403
+    t = AppTheme.query.get_or_404(theme_id)
+    try:
+        db.session.delete(t)
+        db.session.commit()
+        return jsonify({'ok': True, 'deleted': theme_id})
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'failed'})
 
 
 @admin_bp.route('/special_emails/trigger', methods=['POST'])
