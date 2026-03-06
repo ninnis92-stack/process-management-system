@@ -39,7 +39,7 @@
               <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('requests.request_new') else '' }}" href="{{ url_for('requests.request_new') }}">New Request</a></li>
             {% endif %}
             {% if current_user.is_admin %}
-              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin') else '' }}" href="{{ url_for('admin.monitor') }}">Admin</a></li>
+              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin') else '' }}" href="{{ url_for('admin.index') }}">Admin</a></li>
             {% endif %}
           {% endif %}
           <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('external.external_dashboard') else '' }}" href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a></li>

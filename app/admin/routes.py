@@ -321,6 +321,20 @@ def monitor():
     return redirect(url_for("admin.monitor", dept="B"))
 
 
+
+@admin_bp.route("/")
+@login_required
+def index():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    total_users = User.query.count()
+    total_depts = Department.query.count()
+    total_audit = AuditLog.query.count()
+    return render_template('admin_index.html', total_users=total_users, total_depts=total_depts, total_audit=total_audit)
+
+
 @admin_bp.route('/debug_workspace')
 @login_required
 def debug_workspace():
