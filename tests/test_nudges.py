@@ -2,13 +2,18 @@ import pytest
 from app import create_app
 from app.extensions import db
 from app.models import User, Request as ReqModel, Notification, SpecialEmailConfig
+from datetime import datetime, timedelta
 from app.notifications.due import send_high_priority_nudges
 
 
 @pytest.fixture()
 def app():
+    # Use an in-memory DB for isolation during this test
+    import os
+    os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
+    os.environ['AUTO_CREATE_DB'] = 'True'
     app = create_app()
-    app.config.update(TESTING=True, WTF_CSRF_ENABLED=False, EMAIL_ENABLED=False)
+    app.config.update(TESTING=True, WTF_CSRF_ENABLED=False, EMAIL_ENABLED=False, SERVER_NAME='localhost')
     with app.app_context():
         db.create_all()
     yield app
@@ -27,7 +32,7 @@ def test_send_nudges_creates_notification(app):
         db.session.add(u)
         db.session.commit()
 
-        r = ReqModel(title='Urgent', request_type='both', pricebook_status='unknown', description='x', priority='high', status='B_IN_PROGRESS', owner_department='B', submitter_type='user', due_at=None)
+        r = ReqModel(title='Urgent', request_type='both', pricebook_status='unknown', description='x', priority='high', status='B_IN_PROGRESS', owner_department='B', submitter_type='user', due_at=(datetime.utcnow()+timedelta(days=3)))
         db.session.add(r)
         db.session.commit()
 

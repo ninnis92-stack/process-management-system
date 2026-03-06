@@ -80,6 +80,32 @@ If you prefer not to use Flask-Migrate, you can apply the SQL directly for SQLit
 
 ```bash
 sqlite3 instance/dev.sqlite3 "ALTER TABLE user ADD COLUMN is_admin INTEGER DEFAULT 0;"
+```
+
+Debug workspace cleanup (cron example)
+-----------------------------------
+
+To periodically remove old admin-created debug requests (`is_debug=True`) you can schedule a simple maintenance job. Below is an example cron entry that runs a small Flask one-liner to delete debug requests older than 7 days. Adjust the venv activation and working directory to match your host.
+
+```cron
+# Run nightly at 03:30 UTC: delete debug requests older than 7 days
+30 3 * * * cd /path/to/process-management-prototype && /path/to/venv/bin/python3 - <<'PY'
+from app import create_app
+from app.extensions import db
+from app.models import Request
+from datetime import datetime, timedelta
+app = create_app()
+with app.app_context():
+  cutoff = datetime.utcnow() - timedelta(days=7)
+  old = Request.query.filter(Request.is_debug==True, Request.created_at < cutoff).all()
+  for r in old:
+    db.session.delete(r)
+  db.session.commit()
+  print(f"Deleted {len(old)} debug requests")
+PY
+```
+
+If you prefer using the HTTP endpoint, you can call the admin-only `/admin/debug/cleanup` endpoint, but ensure you authenticate the call (for example with a short-lived admin API token or a script that runs inside the app context). The endpoint requires `confirm=true` and accepts an optional `days` parameter.
 
 TOTP 2FA (local accounts):
 

@@ -20,6 +20,7 @@ def test_guest_submission_without_description(client, app, monkeypatch):
             "target_part_number": "ABC",
             "no_donor_reason": "needs_create",
             "pricebook_status": "unknown",
+            "pricebook_number": "PB-TEST",
             "priority": "medium",
             "due_at": _future_due(),
             "description": "",

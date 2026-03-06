@@ -268,6 +268,10 @@ class SpecialEmailConfig(db.Model):
     nudge_enabled = db.Column(db.Boolean, nullable=False, default=False)
     # Interval (in hours) between nudge reminders for the same request/user
     nudge_interval_hours = db.Column(db.Integer, nullable=False, default=24)
+    # Runtime feature toggles (stored so admins can enable prototype integrations)
+    email_override = db.Column(db.Boolean, nullable=False, default=False)
+    ticketing_override = db.Column(db.Boolean, nullable=False, default=False)
+    inventory_override = db.Column(db.Boolean, nullable=False, default=False)
 
     @classmethod
     def get(cls):

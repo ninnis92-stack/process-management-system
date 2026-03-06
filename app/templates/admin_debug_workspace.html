@@ -25,8 +25,9 @@
               <input id="simDueDays" type="number" class="form-control" placeholder="Due in (days)" />
             </div>
             <div class="col-md-4">
-              <button id="simCreateBtn" class="btn btn-sm btn-primary">Create Simulated Request</button>
-              <button id="simFullFlowBtn" class="btn btn-sm btn-secondary">Simulate Full Flow</button>
+                <button id="simCreateBtn" class="btn btn-sm btn-primary">Create Simulated Request</button>
+                <button id="simFullFlowBtn" class="btn btn-sm btn-secondary">Simulate Full Flow</button>
+                <button id="cleanupBtn" class="btn btn-sm btn-danger">Cleanup Old Debug Requests</button>
             </div>
           </div>
           <div class="row g-2 mt-2">
@@ -102,6 +103,16 @@
       const r = await fetch('/admin/debug/simulate_flow', { method: 'POST', body: fd });
       const j = await r.json();
       if(j.ok){ info.textContent = 'Simulated full flow; now ' + j.status; iframe.src = '/requests/' + j.request_id; }
+      else info.textContent = 'Error: ' + (j.error||'unknown');
+    });
+
+    const cleanupBtn = document.getElementById('cleanupBtn');
+    cleanupBtn && cleanupBtn.addEventListener('click', async ()=>{
+      if(!confirm('Delete debug requests older than 7 days? This cannot be undone.')) return;
+      const params = new URLSearchParams({ days: '7', confirm: 'true' });
+      const r = await fetch('/admin/debug/cleanup?' + params.toString(), { method: 'POST' });
+      const j = await r.json();
+      if(j.ok){ info.textContent = 'Deleted ' + j.deleted + ' debug requests'; }
       else info.textContent = 'Error: ' + (j.error||'unknown');
     });
   });

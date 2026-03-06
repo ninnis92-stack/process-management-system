@@ -42,6 +42,35 @@
     <div class="form-text">This message will be sent to the requester when they contact the Request Form Email. Use the following placeholder to list form fields formatted for subject-line filling: <code>{fields_for_subject}</code></div>
   </div>
 
+  <div class="mb-3">
+    <label class="form-label">Runtime Integration Toggles</label>
+    <div class="form-check">
+      {{ form.email_toggle(class='form-check-input') }}
+      <label class="form-check-label ms-2">Enable Email Delivery (runtime override)</label>
+      <div class="form-text">When checked, the admin-controlled runtime toggle will enable email delivery behavior regardless of environment vars. This is useful for staging/prototype toggling.</div>
+    </div>
+    <div class="form-check mt-2">
+      {{ form.ticketing_toggle(class='form-check-input') }}
+      <label class="form-check-label ms-2">Enable Ticketing Integration (runtime override)</label>
+    </div>
+    <div class="form-check mt-2">
+      {{ form.inventory_toggle(class='form-check-input') }}
+      <label class="form-check-label ms-2">Enable Inventory Integration (runtime override)</label>
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Nudge Settings</label>
+    <div class="row g-2">
+      <div class="col-md-4">
+        {{ form.nudge_enable(class='form-select') }}
+      </div>
+      <div class="col-md-4">
+        {{ form.nudge_interval_hours(class='form-control') }}
+      </div>
+    </div>
+  </div>
+
   <button class="btn btn-primary">Save</button>
 </form>
 {% endblock %}

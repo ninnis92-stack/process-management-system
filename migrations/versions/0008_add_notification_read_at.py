@@ -4,8 +4,8 @@ Revision ID: 0008_add_notification_read_at
 Revises: 0007_autogen_add_special_email_config
 Create Date: 2026-03-05 00:00:00.000000
 """
-from alembic import op
-import sqlalchemy as sa
+revision = '0008_add_notification_read_at'
+revises = '0006_add_special_email_config'
 
 # revision identifiers, used by Alembic.
 revision = '0008_add_notification_read_at'

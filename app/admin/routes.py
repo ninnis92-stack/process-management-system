@@ -546,6 +546,10 @@ def special_emails():
     form.request_form_user.choices = users
     # Prefill nudge choices
     form.nudge_enable.choices = [("false", "Off"), ("true", "On")]
+    # runtime integration toggles (boolean fields)
+    form.email_toggle.data = bool(cfg.email_override) if hasattr(cfg, 'email_override') else False
+    form.ticketing_toggle.data = bool(cfg.ticketing_override) if hasattr(cfg, 'ticketing_override') else False
+    form.inventory_toggle.data = bool(cfg.inventory_override) if hasattr(cfg, 'inventory_override') else False
 
     if form.validate_on_submit():
         cfg.enabled = True if form.enable_feature.data == 'true' else False
@@ -571,6 +575,20 @@ def special_emails():
             cfg.request_form_user_id = int(form.request_form_user.data) if form.request_form_user.data else None
         except Exception:
             cfg.request_form_user_id = None
+
+        # Runtime integration toggles
+        try:
+            cfg.email_override = bool(form.email_toggle.data)
+        except Exception:
+            cfg.email_override = False
+        try:
+            cfg.ticketing_override = bool(form.ticketing_toggle.data)
+        except Exception:
+            cfg.ticketing_override = False
+        try:
+            cfg.inventory_override = bool(form.inventory_toggle.data)
+        except Exception:
+            cfg.inventory_override = False
 
         db.session.commit()
         flash('Special email settings saved.', 'success')

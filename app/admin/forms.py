@@ -31,4 +31,7 @@ class AdminSpecialEmailsForm(FlaskForm):
         validators=[DataRequired()],
     )
     nudge_interval_hours = IntegerField("Nudge interval (hours)", default=24, validators=[Optional()])
+    email_toggle = BooleanField("Enable Email Delivery (runtime override)", default=False)
+    ticketing_toggle = BooleanField("Enable Ticketing Integration (runtime override)", default=False)
+    inventory_toggle = BooleanField("Enable Inventory Integration (runtime override)", default=False)
     submit = SubmitField("Save Special Emails")
