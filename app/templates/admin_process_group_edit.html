@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">
+    {% if group %}Edit Process Group — <em>{{ group.name }}</em>
+    {% else %}New Process Flow Group{% endif %}
+  </h3>
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin.list_process_groups') }}">← All Groups</a>
+</div>
+
+{# ── Group metadata form ─────────────────────────────────────────────────── #}
+<div class="card mb-4" style="max-width: 720px;">
+  <div class="card-header fw-semibold">Group Details</div>
+  <div class="card-body">
+    <form method="post">
+      {{ form.hidden_tag() }}
+      <div class="mb-3">
+        {{ form.name.label(class="form-label") }}
+        {{ form.name(class="form-control") }}
+      </div>
+      <div class="mb-3">
+        {{ form.description.label(class="form-label") }}
+        {{ form.description(class="form-control", rows=3, placeholder="Describe this process flow (optional)") }}
+      </div>
+      <div class="form-check mb-3">
+        {{ form.is_active(class="form-check-input") }}
+        <label class="form-check-label ms-2">Active (visible to users)</label>
+      </div>
+      {{ form.submit(class="btn btn-primary") }}
+    </form>
+  </div>
+</div>
+
+{% if group %}
+{# ── Existing steps ──────────────────────────────────────────────────────── #}
+<h5 class="mb-2">Process Steps
+  <span class="badge text-bg-secondary ms-1">{{ group.steps | length }}</span>
+</h5>
+
+<p class="text-muted small mb-3">
+  Each step represents a stage in the process flow. Use the <strong>↑ / ↓</strong> arrows to reorder steps.
+  The <em>Responsible Department</em> column shows which team owns that stage.
+</p>
+
+{% if group.steps %}
+  <div class="table-responsive mb-4" style="max-width: 900px;">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th style="width: 3rem;">#</th>
+          <th>Label</th>
+          <th style="width: 10rem;">Department</th>
+          <th>Notes</th>
+          <th style="width: 8rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for step in group.steps %}
+          <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td><strong>{{ step.label }}</strong></td>
+            <td>
+              <span class="badge text-bg-primary">Dept {{ step.department }}</span>
+            </td>
+            <td class="text-muted small">{{ step.description or '—' }}</td>
+            <td class="text-end">
+              {# Move up #}
+              {% if not loop.first %}
+                <form method="post"
+                      action="{{ url_for('admin.move_process_step', group_id=group.id, step_id=step.id) }}"
+                      class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="direction" value="up">
+                  <button class="btn btn-sm btn-outline-secondary px-1 py-0" title="Move up" aria-label="Move step up">↑</button>
+                </form>
+              {% else %}
+                <button class="btn btn-sm btn-outline-secondary px-1 py-0" disabled aria-hidden="true">↑</button>
+              {% endif %}
+              {# Move down #}
+              {% if not loop.last %}
+                <form method="post"
+                      action="{{ url_for('admin.move_process_step', group_id=group.id, step_id=step.id) }}"
+                      class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="direction" value="down">
+                  <button class="btn btn-sm btn-outline-secondary px-1 py-0" title="Move down" aria-label="Move step down">↓</button>
+                </form>
+              {% else %}
+                <button class="btn btn-sm btn-outline-secondary px-1 py-0" disabled aria-hidden="true">↓</button>
+              {% endif %}
+              {# Delete #}
+              <form method="post"
+                    action="{{ url_for('admin.delete_process_step', group_id=group.id, step_id=step.id) }}"
+                    class="d-inline"
+                    onsubmit="return confirm('Remove step \'{{ step.label }}\'?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger ms-1" title="Delete step" aria-label="Delete step">✕</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="alert alert-secondary mb-4" style="max-width: 720px;">
+    No steps yet. Add the first step below.
+  </div>
+{% endif %}
+
+{# ── Add step form ───────────────────────────────────────────────────────── #}
+<div class="card" style="max-width: 720px;">
+  <div class="card-header fw-semibold">Add Step</div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('admin.add_process_step', group_id=group.id) }}">
+      {{ step_form.hidden_tag() }}
+      <div class="row g-3">
+        <div class="col-md-6">
+          {{ step_form.label.label(class="form-label") }}
+          {{ step_form.label(class="form-control", placeholder="e.g. Initial Review") }}
+        </div>
+        <div class="col-md-3">
+          {{ step_form.department.label(class="form-label") }}
+          {{ step_form.department(class="form-select") }}
+        </div>
+      </div>
+      <div class="mt-3">
+        {{ step_form.description.label(class="form-label") }}
+        {{ step_form.description(class="form-control", rows=2, placeholder="Optional notes for this step") }}
+      </div>
+      <div class="mt-3">
+        {{ step_form.submit(class="btn btn-success") }}
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}{# /if group #}
+
+{% endblock %}

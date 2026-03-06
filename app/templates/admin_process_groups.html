@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Admin — Process Flow Groups</h3>
+  <a class="btn btn-primary" href="{{ url_for('admin.new_process_group') }}">+ New Group</a>
+</div>
+
+<p class="text-muted small">
+  Process flow groups define the ordered sequence of steps and which department handles each step.
+  Assign a group to new requests to guide them through a custom workflow.
+</p>
+
+<div class="d-flex gap-2 mb-3">
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin.list_users') }}">← Back to Users</a>
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin.audit') }}">Audit Log</a>
+</div>
+
+{% if groups %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Steps</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in groups %}
+          <tr>
+            <td><strong>{{ g.name }}</strong></td>
+            <td class="text-muted small">{{ g.description or '—' }}</td>
+            <td>
+              <span class="badge text-bg-secondary">{{ g.steps | length }} step{{ 's' if g.steps | length != 1 else '' }}</span>
+            </td>
+            <td>
+              {% if g.is_active %}
+                <span class="badge text-bg-success">Active</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="small text-muted">{{ g.created_at.strftime('%Y-%m-%d') if g.created_at else '—' }}</td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.edit_process_group', group_id=g.id) }}">Edit</a>
+              <form method="post" action="{{ url_for('admin.delete_process_group', group_id=g.id) }}" class="d-inline"
+                    onsubmit="return confirm('Delete group {{ g.name }}? This will also remove all its steps.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="alert alert-info">
+    No process flow groups yet. <a href="{{ url_for('admin.new_process_group') }}">Create your first group</a>.
+  </div>
+{% endif %}
+{% endblock %}

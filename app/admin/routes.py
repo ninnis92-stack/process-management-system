@@ -3,8 +3,8 @@ from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 
 from ..extensions import db
-from ..models import User
-from .forms import AdminCreateUserForm
+from ..models import User, ProcessGroup, ProcessStep
+from .forms import AdminCreateUserForm, ProcessGroupForm, ProcessStepForm
 from ..models import Request as ReqModel, Artifact, Submission
 from datetime import datetime, timedelta
 from flask import request as flask_request
@@ -356,3 +356,145 @@ def audit():
         audits = audits.filter(AuditLog.action_type.ilike(f"%{action}%"))
     audits = audits.limit(200).all()
     return render_template("admin_audit.html", audits=audits)
+
+
+# ---------------------------------------------------------------------------
+# Process Groups
+# ---------------------------------------------------------------------------
+
+@admin_bp.route("/process-groups")
+@login_required
+def list_process_groups():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+    groups = ProcessGroup.query.order_by(ProcessGroup.name).all()
+    return render_template("admin_process_groups.html", groups=groups)
+
+
+@admin_bp.route("/process-groups/new", methods=["GET", "POST"])
+@login_required
+def new_process_group():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    form = ProcessGroupForm()
+    if form.validate_on_submit():
+        group = ProcessGroup(
+            name=form.name.data.strip(),
+            description=form.description.data.strip() if form.description.data else None,
+            is_active=bool(form.is_active.data),
+        )
+        db.session.add(group)
+        db.session.commit()
+        flash(f"Process group '{group.name}' created.", "success")
+        return redirect(url_for("admin.edit_process_group", group_id=group.id))
+
+    return render_template("admin_process_group_edit.html", form=form, group=None, step_form=None)
+
+
+@admin_bp.route("/process-groups/<int:group_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_process_group(group_id: int):
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    group = ProcessGroup.query.get_or_404(group_id)
+    form = ProcessGroupForm(obj=group)
+    step_form = ProcessStepForm()
+
+    if form.validate_on_submit():
+        group.name = form.name.data.strip()
+        group.description = form.description.data.strip() if form.description.data else None
+        group.is_active = bool(form.is_active.data)
+        db.session.commit()
+        flash(f"Process group '{group.name}' updated.", "success")
+        return redirect(url_for("admin.edit_process_group", group_id=group.id))
+
+    return render_template("admin_process_group_edit.html", form=form, group=group, step_form=step_form)
+
+
+@admin_bp.route("/process-groups/<int:group_id>/delete", methods=["POST"])
+@login_required
+def delete_process_group(group_id: int):
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    group = ProcessGroup.query.get_or_404(group_id)
+    name = group.name
+    db.session.delete(group)
+    db.session.commit()
+    flash(f"Process group '{name}' deleted.", "success")
+    return redirect(url_for("admin.list_process_groups"))
+
+
+@admin_bp.route("/process-groups/<int:group_id>/steps/add", methods=["POST"])
+@login_required
+def add_process_step(group_id: int):
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    group = ProcessGroup.query.get_or_404(group_id)
+    step_form = ProcessStepForm()
+    if step_form.validate_on_submit():
+        # Assign next order if not specified
+        max_order = db.session.query(db.func.max(ProcessStep.step_order)).filter_by(process_group_id=group.id).scalar()
+        next_order = (max_order + 1) if max_order is not None else 1
+        step = ProcessStep(
+            process_group_id=group.id,
+            label=step_form.label.data.strip(),
+            department=step_form.department.data,
+            description=step_form.description.data.strip() if step_form.description.data else None,
+            step_order=next_order,
+        )
+        db.session.add(step)
+        db.session.commit()
+        flash(f"Step '{step.label}' added.", "success")
+    else:
+        for field, errors in step_form.errors.items():
+            for error in errors:
+                flash(f"{field}: {error}", "danger")
+    return redirect(url_for("admin.edit_process_group", group_id=group.id))
+
+
+@admin_bp.route("/process-groups/<int:group_id>/steps/<int:step_id>/delete", methods=["POST"])
+@login_required
+def delete_process_step(group_id: int, step_id: int):
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    step = ProcessStep.query.filter_by(id=step_id, process_group_id=group_id).first_or_404()
+    label = step.label
+    db.session.delete(step)
+    db.session.commit()
+    flash(f"Step '{label}' removed.", "success")
+    return redirect(url_for("admin.edit_process_group", group_id=group_id))
+
+
+@admin_bp.route("/process-groups/<int:group_id>/steps/<int:step_id>/move", methods=["POST"])
+@login_required
+def move_process_step(group_id: int, step_id: int):
+    """Move a step up or down within a process group."""
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    direction = flask_request.form.get("direction", "down")
+    step = ProcessStep.query.filter_by(id=step_id, process_group_id=group_id).first_or_404()
+    steps = ProcessStep.query.filter_by(process_group_id=group_id).order_by(ProcessStep.step_order).all()
+
+    idx = next((i for i, s in enumerate(steps) if s.id == step_id), None)
+    if idx is None:
+        return redirect(url_for("admin.edit_process_group", group_id=group_id))
+
+    swap_idx = idx - 1 if direction == "up" else idx + 1
+    if 0 <= swap_idx < len(steps):
+        steps[idx].step_order, steps[swap_idx].step_order = steps[swap_idx].step_order, steps[idx].step_order
+        db.session.commit()
+
+    return redirect(url_for("admin.edit_process_group", group_id=group_id))

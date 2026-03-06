@@ -211,6 +211,39 @@ class Attachment(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class ProcessGroup(db.Model):
+    """A named process flow template defining an ordered sequence of steps across departments."""
+    __tablename__ = "process_group"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False, unique=True)
+    description = db.Column(db.Text, nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    steps = db.relationship(
+        "ProcessStep",
+        backref="group",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="ProcessStep.step_order",
+    )
+
+
+class ProcessStep(db.Model):
+    """An ordered step within a ProcessGroup, owned by a specific department."""
+    __tablename__ = "process_step"
+
+    id = db.Column(db.Integer, primary_key=True)
+    process_group_id = db.Column(db.Integer, db.ForeignKey("process_group.id"), nullable=False)
+    step_order = db.Column(db.Integer, nullable=False, default=0)
+    label = db.Column(db.String(120), nullable=False)
+    department = db.Column(db.String(1), nullable=False)  # A / B / C
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class AuditLog(db.Model):
     """Immutable audit trail for actions on a request."""
     id = db.Column(db.Integer, primary_key=True)
