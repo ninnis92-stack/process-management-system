@@ -2,6 +2,8 @@
 
 A small prototype app.
 
+Administration: see `docs/ADMIN.md` for notes about the admin-managed Departments and SiteConfig (banner + rolling quotes). Tests covering these features live at `tests/test_admin_site_config.py`.
+
 ## Deployment & seeding (Fly.io)
 
 Quick steps to deploy and ensure the demo users and DB are created on Fly:

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{% if department %}Edit Department{% else %}New Department{% endif %}</h2>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">{{ form.code.label }}{{ form.code(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.name.label }}{{ form.name(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.order.label }}{{ form.order(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.active() }} {{ form.active.label }}</div>
+  <button class="btn btn-primary">Save</button>
+</form>
+{% endblock %}

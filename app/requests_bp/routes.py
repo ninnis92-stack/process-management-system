@@ -31,6 +31,7 @@ from ..models import (
     User,
     Notification,
 )
+from ..models import StatusBucket, BucketStatus
 from .forms import (
     NewRequestForm,
     CommentForm,
@@ -41,6 +42,10 @@ from .forms import (
     DonorOnlyForm,
     AssignmentForm,
 )
+from ..models import FormTemplate, Submission as FormSubmission, DepartmentFormAssignment, FormField, FormFieldOption
+from ..models import Attachment
+import re
+import io
 from .permissions import (
     can_view_request,
     visible_comment_scopes_for_user,
@@ -248,8 +253,10 @@ def dashboard():
         return render_template("dashboard.html", mode="A", requests=my_reqs, now=datetime.utcnow(), artifact_form=artifact_form)
 
     if dept == "B":
-        # Allow filtering by a single status via query param `status`
+        # Allow filtering by a single status via query param `status` or by bucket via `bucket_id`
         status_filter = request.args.get("status")
+        bucket_id = request.args.get('bucket_id')
+        selected_bucket_mode = False
 
         # Include requests that are owned by B OR that have been sent to B via a Submission
         sent_to_b_subq = db.session.query(Submission.request_id).filter(Submission.to_department == "B").subquery()
@@ -259,32 +266,93 @@ def dashboard():
         now = datetime.utcnow()
         closed_cutoff = datetime(now.year, now.month, now.day) - timedelta(days=now.weekday())
 
-        # Status bar counts for Dept B (owner_department == "B")
-        status_counts = {
-            "B_IN_PROGRESS": _exclude_old_closed(base_b.filter(
-                ReqModel.status == "B_IN_PROGRESS"
-            )).count(),
-            "WAITING_ON_A_RESPONSE": _exclude_old_closed(base_b.filter(
-                ReqModel.status == "WAITING_ON_A_RESPONSE"
-            )).count(),
-            "PENDING_C_REVIEW": _exclude_old_closed(base_b.filter(
-                ReqModel.status == "PENDING_C_REVIEW"
-            )).count(),
-            "EXEC_APPROVAL": _exclude_old_closed(base_b.filter(
-                ReqModel.status == "EXEC_APPROVAL"
-            )).count(),
-            "B_FINAL_REVIEW": _exclude_old_closed(base_b.filter(
-                ReqModel.status == "B_FINAL_REVIEW"
-            )).count(),
-            "SENT_TO_A": _exclude_old_closed(base_b.filter(
-                ReqModel.status == "SENT_TO_A"
-            )).count(),
-            # Closed this week (reset every 7 days)
-            "CLOSED": base_b.filter(
-                ReqModel.status == "CLOSED",
-                ReqModel.updated_at >= closed_cutoff,
-            ).count(),
-        }
+        # Build buckets from admin-configurable StatusBucket entries
+        bucket_list = StatusBucket.query.filter(StatusBucket.active == True).filter(
+            (StatusBucket.department_name == None) | (StatusBucket.department_name == '') | (StatusBucket.department_name == dept)
+        ).order_by(StatusBucket.order.asc()).all()
+
+        # If a `bucket_id` is provided, filter by that bucket; otherwise use either `status` filter or show all buckets
+        if bucket_id:
+            selected_bucket_mode = True
+            b = StatusBucket.query.get(int(bucket_id))
+            if not b:
+                items = []
+            else:
+                status_codes = [s.status_code for s in b.statuses.order_by(BucketStatus.order.asc()).all()]
+                if status_codes:
+                    items = base_b.filter(ReqModel.status.in_(status_codes)).order_by(ReqModel.updated_at.desc()).all()
+                else:
+                    items = base_b.order_by(ReqModel.updated_at.desc()).all()
+            label = b.name if b else 'Bucket'
+            buckets = {label: items}
+            status_counts = {}
+            # Annotate each request with the last status set by the current owner dept
+            for name, reqs in buckets.items():
+                for r in reqs:
+                    try:
+                        r.last_owner_status = _last_status_by_owner_dept(r)
+                    except Exception:
+                        r.last_owner_status = r.status
+
+            return render_template("dashboard.html", mode="B", buckets=buckets, status_counts=status_counts, now=datetime.utcnow(), artifact_form=artifact_form)
+        else:
+            # If an explicit legacy status filter is provided, keep existing semantics
+            if status_filter:
+                sf = status_filter
+                if sf == "in_progress":
+                    items = base_b.filter(
+                        ReqModel.status == "B_IN_PROGRESS",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                elif sf == "method_created":
+                    items = base_b.join(Artifact).filter(
+                        Artifact.artifact_type == "instructions",
+                    ).order_by(ReqModel.updated_at.desc()).distinct().all()
+                elif sf == "part_number_created":
+                    items = base_b.join(Artifact).filter(
+                        Artifact.artifact_type == "part_number",
+                        (Artifact.target_part_number.isnot(None)) | (Artifact.donor_part_number.isnot(None)),
+                    ).order_by(ReqModel.updated_at.desc()).distinct().all()
+                elif sf == "under_review_by_department_c":
+                    items = base_b.filter(
+                        ReqModel.status == "PENDING_C_REVIEW",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                elif sf == "waiting_on_department_a":
+                    items = base_b.filter(
+                        ReqModel.status == "WAITING_ON_A_RESPONSE",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                elif sf == "under_final_review":
+                    items = base_b.filter(
+                        ReqModel.status == "B_FINAL_REVIEW",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                elif sf == "exec_approval":
+                    items = base_b.filter(
+                        ReqModel.status == "EXEC_APPROVAL",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                elif sf == "request_denied":
+                    items = base_b.filter(
+                        ReqModel.status == "CLOSED",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                else:
+                    items = base_b.filter(
+                        ReqModel.status == status_filter,
+                    ).order_by(ReqModel.updated_at.desc()).all()
+
+                label = STATUS_LABELS.get(status_filter, status_filter)
+                buckets = {label: items}
+                status_counts = {}
+            else:
+                # No specific filter: build buckets from configured StatusBucket entries
+                buckets = {}
+                status_counts = {}
+                for b in bucket_list:
+                    status_codes = [s.status_code for s in b.statuses.order_by(BucketStatus.order.asc()).all()]
+                    if status_codes:
+                        q = base_b.filter(ReqModel.status.in_(status_codes))
+                    else:
+                        q = base_b
+                    items = q.order_by(ReqModel.updated_at.desc()).all()
+                    buckets[b.name] = items
+                    status_counts[b.id] = q.count()
 
         # Semantic status filters for Dept B dashboard
         STATUS_LABELS = {
@@ -307,51 +375,97 @@ def dashboard():
         }
 
         # Build buckets based on the selected semantic filter, otherwise show default buckets
-        if status_filter:
-            sf = status_filter
-            if sf == "in_progress":
-                items = base_b.filter(
-                    ReqModel.status == "B_IN_PROGRESS",
-                ).order_by(ReqModel.updated_at.desc()).all()
-            elif sf == "method_created":
-                # Requests with an 'instructions' artifact
-                items = base_b.join(Artifact).filter(
-                    Artifact.artifact_type == "instructions",
-                ).order_by(ReqModel.updated_at.desc()).distinct().all()
-            elif sf == "part_number_created":
-                # Requests with a part_number artifact that has any part number filled
-                items = base_b.join(Artifact).filter(
-                    Artifact.artifact_type == "part_number",
-                    (Artifact.target_part_number.isnot(None)) | (Artifact.donor_part_number.isnot(None)),
-                ).order_by(ReqModel.updated_at.desc()).distinct().all()
-            elif sf == "under_review_by_department_c":
-                items = base_b.filter(
-                    ReqModel.status == "PENDING_C_REVIEW",
-                ).order_by(ReqModel.updated_at.desc()).all()
-            elif sf == "waiting_on_department_a":
-                items = base_b.filter(
-                    ReqModel.status == "WAITING_ON_A_RESPONSE",
-                ).order_by(ReqModel.updated_at.desc()).all()
-            elif sf == "under_final_review":
-                items = base_b.filter(
-                    ReqModel.status == "B_FINAL_REVIEW",
-                ).order_by(ReqModel.updated_at.desc()).all()
-            elif sf == "exec_approval":
-                items = base_b.filter(
-                    ReqModel.status == "EXEC_APPROVAL",
-                ).order_by(ReqModel.updated_at.desc()).all()
-            elif sf == "request_denied":
-                items = base_b.filter(
-                    ReqModel.status == "CLOSED",
-                ).order_by(ReqModel.updated_at.desc()).all()
-            else:
-                # fallback: treat as raw status code
-                items = base_b.filter(
-                    ReqModel.status == status_filter,
-                ).order_by(ReqModel.updated_at.desc()).all()
+        if not selected_bucket_mode:
+            if status_filter:
+                sf = status_filter
+                if sf == "in_progress":
+                    items = base_b.filter(
+                        ReqModel.status == "B_IN_PROGRESS",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                elif sf == "method_created":
+                    # Requests with an 'instructions' artifact
+                    items = base_b.join(Artifact).filter(
+                        Artifact.artifact_type == "instructions",
+                    ).order_by(ReqModel.updated_at.desc()).distinct().all()
+                elif sf == "part_number_created":
+                    # Requests with a part_number artifact that has any part number filled
+                    items = base_b.join(Artifact).filter(
+                        Artifact.artifact_type == "part_number",
+                        (Artifact.target_part_number.isnot(None)) | (Artifact.donor_part_number.isnot(None)),
+                    ).order_by(ReqModel.updated_at.desc()).distinct().all()
+                elif sf == "under_review_by_department_c":
+                    items = base_b.filter(
+                        ReqModel.status == "PENDING_C_REVIEW",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                elif sf == "waiting_on_department_a":
+                    items = base_b.filter(
+                        ReqModel.status == "WAITING_ON_A_RESPONSE",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                elif sf == "under_final_review":
+                    items = base_b.filter(
+                        ReqModel.status == "B_FINAL_REVIEW",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                elif sf == "exec_approval":
+                    items = base_b.filter(
+                        ReqModel.status == "EXEC_APPROVAL",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                elif sf == "request_denied":
+                    items = base_b.filter(
+                        ReqModel.status == "CLOSED",
+                    ).order_by(ReqModel.updated_at.desc()).all()
+                else:
+                    # fallback: treat as raw status code
+                    items = base_b.filter(
+                        ReqModel.status == status_filter,
+                    ).order_by(ReqModel.updated_at.desc()).all()
 
-            label = STATUS_LABELS.get(status_filter, status_filter)
-            buckets = {label: items}
+                label = STATUS_LABELS.get(status_filter, status_filter)
+                buckets = {label: items}
+            else:
+                buckets = {
+                    "New from A": base_b.filter(
+                        ReqModel.status == "NEW_FROM_A",
+                    ).order_by(ReqModel.updated_at.desc()).all(),
+
+                    "In progress by Department B": base_b.filter(
+                        ReqModel.status == "B_IN_PROGRESS",
+                    ).order_by(ReqModel.updated_at.desc()).all(),
+
+                    "Pending review from Department A": base_b.filter(
+                        ReqModel.status == "WAITING_ON_A_RESPONSE",
+                    ).order_by(ReqModel.updated_at.desc()).all(),
+
+                    "Needs changes": base_b.filter(
+                        ReqModel.status == "C_NEEDS_CHANGES",
+                    ).order_by(ReqModel.updated_at.desc()).all(),
+
+                    "Exec approval required": base_b.filter(
+                        ReqModel.status == "EXEC_APPROVAL",
+                    ).order_by(ReqModel.updated_at.desc()).all(),
+
+                    "Approved by C": base_b.filter(
+                        ReqModel.status == "C_APPROVED",
+                    ).order_by(ReqModel.updated_at.desc()).all(),
+
+                    "Final review": base_b.filter(
+                        ReqModel.status == "B_FINAL_REVIEW",
+                    ).order_by(ReqModel.updated_at.desc()).all(),
+
+                    "Sent to A": base_b.filter(
+                        ReqModel.status == "SENT_TO_A",
+                    ).order_by(ReqModel.updated_at.desc()).all(),
+
+                    "Under review by Department C": base_b.filter(
+                        ReqModel.status == "PENDING_C_REVIEW",
+                    ).order_by(ReqModel.updated_at.desc()).all(),
+
+                    "Closed this week": base_b.filter(
+                        ReqModel.status == "CLOSED",
+                        ReqModel.updated_at >= closed_cutoff,
+                    ).order_by(ReqModel.updated_at.desc()).all(),
+
+                    "All (B)": base_b.order_by(ReqModel.updated_at.desc()).all(),
+                }
         else:
             buckets = {
             "New from A": base_b.filter(
@@ -584,55 +698,141 @@ def metrics_json():
 def request_new():
     form = NewRequestForm()
 
-    if request.method == "POST":
-        ok = form.validate_on_submit()
-        print("VALID:", ok)
-        print("ERRORS:", form.errors)
+    # Check for an assigned template for Dept A (submitters are in Dept A)
+    assigned = DepartmentFormAssignment.query.filter_by(department_name='A').order_by(DepartmentFormAssignment.created_at.desc()).first()
+    template = None
+    if assigned:
+        template = FormTemplate.query.get(assigned.template_id)
+    template_fields = template.fields.order_by(FormField.order.asc()).all() if template else None
+    template_spec = None
+    if template and template_fields:
+        template_spec = []
+        for f in template_fields:
+            opts = []
+            for o in f.options.order_by(FormFieldOption.order.asc()).all():
+                opts.append({'value': o.value, 'label': o.label})
+            template_spec.append({
+                'id': f.id,
+                'name': f.name,
+                'label': f.label,
+                'field_type': f.field_type,
+                'required': bool(f.required),
+                'hint': f.hint,
+                'options': opts,
+            })
 
-    if form.validate_on_submit():
+    # If a dynamic template is present, expect dynamic form submission
+    if request.method == "POST" and template is None:
+        ok = form.validate_on_submit()
+    elif request.method == "POST" and template is not None:
+        # no WTForms validation for dynamic submission (simple server-side required checks applied below)
+        ok = True
+    else:
+        ok = None
+
+    if (template is None and form.validate_on_submit()) or (template is not None and request.method == 'POST'):
+        # Provide a sensible default due date for dynamic submissions (48 hours from now)
+        default_due = form.due_at.data if getattr(form, 'due_at', None) and form.due_at.data else (datetime.utcnow() + timedelta(days=2))
+
+        # Provide a temporary default title and request_type so flush won't violate NOT NULL constraints.
         req = ReqModel(
-            title=form.title.data.strip(),
-            request_type=form.request_type.data,
-            pricebook_status=form.pricebook_status.data,
-            description=form.description.data.strip(),
-            priority=form.priority.data,
-            requires_c_review=False,
-            status="NEW_FROM_A",
-            owner_department="B",
-            submitter_type="user",
-            created_by_user_id=current_user.id,
-            due_at=form.due_at.data,
-        )
+                # Title/description/priority may come from the dynamic submission fields
+                title=f'Dynamic request {int(time.time())}',
+                request_type='both',
+                pricebook_status='unknown',
+                description='',
+                priority='medium',
+                requires_c_review=False,
+                status="NEW_FROM_A",
+                owner_department="B",
+                submitter_type="user",
+                created_by_user_id=current_user.id,
+                due_at=default_due,
+            )
 
         db.session.add(req)
         db.session.flush()  # req.id available
+        # If dynamic template provided, gather submitted values
+        submission_data = {}
+        if template is not None:
+            for f in template.fields.order_by(FormField.order.asc()).all():
+                val = request.form.get(f.name)
+                # basic presence check for required fields
+                if f.required and (val is None or str(val).strip() == ''):
+                    flash(f"Field {f.label} is required.", 'danger')
+                    db.session.rollback()
+                    return render_template('request_new.html', form=form, template=template, template_fields=template_fields, template_spec=template_spec)
+                submission_data[f.name] = val
 
-        # Auto-create initial artifact (so you don’t need to "Add Artifact" after submission)
-        # Decide artifact_type based on request_type
-        rt = (form.request_type.data or "").strip()
-        if rt == "part_number":
-            artifact_type = "part_number"
-        elif rt == "instructions":
-            artifact_type = "instructions"
+            # Map common fields into Request model where possible
+            req.title = (submission_data.get('title') or submission_data.get('summary') or f'Dynamic request {int(time.time())}')
+            req.description = submission_data.get('description') or ''
+            req.priority = submission_data.get('priority') or 'medium'
+            req.request_type = submission_data.get('request_type') or 'both'
+            req.pricebook_status = submission_data.get('pricebook_status') or 'unknown'
+            # If the dynamic form provided a due date, try to parse and apply it
+            due_val = submission_data.get('due_at') or submission_data.get('due')
+            if due_val:
+                try:
+                    # allow both ISO datetime and date-only formats
+                    parsed = None
+                    try:
+                        parsed = datetime.fromisoformat(due_val)
+                    except Exception:
+                        # try common date-only format
+                        parsed = datetime.strptime(due_val, '%Y-%m-%d')
+                    if parsed:
+                        req.due_at = parsed
+                except Exception:
+                    # ignore parse errors and keep default
+                    pass
+
         else:
-            # "both" -> pick one type, OR you can create TWO artifacts. For now create part_number by default.
-            artifact_type = "part_number"
+            # Legacy path: map WTForm values
+            req.title = form.title.data.strip()
+            req.request_type = form.request_type.data
+            req.pricebook_status = form.pricebook_status.data
+            req.description = form.description.data.strip()
+            req.priority = form.priority.data
 
-        instructions_field = getattr(form, "instructions_url", None)
-        instructions_url = (instructions_field.data or "").strip() if instructions_field else None
+        # Create an initial artifact based on available submission values (if present)
+        # Decide artifact_type based on request_type
+        rt = (req.request_type or '').strip()
+        if rt == 'part_number':
+            artifact_type = 'part_number'
+        elif rt == 'instructions':
+            artifact_type = 'instructions'
+        else:
+            artifact_type = 'part_number'
+
+        instructions_url = None
+        donor = None
+        target = None
+        no_donor_reason = None
+        if template is not None:
+            instructions_url = submission_data.get('instructions_url')
+            donor = submission_data.get('donor_part_number')
+            target = submission_data.get('target_part_number')
+            no_donor_reason = submission_data.get('no_donor_reason')
+        else:
+            instructions_field = getattr(form, 'instructions_url', None)
+            instructions_url = (instructions_field.data or '').strip() if instructions_field else None
+            donor = (getattr(form, 'donor_part_number', None).data or '').strip() or None
+            target = (getattr(form, 'target_part_number', None).data or '').strip() or None
+            no_donor_reason = (getattr(form, 'no_donor_reason', None).data or '').strip() or None
 
         a = Artifact(
             request_id=req.id,
             instructions_url=instructions_url,
             artifact_type=artifact_type,
-            donor_part_number=(getattr(form, "donor_part_number", None).data or "").strip() or None,
-            target_part_number=(getattr(form, "target_part_number", None).data or "").strip() or None,
-            no_donor_reason=(getattr(form, "no_donor_reason", None).data or "").strip() or None,
+            donor_part_number=donor,
+            target_part_number=target,
+            no_donor_reason=no_donor_reason,
             created_by_user_id=current_user.id,
-            created_by_department="A",
+            created_by_department='A',
         )
         db.session.add(a)
-        _log(req, "artifact_added", note=f"Initial artifact created at submission: {a.artifact_type}")
+        _log(req, 'artifact_added', note=f'Initial artifact created at submission: {a.artifact_type}')
 
         # Notify the owner department that a request was generated
         notify_users(
@@ -645,6 +845,76 @@ def request_new():
         )
 
         db.session.commit()
+
+        # Save structured submission if present
+        if template is not None:
+            fs = FormSubmission(template_id=template.id, request_id=req.id, data=submission_data, created_by_user_id=current_user.id)
+            db.session.add(fs)
+            db.session.commit()
+
+            # Handle file-type fields (attachments)
+            for f in template_fields:
+                if f.field_type == 'file':
+                    upload = request.files.get(f.name)
+                    if upload and upload.filename:
+                        from werkzeug.utils import secure_filename
+                        fn = secure_filename(upload.filename)
+                        base, ext = os.path.splitext(fn)
+                        stored = f"uploads/{int(time.time())}-{uuid.uuid4().hex}{ext}"
+                        static_upload_dir = os.path.join(current_app.static_folder or 'static', 'uploads')
+                        os.makedirs(static_upload_dir, exist_ok=True)
+                        dest = os.path.join(current_app.static_folder or 'static', stored)
+                        upload.save(dest)
+                        # create Attachment linked to the Submission
+                        att = Attachment(
+                            submission_id=fs.id,
+                            original_filename=fn,
+                            stored_filename=stored,
+                            content_type=upload.content_type or 'application/octet-stream',
+                            size_bytes=os.path.getsize(dest),
+                            uploaded_by_user_id=current_user.id,
+                        )
+                        db.session.add(att)
+                        db.session.commit()
+
+            # Execute verification rules for fields that have them
+            verification_results = {}
+            for f in template_fields:
+                if f.verification:
+                    try:
+                        v = f.verification
+                        if v.get('type') == 'regex':
+                            pat = v.get('pattern')
+                            val = submission_data.get(f.name)
+                            ok = False
+                            if val is not None and pat:
+                                ok = bool(re.fullmatch(pat, str(val)))
+                            verification_results[f.name] = {'ok': ok, 'type': 'regex'}
+                        elif v.get('type') == 'external_lookup':
+                            # Simple external lookup support for `user` model as a convenience
+                            params = v.get('params') or {}
+                            model = params.get('model')
+                            column = params.get('column')
+                            val = submission_data.get(f.name)
+                            ok = False
+                            if model == 'user' and column and val:
+                                from ..models import User
+                                q = {column: val}
+                                found = User.query.filter(getattr(User, column) == val).first()
+                                ok = bool(found)
+                            verification_results[f.name] = {'ok': ok, 'type': 'external_lookup'}
+                        else:
+                            verification_results[f.name] = {'ok': False, 'reason': 'unknown_rule_type'}
+                    except Exception as e:
+                        current_app.logger.exception('Verification execution failed')
+                        verification_results[f.name] = {'ok': False, 'error': str(e)}
+
+            if verification_results:
+                # attach results into Submission.data for later inspection
+                fs.data = dict(fs.data)
+                fs.data['_verifications'] = verification_results
+                db.session.add(fs)
+                db.session.commit()
         try:
             # Prometheus: increment created counter and refresh owner gauge
             metrics_module.requests_created_total.labels(dept=req.owner_department).inc()
@@ -655,7 +925,7 @@ def request_new():
         flash(f"Request #{req.id} submitted successfully.", "success")
         return redirect(url_for("requests.request_detail", request_id=req.id))
 
-    return render_template("request_new.html", form=form)
+    return render_template("request_new.html", form=form, template=template, template_fields=template_fields, template_spec=template_spec)
 
 
 @requests_bp.route("/requests/<int:request_id>")

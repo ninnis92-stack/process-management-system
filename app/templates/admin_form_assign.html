@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Assign Template: {{ template.name }}</h2>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">{{ form.department_id.label }}{{ form.department_id(class_='form-control') }}</div>
+  <div class="mb-3">{{ form.department_name.label }}{{ form.department_name(class_='form-control') }}</div>
+  <button class="btn btn-primary">Assign</button>
+</form>
+{% endblock %}

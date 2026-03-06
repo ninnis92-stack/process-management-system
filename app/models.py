@@ -178,20 +178,20 @@ class Comment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Submission(db.Model):
-    """Handoff packet between departments, optionally public to submitter."""
+    """Represent a saved submission of a `FormTemplate` tied to a request (optional)."""
     id = db.Column(db.Integer, primary_key=True)
-    request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False)
-
-    from_department = db.Column(db.String(1), nullable=False)
-    to_department = db.Column(db.String(1), nullable=False)
-
-    from_status = db.Column(db.String(40), nullable=False)
-    to_status = db.Column(db.String(40), nullable=False)
-
-    summary = db.Column(db.String(200), nullable=False)
-    details = db.Column(db.Text, nullable=False)
-
+    template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=True)
+    request_id = db.Column(db.Integer, db.ForeignKey('request.id'), nullable=True)
+    data = db.Column(db.JSON, nullable=True)
     is_public_to_submitter = db.Column(db.Boolean, default=False)
+    from_department = db.Column(db.String(1), nullable=True)
+    to_department = db.Column(db.String(1), nullable=True)
+    # Human-friendly summary/details used for handoffs and admin notes
+    summary = db.Column(db.String(400), nullable=True)
+    details = db.Column(db.Text, nullable=True)
+    # Optional status snapshot for handoffs/transitions
+    from_status = db.Column(db.String(40), nullable=True)
+    to_status = db.Column(db.String(40), nullable=True)
 
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     created_by_user = db.relationship("User", foreign_keys=[created_by_user_id])
@@ -199,7 +199,11 @@ class Submission(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    template = db.relationship('FormTemplate')
     attachments = db.relationship("Attachment", backref="submission", lazy=True, cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f'<FormSubmission template={self.template_id} request={self.request_id}>'
 
 class Attachment(db.Model):
     """Files attached to a submission (e.g., screenshots)."""
@@ -301,3 +305,162 @@ class AppTheme(db.Model):
     logo_filename = db.Column(db.String(255), nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class IntegrationKey(db.Model):
+    """Placeholder model for future API keys allowing external sites to push themes.
+
+    Fields:
+      - name: descriptive name
+      - key: random token
+      - active: enabled/disabled
+      - scopes: comma-separated allowed scopes (example: 'themes:push')
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    key = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    active = db.Column(db.Boolean, nullable=False, default=False)
+    scopes = db.Column(db.String(200), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Department(db.Model):
+    """Admin-manageable departments allowing dynamic add/remove of departments."""
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(10), nullable=False, unique=True, index=True)
+    name = db.Column(db.String(150), nullable=False)
+    order = db.Column(db.Integer, default=0, nullable=False)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<Department {self.code}:{self.name}>'
+
+
+class SiteConfig(db.Model):
+    """Singleton site-level configuration: navbar banner and rolling quotes."""
+    id = db.Column(db.Integer, primary_key=True)
+    banner_html = db.Column(db.Text, nullable=True)
+    rolling_quotes_enabled = db.Column(db.Boolean, default=False, nullable=False)
+    rolling_quotes = db.Column(db.JSON, nullable=True)  # list of strings
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @classmethod
+    def get(cls):
+        cfg = cls.query.first()
+        if not cfg:
+            cfg = cls(rolling_quotes=[])
+            db.session.add(cfg)
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        return cfg
+
+
+# Dynamic form templates for admin-editable request forms
+class FormTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    fields = db.relationship('FormField', backref='template', cascade='all, delete-orphan', lazy='dynamic')
+
+    def __repr__(self):
+        return f'<FormTemplate {self.name}>'
+
+
+class FormField(db.Model):
+    """A single field in a form template.
+
+    field_type examples: 'text', 'textarea', 'select', 'checkbox', 'radio', 'date', 'file'
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
+    name = db.Column(db.String(120), nullable=False)  # internal name/key
+    label = db.Column(db.String(200), nullable=False)
+    field_type = db.Column(db.String(40), nullable=False)
+    required = db.Column(db.Boolean, default=False, nullable=False)
+    order = db.Column(db.Integer, default=0, nullable=False)
+    hint = db.Column(db.String(300), nullable=True)
+    options = db.relationship('FormFieldOption', backref='field', cascade='all, delete-orphan', lazy='dynamic')
+    verification = db.Column(db.JSON, nullable=True)  # structured verification rule parameters
+
+    def __repr__(self):
+        return f'<FormField {self.template_id}:{self.name} ({self.field_type})>'
+
+
+class FormFieldOption(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)
+    value = db.Column(db.String(200), nullable=False)
+    label = db.Column(db.String(200), nullable=False)
+    order = db.Column(db.Integer, default=0, nullable=False)
+
+    def __repr__(self):
+        return f'<FormFieldOption {self.field_id}:{self.value}>'
+
+
+class DepartmentFormAssignment(db.Model):
+    """Assign a `FormTemplate` to a department (by name or optional id).
+
+    Some codebases may use a Department model; to avoid a hard FK we store optional
+    `department_id` (nullable) and `department_name` for portability.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
+    department_id = db.Column(db.Integer, nullable=True)
+    department_name = db.Column(db.String(150), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    template = db.relationship('FormTemplate')
+
+    def __repr__(self):
+        return f'<DepartmentFormAssignment dept={self.department_name or self.department_id} template={self.template_id}>'
+
+
+class VerificationRule(db.Model):
+    """Represent a verification rule that can be applied to a field.
+
+    Examples of rule_type: 'external_lookup', 'regex', 'manual_approval'
+    `params` stores provider details (e.g. table/column) or regex pattern.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)
+    rule_type = db.Column(db.String(80), nullable=False)
+    params = db.Column(db.JSON, nullable=True)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    field = db.relationship('FormField')
+
+    def __repr__(self):
+        return f'<VerificationRule field={self.field_id} type={self.rule_type}>'
+
+
+class StatusBucket(db.Model):
+    """A user-editable bucket that groups status codes into a UI button/bucket.
+
+    Buckets can be scoped per-department (optional) and ordered for display.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    department_id = db.Column(db.Integer, nullable=True)
+    department_name = db.Column(db.String(150), nullable=True)
+    order = db.Column(db.Integer, default=0, nullable=False)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    statuses = db.relationship('BucketStatus', backref='bucket', cascade='all, delete-orphan', lazy='dynamic')
+
+    def __repr__(self):
+        return f'<StatusBucket {self.name}>'
+
+
+class BucketStatus(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    bucket_id = db.Column(db.Integer, db.ForeignKey('status_bucket.id'), nullable=False)
+    status_code = db.Column(db.String(80), nullable=False)
+    order = db.Column(db.Integer, default=0, nullable=False)
+
+    def __repr__(self):
+        return f'<BucketStatus bucket={self.bucket_id} status={self.status_code}>'

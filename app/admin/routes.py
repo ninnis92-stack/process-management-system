@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, current_app, session
+from flask import Blueprint, render_template, redirect, url_for, flash, current_app, session, request
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 
@@ -10,11 +10,18 @@ from ..models import AppTheme
 from datetime import datetime, timedelta
 from flask import request as flask_request
 from ..models import Notification, AuditLog
+from ..models import FormTemplate, FormField, FormFieldOption, DepartmentFormAssignment, VerificationRule, IntegrationKey
+from ..models import Department, SiteConfig
 from urllib.parse import unquote
 from .. import notifcations as notifications
 from ..requests_bp.workflow import owner_for_status
 from datetime import datetime, timedelta
 from flask import jsonify
+from .forms import FormTemplateForm, FormFieldForm, DepartmentAssignmentForm, VerificationRuleForm, DepartmentFormAdmin, SiteConfigForm
+from ..admin.forms import FormTemplateForm as _noop_import
+import json
+import os
+from .forms import BucketForm, BucketStatusForm
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -609,6 +616,348 @@ def special_emails():
     return render_template('admin_special_emails.html', form=form, cfg=cfg)
 
 
+@admin_bp.route('/forms')
+@login_required
+def form_templates():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    templates = FormTemplate.query.order_by(FormTemplate.created_at.desc()).all()
+    return render_template('admin_form_templates.html', templates=templates)
+
+
+@admin_bp.route('/forms/new', methods=['GET', 'POST'])
+@login_required
+def form_new():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    form = FormTemplateForm()
+    if form.validate_on_submit():
+        t = FormTemplate(name=form.name.data.strip(), description=form.description.data.strip() if form.description.data else None)
+        db.session.add(t)
+        db.session.commit()
+        flash('Template created.', 'success')
+        return redirect(url_for('admin.form_templates'))
+    return render_template('admin_form_edit.html', form=form)
+
+
+@admin_bp.route('/forms/<int:template_id>/edit', methods=['GET', 'POST'])
+@login_required
+def form_edit(template_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    t = FormTemplate.query.get_or_404(template_id)
+    form = FormTemplateForm(obj=t)
+    if form.validate_on_submit():
+        t.name = form.name.data.strip()
+        t.description = form.description.data.strip() if form.description.data else None
+        db.session.commit()
+        flash('Template updated.', 'success')
+        return redirect(url_for('admin.form_templates'))
+    fields = t.fields.order_by(FormField.order.asc()).all()
+    return render_template('admin_form_edit.html', form=form, template=t, fields=fields)
+
+
+@admin_bp.route('/forms/<int:template_id>/fields/new', methods=['GET', 'POST'])
+@login_required
+def form_field_new(template_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    t = FormTemplate.query.get_or_404(template_id)
+    form = FormFieldForm()
+    if form.validate_on_submit():
+        f = FormField(
+            template_id=t.id,
+            name=form.name.data.strip(),
+            label=form.label.data.strip(),
+            field_type=form.field_type.data,
+            required=bool(form.required.data),
+            hint=form.hint.data.strip() if form.hint.data else None,
+            order=int(form.order.data or 0),
+            verification=json.loads(form.verification_json.data) if form.verification_json.data else None,
+        )
+        db.session.add(f)
+        db.session.commit()
+        # options
+        if form.options_csv.data:
+            for idx, val in enumerate([v.strip() for v in form.options_csv.data.split(',') if v.strip()]):
+                opt = FormFieldOption(field_id=f.id, value=val, label=val, order=idx)
+                db.session.add(opt)
+            db.session.commit()
+        flash('Field added.', 'success')
+        return redirect(url_for('admin.form_edit', template_id=t.id))
+    return render_template('admin_form_field_new.html', form=form, template=t)
+
+
+@admin_bp.route('/forms/<int:template_id>/assign', methods=['GET', 'POST'])
+@login_required
+def form_assign(template_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    t = FormTemplate.query.get_or_404(template_id)
+    form = DepartmentAssignmentForm()
+    if form.validate_on_submit():
+        a = DepartmentFormAssignment(template_id=t.id, department_id=form.department_id.data or None, department_name=form.department_name.data or None)
+        db.session.add(a)
+        db.session.commit()
+        flash('Assigned template to department.', 'success')
+        return redirect(url_for('admin.form_templates'))
+    return render_template('admin_form_assign.html', form=form, template=t)
+
+
+@admin_bp.post('/forms/<int:template_id>/delete')
+@login_required
+def form_delete(template_id: int):
+    if not _is_admin_user():
+        return jsonify({'ok': False, 'error': 'access_denied'}), 403
+    t = FormTemplate.query.get_or_404(template_id)
+    try:
+        db.session.delete(t)
+        db.session.commit()
+        return jsonify({'ok': True, 'deleted': template_id})
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'failed'})
+
+
+
+@admin_bp.route('/buckets')
+@login_required
+def buckets_list():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    from ..models import StatusBucket
+    buckets = StatusBucket.query.order_by(StatusBucket.order.asc(), StatusBucket.created_at.desc()).all()
+    return render_template('admin_buckets.html', buckets=buckets)
+
+
+@admin_bp.route('/buckets/new', methods=['GET', 'POST'])
+@login_required
+def buckets_new():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    form = BucketForm()
+    if form.validate_on_submit():
+        from ..models import StatusBucket
+        b = StatusBucket(name=form.name.data.strip(), department_id=form.department_id.data or None, department_name=form.department_name.data or None, order=int(form.order.data or 0), active=bool(form.active.data))
+        db.session.add(b)
+        db.session.commit()
+        flash('Bucket created.', 'success')
+        return redirect(url_for('admin.buckets_list'))
+    return render_template('admin_bucket_edit.html', form=form)
+
+
+@admin_bp.post('/buckets/import_default')
+@login_required
+def buckets_import_default():
+    """Create a recommended 6-bucket layout for quick setup.
+
+    Idempotent: will not duplicate buckets of the same name for the same department.
+    """
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    from ..models import StatusBucket, BucketStatus
+
+    # Recommended layout (for Dept B by default)
+    dept_name = 'B'
+    layout = [
+        ('New', ['NEW_FROM_A']),
+        ('In Progress', ['B_IN_PROGRESS', 'PENDING_C_REVIEW', 'B_FINAL_REVIEW']),
+        ('Needs Input', ['WAITING_ON_A_RESPONSE', 'C_NEEDS_CHANGES']),
+        ('Pending Approval', ['EXEC_APPROVAL', 'C_APPROVED', 'SENT_TO_A']),
+        ('Completed', ['CLOSED']),
+        ('Archived', []),
+    ]
+
+    created = 0
+    for idx, (name, statuses) in enumerate(layout):
+        exists = StatusBucket.query.filter_by(name=name, department_name=dept_name).first()
+        if exists:
+            # update statuses: remove existing and recreate to match recommended
+            for s in exists.statuses.all():
+                db.session.delete(s)
+            for sidx, code in enumerate(statuses):
+                db.session.add(BucketStatus(bucket_id=exists.id, status_code=code, order=sidx))
+            db.session.commit()
+            continue
+
+        b = StatusBucket(name=name, department_name=dept_name, order=idx, active=True)
+        db.session.add(b)
+        db.session.commit()
+        for sidx, code in enumerate(statuses):
+            db.session.add(BucketStatus(bucket_id=b.id, status_code=code, order=sidx))
+        db.session.commit()
+        created += 1
+
+    flash(f'Imported recommended buckets (created {created} new).', 'success')
+    return redirect(url_for('admin.buckets_list'))
+
+
+@admin_bp.route('/buckets/<int:bucket_id>/edit', methods=['GET', 'POST'])
+@login_required
+def buckets_edit(bucket_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    from ..models import StatusBucket, BucketStatus
+    b = StatusBucket.query.get_or_404(bucket_id)
+    form = BucketForm(obj=b)
+    if form.validate_on_submit():
+        b.name = form.name.data.strip()
+        b.department_id = form.department_id.data or None
+        b.department_name = form.department_name.data or None
+        b.order = int(form.order.data or 0)
+        b.active = bool(form.active.data)
+        db.session.commit()
+        flash('Bucket updated.', 'success')
+        return redirect(url_for('admin.buckets_list'))
+    statuses = b.statuses.order_by(BucketStatus.order.asc()).all()
+    return render_template('admin_bucket_edit.html', form=form, bucket=b, statuses=statuses)
+
+
+@admin_bp.route('/buckets/<int:bucket_id>/statuses/new', methods=['GET', 'POST'])
+@login_required
+def bucket_status_new(bucket_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    from ..models import StatusBucket, BucketStatus
+    b = StatusBucket.query.get_or_404(bucket_id)
+    form = BucketStatusForm()
+    if form.validate_on_submit():
+        bs = BucketStatus(bucket_id=b.id, status_code=form.status_code.data.strip(), order=int(form.order.data or 0))
+        db.session.add(bs)
+        db.session.commit()
+        flash('Status added to bucket.', 'success')
+        return redirect(url_for('admin.buckets_edit', bucket_id=b.id))
+    return render_template('admin_bucket_status_new.html', form=form, bucket=b)
+
+
+@admin_bp.post('/buckets/<int:bucket_id>/delete')
+@login_required
+def buckets_delete(bucket_id: int):
+    if not _is_admin_user():
+        return jsonify({'ok': False, 'error': 'access_denied'}), 403
+    from ..models import StatusBucket
+    b = StatusBucket.query.get_or_404(bucket_id)
+    try:
+        db.session.delete(b)
+        db.session.commit()
+        return jsonify({'ok': True, 'deleted': bucket_id})
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'failed'})
+
+
+@admin_bp.post('/buckets/<int:bucket_id>/statuses/<int:status_id>/delete')
+@login_required
+def bucket_status_delete(bucket_id: int, status_id: int):
+    if not _is_admin_user():
+        return jsonify({'ok': False, 'error': 'access_denied'}), 403
+    from ..models import BucketStatus
+    s = BucketStatus.query.get_or_404(status_id)
+    try:
+        db.session.delete(s)
+        db.session.commit()
+        return jsonify({'ok': True, 'deleted': status_id})
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'failed'})
+
+
+@admin_bp.route('/departments')
+@login_required
+def departments_list():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    deps = Department.query.order_by(Department.order.asc(), Department.created_at.desc()).all()
+    return render_template('admin_departments.html', departments=deps)
+
+
+@admin_bp.route('/departments/new', methods=['GET', 'POST'])
+@login_required
+def departments_new():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    form = DepartmentFormAdmin()
+    if form.validate_on_submit():
+        d = Department(code=form.code.data.strip().upper(), name=form.name.data.strip(), order=int(form.order.data or 0), active=bool(form.active.data))
+        db.session.add(d)
+        db.session.commit()
+        flash('Department created.', 'success')
+        return redirect(url_for('admin.departments_list'))
+    return render_template('admin_department_edit.html', form=form)
+
+
+@admin_bp.route('/departments/<int:dept_id>/edit', methods=['GET', 'POST'])
+@login_required
+def departments_edit(dept_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    d = Department.query.get_or_404(dept_id)
+    form = DepartmentFormAdmin(obj=d)
+    if form.validate_on_submit():
+        d.code = form.code.data.strip().upper()
+        d.name = form.name.data.strip()
+        d.order = int(form.order.data or 0)
+        d.active = bool(form.active.data)
+        db.session.commit()
+        flash('Department updated.', 'success')
+        return redirect(url_for('admin.departments_list'))
+    return render_template('admin_department_edit.html', form=form, department=d)
+
+
+@admin_bp.post('/departments/<int:dept_id>/delete')
+@login_required
+def departments_delete(dept_id: int):
+    if not _is_admin_user():
+        return jsonify({'ok': False, 'error': 'access_denied'}), 403
+    d = Department.query.get_or_404(dept_id)
+    try:
+        db.session.delete(d)
+        db.session.commit()
+        return jsonify({'ok': True, 'deleted': dept_id})
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'failed'})
+
+
+@admin_bp.route('/site_config', methods=['GET', 'POST'])
+@login_required
+def site_config():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    cfg = SiteConfig.get()
+    form = SiteConfigForm()
+    if form.validate_on_submit():
+        cfg.banner_html = form.banner_html.data or None
+        cfg.rolling_quotes_enabled = bool(form.rolling_enabled.data)
+        lines = [l.strip() for l in (form.rolling_csv.data or '').splitlines() if l.strip()]
+        cfg.rolling_quotes = lines
+        db.session.add(cfg)
+        db.session.commit()
+        flash('Site configuration saved.', 'success')
+        return redirect(url_for('admin.site_config'))
+    # prefill
+    if request.method == 'GET':
+        form.banner_html.data = cfg.banner_html or ''
+        form.rolling_enabled.data = bool(cfg.rolling_quotes_enabled)
+        form.rolling_csv.data = '\n'.join(cfg.rolling_quotes or [])
+    return render_template('admin_site_config.html', form=form, cfg=cfg)
+
+
 @admin_bp.route('/themes', methods=['GET', 'POST'])
 @login_required
 def themes():
@@ -626,19 +975,28 @@ def themes():
         upload = flask_request.files.get('logo_upload')
         if upload and upload.filename:
             from werkzeug.utils import secure_filename
+            import time, uuid
             fn = secure_filename(upload.filename)
-            dest = None
+            # prefix with timestamp+uuid to avoid collisions
+            base, ext = os.path.splitext(fn)
+            fn_ts = f"{int(time.time())}-{uuid.uuid4().hex}{ext}"
             try:
-                dest = os.path.join(current_app.config.get('UPLOAD_FOLDER') or 'uploads', fn)
+                static_upload_dir = os.path.join(current_app.static_folder or 'static', 'uploads')
+                os.makedirs(static_upload_dir, exist_ok=True)
+                dest = os.path.join(static_upload_dir, fn_ts)
                 upload.save(dest)
-                logo_filename = fn
+                # store path relative to static so url_for('static', filename=...) works
+                logo_filename = os.path.join('uploads', fn_ts)
             except Exception:
                 current_app.logger.exception('Failed to save uploaded logo')
 
         # prefer explicit URL if provided
         logo_url = form.logo_url.data.strip() if form.logo_url.data else None
 
-        t = AppTheme(name=form.name.data.strip(), css=form.css.data or None, logo_filename=logo_filename)
+        # If a logo URL was provided, prefer that (store as external URL in logo_filename)
+        stored_logo = logo_filename or (logo_url if logo_url else None)
+
+        t = AppTheme(name=form.name.data.strip(), css=form.css.data or None, logo_filename=stored_logo)
         db.session.add(t)
         if form.active.data:
             # deactivate others

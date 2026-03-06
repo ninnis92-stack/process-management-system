@@ -26,9 +26,23 @@
         {% endif %}
         <div>
           <div class="brand-title">FreshProcess</div>
-          <div id="motivation" class="brand-quote" aria-live="polite">Loading inspiration…</div>
+          <div id="motivation" class="brand-quote" aria-live="polite">
+            {% if site_banner_html %}
+              {{ site_banner_html|safe }}
+            {% elif rolling_quotes_enabled and rolling_quotes %}
+              {{ rolling_quotes[0] }}
+            {% else %}
+              Loading inspiration…
+            {% endif %}
+          </div>
         </div>
       </a>
+
+      {% if site_banner_html %}
+        <div class="navbar-banner ms-3">
+          {{ site_banner_html|safe }}
+        </div>
+      {% endif %}
 
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -183,6 +197,24 @@
         console.warn('Copy failed', e);
       }
     }
+  </script>
+
+  <script>
+    // Rolling quotes rotation (admin-configurable)
+    try{
+      const rollingEnabled = {{ 'true' if rolling_quotes_enabled else 'false' }};
+      const rollingQuotes = {{ rolling_quotes|tojson }};
+      if(rollingEnabled && Array.isArray(rollingQuotes) && rollingQuotes.length){
+        let idx = 0;
+        const mot = document.getElementById('motivation');
+        setInterval(() => {
+          try{
+            idx = (idx + 1) % rollingQuotes.length;
+            if(mot) mot.innerText = rollingQuotes[idx];
+          }catch(e){}
+        }, 4000);
+      }
+    }catch(e){}
   </script>
 
   <script>

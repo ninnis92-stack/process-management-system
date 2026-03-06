@@ -15,13 +15,16 @@
       </form>
     </div>
     <div class="col-md-6">
-      <div class="list-group">
+        <div class="list-group">
         {% for t in themes %}
-          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div class="list-group-item d-flex justify-content-between align-items-center" data-theme-css="{{ (t.css|e) if t.css else '' }}" data-theme-logo="{{ t.logo_filename }}">
             <div>
               <strong>{{ t.name }}</strong>
               {% if t.active %}<span class="badge bg-success ms-2">Active</span>{% endif %}
               <div class="small text-muted">Created {{ t.created_at.strftime('%Y-%m-%d') }}</div>
+                {% if t.logo_filename %}
+                  <div class="mt-1"><img src="{{ url_for('static', filename=t.logo_filename) if t.logo_filename and t.logo_filename.startswith('uploads/') else t.logo_filename }}" style="height:28px;" alt="logo"/></div>
+                {% endif %}
             </div>
             <div>
               <form method="post" action="{{ url_for('admin.themes_activate', theme_id=t.id) }}" style="display:inline">
@@ -32,6 +35,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn-sm btn-outline-danger">Delete</button>
               </form>
+                <button class="btn btn-sm btn-outline-secondary ms-2 preview-theme-btn">Preview</button>
             </div>
           </div>
         {% else %}
@@ -40,5 +44,63 @@
       </div>
     </div>
   </div>
+    <div class="row mt-3">
+      <div class="col-12">
+        <h5>Live Preview</h5>
+        <iframe id="themePreviewFrame" style="width:100%; height:60vh; border:1px solid #ddd; border-radius:6px;" src="/debug/preview_base" sandbox="allow-same-origin allow-scripts"></iframe>
+      </div>
+    </div>
 </div>
 {% endblock %}
+
+  {% block scripts %}
+  <script>
+  document.addEventListener('DOMContentLoaded', function(){
+    const iframe = document.getElementById('themePreviewFrame');
+    const cssTextarea = document.querySelector('textarea[name="css"]');
+    const logoUrlInput = document.querySelector('input[name="logo_url"]');
+    const logoUploadInput = document.querySelector('input[name="logo_upload"]');
+
+    function postCssToIframe(css, logoSrc){
+      try{
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        if(!doc) return;
+        // remove existing theme style
+        let el = doc.getElementById('preview-theme-style');
+        if(el) el.remove();
+        el = doc.createElement('style');
+        el.id = 'preview-theme-style';
+        el.textContent = css || '';
+        doc.head.appendChild(el);
+        if(logoSrc){
+          const img = doc.querySelector('.brand-logo-img');
+          if(img){ img.src = logoSrc; }
+        }
+      }catch(e){ console.warn('preview error', e); }
+    }
+
+    // live update when typing CSS
+    if(cssTextarea){ cssTextarea.addEventListener('input', ()=> postCssToIframe(cssTextarea.value, null)); }
+    if(logoUrlInput){ logoUrlInput.addEventListener('input', ()=> postCssToIframe(cssTextarea.value, logoUrlInput.value)); }
+    if(logoUploadInput){ logoUploadInput.addEventListener('change', function(){
+      const file = this.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev){ postCssToIframe(cssTextarea.value, ev.target.result); };
+      reader.readAsDataURL(file);
+    }); }
+
+    // preview saved themes
+    document.querySelectorAll('.preview-theme-btn').forEach(btn => {
+      btn.addEventListener('click', function(){
+        const item = this.closest('.list-group-item');
+        const css = item.getAttribute('data-theme-css') || '';
+        const logo = item.getAttribute('data-theme-logo') || '';
+        let logoUrl = logo || '';
+        if(logo && logo.startsWith('uploads/')) logoUrl = '/static/' + logo;
+        postCssToIframe(css, logoUrl);
+      });
+    });
+  });
+  </script>
+  {% endblock %}

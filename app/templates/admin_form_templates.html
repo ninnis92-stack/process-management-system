@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Form Templates</h2>
+<a class="btn btn-primary" href="{{ url_for('admin.form_new') }}">New Template</a>
+<hr/>
+<ul class="list-group">
+{% for t in templates %}
+  <li class="list-group-item d-flex justify-content-between align-items-center">
+    <div>
+      <strong>{{ t.name }}</strong><br/>
+      <small class="text-muted">{{ t.description }}</small>
+    </div>
+    <div>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.form_edit', template_id=t.id) }}">Edit</a>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.form_assign', template_id=t.id) }}">Assign</a>
+      <form method="post" action="{{ url_for('admin.form_delete', template_id=t.id) }}" style="display:inline" onsubmit="return confirm('Delete template?');">
+        <button class="btn btn-sm btn-danger">Delete</button>
+      </form>
+    </div>
+  </li>
+{% else %}
+  <li class="list-group-item">No templates yet.</li>
+{% endfor %}
+</ul>
+{% endblock %}
