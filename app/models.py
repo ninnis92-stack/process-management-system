@@ -326,7 +326,20 @@ class FeatureFlags(db.Model):
 
     @classmethod
     def get(cls):
-        f = cls.query.first()
+        try:
+            f = cls.query.first()
+        except Exception:
+            try:
+                from flask import current_app
+
+                current_app.logger.exception("FeatureFlags: DB read failed")
+            except Exception:
+                pass
+            # If the DB schema is out-of-date (column missing) or the DB is
+            # otherwise unavailable, return a default in-memory FeatureFlags
+            # instance rather than raising and causing a 500 in templates.
+            return cls()
+
         if not f:
             f = cls()
             db.session.add(f)
