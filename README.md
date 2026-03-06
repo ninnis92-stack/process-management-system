@@ -58,6 +58,24 @@ flask db migrate -m "add is_admin to user"
 flask db upgrade
 ```
 
+## Scheduling & Nudges
+
+- Automated nudges for high-priority requests: enable from the Admin -> Special Emails page (`High-priority nudges`). Set the reminder interval in hours (default 24).
+- A small cron example is provided at `scripts/cron_examples.sh` showing how to run the nudge sender hourly and refresh Prometheus gauges periodically. Adjust paths and virtualenv activation to match your environment or use your platform's scheduler.
+- Run nudges manually for testing:
+
+```bash
+FLASK_APP=app flask notify-nudges
+```
+
+- Refresh metrics (owner counts and overdue gauge):
+
+```bash
+python3 -c "from app import create_app; from app.metrics import update_owner_gauge; from app.extensions import db; app=create_app(); ctx=app.app_context(); ctx.push(); from app.models import Request as ReqModel; update_owner_gauge(db.session, ReqModel); ctx.pop()"
+```
+
+These hooks are safe to run in development and can be scheduled by your host (cron, Fly scheduled jobs, Heroku Scheduler, etc.).
+
 If you prefer not to use Flask-Migrate, you can apply the SQL directly for SQLite:
 
 ```bash
