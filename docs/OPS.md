@@ -1,5 +1,105 @@
 # Operations Runbook
 
+This document contains concise, repeatable steps for deploying, testing,
+and maintaining the Process Management Prototype in production.
+
+## Quick deploy
+
+- Branch to deploy: `main`
+- Tag format: `release-YYYY-MM-DD` (annotated)
+
+Commands:
+
+```bash
+git checkout main
+git pull origin main
+git tag -a release-$(date -I) -m "Release $(date -I)"
+git push origin --tags
+flyctl deploy -a <app-name>
+```
+
+The `flyctl deploy` run uses `scripts/release_tasks.py` as the `release_command` to run migrations / schema fixes.
+
+## Post-deploy smoke checks
+
+Run these after the deployment completes:
+
+```bash
+curl -fsS https://<app>/health || echo "health failed" && exit 2
+curl -fsS -I https://<app>/ | head -n 1
+curl -fsS https://<app>/auth/login || echo "login failed" && exit 2
+```
+
+We've included `scripts/remote_smoke_check.sh` to run these checks automatically.
+
+## Environment variables & secrets
+
+Recommended secrets and env vars (non-exhaustive):
+
+- `DATABASE_URL` — Postgres connection string
+- `WEBHOOK_SHARED_SECRET` — HMAC secret for inbound webhooks
+- `SENTRY_DSN` — optional error reporting
+- `INVENTORY_DSN` — external inventory service DSN
+- `ENABLE_EXTERNAL_VERIFICATION` — toggle (true/false)
+
+On Fly use `fly secrets set KEY=VALUE` to store secrets.
+
+## Migrations
+
+We use Alembic where available. Typical workflow:
+
+```bash
+pip install alembic
+alembic revision --autogenerate -m "describe change"
+alembic upgrade head
+```
+
+Before running migrations in production: take a DB backup (see Backup section).
+
+## Rollback
+
+If a deploy introduces critical failures:
+
+1. Identify last working tag (e.g. `release-2026-02-28`).
+2. Deploy that tag or its image:
+
+```bash
+git checkout tags/<previous-tag> -b rollback-temp
+git push origin rollback-temp:main
+flyctl deploy -a <app-name>
+```
+
+Or re-deploy the previous image via `flyctl` if available.
+
+## Monitoring & synthetic checks
+
+- Add a readiness probe hitting `/health`.
+- Configure external uptime monitors (UptimeRobot, Pingdom) to alert on `/health` or the root endpoint.
+- Integrate Sentry + Slack/PagerDuty for error alerting.
+
+## Backups
+
+Schedule regular DB backups. Example (Postgres):
+
+```bash
+# run on a trusted host with access to $DATABASE_URL
+pg_dump -Fc "$DATABASE_URL" -f /backups/db-$(date -I).dump
+```
+
+Also back up persistent `uploads/` or storage buckets.
+
+## Runbook checks to include in PRs
+
+- Confirm migrations are present for schema changes.
+- Ensure `ENABLE_EXTERNAL_VERIFICATION` remains off by default unless intended.
+- Verify secrets are present in the target environment.
+
+## Contact
+
+Document primary on-call or team contacts here.
+
+# Operations Runbook
+
 This runbook documents quick operational commands for deploys, smoke tests, and rollbacks.
 
 Prerequisites
