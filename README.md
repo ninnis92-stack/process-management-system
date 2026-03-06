@@ -191,6 +191,8 @@ flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command
 Deployment note (automated):
 
 - Last automated verification and smoke-clean ran on 2026-03-06 UTC: deployed, smoke login/dashboard validated, remote SMOKE_ rows cleared (0 deleted).
+ - Last automated verification and smoke-clean ran on 2026-03-06 UTC: deployed, smoke login/dashboard validated, remote SMOKE_ rows cleared (0 deleted).
+ - 2026-03-06 UTC: Redeployed fix for `/admin/special_email`; automated admin smoke passed and `/health` returned 200.
 
 
 ## Auto-reject for unavailable API-backed fields
