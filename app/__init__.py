@@ -349,4 +349,62 @@ def create_app():
             else:
                 app.logger.warning("Timed out waiting for database (proceeding anyway)")
 
+    # Ensure recommended default buckets exist for Dept B unless explicitly disabled.
+    # This provides sensible defaults for the Dept B dashboard when a fresh DB
+    # is created or when a deploy doesn't include seeded data. Admins can still
+    # edit or replace buckets via the admin UI.
+    try:
+        if os.getenv("SEED_DEFAULT_BUCKETS", "True").lower() != "false":
+            from .models import StatusBucket, BucketStatus
+            try:
+                with app.app_context():
+                    # Only seed if Dept B has no buckets configured.
+                    if StatusBucket.query.filter_by(department_name='B').count() == 0:
+                        # New
+                        nb = StatusBucket(name='New', department_name='B', order=0, active=True)
+                        db.session.add(nb)
+                        db.session.flush()
+                        db.session.add(BucketStatus(bucket_id=nb.id, status_code='NEW_FROM_A', order=0))
+
+                        # In Progress
+                        ip = StatusBucket(name='In Progress', department_name='B', order=1, active=True)
+                        db.session.add(ip)
+                        db.session.flush()
+                        db.session.add(BucketStatus(bucket_id=ip.id, status_code='B_IN_PROGRESS', order=0))
+                        db.session.add(BucketStatus(bucket_id=ip.id, status_code='PENDING_C_REVIEW', order=1))
+                        db.session.add(BucketStatus(bucket_id=ip.id, status_code='B_FINAL_REVIEW', order=2))
+
+                        # Needs Input / Waiting
+                        ni = StatusBucket(name='Needs Input', department_name='B', order=2, active=True)
+                        db.session.add(ni)
+                        db.session.flush()
+                        db.session.add(BucketStatus(bucket_id=ni.id, status_code='WAITING_ON_A_RESPONSE', order=0))
+                        db.session.add(BucketStatus(bucket_id=ni.id, status_code='C_NEEDS_CHANGES', order=1))
+
+                        # Pending Approval
+                        pa = StatusBucket(name='Pending Approval', department_name='B', order=3, active=True)
+                        db.session.add(pa)
+                        db.session.flush()
+                        db.session.add(BucketStatus(bucket_id=pa.id, status_code='EXEC_APPROVAL', order=0))
+                        db.session.add(BucketStatus(bucket_id=pa.id, status_code='C_APPROVED', order=1))
+                        db.session.add(BucketStatus(bucket_id=pa.id, status_code='SENT_TO_A', order=2))
+
+                        # Completed
+                        comp = StatusBucket(name='Completed', department_name='B', order=4, active=True)
+                        db.session.add(comp)
+                        db.session.flush()
+                        db.session.add(BucketStatus(bucket_id=comp.id, status_code='CLOSED', order=0))
+
+                        # Archived (placeholder)
+                        arch = StatusBucket(name='Archived', department_name='B', order=5, active=True)
+                        db.session.add(arch)
+
+                        db.session.commit()
+                        app.logger.info('Seeded default Dept B buckets')
+            except Exception:
+                app.logger.exception('Failed to seed default Dept B buckets')
+    except Exception:
+        # Best-effort; avoid failing app startup if env inspection or imports fail.
+        pass
+
     return app
