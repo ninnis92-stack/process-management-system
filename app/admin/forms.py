@@ -81,3 +81,13 @@ class FeatureFlagsForm(FlaskForm):
     enable_nudges = BooleanField("Enable automated nudges", default=True)
     allow_user_nudges = BooleanField("Allow users to push nudges to others", default=False)
     submit = SubmitField("Save Flags")
+
+
+class RejectRequestConfigForm(FlaskForm):
+    enabled = BooleanField("Enable reject request feature", default=True)
+    button_label = StringField("Reject button label", validators=[Optional(), Length(max=120)])
+    rejection_message = TextAreaField("Message shown with reject action", validators=[Optional(), Length(max=2000)])
+    dept_a_enabled = BooleanField("Allow Dept A to reject", default=False)
+    dept_b_enabled = BooleanField("Allow Dept B to reject", default=True)
+    dept_c_enabled = BooleanField("Allow Dept C to reject", default=False)
+    submit = SubmitField("Save Reject Settings")

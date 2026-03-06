@@ -300,6 +300,21 @@
       <div class="card-body">
         <h5>Status Update</h5>
         <div class="small text-muted mb-2">Note: Department A may close a ticket without providing a submission. Dept A may reopen the ticket within 48 hours after closure. Dept B will be notified when a ticket is closed.</div>
+        {% if can_reject_request %}
+          <div class="alert alert-warning mb-3">
+            {% if reject_message %}
+              <div class="mb-2">{{ reject_message }}</div>
+            {% endif %}
+            <form method="post" action="{{ url_for('requests.reject_request', request_id=req.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="mb-2">
+                <label class="form-label">Rejection Reason (required)</label>
+                <textarea name="reject_reason" class="form-control" rows="3" required placeholder="Explain why this request is being rejected"></textarea>
+              </div>
+              <button class="btn btn-outline-danger w-100">{{ reject_button_label }}</button>
+            </form>
+          </div>
+        {% endif %}
         {% if transition_form.to_status.choices %}
           {% if (not req.assigned_to_user) or (req.assigned_to_user and req.assigned_to_user.id == current_user.id) %}
           <form method="post" action="{{ url_for('requests.do_transition', request_id=req.id) }}" enctype="multipart/form-data">

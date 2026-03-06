@@ -307,6 +307,40 @@ class FeatureFlags(db.Model):
         return f
 
 
+class RejectRequestConfig(db.Model):
+    """Singleton configuration for assignee-driven request rejection."""
+    id = db.Column(db.Integer, primary_key=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=True)
+    button_label = db.Column(db.String(120), nullable=False, default="Reject Request")
+    rejection_message = db.Column(db.Text, nullable=True)
+    dept_a_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    dept_b_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    dept_c_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @classmethod
+    def get(cls):
+        cfg = cls.query.first()
+        if not cfg:
+            cfg = cls()
+            db.session.add(cfg)
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        return cfg
+
+    def enabled_for_department(self, dept: str) -> bool:
+        d = (dept or "").upper()
+        if d == "A":
+            return bool(self.dept_a_enabled)
+        if d == "B":
+            return bool(self.dept_b_enabled)
+        if d == "C":
+            return bool(self.dept_c_enabled)
+        return False
+
+
 class StatusBucket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)

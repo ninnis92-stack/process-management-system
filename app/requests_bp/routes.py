@@ -30,6 +30,7 @@ from ..models import (
     Attachment,
     User,
     Notification,
+    RejectRequestConfig,
 )
 from ..models import StatusBucket, BucketStatus
 from .forms import (
@@ -1090,6 +1091,28 @@ def request_detail(request_id: int):
     except Exception:
         image_attachments = []
 
+    # Reject-request feature config (assignee-only action; dept-specific toggle)
+    reject_cfg = None
+    # Safe default per requirement: Dept B enabled by default.
+    reject_enabled_here = (current_user.department == "B")
+    reject_button_label = "Reject Request"
+    reject_message = None
+    try:
+        reject_cfg = RejectRequestConfig.get()
+        reject_button_label = (reject_cfg.button_label or "Reject Request").strip() or "Reject Request"
+        reject_message = reject_cfg.rejection_message
+        reject_enabled_here = bool(reject_cfg.enabled) and reject_cfg.enabled_for_department(current_user.department)
+    except Exception:
+        # Keep default behavior when config storage is unavailable.
+        reject_enabled_here = (current_user.department == "B")
+
+    can_reject_request = bool(
+        reject_enabled_here
+        and req.status != "CLOSED"
+        and req.assigned_to_user_id
+        and req.assigned_to_user_id == current_user.id
+    )
+
     return render_template(
         "request_detail.html",
         req=req,
@@ -1110,6 +1133,9 @@ def request_detail(request_id: int):
         assigned_user=req.assigned_to_user,
         handoff_targets=[t for t, _ in possible if handoff_for_transition(req.status, t)],
         image_attachments=image_attachments,
+        can_reject_request=can_reject_request,
+        reject_button_label=reject_button_label,
+        reject_message=reject_message,
     )
 
 
@@ -1178,6 +1204,85 @@ def assign_self(request_id: int):
 
     flash("Assigned to you.", "success")
     return redirect(url_for("requests.request_detail", request_id=request_id))
+
+
+@requests_bp.route('/requests/<int:request_id>/reject', methods=['POST'])
+@login_required
+def reject_request(request_id: int):
+    req = ReqModel.query.get_or_404(request_id)
+    if not can_view_request(req):
+        abort(403)
+
+    rv = _require_assigned_user(req)
+    if rv:
+        return rv
+
+    cfg = None
+    try:
+        cfg = RejectRequestConfig.get()
+    except Exception:
+        cfg = None
+
+    enabled_for_dept = (current_user.department == "B")
+    if cfg is not None:
+        enabled_for_dept = bool(cfg.enabled) and cfg.enabled_for_department(current_user.department)
+
+    if not enabled_for_dept:
+        flash('Reject request is disabled for your department.', 'warning')
+        return redirect(url_for('requests.request_detail', request_id=req.id))
+
+    if req.status == 'CLOSED':
+        flash('Request is already closed.', 'warning')
+        return redirect(url_for('requests.request_detail', request_id=req.id))
+
+    reason = (request.form.get('reject_reason') or '').strip()
+    if not reason:
+        flash('A rejection reason is required.', 'danger')
+        return redirect(url_for('requests.request_detail', request_id=req.id))
+
+    message = 'This request was rejected.'
+    if cfg is not None and cfg.rejection_message:
+        message = cfg.rejection_message.strip() or message
+    comment_body = f"{message}\n\nReason: {reason}"
+
+    db.session.add(Comment(
+        request_id=req.id,
+        author_type='user',
+        author_user_id=current_user.id,
+        visibility_scope='public',
+        body=comment_body,
+    ))
+
+    from_status = req.status
+    req.status = 'CLOSED'
+    req.owner_department = owner_for_status('CLOSED')
+    req.assigned_to_user = None
+
+    _log(
+        req,
+        'status_change',
+        note=f"Request rejected by {current_user.email}. Reason: {reason}",
+        from_status=from_status,
+        to_status='CLOSED',
+    )
+
+    recipients = []
+    if req.created_by_user and req.created_by_user.is_active and req.created_by_user.id != current_user.id:
+        recipients.append(req.created_by_user)
+
+    if recipients:
+        notify_users(
+            recipients,
+            title=f"Request #{req.id} rejected",
+            body=comment_body,
+            url=url_for('requests.request_detail', request_id=req.id),
+            ntype='status_change',
+            request_id=req.id,
+        )
+
+    db.session.commit()
+    flash('Request rejected and closed.', 'success')
+    return redirect(url_for('requests.request_detail', request_id=req.id))
 
 
 def _clean_presence():

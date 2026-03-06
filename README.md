@@ -260,6 +260,16 @@ This script will create temporary test users and print counts of in‑app `Notif
 - A default minimum delay of 4 hours after request creation is enforced before nudges begin; admin can only extend that delay.
 - User-driven nudge pushing is disabled by default; nudges are intended to be timer-driven by admin configuration.
 
+## Reject Request
+- The assigned user can reject a request with a required rejection reason.
+- Rejection closes the request and posts a public rejection comment for visibility across handoffs.
+- The reject button label is admin-editable and defaults to `Reject Request`.
+- Admin can enable/disable the reject feature and configure which departments can use it.
+- Default behavior: only Dept B has reject enabled.
+
+## Deploy Smoke Hygiene
+- For release verification, run deployed smoke checks after deploy and clear smoke test records before final redeploy to keep production validation clean.
+
 ## Forms & Validations
 - WTForms in `app/requests_bp/forms.py` drive request create/edit/transition forms.
 - File uploads stored under `UPLOAD_FOLDER`; only PNG/JPEG/WebP allowed; 10MB per file; `MAX_FILES_PER_SUBMISSION` controls count.

@@ -12,7 +12,7 @@ from ..models import IntegrationConfig
 from datetime import datetime, timedelta
 from flask import request as flask_request
 from ..models import Notification, AuditLog, NotificationRetention, StatusBucket, BucketStatus
-from ..models import FeatureFlags
+from ..models import FeatureFlags, RejectRequestConfig
 from urllib.parse import unquote
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -605,6 +605,39 @@ def feature_flags():
         return redirect(url_for('admin.feature_flags'))
 
     return render_template('admin_feature_flags.html', form=form, flags=flags)
+
+
+@admin_bp.route('/reject_request_config', methods=['GET', 'POST'])
+@login_required
+def reject_request_config():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    from .forms import RejectRequestConfigForm
+    cfg = RejectRequestConfig.get()
+    form = RejectRequestConfigForm()
+
+    if flask_request.method == 'GET':
+        form.enabled.data = bool(getattr(cfg, 'enabled', True))
+        form.button_label.data = getattr(cfg, 'button_label', 'Reject Request') or 'Reject Request'
+        form.rejection_message.data = getattr(cfg, 'rejection_message', None)
+        form.dept_a_enabled.data = bool(getattr(cfg, 'dept_a_enabled', False))
+        form.dept_b_enabled.data = bool(getattr(cfg, 'dept_b_enabled', True))
+        form.dept_c_enabled.data = bool(getattr(cfg, 'dept_c_enabled', False))
+
+    if form.validate_on_submit():
+        cfg.enabled = bool(form.enabled.data)
+        cfg.button_label = (form.button_label.data or 'Reject Request').strip()[:120]
+        cfg.rejection_message = (form.rejection_message.data or '').strip() or None
+        cfg.dept_a_enabled = bool(form.dept_a_enabled.data)
+        cfg.dept_b_enabled = bool(form.dept_b_enabled.data)
+        cfg.dept_c_enabled = bool(form.dept_c_enabled.data)
+        db.session.commit()
+        flash('Reject request configuration updated.', 'success')
+        return redirect(url_for('admin.reject_request_config'))
+
+    return render_template('admin_reject_request_config.html', form=form, cfg=cfg)
 
 
 @admin_bp.route('/departments')

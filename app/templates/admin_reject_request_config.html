@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>Reject Request Settings</h2>
+  <form method="post">
+    {{ form.hidden_tag() }}
+
+    <div class="form-check mb-3">
+      {{ form.enabled(class_='form-check-input') }}
+      {{ form.enabled.label(class_='form-check-label') }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.button_label.label(class_='form-label') }}
+      {{ form.button_label(class_='form-control', placeholder='Reject Request') }}
+      <div class="form-text">Default is “Reject Request”.</div>
+    </div>
+
+    <div class="mb-3">
+      {{ form.rejection_message.label(class_='form-label') }}
+      {{ form.rejection_message(class_='form-control', rows='4', placeholder='Add context shown during rejection...') }}
+      <div class="form-text">This message is shown to assignees and included with rejection notifications.</div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Departments allowed to reject</label>
+      <div class="form-check">
+        {{ form.dept_a_enabled(class_='form-check-input') }}
+        {{ form.dept_a_enabled.label(class_='form-check-label') }}
+      </div>
+      <div class="form-check">
+        {{ form.dept_b_enabled(class_='form-check-input') }}
+        {{ form.dept_b_enabled.label(class_='form-check-label') }}
+      </div>
+      <div class="form-check">
+        {{ form.dept_c_enabled(class_='form-check-input') }}
+        {{ form.dept_c_enabled.label(class_='form-check-label') }}
+      </div>
+      <div class="form-text">By default, only Dept B is enabled.</div>
+    </div>
+
+    <button class="btn btn-primary">Save</button>
+  </form>
+{% endblock %}
