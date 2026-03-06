@@ -114,6 +114,10 @@ class Request(db.Model):
 
     due_at = db.Column(db.DateTime, nullable=False)
 
+    # Flag indicating this request was created by the admin debug workspace
+    # and should be kept isolated from normal app flows.
+    is_debug = db.Column(db.Boolean, nullable=False, default=False)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

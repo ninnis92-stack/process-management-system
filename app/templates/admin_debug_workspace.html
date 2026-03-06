@@ -7,6 +7,39 @@
       <div class="small text-muted">This workspace mirrors the app for debugging. For session isolation open in a Private/Incognito window.</div>
     </div>
     <div class="card-body">
+        <div class="mb-3">
+          <strong>Debug Controls</strong>
+          <div class="small text-muted">Use these controls to simulate requests and flows inside the debug iframe.</div>
+          <div class="row g-2 mt-2">
+            <div class="col-md-4">
+              <input id="simTitle" class="form-control" placeholder="Title (Simulated Request)" />
+            </div>
+            <div class="col-md-2">
+              <select id="simPriority" class="form-select">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <input id="simDueDays" type="number" class="form-control" placeholder="Due in (days)" />
+            </div>
+            <div class="col-md-4">
+              <button id="simCreateBtn" class="btn btn-sm btn-primary">Create Simulated Request</button>
+              <button id="simFullFlowBtn" class="btn btn-sm btn-secondary">Simulate Full Flow</button>
+            </div>
+          </div>
+          <div class="row g-2 mt-2">
+            <div class="col-md-4">
+              <input id="simRequestId" class="form-control" placeholder="Request ID" />
+            </div>
+            <div class="col-md-8">
+              <button id="simOverdueBtn" class="btn btn-sm btn-warning">Mark Overdue</button>
+              <button id="simStepBtn" class="btn btn-sm btn-info">Step Flow</button>
+            </div>
+          </div>
+          <div id="simInfo" class="mt-2 small text-muted"></div>
+        </div>
       <div class="mb-2">
         <small class="text-muted">Loaded path: <code>{{ path }}</code></small>
       </div>
@@ -14,4 +47,63 @@
     </div>
   </div>
 </div>
+  <script>
+  document.addEventListener('DOMContentLoaded', function(){
+    const createBtn = document.getElementById('simCreateBtn');
+    const simFullBtn = document.getElementById('simFullFlowBtn');
+    const overdueBtn = document.getElementById('simOverdueBtn');
+    const stepBtn = document.getElementById('simStepBtn');
+    const info = document.getElementById('simInfo');
+    const iframe = document.querySelector('iframe');
+
+    createBtn && createBtn.addEventListener('click', async ()=>{
+      const title = document.getElementById('simTitle').value || undefined;
+      const priority = document.getElementById('simPriority').value;
+      const due_days = document.getElementById('simDueDays').value || 0;
+      const fd = new FormData();
+      if(title) fd.append('title', title);
+      fd.append('priority', priority);
+      fd.append('due_days', due_days);
+      const r = await fetch('/admin/debug/simulate_create', { method: 'POST', body: fd });
+      const j = await r.json();
+      if(j.ok){
+        info.textContent = 'Created request #' + j.request_id;
+        document.getElementById('simRequestId').value = j.request_id;
+        if(j.url) iframe.src = j.url;
+      } else {
+        info.textContent = 'Error: ' + (j.error||'unknown');
+      }
+    });
+
+    overdueBtn && overdueBtn.addEventListener('click', async ()=>{
+      const id = document.getElementById('simRequestId').value;
+      if(!id){ info.textContent = 'Enter Request ID first'; return; }
+      const fd = new FormData(); fd.append('request_id', id);
+      const r = await fetch('/admin/debug/simulate_overdue', { method: 'POST', body: fd });
+      const j = await r.json();
+      if(j.ok){ info.textContent = 'Marked request #' + j.request_id + ' overdue'; iframe.contentWindow.location.reload(); }
+      else info.textContent = 'Error: ' + (j.error||'unknown');
+    });
+
+    stepBtn && stepBtn.addEventListener('click', async ()=>{
+      const id = document.getElementById('simRequestId').value;
+      if(!id){ info.textContent = 'Enter Request ID first'; return; }
+      const fd = new FormData(); fd.append('request_id', id); fd.append('mode','step');
+      const r = await fetch('/admin/debug/simulate_flow', { method: 'POST', body: fd });
+      const j = await r.json();
+      if(j.ok){ info.textContent = 'Advanced to ' + j.status; iframe.src = '/requests/' + j.request_id; }
+      else info.textContent = 'Error: ' + (j.error||'unknown');
+    });
+
+    simFullBtn && simFullBtn.addEventListener('click', async ()=>{
+      const id = document.getElementById('simRequestId').value;
+      if(!id){ info.textContent = 'Enter Request ID first'; return; }
+      const fd = new FormData(); fd.append('request_id', id); fd.append('mode','full');
+      const r = await fetch('/admin/debug/simulate_flow', { method: 'POST', body: fd });
+      const j = await r.json();
+      if(j.ok){ info.textContent = 'Simulated full flow; now ' + j.status; iframe.src = '/requests/' + j.request_id; }
+      else info.textContent = 'Error: ' + (j.error||'unknown');
+    });
+  });
+  </script>
 {% endblock %}

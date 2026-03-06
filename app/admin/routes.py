@@ -11,6 +11,9 @@ from flask import request as flask_request
 from ..models import Notification, AuditLog
 from urllib.parse import unquote
 from .. import notifcations as notifications
+from ..requests_bp.workflow import owner_for_status
+from datetime import datetime, timedelta
+from flask import jsonify
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -339,6 +342,174 @@ def debug_workspace():
     if not path.startswith('/'):
         path = '/dashboard'
     return render_template('admin_debug_workspace.html', path=path)
+
+
+@admin_bp.post('/debug/simulate_create')
+@login_required
+def debug_simulate_create():
+    if not _is_admin_user():
+        return jsonify({'ok': False, 'error': 'access_denied'}), 403
+
+    title = flask_request.form.get('title') or 'Simulated Request'
+    priority = flask_request.form.get('priority') or 'medium'
+    due_days = int(flask_request.form.get('due_days') or 0)
+
+    now = datetime.utcnow()
+    due_at = (now + timedelta(days=due_days)) if due_days else None
+
+    req = ReqModel(
+        title=title,
+        request_type='both',
+        pricebook_status='unknown',
+        description='Simulated by admin debug workspace',
+        priority=priority,
+        requires_c_review=False,
+        status='NEW_FROM_A',
+        owner_department='B',
+        submitter_type='user',
+        created_by_user_id=current_user.id,
+        due_at=due_at,
+        is_debug=True,
+    )
+    db.session.add(req)
+    db.session.commit()
+
+    url = url_for('requests.request_detail', request_id=req.id)
+    return jsonify({'ok': True, 'request_id': req.id, 'url': url})
+
+
+@admin_bp.post('/debug/simulate_overdue')
+@login_required
+def debug_simulate_overdue():
+    if not _is_admin_user():
+        return jsonify({'ok': False, 'error': 'access_denied'}), 403
+
+    req_id = flask_request.form.get('request_id')
+    if not req_id:
+        return jsonify({'ok': False, 'error': 'missing_request_id'}), 400
+
+    req = ReqModel.query.get(int(req_id))
+    if not req:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    # Only allow operating on debug requests from this endpoint
+    if not getattr(req, 'is_debug', False):
+        return jsonify({'ok': False, 'error': 'not_debug_request'}), 403
+
+    # set due date to past to simulate overdue
+    req.due_at = datetime.utcnow() - timedelta(days=2)
+    db.session.commit()
+    return jsonify({'ok': True, 'request_id': req.id})
+
+
+@admin_bp.post('/debug/simulate_flow')
+@login_required
+def debug_simulate_flow():
+    if not _is_admin_user():
+        return jsonify({'ok': False, 'error': 'access_denied'}), 403
+
+    req_id = flask_request.form.get('request_id')
+    mode = flask_request.form.get('mode') or 'step'  # 'step' or 'full'
+    if not req_id:
+        return jsonify({'ok': False, 'error': 'missing_request_id'}), 400
+    req = ReqModel.query.get(int(req_id))
+    if not req:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    # Only allow operating on debug requests from this endpoint
+    if not getattr(req, 'is_debug', False):
+        return jsonify({'ok': False, 'error': 'not_debug_request'}), 403
+
+    # demo path
+    path = [
+        'NEW_FROM_A', 'B_IN_PROGRESS', 'PENDING_C_REVIEW', 'C_APPROVED',
+        'B_FINAL_REVIEW', 'SENT_TO_A', 'CLOSED'
+    ]
+
+    try:
+        cur = req.status
+        idx = path.index(cur) if cur in path else 0
+    except Exception:
+        idx = 0
+
+    def _apply_status(r, new_status):
+        r.status = new_status
+        r.owner_department = owner_for_status(new_status)
+        # audit log
+        entry = AuditLog(request_id=r.id, actor_type='user', actor_user_id=current_user.id,
+                         actor_label=current_user.email, action_type='status_change',
+                         from_status=cur, to_status=new_status, note='Simulated status change by admin')
+        db.session.add(entry)
+        # notify new owners
+        recipients = [u for u in User.query.filter_by(department=r.owner_department, is_active=True).all()]
+        try:
+            notifications.notify_users(recipients, title=f"Simulated: Request #{r.id} -> {new_status}", body=r.title,
+                                       url=url_for('requests.request_detail', request_id=r.id), ntype='status_change', request_id=r.id)
+        except Exception:
+            current_app.logger.exception('Failed to send simulated notifications')
+
+    if mode == 'full':
+        # apply all remaining steps
+        for next_status in path[idx+1:]:
+            _apply_status(req, next_status)
+        db.session.commit()
+        return jsonify({'ok': True, 'request_id': req.id, 'status': req.status})
+    else:
+        # single step
+        if idx+1 < len(path):
+            next_status = path[idx+1]
+            _apply_status(req, next_status)
+            db.session.commit()
+            return jsonify({'ok': True, 'request_id': req.id, 'status': req.status})
+        else:
+            return jsonify({'ok': False, 'error': 'already_final'})
+
+
+@admin_bp.post('/debug/cleanup')
+@login_required
+def debug_cleanup():
+    """Delete `is_debug` requests older than `days` (requires confirm=true).
+
+    Usage (POST or GET): /admin/debug/cleanup?days=7&confirm=true
+    """
+    if not _is_admin_user():
+        return jsonify({'ok': False, 'error': 'access_denied'}), 403
+
+    try:
+        days = int(flask_request.form.get('days') or flask_request.args.get('days') or 7)
+    except Exception:
+        days = 7
+
+    confirm = (flask_request.form.get('confirm') or flask_request.args.get('confirm') or 'false').lower()
+    if confirm != 'true':
+        return jsonify({'ok': False, 'error': 'confirm_required', 'message': 'Pass confirm=true to actually delete.'}), 400
+
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    # Find debug requests older than cutoff
+    old_reqs = ReqModel.query.filter(ReqModel.is_debug == True, ReqModel.created_at < cutoff).all()
+    deleted = 0
+    for r in old_reqs:
+        try:
+            db.session.delete(r)
+            deleted += 1
+        except Exception:
+            current_app.logger.exception('Failed to delete debug request %s', getattr(r, 'id', None))
+
+    db.session.commit()
+
+    # Record an audit entry for cleanup
+    try:
+        entry = AuditLog(request_id=None, actor_type='user', actor_user_id=current_user.id,
+                         actor_label=current_user.email, action_type='debug_cleanup',
+                         note=f'Deleted {deleted} debug requests older than {days} days', event_ts=datetime.utcnow())
+        db.session.add(entry)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Failed to write debug cleanup audit log')
+
+    return jsonify({'ok': True, 'deleted': deleted})
 
 
 @admin_bp.route("/audit")
