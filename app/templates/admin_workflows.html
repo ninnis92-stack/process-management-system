@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Workflows</h2>
+<p><a class="btn btn-primary" href="{{ url_for('admin.create_workflow') }}">New Workflow</a></p>
+<table class="table">
+  <thead>
+    <tr><th>Name</th><th>Department</th><th>Active</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+  {% for wf in workflows %}
+    <tr>
+      <td>{{ wf.name }}</td>
+      <td>{{ wf.department_code or 'Global' }}</td>
+      <td>{{ 'Yes' if wf.active else 'No' }}</td>
+      <td>
+        <a href="{{ url_for('admin.edit_workflow', wf_id=wf.id) }}">Edit</a>
+        <form style="display:inline" method="post" action="{{ url_for('admin.delete_workflow', wf_id=wf.id) }}">
+          <button class="btn btn-link" type="submit" onclick="return confirm('Delete workflow?')">Delete</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

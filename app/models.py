@@ -237,6 +237,25 @@ class DepartmentFormAssignment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class FieldVerification(db.Model):
+    """Map a `FormField` to an external verification provider and key.
+
+    This allows admins to point a field at an external system (for example
+    an inventory lookup) without hard-coding provider details into the
+    `FormField.verification` JSON column. The runtime code prefers the
+    `FormField.verification` payload but will fall back to this mapping when
+    present. Storing provider and params separately makes migrations and
+    connector wiring easier.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)
+    field = db.relationship('FormField', backref='verifications')
+    provider = db.Column(db.String(100), nullable=False)  # e.g. 'inventory'
+    external_key = db.Column(db.String(200), nullable=True)  # e.g. 'part_number'
+    params = db.Column(db.JSON, nullable=True)  # provider-specific params
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class Attachment(db.Model):
     """Files attached to a submission (e.g., screenshots)."""
     id = db.Column(db.Integer, primary_key=True)
@@ -297,6 +316,7 @@ class FeatureFlags(db.Model):
     enable_notifications = db.Column(db.Boolean, nullable=False, default=True)
     enable_nudges = db.Column(db.Boolean, nullable=False, default=True)
     allow_user_nudges = db.Column(db.Boolean, nullable=False, default=False)
+    vibe_enabled = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     @classmethod
@@ -513,6 +533,23 @@ class StatusOption(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     # Whether this status should produce email deliveries (when mailer/SSO is active)
     email_enabled = db.Column(db.Boolean, nullable=False, default=False)
+
+
+class Workflow(db.Model):
+    """Admin-definable workflow specification.
+
+    Stores an admin-editable JSON `spec` describing steps and transitions.
+    This keeps initial implementation flexible and allows a richer editor
+    to be added later.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    # Optional department code to scope this workflow (A/B/C) or NULL for global
+    department_code = db.Column(db.String(2), nullable=True)
+    spec = db.Column(db.JSON, nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class DepartmentEditor(db.Model):

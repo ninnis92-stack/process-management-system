@@ -74,7 +74,9 @@
               </span>
               <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
             </button>
-            <button id="vibeBtn" class="btn btn-outline-light btn-sm">Vibe · <span id="vibeLabel">—</span></button>
+            {% if FeatureFlags.get().vibe_enabled %}
+              <button id="vibeBtn" class="btn btn-outline-light btn-sm">Vibe · <span id="vibeLabel">—</span></button>
+            {% endif %}
             {% if current_user.is_admin %}
               <form method="get" action="{{ url_for('requests.dashboard') }}" class="m-0 d-inline" id="admin-dept-view-form">
                 <select name="as_dept" onchange="this.form.submit()" class="form-select form-select-sm text-dark" style="display:inline-block; width:auto; margin-right:8px;">

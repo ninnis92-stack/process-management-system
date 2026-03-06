@@ -48,7 +48,7 @@ def test_reject_request_requires_reason_and_closes(app, client):
     assert b'rejected and closed' in rv.data.lower()
 
     with app.app_context():
-        fresh = ReqModel.query.get(req_id)
+        fresh = db.session.get(ReqModel, req_id)
         assert fresh.status == 'CLOSED'
         c = Comment.query.filter_by(request_id=req_id, visibility_scope='public').order_by(Comment.id.desc()).first()
         assert c is not None

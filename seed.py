@@ -33,12 +33,28 @@ def main():
             # If inspection isn't available, proceed — seed has additional
             # fallback handling later when commits fail.
             pass
+        # Create nine demo users for testing. Keep the first three as
+        # the original Dept A/B/C users so existing tests and examples
+        # continue to work. Additional users allow exercising different
+        # department views during manual testing; admin roles can be
+        # granted via `ADMIN_EMAILS` in config (SSO will set roles later).
         demo = [
             ("Dept A User", "a@example.com", "A"),
             ("Dept B User", "b@example.com", "B"),
             ("Dept C User", "c@example.com", "C"),
+            ("Dept A User 2", "a2@example.com", "A"),
+            ("Dept B User 2", "b2@example.com", "B"),
+            ("Dept C User 2", "c2@example.com", "C"),
+            ("Dept A User 3", "a3@example.com", "A"),
+            ("Dept B User 3", "b3@example.com", "B"),
+            ("Dept C User 3", "c3@example.com", "C"),
         ]
-        for name, email, dept in demo:
+        for idx, (name, email, dept) in enumerate(demo):
+            # Keep the first three users active by default for convenience.
+            # The remaining demo accounts are created deactivated so admins
+            # can exercise activation/role assignment in the admin UI (and
+            # SSO will set proper roles later).
+            active = True if idx < 3 else False
             u = User.query.filter_by(email=email).first()
             if not u:
                 u = User(
@@ -46,7 +62,7 @@ def main():
                     email=email,
                     department=dept,
                     password_hash=generate_password_hash("password123", method="pbkdf2:sha256"),
-                    is_active=True,
+                    is_active=active,
                 )
                 db.session.add(u)
         db.session.commit()

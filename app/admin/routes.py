@@ -16,6 +16,13 @@ from ..models import FeatureFlags, RejectRequestConfig
 from urllib.parse import unquote
 import os
 from werkzeug.utils import secure_filename
+from ..models import Workflow
+from .forms import WorkflowForm
+from .forms import FormTemplateAdminForm, FormFieldInlineForm
+from .forms import DepartmentAssignmentForm
+from ..models import FormTemplate, FormField, DepartmentFormAssignment
+from .forms import FieldVerificationForm
+from ..models import FieldVerification
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -262,56 +269,26 @@ def monitor():
 
     if dept == "B":
         # Build buckets similar to Dept B dashboard but for monitoring
+        # Use department-scoped queries so monitoring honors handoffs as well
+        from ..utils.dept_scope import scope_requests_for_department
+        base_b = scope_requests_for_department(ReqModel.query, 'B')
         buckets = {
-            "New from A": ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-                ReqModel.status == "NEW_FROM_A",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-            "In progress by Department B": ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-                ReqModel.status == "B_IN_PROGRESS",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-            "Pending review from Department A": ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-                ReqModel.status == "WAITING_ON_A_RESPONSE",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-            "Needs changes": ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-                ReqModel.status == "C_NEEDS_CHANGES",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-            "Exec approval required": ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-                ReqModel.status == "EXEC_APPROVAL",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-            "Approved by C": ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-                ReqModel.status == "C_APPROVED",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-            "Final review": ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-                ReqModel.status == "B_FINAL_REVIEW",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-            "Sent to A": ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-                ReqModel.status == "SENT_TO_A",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-            "Under review by Department C": ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-                ReqModel.status == "PENDING_C_REVIEW",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-            "Closed": ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-                ReqModel.status == "CLOSED",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-            "All (B)": ReqModel.query.filter(
-                ReqModel.owner_department == "B",
-            ).order_by(ReqModel.updated_at.desc()).all(),
+            "New from A": base_b.filter(ReqModel.status == "NEW_FROM_A").order_by(ReqModel.updated_at.desc()).all(),
+            "In progress by Department B": base_b.filter(ReqModel.status == "B_IN_PROGRESS").order_by(ReqModel.updated_at.desc()).all(),
+            "Pending review from Department A": base_b.filter(ReqModel.status == "WAITING_ON_A_RESPONSE").order_by(ReqModel.updated_at.desc()).all(),
+            "Needs changes": base_b.filter(ReqModel.status == "C_NEEDS_CHANGES").order_by(ReqModel.updated_at.desc()).all(),
+            "Exec approval required": base_b.filter(ReqModel.status == "EXEC_APPROVAL").order_by(ReqModel.updated_at.desc()).all(),
+            "Approved by C": base_b.filter(ReqModel.status == "C_APPROVED").order_by(ReqModel.updated_at.desc()).all(),
+            "Final review": base_b.filter(ReqModel.status == "B_FINAL_REVIEW").order_by(ReqModel.updated_at.desc()).all(),
+            "Sent to A": base_b.filter(ReqModel.status == "SENT_TO_A").order_by(ReqModel.updated_at.desc()).all(),
+            "Under review by Department C": base_b.filter(ReqModel.status == "PENDING_C_REVIEW").order_by(ReqModel.updated_at.desc()).all(),
+            "Closed": base_b.filter(ReqModel.status == "CLOSED").order_by(ReqModel.updated_at.desc()).all(),
+            "All (B)": base_b.order_by(ReqModel.updated_at.desc()).all(),
         }
 
         # status counts for quick badges
-        status_counts = {code: ReqModel.query.filter(ReqModel.owner_department == "B", ReqModel.status == code).count() for code in [
-            "B_IN_PROGRESS", "WAITING_ON_A_RESPONSE", "PENDING_C_REVIEW", "EXEC_APPROVAL", "B_FINAL_REVIEW", "SENT_TO_A", "CLOSED"
-        ]}
+        status_codes = ["B_IN_PROGRESS", "WAITING_ON_A_RESPONSE", "PENDING_C_REVIEW", "EXEC_APPROVAL", "B_FINAL_REVIEW", "SENT_TO_A", "CLOSED"]
+        status_counts = {code: base_b.filter(ReqModel.status == code).count() for code in status_codes}
 
         dashboard_html = render_template("dashboard.html", mode="B", buckets=buckets, status_counts=status_counts, now=now)
         return render_template("admin_monitor.html", dept=dept, dashboard_html=dashboard_html,
@@ -486,6 +463,201 @@ def site_config():
     return render_template('admin_site_config.html', form=form, cfg=cfg)
 
 
+@admin_bp.route('/workflows')
+@login_required
+def list_workflows():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    wfs = Workflow.query.order_by(Workflow.name.asc()).all()
+    return render_template('admin_workflows.html', workflows=wfs)
+
+
+@admin_bp.route('/workflows/new', methods=['GET', 'POST'])
+@login_required
+def create_workflow():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    form = WorkflowForm()
+    if form.validate_on_submit():
+        wf = Workflow(
+            name=form.name.data.strip(),
+            description=(form.description.data or '').strip() or None,
+            department_code=(form.department_code.data or None) or None,
+            spec=None,
+            active=bool(form.active.data),
+        )
+        # attempt to parse JSON if provided
+        import json
+        if form.spec_json.data:
+            try:
+                wf.spec = json.loads(form.spec_json.data)
+            except Exception:
+                flash('Invalid JSON for workflow spec.', 'danger')
+                return render_template('admin_workflow_form.html', form=form)
+        db.session.add(wf)
+        db.session.commit()
+        flash('Workflow created.', 'success')
+        return redirect(url_for('admin.list_workflows'))
+    return render_template('admin_workflow_form.html', form=form)
+
+
+@admin_bp.route('/workflows/<int:wf_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_workflow(wf_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    wf = Workflow.query.get_or_404(wf_id)
+    form = WorkflowForm(obj=wf)
+    # prefill spec_json
+    if flask_request.method == 'GET' and wf.spec is not None:
+        import json
+        try:
+            form.spec_json.data = json.dumps(wf.spec, indent=2)
+        except Exception:
+            form.spec_json.data = str(wf.spec)
+
+    if form.validate_on_submit():
+        wf.name = form.name.data.strip()
+        wf.description = (form.description.data or '').strip() or None
+        wf.department_code = (form.department_code.data or None) or None
+        wf.active = bool(form.active.data)
+        if form.spec_json.data:
+            import json
+            try:
+                wf.spec = json.loads(form.spec_json.data)
+            except Exception:
+                flash('Invalid JSON for workflow spec.', 'danger')
+                return render_template('admin_workflow_form.html', form=form, wf=wf)
+        else:
+            wf.spec = None
+        db.session.commit()
+        flash('Workflow updated.', 'success')
+        return redirect(url_for('admin.list_workflows'))
+    return render_template('admin_workflow_form.html', form=form, wf=wf)
+
+
+@admin_bp.route('/workflows/<int:wf_id>/delete', methods=['POST'])
+@login_required
+def delete_workflow(wf_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    wf = Workflow.query.get_or_404(wf_id)
+    db.session.delete(wf)
+    db.session.commit()
+    flash('Workflow deleted.', 'success')
+    return redirect(url_for('admin.list_workflows'))
+
+
+@admin_bp.route('/templates')
+@login_required
+def list_templates():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    templates = FormTemplate.query.order_by(FormTemplate.created_at.desc()).all()
+    return render_template('admin_templates.html', templates=templates)
+
+
+@admin_bp.route('/templates/new', methods=['GET', 'POST'])
+@login_required
+def create_template():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    form = FormTemplateAdminForm()
+    if form.validate_on_submit():
+        t = FormTemplate(name=form.name.data.strip(), description=(form.description.data or '').strip() or None)
+        db.session.add(t)
+        db.session.commit()
+        # create requested number of empty fields
+        try:
+            n = int(form.field_count.data or 0)
+        except Exception:
+            n = 0
+        for i in range(max(0, n)):
+            f = FormField(template_id=t.id, name=f'field_{i+1}', label=f'Field {i+1}', field_type='text', required=False)
+            db.session.add(f)
+        db.session.commit()
+        flash('Template created. Edit fields as needed.', 'success')
+        return redirect(url_for('admin.edit_template_fields', template_id=t.id))
+    return render_template('admin_template_form.html', form=form)
+
+
+@admin_bp.route('/templates/<int:template_id>/fields', methods=['GET', 'POST'])
+@login_required
+def edit_template_fields(template_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    t = FormTemplate.query.get_or_404(template_id)
+    # Handle simple bulk update: inputs named field_<id>_label, field_<id>_required
+    if flask_request.method == 'POST':
+        for f in t.fields:
+            lab = flask_request.form.get(f'field_{f.id}_label')
+            nm = flask_request.form.get(f'field_{f.id}_name')
+            req = flask_request.form.get(f'field_{f.id}_required')
+            ft = flask_request.form.get(f'field_{f.id}_type')
+            if lab is not None:
+                f.label = lab.strip()
+            if nm is not None:
+                f.name = nm.strip() or f.name
+            if ft is not None:
+                f.field_type = ft
+            f.required = bool(req)
+            db.session.add(f)
+        db.session.commit()
+        flash('Fields updated.', 'success')
+        return redirect(url_for('admin.list_templates'))
+
+    # Render editing UI
+    fields = sorted(list(t.fields), key=lambda ff: getattr(ff, 'created_at', getattr(ff, 'id', 0)))
+    return render_template('admin_edit_template_fields.html', template=t, fields=fields)
+
+
+@admin_bp.route('/fields/<int:field_id>/verification', methods=['GET', 'POST'])
+@login_required
+def edit_field_verification(field_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    f = FormField.query.get_or_404(field_id)
+    # pick latest mapping if multiple
+    fv = FieldVerification.query.filter_by(field_id=f.id).order_by(FieldVerification.created_at.desc()).first()
+    form = FieldVerificationForm()
+    if flask_request.method == 'GET' and fv:
+        form.provider.data = fv.provider
+        form.external_key.data = fv.external_key
+        import json
+        try:
+            form.params_json.data = json.dumps(fv.params, indent=2) if fv.params is not None else ''
+        except Exception:
+            form.params_json.data = str(fv.params or '')
+
+    if form.validate_on_submit():
+        import json
+        params = None
+        if form.params_json.data:
+            try:
+                params = json.loads(form.params_json.data)
+            except Exception:
+                flash('Invalid JSON in params field.', 'danger')
+                return render_template('admin_field_verification.html', form=form, field=f, fv=fv)
+
+        # Replace existing mapping (simple policy: create new row)
+        new = FieldVerification(field_id=f.id, provider=form.provider.data, external_key=(form.external_key.data or None), params=params)
+        db.session.add(new)
+        db.session.commit()
+        flash('Field verification mapping saved.', 'success')
+        return redirect(url_for('admin.edit_template_fields', template_id=f.template_id))
+
+    return render_template('admin_field_verification.html', form=form, field=f, fv=fv)
+
+
 @admin_bp.route('/notifications_retention', methods=['GET', 'POST'])
 @login_required
 def notifications_retention():
@@ -601,7 +773,7 @@ def special_email():
 
         cfg.enabled = bool(form.enabled.data)
         selected_owner_id = int(form.request_form_user_id.data or 0)
-        selected_owner = User.query.get(selected_owner_id) if selected_owner_id else None
+        selected_owner = db.session.get(User, selected_owner_id) if selected_owner_id else None
         if selected_owner and not selected_owner.sso_sub:
             selected_owner = None
             selected_owner_id = 0
@@ -670,6 +842,54 @@ def email_routing_new():
     return render_template('admin_email_routing_form.html', form=form)
 
 
+@admin_bp.route('/assignments')
+@login_required
+def list_assignments():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    rows = DepartmentFormAssignment.query.order_by(DepartmentFormAssignment.department_name.asc()).all()
+    # load templates map for display
+    templates = {t.id: t for t in FormTemplate.query.order_by(FormTemplate.name.asc()).all()}
+    return render_template('admin_assignments.html', rows=rows, templates=templates)
+
+
+@admin_bp.route('/assignments/new', methods=['GET', 'POST'])
+@login_required
+def new_assignment():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    form = DepartmentAssignmentForm()
+    form.template_id.choices = [(t.id, t.name) for t in FormTemplate.query.order_by(FormTemplate.name.asc()).all()]
+    if form.validate_on_submit():
+        # ensure one assignment per department (replace existing)
+        DepartmentFormAssignment.query.filter_by(department_name=form.department.data).delete()
+        a = DepartmentFormAssignment(template_id=form.template_id.data, department_name=form.department.data)
+        db.session.add(a)
+        db.session.commit()
+        flash('Template assigned to department.', 'success')
+        return redirect(url_for('admin.list_assignments'))
+
+    return render_template('admin_assignments.html', form=form, rows=[], templates={})
+
+
+@admin_bp.route('/assignments/<int:assignment_id>/delete', methods=['POST'])
+@login_required
+def delete_assignment(assignment_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    a = DepartmentFormAssignment.query.get_or_404(assignment_id)
+    db.session.delete(a)
+    db.session.commit()
+    flash('Assignment removed.', 'success')
+    return redirect(url_for('admin.list_assignments'))
+
+
 @admin_bp.route('/email_routing/<int:rid>/edit', methods=['GET', 'POST'])
 @login_required
 def email_routing_edit(rid: int):
@@ -721,11 +941,13 @@ def feature_flags():
         form.enable_notifications.data = bool(getattr(flags, 'enable_notifications', True))
         form.enable_nudges.data = bool(getattr(flags, 'enable_nudges', True))
         form.allow_user_nudges.data = bool(getattr(flags, 'allow_user_nudges', False))
+        form.vibe_enabled.data = bool(getattr(flags, 'vibe_enabled', True))
 
     if form.validate_on_submit():
         flags.enable_notifications = bool(form.enable_notifications.data)
         flags.enable_nudges = bool(form.enable_nudges.data)
         flags.allow_user_nudges = bool(form.allow_user_nudges.data)
+        flags.vibe_enabled = bool(form.vibe_enabled.data)
         db.session.commit()
         flash('Feature flags updated.', 'success')
         return redirect(url_for('admin.feature_flags'))

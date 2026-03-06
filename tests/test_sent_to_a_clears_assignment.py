@@ -46,7 +46,7 @@ def test_sent_to_a_clears_assignment_and_notifies(app, client):
     assert resp.status_code == 200
 
     with app.app_context():
-        r = ReqModel.query.get(req.id)
+        r = db.session.get(ReqModel, req.id)
         assert r is not None
         assert r.status == "SENT_TO_A"
         # assignment should be cleared

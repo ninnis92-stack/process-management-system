@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>{% if wf %}Edit{% else %}New{% endif %} Workflow</h2>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="form-group">
+    {{ form.name.label }}
+    {{ form.name(class='form-control') }}
+  </div>
+  <div class="form-group">
+    {{ form.description.label }}
+    {{ form.description(class='form-control', rows=3) }}
+  </div>
+  <div class="form-group">
+    {{ form.department_code.label }}
+    {{ form.department_code(class='form-control') }}
+  </div>
+  <div class="form-group">
+    {{ form.active() }} {{ form.active.label }}
+  </div>
+  <div class="form-group">
+    {{ form.spec_json.label }}
+    {{ form.spec_json(class='form-control', rows=12) }}
+    <small class="form-text text-muted">Enter a JSON object describing steps and transitions. Example: {"steps": ["NEW","IN_PROGRESS"], "transitions": [{"from":"NEW","to":"IN_PROGRESS"}]}</small>
+  </div>
+  <div class="form-group">
+    {{ form.submit(class='btn btn-primary') }}
+    <a class="btn btn-secondary" href="{{ url_for('admin.list_workflows') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -41,7 +41,7 @@ def test_inbound_mail_creates_guest_request(app, client):
     assert data["created_request_id"] is not None
 
     with app.app_context():
-        req = ReqModel.query.get(data["created_request_id"])
+        req = db.session.get(ReqModel, data["created_request_id"])
         assert req is not None
         assert req.submitter_type == "guest"
         assert req.guest_email == "guest.sender@example.com"
@@ -91,8 +91,8 @@ def test_inbound_mail_creates_user_request_for_sso_sender(app, client):
     assert data["created_request_id"] is not None
 
     with app.app_context():
-        req = ReqModel.query.get(data["created_request_id"])
-        user = User.query.get(uid)
+        req = db.session.get(ReqModel, data["created_request_id"])
+        user = db.session.get(User, uid)
         assert req is not None
         assert req.submitter_type == "user"
         assert req.created_by_user_id == uid
@@ -168,7 +168,7 @@ def test_inbound_mail_allows_invalid_fields_when_validation_disabled(app, client
     assert "request_type" in data["invalid_fields"]
 
     with app.app_context():
-        req = ReqModel.query.get(data["created_request_id"])
+        req = db.session.get(ReqModel, data["created_request_id"])
         assert req is not None
         assert req.request_type == "both"
 

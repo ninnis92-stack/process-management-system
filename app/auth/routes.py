@@ -148,7 +148,7 @@ def totp_setup():
         return redirect(url_for('auth.totp_setup'))
 
     if pyotp.TOTP(secret).verify(code):
-        u = User.query.get(current_user.id)
+        u = db.session.get(User, current_user.id)
         u.totp_secret = secret
         u.totp_enabled = True
         db.session.commit()
@@ -168,7 +168,7 @@ def totp_verify():
         flash('No 2FA login pending.', 'warning')
         return redirect(url_for('auth.login'))
 
-    u = User.query.get(pre_id)
+    u = db.session.get(User, pre_id)
     if not u:
         session.pop('pre_2fa_userid', None)
         flash('User not found.', 'danger')
@@ -220,7 +220,7 @@ def set_vibe():
     if v is None:
         return ("Missing vibe_index", 400)
 
-    u = User.query.get(current_user.id)
+    u = db.session.get(User, current_user.id)
     u.vibe_index = max(0, int(v))
     db.session.commit()
     return ({'ok': True}, 200)

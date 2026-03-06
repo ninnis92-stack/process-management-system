@@ -25,7 +25,7 @@ def send_due_soon_notifications(app, hours=24):
 
         targets = users_in_dept(req.owner_department)
         if req.created_by_user_id:
-            creator = User.query.get(req.created_by_user_id)
+            creator = db.session.get(User, req.created_by_user_id)
             if creator and creator.is_active:
                 targets.append(creator)
 
@@ -92,7 +92,7 @@ def send_high_priority_nudges(app):
         # determine targets: prefer explicit assignee
         targets = []
         if req.assigned_to_user_id:
-            u = User.query.get(req.assigned_to_user_id)
+            u = db.session.get(User, req.assigned_to_user_id)
             if u and u.is_active:
                 targets.append(u)
         else:

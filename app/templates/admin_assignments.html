@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Department Template Assignments</h2>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul class="flashes">
+    {% for cat, msg in messages %}
+      <li class="flash {{ cat }}">{{ msg }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+<div style="display:flex;gap:2rem;align-items:flex-start;">
+  <div style="flex:1;">
+    <h3>Current Assignments</h3>
+    {% if rows %}
+      <table class="table">
+        <thead><tr><th>Department</th><th>Template</th><th>Created</th><th>Actions</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>{{ r.department_name }}</td>
+            <td>{{ templates.get(r.template_id).name if templates.get(r.template_id) else ('#'+(r.template_id|string)) }}</td>
+            <td>{{ r.created_at }}</td>
+            <td>
+              <form action="{{ url_for('admin.delete_assignment', assignment_id=r.id) }}" method="post" style="display:inline">
+                <button class="btn btn-sm btn-danger">Remove</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No assignments configured.</p>
+    {% endif %}
+  </div>
+
+  <div style="width:350px;">
+    <h3>Create / Replace Assignment</h3>
+    <form method="post" action="{{ url_for('admin.new_assignment') }}">
+      <div class="form-group">
+        <label for="department">Department</label>
+        <select name="department" id="department" class="form-control">
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="template_id">Template</label>
+        <select name="template_id" id="template_id" class="form-control">
+          {% for t in templates.values() %}
+            <option value="{{ t.id }}">{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <button class="btn btn-primary">Assign</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

@@ -15,7 +15,7 @@ from typing import Optional, List, Dict
 from sqlalchemy import or_, and_, func
 
 from flask import (
-    Blueprint, render_template, redirect, request, url_for, flash, abort, send_file, current_app, jsonify, Response
+    Blueprint, render_template, redirect, request, url_for, flash, abort, send_file, current_app, jsonify, Response, session
 )
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -52,8 +52,10 @@ from .permissions import (
     visible_comment_scopes_for_user,
     allowed_comment_scopes_for_user,
 )
+from ..utils.dept_scope import scope_requests_for_department
 from .workflow import transition_allowed, owner_for_status, handoff_for_transition
 from ..services.verification import VerificationService
+from ..services.inventory import InventoryService
 from ..notifcations import notify_users, users_in_department
 from .. import metrics as metrics_module
 from ..services.ticketing import TicketingClient
@@ -155,7 +157,7 @@ def _require_assigned_user(req: ReqModel):
     # If assigned to someone else: avoid raw 403 pages for normal form submits —
     # redirect with a helpful message. For AJAX callers return JSON + 403.
     if req.assigned_to_user_id != current_user.id:
-        other = User.query.get(req.assigned_to_user_id)
+        other = db.session.get(User, req.assigned_to_user_id)
         label = (other.name or other.email) if other else "Another user"
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"ok": False, "error": "assigned_to_other", "assigned_to": label}), 403
@@ -270,10 +272,8 @@ def dashboard():
         bucket_id = request.args.get('bucket_id')
         selected_bucket_mode = False
 
-        # Include requests that are owned by B OR that have been sent to B via a Submission
-        sent_to_b_subq = db.session.query(Submission.request_id).filter(Submission.to_department == "B").subquery()
-        base_b_raw = ReqModel.query.filter(or_(ReqModel.owner_department == "B", ReqModel.id.in_(sent_to_b_subq)))
-        base_b = base_b_raw
+        # Build base query scoped to Dept B (owned by B or explicitly sent to B)
+        base_b = scope_requests_for_department(ReqModel.query, 'B')
         # cutoff for 'closed this week' — start of current week (Monday 00:00 UTC)
         now = datetime.utcnow()
         closed_cutoff = datetime(now.year, now.month, now.day) - timedelta(days=now.weekday())
@@ -286,7 +286,7 @@ def dashboard():
         # If a `bucket_id` is provided, filter by that bucket; otherwise use either `status` filter or show all buckets
         if bucket_id:
             selected_bucket_mode = True
-            b = StatusBucket.query.get(int(bucket_id))
+            b = db.session.get(StatusBucket, int(bucket_id))
             if not b:
                 items = []
             else:
@@ -718,7 +718,7 @@ def request_new():
     assigned = DepartmentFormAssignment.query.filter_by(department_name='A').order_by(DepartmentFormAssignment.created_at.desc()).first()
     template = None
     if assigned:
-        template = FormTemplate.query.get(assigned.template_id)
+        template = db.session.get(FormTemplate, assigned.template_id)
     template_fields = None
     if template:
         # `template.fields` is an InstrumentedList; sort in-Python by created_at
@@ -905,37 +905,95 @@ def request_new():
                         db.session.add(att)
                         db.session.commit()
 
-            # Execute verification rules for fields that have them
+            # Execute verification rules for fields that have them. Prefer inline
+            # `FormField.verification`; otherwise consult DB mappings. Fetch the
+            # latest `FieldVerification` rows for all template fields in a single
+            # query to avoid subtle visibility/session issues in request contexts.
             verification_results = {}
+            try:
+                from ..models import FieldVerification
+                fids = [f.id for f in template_fields]
+                latest_map = {}
+                if fids and db.engine.has_table('field_verification'):
+                    fvs = db.session.query(FieldVerification).filter(FieldVerification.field_id.in_(fids)).order_by(FieldVerification.field_id.asc(), FieldVerification.created_at.desc()).all()
+                    for fv in fvs:
+                        if fv.field_id not in latest_map:
+                            latest_map[fv.field_id] = fv
+            except Exception:
+                latest_map = {}
+
             for f in template_fields:
+                # Determine verification rule: prefer inline `FormField.verification`,
+                # otherwise consult `latest_map` for a DB mapping.
+                v = None
                 if f.verification:
-                    try:
-                        v = f.verification
-                        if v.get('type') == 'regex':
-                            pat = v.get('pattern')
-                            val = submission_data.get(f.name)
-                            ok = False
-                            if val is not None and pat:
-                                ok = bool(re.fullmatch(pat, str(val)))
-                            verification_results[f.name] = {'ok': ok, 'type': 'regex'}
-                        elif v.get('type') == 'external_lookup':
-                            # Simple external lookup support for `user` model as a convenience
-                            params = v.get('params') or {}
-                            model = params.get('model')
-                            column = params.get('column')
-                            val = submission_data.get(f.name)
-                            ok = False
-                            if model == 'user' and column and val:
-                                from ..models import User
-                                q = {column: val}
-                                found = User.query.filter(getattr(User, column) == val).first()
-                                ok = bool(found)
-                            verification_results[f.name] = {'ok': ok, 'type': 'external_lookup'}
+                    v = f.verification
+                else:
+                    fv = latest_map.get(f.id)
+                    if fv:
+                        if fv.provider == 'inventory':
+                            v = {'type': 'external_lookup', 'params': {'provider': 'inventory', 'external_key': fv.external_key, 'options': fv.params or {}}}
                         else:
-                            verification_results[f.name] = {'ok': False, 'reason': 'unknown_rule_type'}
-                    except Exception as e:
-                        current_app.logger.exception('Verification execution failed')
-                        verification_results[f.name] = {'ok': False, 'error': str(e)}
+                            v = {'type': 'external_lookup', 'params': {'provider': fv.provider, 'external_key': fv.external_key, 'options': fv.params or {}}}
+                    else:
+                        # As a fallback, when external verification feature is enabled,
+                        # treat common field names as inventory lookups (keeps prototype
+                        # behavior working even if DB mapping lookup fails).
+                        try:
+                            if current_app.config.get('ENABLE_EXTERNAL_VERIFICATION') and f.name in ('donor_part_number', 'target_part_number', 'part_number', 'price_book_number', 'pricebook'):
+                                v = {'type': 'external_lookup', 'params': {'provider': 'inventory', 'external_key': f.name, 'options': {}}}
+                        except Exception:
+                            pass
+
+                if not v:
+                    continue
+
+                try:
+                    if v.get('type') == 'regex':
+                        pat = v.get('pattern')
+                        val = submission_data.get(f.name)
+                        ok = False
+                        if val is not None and pat:
+                            ok = bool(re.fullmatch(pat, str(val)))
+                        verification_results[f.name] = {'ok': ok, 'type': 'regex'}
+                    elif v.get('type') == 'external_lookup':
+                        params = v.get('params') or {}
+                        provider = params.get('provider')
+                        ext_key = params.get('external_key') or v.get('external_key')
+                        val = submission_data.get(f.name)
+                        ok = False
+                        if provider == 'inventory' and val is not None:
+                            try:
+                                inv = InventoryService()
+                                if ext_key in ('donor_part_number', 'target_part_number', 'part_number'):
+                                    res = inv.validate_part_number(val)
+                                elif ext_key in ('price_book_number', 'pricebook'):
+                                    res = inv.validate_sales_list_number(val)
+                                else:
+                                    res = inv.validate_part_number(val)
+                                if res is None:
+                                    ok = None
+                                else:
+                                    ok = bool(res)
+                            except Exception:
+                                current_app.logger.exception('Inventory verification failed')
+                                ok = None
+                        else:
+                            if params.get('model') == 'user':
+                                from ..models import User
+                                found = False
+                                column = params.get('column')
+                                if column and val is not None:
+                                    found = bool(db.session.query(User).filter(getattr(User, column) == val).first())
+                                ok = found
+                            else:
+                                ok = False
+                        verification_results[f.name] = {'ok': ok, 'type': 'external_lookup'}
+                    else:
+                        verification_results[f.name] = {'ok': False, 'reason': 'unknown_rule_type'}
+                except Exception as e:
+                    current_app.logger.exception('Verification execution failed')
+                    verification_results[f.name] = {'ok': False, 'error': str(e)}
 
             if verification_results:
                 # attach results into Submission.data for later inspection
@@ -1008,9 +1066,13 @@ def request_detail(request_id: int):
 
     transition_form = TransitionForm()
     dept = current_user.department
-    # Build status choices per department: A only sees reopen/close, B sees all B-facing states (validation on submit), C stays constrained.
+    # Use active Workflow spec (if present) to compute allowed transitions and labels.
+    from .workflow import allowed_transitions_with_labels
+
     if dept == "A":
-        possible = []
+        # Dept A has a constrained set: prefer workflow-defined choices but
+        # keep the small set of actions available to Dept A (reopen/close).
+        choices = []
         label_map = {
             "B_IN_PROGRESS": "Request review from Department B",
             "CLOSED": "Close ticket",
@@ -1018,37 +1080,25 @@ def request_detail(request_id: int):
         if req.status == "SENT_TO_A":
             for to in ("B_IN_PROGRESS", "CLOSED"):
                 if is_transition_valid_for_request(req, dept, req.status, to):
-                    possible.append((to, label_map[to]))
+                    choices.append((to, label_map[to]))
         elif req.status == "CLOSED":
-            # Allow Dept A to reopen only within 48 hours of closure.
             if _closed_within_hours(req, hours=48) and is_transition_valid_for_request(req, dept, req.status, "B_IN_PROGRESS"):
-                possible.append(("B_IN_PROGRESS", label_map["B_IN_PROGRESS"]))
-        transition_form.to_status.choices = possible
+                choices.append(("B_IN_PROGRESS", label_map["B_IN_PROGRESS"]))
+        transition_form.to_status.choices = choices
     elif dept == "B":
-        possible = []
-        for to in ("B_IN_PROGRESS", "UNDER_REVIEW", "WAITING_ON_A_RESPONSE", "PENDING_C_REVIEW", "C_APPROVED", "C_NEEDS_CHANGES",
-                   "B_FINAL_REVIEW", "EXEC_APPROVAL", "SENT_TO_A", "CLOSED"):
-            if to == "WAITING_ON_A_RESPONSE":
-                label = "Pending review from Department A"
-            elif to == "B_IN_PROGRESS":
-                label = "In progress by Department B"
-            elif to == "UNDER_REVIEW":
-                label = "Under review"
-            elif to == "PENDING_C_REVIEW":
-                label = "Under review by Department C"
-            elif to == "EXEC_APPROVAL":
-                label = "Requires executive approval"
-            else:
-                label = to.replace("_", " ").title()
-            possible.append((to, label))
-        transition_form.to_status.choices = possible
+        # For Dept B, consult the workflow helper which prefers a dept-scoped
+        # workflow then global; fall back to legacy allowed transitions.
+        choices = allowed_transitions_with_labels(dept, req.status)
+        # In some legacy cases we still want WAITING_ON_A_RESPONSE to show a friendlier label
+        choices = [(c, ("Pending review from Department A" if c == "WAITING_ON_A_RESPONSE" else l)) for c, l in choices]
+        transition_form.to_status.choices = choices
         transition_form.requires_c_review.data = req.requires_c_review
     else:
-        possible = []
-        for to in ("C_APPROVED", "C_NEEDS_CHANGES"):
-            if is_transition_valid_for_request(req, dept, req.status, to):
-                possible.append((to, to.replace("_", " ").title()))
-        transition_form.to_status.choices = possible
+        # Dept C: constrained to approvals/changes; still consult workflow spec
+        transition_form.to_status.choices = allowed_transitions_with_labels(dept, req.status)
+
+    # Keep a local `possible` list for downstream handoff hint logic (legacy name)
+    possible = transition_form.to_status.choices
 
     toggle_form = ToggleCReviewForm()
     request_edit_form = RequestArtifactEditForm()
@@ -1490,7 +1540,7 @@ def add_comment(request_id: int):
     targets.extend(_users_in_dept(req.owner_department))
 
     if req.created_by_user_id:
-        creator = User.query.get(req.created_by_user_id)
+        creator = db.session.get(User, req.created_by_user_id)
         if creator and getattr(creator, "is_active", True):
             targets.append(creator)
 
@@ -2053,7 +2103,7 @@ def do_transition(request_id: int):
 
     # Notify creator (if exists, and not actor)
     if req.created_by_user_id and req.created_by_user_id != current_user.id:
-        creator = User.query.get(req.created_by_user_id)
+        creator = db.session.get(User, req.created_by_user_id)
         if creator and getattr(creator, "is_active", True):
             notify_users(
                 [creator],
@@ -2120,7 +2170,7 @@ def assign_request(request_id: int):
     if new_assignee and new_assignee.id != current_user.id:
         notif_targets.append(new_assignee)
     if req.created_by_user_id and req.created_by_user_id != current_user.id:
-        creator = User.query.get(req.created_by_user_id)
+        creator = db.session.get(User, req.created_by_user_id)
         if creator and getattr(creator, "is_active", True):
             notif_targets.append(creator)
 

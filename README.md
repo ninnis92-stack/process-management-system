@@ -317,6 +317,8 @@ This project now includes an admin-managed "Special Emails" feature, an inbound-
 
 - Site branding customization: Admin → Site Config now supports company branding with `Brand name`, `Theme preset` (default/ocean/forest/sunset/midnight), and `Logo upload` (png/jpg/jpeg/webp/svg). This allows internal deployment branding without code changes.
 
+- Vibe behavior with external themes: when a custom `AppTheme` or a `SiteConfig` logo/theme is present the global "Vibe" button is deactivated by default to preserve imported branding. If the imported logos/themes are later removed the app will revert to the original UI (the vibe button will be available again).
+
 - Department naming customization: Admin → Departments already supports editing department labels/codes and ordering. Updated labels are reflected in shared UI navigation so teams can use universal names instead of A/B/C semantics.
 
 ## Email Form Generation (Admin)

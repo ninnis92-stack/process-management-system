@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Create Form Template</h3>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">
+    <label class="form-label">Name</label>
+    {{ form.name(class="form-control") }}
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Description</label>
+    {{ form.description(class="form-control", rows=3) }}
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Number of fields</label>
+    {{ form.field_count(class="form-control") }}
+    <div class="form-text">Create this many empty fields (editable later).</div>
+  </div>
+  <button class="btn btn-primary">Create</button>
+</form>
+{% endblock %}

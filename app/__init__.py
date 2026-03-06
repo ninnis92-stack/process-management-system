@@ -172,7 +172,7 @@ def create_app():
     @app.context_processor
     def _theme_context():
         try:
-            from .models import SiteConfig, Department
+            from .models import SiteConfig, Department, FeatureFlags
             from flask import url_for
             css = ''
             logo = current_app.config.get('LOGO_URL')
@@ -195,6 +195,54 @@ def create_app():
                         pass
             except Exception:
                 pass
+
+                # If an AppTheme or SiteConfig supplies a custom logo or theme
+                # preset, treat that as an "imported" external theme and
+                # deactivate the vibe UI by default. We don't persistently
+                # modify the DB flag here; instead expose a light wrapper to
+                # templates so `FeatureFlags.get().vibe_enabled` will reflect the
+                # runtime override while leaving the stored flag untouched.
+                external_theme_loaded = False
+                try:
+                    # AppTheme active with logo or css
+                    from .models import AppTheme
+                    t_check = AppTheme.query.filter_by(active=True).first()
+                    if t_check and (getattr(t_check, 'logo_filename', None) or getattr(t_check, 'css', None)):
+                        external_theme_loaded = True
+                except Exception:
+                    pass
+                try:
+                    # SiteConfig provides a logo or non-default preset
+                    cfg_check = SiteConfig.get()
+                    if getattr(cfg_check, 'logo_filename', None):
+                        external_theme_loaded = True
+                    if getattr(cfg_check, 'theme_preset', None) and (cfg_check.theme_preset or '').strip().lower() != 'default':
+                        external_theme_loaded = True
+                except Exception:
+                    pass
+
+                class _FeatureFlagsProxy:
+                    def __init__(self, real_cls, force_vibe=None):
+                        self._real = real_cls
+                        self._force = force_vibe
+
+                    def get(self):
+                        f = self._real.get()
+                        if self._force is None:
+                            return f
+                        # Return a lightweight view object that overrides
+                        # `vibe_enabled` while delegating other attributes.
+                        class _View:
+                            def __init__(self, orig, forced):
+                                self._orig = orig
+                                self.vibe_enabled = forced
+
+                            def __getattr__(self, name):
+                                return getattr(self._orig, name)
+
+                        return _View(f, self._force)
+
+                feature_flags_obj = _FeatureFlagsProxy(FeatureFlags, force_vibe=False if external_theme_loaded else None)
 
             # site config (singleton)
             try:
@@ -234,13 +282,15 @@ def create_app():
                         department_labels=dept_labels,
                         site_banner_html=banner_html,
                         rolling_quotes_enabled=rolling_quotes_enabled,
-                        rolling_quotes=rolling_quotes)
+                        rolling_quotes=rolling_quotes,
+                        FeatureFlags=FeatureFlags)
         except Exception:
             return dict(active_theme_css='', theme_logo_url=current_app.config.get('LOGO_URL'),
                         site_brand_name='FreshProcess',
                         site_theme_preset='default',
                         department_labels={'A': 'Dept A', 'B': 'Dept B', 'C': 'Dept C'},
-                        site_banner_html='', rolling_quotes_enabled=False, rolling_quotes=[])
+                        site_banner_html='', rolling_quotes_enabled=False, rolling_quotes=[],
+                        FeatureFlags=None)
 
     # Track the last successfully rendered GET URL in the session so that
     # when the DB is temporarily unavailable we can redirect users back to

@@ -39,6 +39,13 @@ class Config:
     PART_API_TOKEN = os.getenv("PART_API_TOKEN")
     PART_API_TIMEOUT = int(os.getenv("PART_API_TIMEOUT", "5"))
 
+    # External verification feature flag (safe to keep False until migrations/connectors ready)
+    ENABLE_EXTERNAL_VERIFICATION = os.getenv("ENABLE_EXTERNAL_VERIFICATION", "False") == "True"
+
+    # Inventory connector (skeleton). When False the InventoryService is a no-op.
+    INVENTORY_ENABLED = os.getenv("INVENTORY_ENABLED", "False") == "True"
+    INVENTORY_DSN = os.getenv("INVENTORY_DSN")
+
     # Method verification (separate service allowing different endpoints/tokens)
     METHOD_API_ENABLED = os.getenv("METHOD_API_ENABLED", "False") == "True"
     METHOD_API_URL = os.getenv("METHOD_API_URL")
@@ -73,3 +80,7 @@ class Config:
     # WTForms/CSRF settings
     # Increase CSRF token lifetime for prototype use (default 24 hours)
     WTF_CSRF_TIME_LIMIT = int(os.getenv("WTF_CSRF_TIME_LIMIT", "86400"))
+    # When True, tighten request visibility so users only see requests owned
+    # by their department or explicitly handed off to them. Useful for
+    # enforcing strict inter-department isolation in production.
+    ENFORCE_DEPT_ISOLATION = os.getenv("ENFORCE_DEPT_ISOLATION", "False") == "True"

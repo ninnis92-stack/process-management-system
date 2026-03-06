@@ -114,10 +114,48 @@ class EmailRoutingForm(FlaskForm):
     submit = SubmitField("Save Mapping")
 
 
+class WorkflowForm(FlaskForm):
+    name = StringField("Workflow name", validators=[DataRequired(), Length(max=200)])
+    description = TextAreaField("Description", validators=[Optional(), Length(max=2000)])
+    department_code = SelectField("Department (optional)", choices=[("", "-- global --"), ("A", "A"), ("B", "B"), ("C", "C")], validators=[Optional()])
+    spec_json = TextAreaField("Workflow spec (JSON)", validators=[Optional(), Length(max=20000)])
+    active = BooleanField("Active", default=True)
+    submit = SubmitField("Save Workflow")
+
+
+class FormTemplateAdminForm(FlaskForm):
+    name = StringField("Template name", validators=[DataRequired(), Length(max=200)])
+    description = TextAreaField("Description", validators=[Optional(), Length(max=1000)])
+    field_count = IntegerField("Number of fields", default=3)
+    submit = SubmitField("Create Template")
+
+
+class FormFieldInlineForm(FlaskForm):
+    label = StringField("Field label", validators=[DataRequired(), Length(max=200)])
+    name = StringField("Field name/key", validators=[Optional(), Length(max=200)])
+    field_type = SelectField("Type", choices=[("text", "Text"), ("textarea", "Textarea"), ("select", "Select")], default="text")
+    required = BooleanField("Required", default=False)
+    submit = SubmitField("Save Fields")
+
+
+class DepartmentAssignmentForm(FlaskForm):
+    department = SelectField("Department", choices=[("A", "A"), ("B", "B"), ("C", "C")], validators=[DataRequired()])
+    template_id = SelectField("Template", coerce=int, validators=[DataRequired()])
+    submit = SubmitField("Assign Template")
+
+
+class FieldVerificationForm(FlaskForm):
+    provider = SelectField("Provider", choices=[('inventory', 'Inventory Service')], validators=[DataRequired()])
+    external_key = StringField("External key", validators=[Optional(), Length(max=200)])
+    params_json = TextAreaField("Params (JSON)", validators=[Optional(), Length(max=2000)])
+    submit = SubmitField("Save Verification")
+
+
 class FeatureFlagsForm(FlaskForm):
     enable_notifications = BooleanField("Enable in-app notifications", default=True)
     enable_nudges = BooleanField("Enable automated nudges", default=True)
     allow_user_nudges = BooleanField("Allow users to push nudges to others", default=False)
+    vibe_enabled = BooleanField("Show Vibe button UI", default=True)
     submit = SubmitField("Save Flags")
 
 

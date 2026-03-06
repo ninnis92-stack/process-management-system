@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Edit Fields for {{ template.name }}</h3>
+<form method="post">
+  <table class="table">
+    <thead>
+      <tr><th>Label</th><th>Name/key</th><th>Type</th><th>Required</th></tr>
+    </thead>
+    <tbody>
+      {% for f in fields %}
+      <tr>
+        <td><input class="form-control" name="field_{{ f.id }}_label" value="{{ f.label }}"/></td>
+        <td><input class="form-control" name="field_{{ f.id }}_name" value="{{ f.name }}"/></td>
+        <td>
+          <select name="field_{{ f.id }}_type" class="form-select">
+            <option value="text" {% if f.field_type=='text' %}selected{% endif %}>Text</option>
+            <option value="textarea" {% if f.field_type=='textarea' %}selected{% endif %}>Textarea</option>
+            <option value="select" {% if f.field_type=='select' %}selected{% endif %}>Select</option>
+          </select>
+        </td>
+        <td><input type="checkbox" name="field_{{ f.id }}_required" value="1" {% if f.required %}checked{% endif %}></td>
+        <td>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.edit_field_verification', field_id=f.id) }}">Verify</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <button class="btn btn-primary">Save fields</button>
+</form>
+{% endblock %}

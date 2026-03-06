@@ -46,7 +46,7 @@ def test_departments_crud_and_site_config(app, client):
     assert b'Department updated' in rv.data
 
     with app.app_context():
-        d = Department.query.get(did)
+        d = db.session.get(Department, did)
         assert d.name == 'Dept X Updated'
         assert d.order == 11
 

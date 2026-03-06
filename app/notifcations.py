@@ -52,7 +52,7 @@ def _get_latest_department_template(department_code: str):
         .order_by(DepartmentFormAssignment.created_at.desc())
         .first()
     )
-    return FormTemplate.query.get(assigned.template_id) if assigned else None
+    return db.session.get(FormTemplate, assigned.template_id) if assigned else None
 
 
 def users_in_department(dept: str):

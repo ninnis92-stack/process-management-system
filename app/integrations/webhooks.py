@@ -28,7 +28,7 @@ def _get_latest_department_template(department_code: str):
         .order_by(DepartmentFormAssignment.created_at.desc())
         .first()
     )
-    return FormTemplate.query.get(assigned.template_id) if assigned else None
+    return db.session.get(FormTemplate, assigned.template_id) if assigned else None
 
 
 def _get_shared_secret():
@@ -131,7 +131,7 @@ def inbound_mail():
         except Exception:
             owner_id = 0
         if owner_id:
-            owner_user = User.query.get(owner_id)
+            owner_user = db.session.get(User, owner_id)
             if owner_user and owner_user.email:
                 target = owner_user.email.strip().lower()
 

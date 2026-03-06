@@ -1,5 +1,5 @@
 from typing import Optional, Tuple
-from ..models import StatusOption
+from ..models import StatusOption, Workflow
 
 OWNER_BY_STATUS = {
     "PENDING_C_REVIEW": "C",
@@ -67,8 +67,113 @@ HANDOFF_TRANSITIONS = {
     ("NEW_FROM_A", "PENDING_C_REVIEW"),      # B -> C (early send)
 }
 
+def _allowed_from_spec(spec: dict) -> set:
+    """Return a set of (from,to) tuples from a workflow spec dict.
+
+    Expected spec format (flexible):
+      {"transitions": [{"from": "A", "to": "B"}, ...]}
+    """
+    out = set()
+    if not spec or not isinstance(spec, dict):
+        return out
+    trans = spec.get('transitions') or spec.get('allowed_transitions') or []
+    if isinstance(trans, dict):
+        # support mapping format {"A": ["B","C"]}
+        for k, vals in trans.items():
+            if isinstance(vals, (list, tuple)):
+                for v in vals:
+                    out.add((k, v))
+    elif isinstance(trans, (list, tuple)):
+        for item in trans:
+            if isinstance(item, dict):
+                f = item.get('from') or item.get('source')
+                t = item.get('to') or item.get('target')
+                if f and t:
+                    out.add((f, t))
+            elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                out.add((item[0], item[1]))
+    return out
+
+
 def transition_allowed(dept: str, from_status: str, to_status: str) -> bool:
+    """Decide whether `dept` may move from `from_status` to `to_status`.
+
+    If an active `Workflow` exists for the department (or a global one), its
+    `spec` takes precedence. Otherwise fall back to hard-coded
+    `ALLOWED_TRANSITIONS` for legacy behavior.
+    """
+    try:
+        # Prefer department-scoped workflow, then global
+        wf = Workflow.query.filter_by(active=True, department_code=dept).first()
+        if not wf:
+            wf = Workflow.query.filter_by(active=True, department_code=None).first()
+        if wf and wf.spec:
+            allowed = _allowed_from_spec(wf.spec)
+            return (from_status, to_status) in allowed
+    except Exception:
+        # On any DB/spec parse error, fall back to legacy map
+        pass
+
     return (from_status, to_status) in ALLOWED_TRANSITIONS.get(dept, set())
+
+
+def allowed_transitions_with_labels(dept: str, from_status: str) -> list:
+    """Return a list of `(to_status, label)` choices allowed for `dept` from `from_status`.
+
+    Labels are taken from an active workflow spec `steps` mapping when present,
+    falling back to a `StatusOption` label in the DB or a humanized status string.
+    """
+    choices = []
+    label_map = {}
+    try:
+        wf = Workflow.query.filter_by(active=True, department_code=dept).first()
+        if not wf:
+            wf = Workflow.query.filter_by(active=True, department_code=None).first()
+        if wf and isinstance(wf.spec, dict):
+            steps = wf.spec.get('steps') or wf.spec.get('labels')
+            if isinstance(steps, dict):
+                label_map.update(steps)
+            elif isinstance(steps, (list, tuple)):
+                for s in steps:
+                    if isinstance(s, dict):
+                        code = s.get('code') or s.get('id') or s.get('name')
+                        lab = s.get('label') or s.get('title')
+                        if code and lab:
+                            label_map[code] = lab
+    except Exception:
+        # ignore DB/spec parsing issues and fall back to legacy behavior
+        pass
+
+    allowed = set()
+    try:
+        wf = Workflow.query.filter_by(active=True, department_code=dept).first()
+        if not wf:
+            wf = Workflow.query.filter_by(active=True, department_code=None).first()
+        if wf and wf.spec:
+            allowed = _allowed_from_spec(wf.spec)
+    except Exception:
+        # fall back to legacy map
+        allowed = set()
+
+    # If no workflow-defined allowed set, use legacy ALLOWED_TRANSITIONS
+    if not allowed:
+        allowed = ALLOWED_TRANSITIONS.get(dept, set())
+
+    tos = sorted({t for (f, t) in allowed if f == from_status})
+    for t in tos:
+        lab = label_map.get(t)
+        if not lab:
+            try:
+                from ..models import StatusOption
+                so = StatusOption.query.filter_by(code=t).first()
+                if so and so.label:
+                    lab = so.label
+            except Exception:
+                lab = None
+        if not lab:
+            lab = t.replace("_", " ").title()
+        choices.append((t, lab))
+    return choices
 
 def handoff_for_transition(from_status: str, to_status: str) -> Optional[Tuple[str, str]]:
     if (from_status, to_status) not in HANDOFF_TRANSITIONS:
