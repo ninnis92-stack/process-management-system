@@ -831,6 +831,8 @@ def special_email():
         flash('Nudge / special email settings saved.', 'success')
         return redirect(url_for('admin.special_email'))
 
+    return render_template('admin_special_email.html', form=form, cfg=cfg)
+
 
 @admin_bp.route('/email_routing')
 @login_required
@@ -944,8 +946,6 @@ def email_routing_delete(rid: int):
     db.session.commit()
     flash('Email routing mapping deleted.', 'success')
     return redirect(url_for('admin.email_routing_list'))
-
-    return render_template('admin_special_email.html', form=form, cfg=cfg)
 
 
 @admin_bp.route('/feature_flags', methods=['GET', 'POST'])
