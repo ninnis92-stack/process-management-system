@@ -325,6 +325,8 @@ This project now includes an admin-managed "Special Emails" feature, an inbound-
 
 - SSO integration for form-generation ownership: in Admin Special Email settings, set `Form generation owner (SSO user)` to designate the responsible SSO-linked user. If `Request form inbox email` is blank, the selected owner email is used for inbound mailbox matching and department routing defaults to the selected owner department.
 
+- Admin-driven email form generation + verification: request-by-email instructions are generated from the admin-edited form template assigned to the configured department (Admin form templates + department assignment). In strict verification mode, inbound email fields are validated against those same template rules (required fields, selectable options, and regex rules), so the generated form and runtime verification stay aligned.
+
 - Autoresponder: when enabled the app will send a reply to senders of the Request Form Email explaining how to submit requests by composing a subject line. The autoresponder uses the same EmailService used elsewhere (logs messages when `EMAIL_ENABLED` is false).
 
 - Inbound mail webhook: a signed endpoint is available at `/integrations/inbound-mail` (CSRF-exempt). It expects a HMAC-SHA256 signature in the `X-Webhook-Signature` header. Example (bash):
