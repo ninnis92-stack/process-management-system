@@ -12,6 +12,7 @@ from .extensions import db
 from .models import Notification, User, SpecialEmailConfig, NotificationRetention
 from flask import current_app
 from threading import Thread
+from typing import Optional
 
 from .services.emailer import EmailService
 import importlib
@@ -242,5 +243,60 @@ def send_request_form_autoresponder(sender_email: str) -> bool:
     # Send the autoresponder (non-blocking)
     recipients_map = {sender_email: None}
     subject = "Request form: instructions to submit via subject"
+    _send_emails_async(recipients_map, subject, body)
+    return True
+
+
+def send_request_form_validation_rejection(sender_email: str, invalid_fields: list[str]) -> bool:
+    """Send automated rejection email listing invalid fields for inbound request submissions."""
+    if not sender_email or not invalid_fields:
+        return False
+
+    normalized = []
+    for field in invalid_fields:
+        name = (field or '').strip()
+        if name and name not in normalized:
+            normalized.append(name)
+    if not normalized:
+        return False
+
+    bullet_list = "\n".join([f"- {f}" for f in normalized])
+    body = (
+        "Your request-by-email submission was rejected because one or more fields failed verification.\n\n"
+        "Invalid field(s):\n"
+        f"{bullet_list}\n\n"
+        "Please correct these fields and resend your email."
+    )
+    recipients_map = {sender_email: None}
+    subject = "Request rejected: invalid field values"
+    _send_emails_async(recipients_map, subject, body)
+    return True
+
+
+def send_request_form_inventory_out_of_stock_notice(sender_email: str, out_of_stock_fields: list[str], message: Optional[str] = None) -> bool:
+    """Notify requester when verified inventory fields resolve as out of stock."""
+    if not sender_email or not out_of_stock_fields:
+        return False
+
+    normalized = []
+    for field in out_of_stock_fields:
+        name = (field or '').strip()
+        if name and name not in normalized:
+            normalized.append(name)
+    if not normalized:
+        return False
+
+    bullet_list = "\n".join([f"- {f}" for f in normalized])
+    if message and isinstance(message, str) and message.strip():
+        body = message.replace("{out_of_stock_fields}", bullet_list)
+    else:
+        body = (
+            "Your request-by-email submission includes inventory fields that are currently out of stock.\n\n"
+            "Out-of-stock field(s):\n"
+            f"{bullet_list}\n\n"
+            "You can continue by updating the parts/values, or wait for inventory restock."
+        )
+    recipients_map = {sender_email: None}
+    subject = "Inventory notice: out-of-stock field values"
     _send_emails_async(recipients_map, subject, body)
     return True

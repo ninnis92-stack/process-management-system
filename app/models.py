@@ -263,6 +263,11 @@ class SpecialEmailConfig(db.Model):
     request_form_email = db.Column(db.String(255), nullable=True)
     request_form_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     request_form_first_message = db.Column(db.Text, nullable=True)
+    request_form_department = db.Column(db.String(2), nullable=False, default='A')
+    request_form_field_validation_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    request_form_inventory_out_of_stock_notify_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    request_form_inventory_out_of_stock_notify_mode = db.Column(db.String(20), nullable=False, default='email')
+    request_form_inventory_out_of_stock_message = db.Column(db.Text, nullable=True)
     nudge_enabled = db.Column(db.Boolean, nullable=False, default=False)
     nudge_interval_hours = db.Column(db.Integer, nullable=True)
     # Minimum hours after request creation before nudges may start.

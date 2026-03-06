@@ -70,6 +70,21 @@ class NotificationRetentionForm(FlaskForm):
 
 
 class SpecialEmailConfigForm(FlaskForm):
+    enabled = BooleanField("Enable request-by-email feature", default=False)
+    request_form_email = StringField("Request form inbox email", validators=[Optional(), Email(), Length(max=255)])
+    request_form_first_message = TextAreaField("First autoresponder message", validators=[Optional(), Length(max=4000)])
+    request_form_department = SelectField("SSO recognized sender department", choices=[("A", "A"), ("B", "B"), ("C", "C")], default="A")
+    request_form_field_validation_enabled = BooleanField("Enable strict field verification (auto-reject invalid emails)", default=False)
+    request_form_inventory_out_of_stock_notify_enabled = BooleanField("Notify requester when inventory verification returns out of stock", default=False)
+    request_form_inventory_out_of_stock_notify_mode = SelectField(
+        "Out-of-stock notify mode",
+        choices=[("notification", "Notification only"), ("email", "Email only"), ("both", "Both notification and email")],
+        default="email",
+    )
+    request_form_inventory_out_of_stock_message = TextAreaField(
+        "Out-of-stock requester message",
+        validators=[Optional(), Length(max=4000)],
+    )
     nudge_enabled = BooleanField("Enable nudges", default=False)
     nudge_interval_hours = IntegerField("Nudge interval (hours)", default=24)
     nudge_min_delay_hours = IntegerField("Minimum delay before first nudge (hours)", default=4)

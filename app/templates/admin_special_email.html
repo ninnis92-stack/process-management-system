@@ -6,6 +6,52 @@
     {{ form.hidden_tag() }}
 
     <div class="form-check mb-3">
+      {{ form.enabled(class_='form-check-input') }}
+      {{ form.enabled.label(class_='form-check-label') }}
+      <div class="form-text">When enabled, inbound mail webhook can generate request records.</div>
+    </div>
+
+    <div class="mb-3">
+      {{ form.request_form_email.label(class_='form-label') }}
+      {{ form.request_form_email(class_='form-control', placeholder='requests@yourdomain.com') }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.request_form_first_message.label(class_='form-label') }}
+      {{ form.request_form_first_message(class_='form-control', rows='4', placeholder='Use {fields_for_subject} placeholder in your message...') }}
+      <div class="form-text">Used by the autoresponder for request-by-email.</div>
+    </div>
+
+    <div class="mb-3">
+      {{ form.request_form_department.label(class_='form-label') }}
+      {{ form.request_form_department(class_='form-select') }}
+      <div class="form-text">Default department applied to SSO-recognized sender emails for generated request flow.</div>
+    </div>
+
+    <div class="form-check mb-3">
+      {{ form.request_form_field_validation_enabled(class_='form-check-input') }}
+      {{ form.request_form_field_validation_enabled.label(class_='form-check-label') }}
+      <div class="form-text">When enabled, inbound request emails with invalid fields are rejected and an automated email identifies each invalid field.</div>
+    </div>
+
+    <div class="form-check mb-3">
+      {{ form.request_form_inventory_out_of_stock_notify_enabled(class_='form-check-input') }}
+      {{ form.request_form_inventory_out_of_stock_notify_enabled.label(class_='form-check-label') }}
+      <div class="form-text">When enabled, verified inventory fields that return out of stock trigger an automated requester notification naming those fields.</div>
+    </div>
+
+    <div class="mb-3">
+      {{ form.request_form_inventory_out_of_stock_notify_mode.label(class_='form-label') }}
+      {{ form.request_form_inventory_out_of_stock_notify_mode(class_='form-select') }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.request_form_inventory_out_of_stock_message.label(class_='form-label') }}
+      {{ form.request_form_inventory_out_of_stock_message(class_='form-control', rows='4', placeholder='Use {out_of_stock_fields} in your message template...') }}
+      <div class="form-text">Editable message sent to requester for out-of-stock inventory fields.</div>
+    </div>
+
+    <div class="form-check mb-3">
       {{ form.nudge_enabled(class_='form-check-input') }}
       {{ form.nudge_enabled.label(class_='form-check-label') }}
     </div>

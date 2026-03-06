@@ -78,6 +78,26 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(text('ALTER TABLE special_email_config ADD COLUMN nudge_min_delay_hours INTEGER DEFAULT 4'))
                     print('schema_fix=special_email_config.nudge_min_delay_hours_added')
+                if 'special_email_config' in insp.get_table_names() and 'request_form_department' not in special_cols:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE special_email_config ADD COLUMN request_form_department VARCHAR(2) DEFAULT 'A'"))
+                    print('schema_fix=special_email_config.request_form_department_added')
+                if 'special_email_config' in insp.get_table_names() and 'request_form_field_validation_enabled' not in special_cols:
+                    with engine.begin() as conn:
+                        conn.execute(text('ALTER TABLE special_email_config ADD COLUMN request_form_field_validation_enabled BOOLEAN DEFAULT FALSE'))
+                    print('schema_fix=special_email_config.request_form_field_validation_enabled_added')
+                if 'special_email_config' in insp.get_table_names() and 'request_form_inventory_out_of_stock_notify_enabled' not in special_cols:
+                    with engine.begin() as conn:
+                        conn.execute(text('ALTER TABLE special_email_config ADD COLUMN request_form_inventory_out_of_stock_notify_enabled BOOLEAN DEFAULT FALSE'))
+                    print('schema_fix=special_email_config.request_form_inventory_out_of_stock_notify_enabled_added')
+                if 'special_email_config' in insp.get_table_names() and 'request_form_inventory_out_of_stock_notify_mode' not in special_cols:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE special_email_config ADD COLUMN request_form_inventory_out_of_stock_notify_mode VARCHAR(20) DEFAULT 'email'"))
+                    print('schema_fix=special_email_config.request_form_inventory_out_of_stock_notify_mode_added')
+                if 'special_email_config' in insp.get_table_names() and 'request_form_inventory_out_of_stock_message' not in special_cols:
+                    with engine.begin() as conn:
+                        conn.execute(text('ALTER TABLE special_email_config ADD COLUMN request_form_inventory_out_of_stock_message TEXT'))
+                    print('schema_fix=special_email_config.request_form_inventory_out_of_stock_message_added')
 
                 status_cols = {c['name'] for c in insp.get_columns('status_option')} if 'status_option' in insp.get_table_names() else set()
                 if 'status_option' in insp.get_table_names() and 'email_enabled' not in status_cols:

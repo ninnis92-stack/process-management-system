@@ -552,6 +552,14 @@ def special_email():
 
     form = SpecialEmailConfigForm()
     if flask_request.method == 'GET' and cfg:
+        form.enabled.data = bool(getattr(cfg, 'enabled', False))
+        form.request_form_email.data = getattr(cfg, 'request_form_email', None)
+        form.request_form_first_message.data = getattr(cfg, 'request_form_first_message', None)
+        form.request_form_department.data = (getattr(cfg, 'request_form_department', 'A') or 'A')
+        form.request_form_field_validation_enabled.data = bool(getattr(cfg, 'request_form_field_validation_enabled', False))
+        form.request_form_inventory_out_of_stock_notify_enabled.data = bool(getattr(cfg, 'request_form_inventory_out_of_stock_notify_enabled', False))
+        form.request_form_inventory_out_of_stock_notify_mode.data = (getattr(cfg, 'request_form_inventory_out_of_stock_notify_mode', 'email') or 'email')
+        form.request_form_inventory_out_of_stock_message.data = getattr(cfg, 'request_form_inventory_out_of_stock_message', None)
         form.nudge_enabled.data = bool(getattr(cfg, 'nudge_enabled', False))
         form.nudge_interval_hours.data = int(getattr(cfg, 'nudge_interval_hours', 24) or 24)
         form.nudge_min_delay_hours.data = int(getattr(cfg, 'nudge_min_delay_hours', 4) or 4)
@@ -561,6 +569,19 @@ def special_email():
             from ..models import SpecialEmailConfig
             cfg = SpecialEmailConfig()
             db.session.add(cfg)
+
+        cfg.enabled = bool(form.enabled.data)
+        cfg.request_form_email = (form.request_form_email.data or '').strip() or None
+        cfg.request_form_first_message = (form.request_form_first_message.data or '').strip() or None
+        cfg.request_form_department = (form.request_form_department.data or 'A').strip().upper()
+        if cfg.request_form_department not in ('A', 'B', 'C'):
+            cfg.request_form_department = 'A'
+        cfg.request_form_field_validation_enabled = bool(form.request_form_field_validation_enabled.data)
+        cfg.request_form_inventory_out_of_stock_notify_enabled = bool(form.request_form_inventory_out_of_stock_notify_enabled.data)
+        cfg.request_form_inventory_out_of_stock_notify_mode = (form.request_form_inventory_out_of_stock_notify_mode.data or 'email').strip().lower()
+        if cfg.request_form_inventory_out_of_stock_notify_mode not in ('notification', 'email', 'both'):
+            cfg.request_form_inventory_out_of_stock_notify_mode = 'email'
+        cfg.request_form_inventory_out_of_stock_message = (form.request_form_inventory_out_of_stock_message.data or '').strip() or None
 
         cfg.nudge_enabled = bool(form.nudge_enabled.data)
         cfg.nudge_interval_hours = int(form.nudge_interval_hours.data or 24)

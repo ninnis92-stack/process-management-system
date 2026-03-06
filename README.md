@@ -336,6 +336,10 @@ curl -v \
 
 The handler will parse semicolon-separated `key=value` pairs from the subject and (optionally) call the `InventoryService` to validate part numbers or sales list numbers. By default `InventoryService` is disabled and returns `null`/`None` for checks.
 
+- Strict field verification (toggleable): in Admin Special Email settings, enable `Enable strict field verification (auto-reject invalid emails)` to reject inbound request emails that include invalid values (for example invalid `request_type`, `priority`, malformed `due_at`, or failed inventory checks). Rejected submissions do not create a request and trigger an automated rejection email listing the exact invalid field names. API responses include `rejected` and `invalid_fields`.
+
+- Inventory out-of-stock requester notifications (toggleable): in Admin Special Email settings, enable `Notify requester when inventory verification returns out of stock`, choose `Out-of-stock notify mode` (`Notification only`, `Email only`, or `Both notification and email`), and edit `Out-of-stock requester message`. Use `{out_of_stock_fields}` in the message template to inject the verified field list. API responses include `out_of_stock_notified`, `out_of_stock_fields`, and `out_of_stock_notify_mode`.
+
 - Inventory skeleton: configuration keys are `INVENTORY_ENABLED` and `INVENTORY_DSN`. The implementation lives at `app/services/inventory.py`. When `INVENTORY_ENABLED` is false the service is a no-op, so current behavior is unchanged. To integrate later, implement `_client` using your DSN and return True/False from `validate_part_number()` / `validate_sales_list_number()`.
 
 ### Migrations / Alembic notes
