@@ -3,9 +3,8 @@ from flask import url_for
 from ..extensions import db
 from ..models import Request as ReqModel, User, Notification
 from ..models import SpecialEmailConfig
+from ..models import FeatureFlags
 from .. import notifcations as notifications_module
-from datetime import datetime, timedelta
-from flask import url_for
 
 def users_in_dept(dept: str):
     return User.query.filter_by(department=dept, is_active=True).all()
@@ -64,12 +63,28 @@ def send_high_priority_nudges(app):
     except Exception:
         return
 
+    # Respect both the special-email config and global feature flags
+    flags = None
+    try:
+        flags = FeatureFlags.get()
+    except Exception:
+        flags = None
+
     if not cfg or not cfg.nudge_enabled:
+        return
+    if flags and not getattr(flags, 'enable_nudges', True):
         return
 
     interval = int(cfg.nudge_interval_hours or 24)
     now = datetime.utcnow()
     cutoff = now - timedelta(hours=interval)
+    # Respect administrative minimum delay: do not nudge requests created
+    # within `nudge_min_delay_hours` of their creation. Default is 4 hours.
+    try:
+        raw_min_delay = getattr(cfg, 'nudge_min_delay_hours', None)
+        min_delay = 4 if raw_min_delay is None else int(raw_min_delay)
+    except Exception:
+        min_delay = 4
 
     # Find high-priority requests still open
     reqs = ReqModel.query.filter(ReqModel.priority == 'high').filter(ReqModel.status != 'CLOSED').all()
@@ -90,6 +105,18 @@ def send_high_priority_nudges(app):
             # skip if we've sent a nudge within the interval
             recent = Notification.query.filter_by(user_id=u.id, dedupe_key=f'nudge:req_{req.id}').filter(Notification.created_at >= cutoff).first()
             if recent:
+                continue
+
+            # skip if request is too new (within admin-configured delay)
+            try:
+                if req.created_at:
+                    age_seconds = (now - req.created_at).total_seconds()
+                    # only enforce the min-delay for positive ages; if created_at
+                    # is unexpectedly in the future, allow the nudge path.
+                    if age_seconds >= 0 and age_seconds < (min_delay * 3600):
+                        continue
+            except Exception:
+                # on any problem reading created_at, be conservative and skip
                 continue
 
             # create in-app notification

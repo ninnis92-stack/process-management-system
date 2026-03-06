@@ -1,6 +1,7 @@
 """Data models for users, requests, artifacts, comments, submissions, and audit trails."""
 
 from datetime import datetime, timedelta
+import json
 import secrets
 from flask_login import UserMixin
 from .extensions import db
@@ -179,14 +180,14 @@ class Submission(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False)
 
-    from_department = db.Column(db.String(1), nullable=False)
-    to_department = db.Column(db.String(1), nullable=False)
+    from_department = db.Column(db.String(1), nullable=True)
+    to_department = db.Column(db.String(1), nullable=True)
 
-    from_status = db.Column(db.String(40), nullable=False)
-    to_status = db.Column(db.String(40), nullable=False)
+    from_status = db.Column(db.String(40), nullable=True)
+    to_status = db.Column(db.String(40), nullable=True)
 
-    summary = db.Column(db.String(200), nullable=False)
-    details = db.Column(db.Text, nullable=False)
+    summary = db.Column(db.String(200), nullable=True)
+    details = db.Column(db.Text, nullable=True)
 
     is_public_to_submitter = db.Column(db.Boolean, default=False)
 
@@ -197,6 +198,44 @@ class Submission(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     attachments = db.relationship("Attachment", backref="submission", lazy=True, cascade="all, delete-orphan")
+
+    # Optional fields to support dynamic form submissions (template-driven)
+    template_id = db.Column(db.Integer, nullable=True)
+    data = db.Column(db.JSON, nullable=True)
+
+
+class FormTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class FormField(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
+    template = db.relationship('FormTemplate', backref='fields')
+    name = db.Column(db.String(200), nullable=False)
+    label = db.Column(db.String(200), nullable=False)
+    field_type = db.Column(db.String(50), nullable=False)
+    required = db.Column(db.Boolean, nullable=False, default=False)
+    verification = db.Column(db.JSON, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class FormFieldOption(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    field_id = db.Column(db.Integer, db.ForeignKey('form_field.id'), nullable=False)
+    field = db.relationship('FormField', backref='options')
+    value = db.Column(db.String(400), nullable=False)
+
+
+class DepartmentFormAssignment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer, db.ForeignKey('form_template.id'), nullable=False)
+    department_name = db.Column(db.String(10), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 class Attachment(db.Model):
     """Files attached to a submission (e.g., screenshots)."""
@@ -213,6 +252,76 @@ class Attachment(db.Model):
     size_bytes = db.Column(db.Integer, nullable=False)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class SpecialEmailConfig(db.Model):
+    """Singleton configuration for special email/autoresponder and nudges."""
+    id = db.Column(db.Integer, primary_key=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=False)
+    help_email = db.Column(db.String(255), nullable=True)
+    help_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    request_form_email = db.Column(db.String(255), nullable=True)
+    request_form_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    request_form_first_message = db.Column(db.Text, nullable=True)
+    nudge_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    nudge_interval_hours = db.Column(db.Integer, nullable=True)
+    # Minimum hours after request creation before nudges may start.
+    # Defaults to 4 hours; admin may only extend (enforced in admin UI).
+    nudge_min_delay_hours = db.Column(db.Integer, nullable=False, default=4)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @classmethod
+    def get(cls):
+        cfg = cls.query.first()
+        if not cfg:
+            cfg = cls()
+            db.session.add(cfg)
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        return cfg
+
+
+class FeatureFlags(db.Model):
+    """Singleton feature flags for admin toggles.
+
+    Use `FeatureFlags.get()` to access the single row.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    enable_notifications = db.Column(db.Boolean, nullable=False, default=True)
+    enable_nudges = db.Column(db.Boolean, nullable=False, default=True)
+    allow_user_nudges = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @classmethod
+    def get(cls):
+        f = cls.query.first()
+        if not f:
+            f = cls()
+            db.session.add(f)
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        return f
+
+
+class StatusBucket(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    department_name = db.Column(db.String(10), nullable=True)
+    order = db.Column(db.Integer, nullable=False, default=0)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    statuses = db.relationship('BucketStatus', backref='bucket', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class BucketStatus(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    bucket_id = db.Column(db.Integer, db.ForeignKey('status_bucket.id'), nullable=False)
+    status_code = db.Column(db.String(80), nullable=False)
+    order = db.Column(db.Integer, nullable=False, default=0)
 
 class AuditLog(db.Model):
     """Immutable audit trail for actions on a request."""
@@ -248,8 +357,77 @@ class SiteConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     navbar_banner = db.Column(db.String(500), nullable=True)
     show_banner = db.Column(db.Boolean, nullable=False, default=False)
-    rolling_quotes = db.Column(db.Text, nullable=True)  # JSON list of strings
+    _rolling_quotes = db.Column("rolling_quotes", db.Text, nullable=True)  # JSON list of strings
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def banner_html(self):
+        return self.navbar_banner
+
+    @banner_html.setter
+    def banner_html(self, value):
+        self.navbar_banner = value
+
+    @property
+    def rolling_quotes_enabled(self):
+        return self.show_banner
+
+    @rolling_quotes_enabled.setter
+    def rolling_quotes_enabled(self, value):
+        self.show_banner = bool(value)
+
+    @property
+    def rolling_quotes(self):
+        if not self._rolling_quotes:
+            return []
+        try:
+            parsed = json.loads(self._rolling_quotes)
+            if isinstance(parsed, list):
+                return [str(x).strip() for x in parsed if str(x).strip()]
+        except Exception:
+            pass
+        # fallback for newline-delimited legacy storage
+        return [line.strip() for line in str(self._rolling_quotes).splitlines() if line.strip()]
+
+    @rolling_quotes.setter
+    def rolling_quotes(self, value):
+        if value is None:
+            self._rolling_quotes = None
+            return
+        if isinstance(value, list):
+            cleaned = [str(x).strip() for x in value if str(x).strip()]
+            self._rolling_quotes = json.dumps(cleaned)
+            return
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                self._rolling_quotes = None
+                return
+            # accept JSON list or newline-delimited text from admin input
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    cleaned = [str(x).strip() for x in parsed if str(x).strip()]
+                    self._rolling_quotes = json.dumps(cleaned)
+                    return
+            except Exception:
+                pass
+            cleaned = [line.strip() for line in raw.splitlines() if line.strip()]
+            self._rolling_quotes = json.dumps(cleaned)
+            return
+        self._rolling_quotes = json.dumps([str(value)])
+
+    @classmethod
+    def get(cls):
+        cfg = cls.query.first()
+        if not cfg:
+            cfg = cls()
+            db.session.add(cfg)
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        return cfg
 
 
 class Department(db.Model):
@@ -260,6 +438,15 @@ class Department(db.Model):
     description = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    order = db.Column(db.Integer, nullable=False, default=0)
+
+    @property
+    def name(self):
+        return self.label
+
+    @name.setter
+    def name(self, v):
+        self.label = v
 
 
 class StatusOption(db.Model):
@@ -282,6 +469,8 @@ class StatusOption(db.Model):
     # If false, status selection will not trigger notifications at all.
     notify_enabled = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Whether this status should produce email deliveries (when mailer/SSO is active)
+    email_enabled = db.Column(db.Boolean, nullable=False, default=False)
 
 
 class DepartmentEditor(db.Model):
@@ -293,3 +482,49 @@ class DepartmentEditor(db.Model):
     can_edit = db.Column(db.Boolean, nullable=False, default=True)
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (db.UniqueConstraint('user_id', 'department', name='uq_user_dept_editor'),)
+
+
+class IntegrationConfig(db.Model):
+    """Per-department integration configuration for outbound connectors.
+
+    `kind` is one of: 'ticketing', 'webhook', 'inventory', 'verification'.
+    `config` holds provider-specific JSON (as text) such as endpoint URLs and tokens.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    department = db.Column(db.String(2), nullable=False, index=True)
+    kind = db.Column(db.String(40), nullable=False)
+    enabled = db.Column(db.Boolean, nullable=False, default=True)
+    config = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('department', 'kind', name='uq_dept_kind'),)
+
+
+class NotificationRetention(db.Model):
+        """Singleton configuration for notification retention and caps.
+
+        - When `retain_until_eod` is True notifications that were read before
+            the start of the current UTC day will no longer be shown in the UI.
+        - When `clear_after_read_seconds` is set (int >= 0) read notifications
+            are retained only for that many seconds after `read_at`.
+            A value of 0 means "clear immediately when checked".
+        - `max_notifications_per_user` caps how many notifications are stored
+            per user; older notifications are removed when the cap is exceeded.
+        """
+        id = db.Column(db.Integer, primary_key=True)
+        retain_until_eod = db.Column(db.Boolean, nullable=False, default=True)
+        clear_after_read_seconds = db.Column(db.Integer, nullable=True)  # seconds, nullable if using retain_until_eod
+        max_notifications_per_user = db.Column(db.Integer, nullable=False, default=20)
+        max_retention_days = db.Column(db.Integer, nullable=False, default=7)
+        created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+        @classmethod
+        def get(cls):
+                cfg = cls.query.first()
+                if not cfg:
+                        cfg = cls()
+                        db.session.add(cfg)
+                        try:
+                                db.session.commit()
+                        except Exception:
+                                db.session.rollback()
+                return cfg

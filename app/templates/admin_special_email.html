@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>Special Email / Nudge Settings</h2>
+  <form method="post">
+    {{ form.hidden_tag() }}
+
+    <div class="form-check mb-3">
+      {{ form.nudge_enabled(class_='form-check-input') }}
+      {{ form.nudge_enabled.label(class_='form-check-label') }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.nudge_interval_hours.label(class_='form-label') }}
+      {{ form.nudge_interval_hours(class_='form-control') }}
+      <div class="form-text">Hours between nudges per-request (rate limit).</div>
+    </div>
+
+    <div class="mb-3">
+      {{ form.nudge_min_delay_hours.label(class_='form-label') }}
+      {{ form.nudge_min_delay_hours(class_='form-control') }}
+      <div class="form-text">Minimum hours after request creation before nudges may start. Minimum enforced is 4 hours.</div>
+    </div>
+
+    <button class="btn btn-primary">Save</button>
+  </form>
+{% endblock %}

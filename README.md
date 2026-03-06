@@ -250,11 +250,15 @@ PYTHONPATH=. python3 scripts/notify_test.py
 This script will create temporary test users and print counts of in‑app `Notification` rows created when email is disabled vs enabled.
 
 ## Search & Filtering
-- Search endpoint `/search` (title/description/id) scoped by department access.
+- Search endpoint `/search` supports request-number lookup (`id`) plus keyword search across request/public fields (`title`, `description`, `request_type`, `pricebook_status`, `sales_list_reference`, artifact fields, and public submissions).
+- By default, comment bodies are excluded from search (private/internal comment scopes are not indexed by search).
 - Dept B dashboard shows status buckets and semantic filters (in progress, C review, final review, etc.). Closed items >24h are hidden.
 
 ## Nudges
-- Only the original submitter can nudge; gated to 48h after creation and 24h cooldown; Dept C cannot send nudges.
+- Nudges are automated reminders for high-priority requests that are still open for the assigned user.
+- Admin can enable/disable nudges and control the timer interval in the admin special-email settings.
+- A default minimum delay of 4 hours after request creation is enforced before nudges begin; admin can only extend that delay.
+- User-driven nudge pushing is disabled by default; nudges are intended to be timer-driven by admin configuration.
 
 ## Forms & Validations
 - WTForms in `app/requests_bp/forms.py` drive request create/edit/transition forms.

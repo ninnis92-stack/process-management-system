@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Integrations</h2>
+<p><a href="{{ url_for('admin.create_integration') }}" class="btn btn-primary">New integration</a></p>
+<table class="table">
+  <thead><tr><th>Department</th><th>Kind</th><th>Enabled</th><th>Config</th><th>Actions</th></tr></thead>
+  <tbody>
+  {% for i in integrations %}
+    <tr>
+      <td>{{ i.department }}</td>
+      <td>{{ i.kind }}</td>
+      <td>{{ 'yes' if i.enabled else 'no' }}</td>
+      <td><pre style="max-width:400px; white-space:pre-wrap;">{{ i.config or '' }}</pre></td>
+      <td>
+        <a href="{{ url_for('admin.edit_integration', int_id=i.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('admin.delete_integration', int_id=i.id) }}" style="display:inline">
+          <button class="btn btn-link">Delete</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -9,7 +9,7 @@ Keep the send path idempotent and non-blocking from request handlers.
 """
 
 from .extensions import db
-from .models import Notification, User, SpecialEmailConfig
+from .models import Notification, User, SpecialEmailConfig, NotificationRetention
 from flask import current_app
 from threading import Thread
 
@@ -126,7 +126,7 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
     Thread(target=_send, daemon=True).start()
 
 
-def notify_users(users, title, body=None, url=None, ntype="generic", request_id=None):
+def notify_users(users, title, body=None, url=None, ntype="generic", request_id=None, allow_email: bool = True):
     # Decide whether to persist in-app notifications per-recipient.
     # If the app's EmailService is enabled and an email address exists for
     # a recipient, prefer sending email and skip creating an in-app row for
@@ -142,7 +142,7 @@ def notify_users(users, title, body=None, url=None, ntype="generic", request_id=
 
     for u in users:
         has_email = bool(getattr(u, "email", None))
-        if email_enabled and has_email:
+        if email_enabled and has_email and allow_email:
             # collect for email send but do not create DB Notification row
             recipients_map[u.email] = u.id
         else:
@@ -157,6 +157,37 @@ def notify_users(users, title, body=None, url=None, ntype="generic", request_id=
                     url=url,
                 )
             )
+
+    # Enforce per-user notification cap: remove oldest notifications beyond cap.
+    try:
+        cfg = NotificationRetention.get()
+        max_per_user = cfg.max_notifications_per_user or 20
+        # Cap maximum to 20 to avoid accidental large values
+        if max_per_user > 20:
+            max_per_user = 20
+    except Exception:
+        max_per_user = 20
+
+    # For any users we added DB rows for, ensure their total stored notifications
+    # do not exceed the configured cap. We perform deletions within the same
+    # session so the caller's commit will persist the removals.
+    try:
+        for u in users:
+            # only enforce for users that will have DB rows (email-disabled or no email)
+            has_email = bool(getattr(u, "email", None))
+            if email_enabled and has_email:
+                continue
+            count = Notification.query.filter_by(user_id=u.id).count()
+            if count > max_per_user:
+                to_remove = count - max_per_user
+                old = [n.id for n in Notification.query.filter_by(user_id=u.id).order_by(Notification.created_at.asc()).limit(to_remove).all()]
+                if old:
+                    Notification.query.filter(Notification.id.in_(old)).delete(synchronize_session=False)
+    except Exception:
+        try:
+            current_app.logger.exception("Failed to enforce notification cap")
+        except Exception:
+            pass
 
     # Fire-and-forget email notifications (non-blocking). Email sending is optional/config-driven
     if recipients_map:

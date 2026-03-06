@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, redirect, url_for, request
 from flask_login import login_required, current_user
 from ..extensions import db
 from ..models import Notification
+from ..models import NotificationRetention
 from sqlalchemy import or_
 from datetime import datetime, timedelta
 
@@ -19,13 +20,26 @@ def latest():
     # Only return notifications that are unread, or were read today.
     # Notifications marked read before start of today will no longer appear
     # in the dropdown.
-    start_of_today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    now = datetime.utcnow()
+    # Determine retention cutoff based on admin settings.
+    cfg = NotificationRetention.get()
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    if cfg and not cfg.retain_until_eod and cfg.clear_after_read_seconds is not None:
+        cutoff = now - timedelta(seconds=int(cfg.clear_after_read_seconds))
+    else:
+        cutoff = start_of_today
+
+    per_user_limit = getattr(cfg, 'max_notifications_per_user', 20) or 20
+    if per_user_limit > 20:
+        per_user_limit = 20
+
     items = (
         Notification.query
         .filter(Notification.user_id == current_user.id)
-        .filter(or_(Notification.is_read == False, Notification.read_at >= start_of_today))
+        .filter(or_(Notification.is_read == False, Notification.read_at >= cutoff))
         .order_by(Notification.created_at.desc())
-        .limit(10)
+        .limit(per_user_limit)
         .all()
     )
     return jsonify([{
@@ -41,8 +55,14 @@ def latest():
 @login_required
 def mark_read(notif_id: int):
     n = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
-    n.is_read = True
-    n.read_at = datetime.utcnow()
+    cfg = NotificationRetention.get()
+    now = datetime.utcnow()
+    # If admin configured immediate clear on check, remove the row instead
+    if cfg and cfg.clear_after_read_seconds is not None and int(cfg.clear_after_read_seconds) == 0:
+        db.session.delete(n)
+    else:
+        n.is_read = True
+        n.read_at = now
     db.session.commit()
     return jsonify({"ok": True})
 
@@ -51,6 +71,12 @@ def mark_read(notif_id: int):
 @login_required
 def mark_all_read():
     # Mark all unread notifications for current user as read
-    Notification.query.filter_by(user_id=current_user.id, is_read=False).update({"is_read": True, "read_at": datetime.utcnow()})
+    cfg = NotificationRetention.get()
+    now = datetime.utcnow()
+    if cfg and cfg.clear_after_read_seconds is not None and int(cfg.clear_after_read_seconds) == 0:
+        # delete all unread notifications
+        Notification.query.filter_by(user_id=current_user.id, is_read=False).delete(synchronize_session=False)
+    else:
+        Notification.query.filter_by(user_id=current_user.id, is_read=False).update({"is_read": True, "read_at": now})
     db.session.commit()
     return jsonify({"ok": True})

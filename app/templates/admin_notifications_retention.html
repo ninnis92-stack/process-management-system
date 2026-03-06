@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>Notification Retention</h2>
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <div class="form-check mb-3">
+      {{ form.retain_until_eod(class_='form-check-input') }}
+      {{ form.retain_until_eod.label(class_='form-check-label') }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.clear_after_choice.label(class_='form-label') }}
+      {{ form.clear_after_choice(class_='form-select') }}
+    </div>
+    <div class="mb-3">
+      {{ form.custom_days.label(class_='form-label') }}
+      {{ form.custom_days(class_='form-control', placeholder='Enter 1-7') }}
+      <div class="form-text">If choosing "Custom", enter number of days (max 7).</div>
+    </div>
+
+    <div class="mb-3">
+      {{ form.max_notifications_per_user.label(class_='form-label') }}
+      {{ form.max_notifications_per_user(class_='form-control') }}
+      <div class="form-text">Maximum number of notifications stored and shown per user (max 20).</div>
+    </div>
+
+    <button class="btn btn-primary">Save</button>
+  </form>
+{% endblock %}

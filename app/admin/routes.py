@@ -1,15 +1,18 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, current_app, session
+from flask import Blueprint, render_template, redirect, url_for, flash, current_app, session, jsonify
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 
 from ..extensions import db
 from ..models import User
 from .forms import AdminCreateUserForm, SiteConfigForm, DepartmentForm, SSOAssignForm
+from .forms import NotificationRetentionForm
 from ..models import Request as ReqModel, Artifact, Submission, SiteConfig, Department
 from ..models import StatusOption, DepartmentEditor
+from ..models import IntegrationConfig
 from datetime import datetime, timedelta
 from flask import request as flask_request
-from ..models import Notification, AuditLog
+from ..models import Notification, AuditLog, NotificationRetention, StatusBucket, BucketStatus
+from ..models import FeatureFlags
 from urllib.parse import unquote
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -127,6 +130,8 @@ def delete_user(user_id: int):
 
 @admin_bp.route('/users/<int:user_id>/impersonate', methods=['POST'])
 @login_required
+
+
 def impersonate_user(user_id: int):
     if not _is_admin_user():
         flash('Access denied.', 'danger')
@@ -419,18 +424,187 @@ def site_config():
 
     cfg = SiteConfig.query.first()
     form = SiteConfigForm(obj=cfg)
+    if flask_request.method == 'GET' and cfg:
+        form.navbar_banner.data = getattr(cfg, 'banner_html', None) or getattr(cfg, 'navbar_banner', None)
+        try:
+            rq = getattr(cfg, 'rolling_quotes', []) or []
+            form.rolling_quotes.data = '\n'.join(rq) if isinstance(rq, list) else str(rq)
+        except Exception:
+            form.rolling_quotes.data = None
+        form.show_banner.data = bool(getattr(cfg, 'rolling_quotes_enabled', getattr(cfg, 'show_banner', False)))
+
     if form.validate_on_submit():
         if not cfg:
             cfg = SiteConfig()
             db.session.add(cfg)
-        cfg.navbar_banner = form.navbar_banner.data or None
-        cfg.show_banner = bool(form.show_banner.data)
-        cfg.rolling_quotes = form.rolling_quotes.data or None
+        # Support both current field names and legacy payload keys used by tests/UI.
+        banner = form.navbar_banner.data
+        if not banner:
+            banner = flask_request.form.get('banner_html')
+
+        rolling_enabled = bool(form.show_banner.data)
+        if 'rolling_enabled' in flask_request.form:
+            rolling_enabled = True
+
+        rolling_input = form.rolling_quotes.data
+        if not rolling_input:
+            rolling_input = flask_request.form.get('rolling_csv')
+
+        cfg.banner_html = banner or None
+        cfg.rolling_quotes_enabled = rolling_enabled
+        cfg.rolling_quotes = rolling_input or None
         db.session.commit()
         flash('Site configuration saved.', 'success')
         return redirect(url_for('admin.site_config'))
 
     return render_template('admin_site_config.html', form=form, cfg=cfg)
+
+
+@admin_bp.route('/notifications_retention', methods=['GET', 'POST'])
+@login_required
+def notifications_retention():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    cfg = NotificationRetention.get()
+    form = NotificationRetentionForm()
+    if flask_request.method == 'GET':
+        # prefill form
+        form.retain_until_eod.data = bool(getattr(cfg, 'retain_until_eod', True))
+        if cfg and cfg.clear_after_read_seconds is not None:
+            secs = int(cfg.clear_after_read_seconds)
+            if secs == 0:
+                form.clear_after_choice.data = 'immediate'
+            elif secs == 300:
+                form.clear_after_choice.data = '5m'
+            elif secs == 1800:
+                form.clear_after_choice.data = '30m'
+            elif secs == 3600:
+                form.clear_after_choice.data = '1h'
+            elif secs == 86400:
+                form.clear_after_choice.data = '24h'
+            else:
+                days = max(1, min(7, int(secs / 86400)))
+                form.clear_after_choice.data = 'custom'
+                form.custom_days.data = days
+        else:
+            form.clear_after_choice.data = 'eod'
+        form.max_notifications_per_user.data = int(getattr(cfg, 'max_notifications_per_user', 20) or 20)
+
+    if form.validate_on_submit():
+        if not cfg:
+            cfg = NotificationRetention()
+            db.session.add(cfg)
+
+        cfg.retain_until_eod = bool(form.retain_until_eod.data)
+        choice = form.clear_after_choice.data
+        if choice == 'eod':
+            cfg.clear_after_read_seconds = None
+        elif choice == 'immediate':
+            cfg.clear_after_read_seconds = 0
+        elif choice == '5m':
+            cfg.clear_after_read_seconds = 300
+        elif choice == '30m':
+            cfg.clear_after_read_seconds = 1800
+        elif choice == '1h':
+            cfg.clear_after_read_seconds = 3600
+        elif choice == '24h':
+            cfg.clear_after_read_seconds = 86400
+        elif choice == 'custom':
+            days = int(form.custom_days.data or 1)
+            if days < 1:
+                days = 1
+            if days > 7:
+                days = 7
+            cfg.clear_after_read_seconds = days * 86400
+            cfg.retain_until_eod = False
+
+        maxn = int(form.max_notifications_per_user.data or 20)
+        if maxn < 1:
+            maxn = 1
+        if maxn > 20:
+            maxn = 20
+        cfg.max_notifications_per_user = maxn
+        cfg.max_retention_days = 7
+
+        db.session.commit()
+        flash('Notification retention updated.', 'success')
+        return redirect(url_for('admin.notifications_retention'))
+
+    return render_template('admin_notifications_retention.html', form=form, cfg=cfg)
+
+
+@admin_bp.route('/special_email', methods=['GET', 'POST'])
+@login_required
+def special_email():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    from .forms import SpecialEmailConfigForm
+    cfg = None
+    try:
+        from ..models import SpecialEmailConfig
+        cfg = SpecialEmailConfig.get()
+    except Exception:
+        cfg = None
+
+    form = SpecialEmailConfigForm()
+    if flask_request.method == 'GET' and cfg:
+        form.nudge_enabled.data = bool(getattr(cfg, 'nudge_enabled', False))
+        form.nudge_interval_hours.data = int(getattr(cfg, 'nudge_interval_hours', 24) or 24)
+        form.nudge_min_delay_hours.data = int(getattr(cfg, 'nudge_min_delay_hours', 4) or 4)
+
+    if form.validate_on_submit():
+        if not cfg:
+            from ..models import SpecialEmailConfig
+            cfg = SpecialEmailConfig()
+            db.session.add(cfg)
+
+        cfg.nudge_enabled = bool(form.nudge_enabled.data)
+        cfg.nudge_interval_hours = int(form.nudge_interval_hours.data or 24)
+        # enforce minimum allowed (4 hours); admin may only extend beyond this
+        try:
+            requested = int(form.nudge_min_delay_hours.data or 4)
+        except Exception:
+            requested = 4
+        if requested < 4:
+            requested = 4
+            flash('Minimum nudge delay cannot be less than 4 hours; adjusted to 4.', 'warning')
+        cfg.nudge_min_delay_hours = requested
+
+        db.session.commit()
+        flash('Nudge / special email settings saved.', 'success')
+        return redirect(url_for('admin.special_email'))
+
+    return render_template('admin_special_email.html', form=form, cfg=cfg)
+
+
+@admin_bp.route('/feature_flags', methods=['GET', 'POST'])
+@login_required
+def feature_flags():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    from .forms import FeatureFlagsForm
+    flags = FeatureFlags.get()
+    form = FeatureFlagsForm()
+    if flask_request.method == 'GET':
+        form.enable_notifications.data = bool(getattr(flags, 'enable_notifications', True))
+        form.enable_nudges.data = bool(getattr(flags, 'enable_nudges', True))
+        form.allow_user_nudges.data = bool(getattr(flags, 'allow_user_nudges', False))
+
+    if form.validate_on_submit():
+        flags.enable_notifications = bool(form.enable_notifications.data)
+        flags.enable_nudges = bool(form.enable_nudges.data)
+        flags.allow_user_nudges = bool(form.allow_user_nudges.data)
+        db.session.commit()
+        flash('Feature flags updated.', 'success')
+        return redirect(url_for('admin.feature_flags'))
+
+    return render_template('admin_feature_flags.html', form=form, flags=flags)
 
 
 @admin_bp.route('/departments')
@@ -463,7 +637,14 @@ def create_status_option():
     form = StatusOptionForm()
     if form.validate_on_submit():
         code = form.code.data.strip()
-        opt = StatusOption(code=code, label=form.label.data.strip(), target_department=(form.target_department.data or None), notify_enabled=bool(form.notify_enabled.data), notify_on_transfer_only=bool(form.notify_on_transfer_only.data))
+        opt = StatusOption(
+            code=code,
+            label=form.label.data.strip(),
+            target_department=(form.target_department.data or None),
+            notify_enabled=bool(form.notify_enabled.data),
+            notify_on_transfer_only=bool(form.notify_on_transfer_only.data),
+            email_enabled=bool(getattr(form, 'email_enabled', False).data if getattr(form, 'email_enabled', None) else False),
+        )
         db.session.add(opt)
         db.session.commit()
         flash('Status option created.', 'success')
@@ -486,6 +667,7 @@ def edit_status_option(opt_id: int):
         opt.target_department = form.target_department.data or None
         opt.notify_enabled = bool(form.notify_enabled.data)
         opt.notify_on_transfer_only = bool(form.notify_on_transfer_only.data)
+        opt.email_enabled = bool(getattr(form, 'email_enabled', False).data if getattr(form, 'email_enabled', None) else False)
         db.session.commit()
         flash('Status option updated.', 'success')
         return redirect(url_for('admin.list_status_options'))
@@ -513,6 +695,102 @@ def list_dept_editors():
         return redirect(url_for('requests.dashboard'))
     editors = DepartmentEditor.query.order_by(DepartmentEditor.department, DepartmentEditor.assigned_at.desc()).all()
     return render_template('admin_dept_editors.html', editors=editors)
+
+
+@admin_bp.route('/integrations')
+@login_required
+def list_integrations():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    ints = IntegrationConfig.query.order_by(IntegrationConfig.department, IntegrationConfig.kind).all()
+    return render_template('admin_integrations.html', integrations=ints)
+
+
+@admin_bp.route('/buckets/import_default', methods=['POST'])
+@login_required
+def import_default_buckets():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    # Recommended default buckets for Dept B (used by tests)
+    try:
+        # In Progress bucket
+        b = StatusBucket.query.filter_by(name='In Progress', department_name='B').first()
+        if not b:
+            b = StatusBucket(name='In Progress', department_name='B', order=0, active=True)
+            db.session.add(b)
+            db.session.flush()
+            bs = BucketStatus(bucket_id=b.id, status_code='B_IN_PROGRESS', order=0)
+            db.session.add(bs)
+
+        # Waiting bucket
+        w = StatusBucket.query.filter_by(name='Waiting', department_name='B').first()
+        if not w:
+            w = StatusBucket(name='Waiting', department_name='B', order=1, active=True)
+            db.session.add(w)
+            db.session.flush()
+            ws = BucketStatus(bucket_id=w.id, status_code='WAITING_ON_A_RESPONSE', order=0)
+            db.session.add(ws)
+
+        db.session.commit()
+        flash('Imported recommended buckets.', 'success')
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Failed to import default buckets')
+        flash('Failed to import buckets.', 'danger')
+    return redirect(url_for('admin.list_departments'))
+
+
+@admin_bp.route('/integrations/new', methods=['GET', 'POST'])
+@login_required
+def create_integration():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    from .forms import IntegrationConfigForm
+    form = IntegrationConfigForm()
+    if form.validate_on_submit():
+        ic = IntegrationConfig(department=form.department.data, kind=form.kind.data, enabled=bool(form.enabled.data), config=(form.config_json.data or None))
+        db.session.add(ic)
+        db.session.commit()
+        flash('Integration saved.', 'success')
+        return redirect(url_for('admin.list_integrations'))
+    return render_template('admin_integration_edit.html', form=form)
+
+
+@admin_bp.route('/integrations/<int:int_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_integration(int_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    from .forms import IntegrationConfigForm
+    ic = IntegrationConfig.query.get_or_404(int_id)
+    form = IntegrationConfigForm(obj=ic)
+    if form.validate_on_submit():
+        ic.department = form.department.data
+        ic.kind = form.kind.data
+        ic.enabled = bool(form.enabled.data)
+        ic.config = form.config_json.data or None
+        db.session.commit()
+        flash('Integration updated.', 'success')
+        return redirect(url_for('admin.list_integrations'))
+    return render_template('admin_integration_edit.html', form=form, integration=ic)
+
+
+@admin_bp.route('/integrations/<int:int_id>/delete', methods=['POST'])
+@login_required
+def delete_integration(int_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    ic = IntegrationConfig.query.get_or_404(int_id)
+    db.session.delete(ic)
+    db.session.commit()
+    flash('Integration removed.', 'success')
+    return redirect(url_for('admin.list_integrations'))
 
 
 @admin_bp.route('/dept_editors/new', methods=['GET', 'POST'])
@@ -555,7 +833,7 @@ def create_department():
         return redirect(url_for('requests.dashboard'))
     form = DepartmentForm()
     if form.validate_on_submit():
-        d = Department(code=form.code.data.upper(), label=form.label.data, description=form.description.data, is_active=bool(form.is_active.data))
+        d = Department(code=form.code.data.upper(), label=form.name.data, description=None, is_active=bool(form.active.data), order=int(form.order.data or 0))
         db.session.add(d)
         db.session.commit()
         flash('Department created.', 'success')
@@ -573,9 +851,9 @@ def edit_department(dept_id: int):
     form = DepartmentForm(obj=d)
     if form.validate_on_submit():
         d.code = form.code.data.upper()
-        d.label = form.label.data
-        d.description = form.description.data
-        d.is_active = bool(form.is_active.data)
+        d.label = form.name.data
+        d.order = int(form.order.data or 0)
+        d.is_active = bool(form.active.data)
         db.session.commit()
         flash('Department updated.', 'success')
         return redirect(url_for('admin.list_departments'))
@@ -592,4 +870,4 @@ def delete_department(dept_id: int):
     db.session.delete(d)
     db.session.commit()
     flash('Department deleted.', 'success')
-    return redirect(url_for('admin.list_departments'))
+    return jsonify({"ok": True})

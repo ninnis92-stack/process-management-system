@@ -25,6 +25,7 @@ def test_send_nudges_creates_notification(app):
         cfg = SpecialEmailConfig.get()
         cfg.nudge_enabled = True
         cfg.nudge_interval_hours = 1
+        cfg.nudge_min_delay_hours = 4
         db.session.commit()
 
         # create user and high-priority request
@@ -38,6 +39,8 @@ def test_send_nudges_creates_notification(app):
 
         # assign to user
         r.assigned_to_user_id = u.id
+        # move request creation time back beyond minimum nudge delay
+        r.created_at = datetime.utcnow() - timedelta(hours=5)
         db.session.commit()
 
         # run nudges

@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h2>{{ 'Edit' if integration else 'New' }} Integration</h2>
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+      {{ form.department.label }}
+      {{ form.department(class_='form-select') }}
+    </div>
+    <div class="mb-3">
+      {{ form.kind.label }}
+      {{ form.kind(class_='form-select') }}
+    </div>
+    <div class="form-check">
+      {{ form.enabled() }} {{ form.enabled.label }}
+    </div>
+    <div class="mb-3 mt-2">
+      {{ form.config_json.label }}
+      {{ form.config_json(class_='form-control', rows=6) }}
+    </div>
+    <div class="mt-3">
+      <button class="btn btn-primary" type="submit">Save</button>
+      <a href="{{ url_for('admin.list_integrations') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

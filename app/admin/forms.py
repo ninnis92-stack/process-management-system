@@ -24,9 +24,9 @@ class SiteConfigForm(FlaskForm):
 
 class DepartmentForm(FlaskForm):
     code = StringField("Department code", validators=[DataRequired(), Length(max=2)])
-    label = StringField("Label", validators=[DataRequired(), Length(max=200)])
-    description = StringField("Description", validators=[Optional(), Length(max=1000)])
-    is_active = BooleanField("Active", default=True)
+    name = StringField("Name", validators=[DataRequired(), Length(max=200)])
+    order = IntegerField("Order", default=0, validators=[Optional()])
+    active = BooleanField("Active", default=True)
     submit = SubmitField("Save Department")
 
 
@@ -42,6 +42,7 @@ class StatusOptionForm(FlaskForm):
     target_department = SelectField("Target department (optional)", choices=[("", "-- default --"), ("A", "A"), ("B", "B"), ("C", "C")], validators=[Optional()])
     notify_enabled = BooleanField("Enable notifications for this status", default=True)
     notify_on_transfer_only = BooleanField("Only notify when request transfers departments", default=False)
+    email_enabled = BooleanField("Send email for this status (when mailer/SSO enabled)", default=False)
     submit = SubmitField("Save Status")
 
 
@@ -50,3 +51,33 @@ class DepartmentEditorForm(FlaskForm):
     department = SelectField("Department", choices=[("A", "A"), ("B", "B"), ("C", "C")], validators=[DataRequired()])
     can_edit = BooleanField("Can edit selections / form fields", default=True)
     submit = SubmitField("Save Editor")
+
+
+class IntegrationConfigForm(FlaskForm):
+    department = SelectField("Department", choices=[("A", "A"), ("B", "B"), ("C", "C")], validators=[DataRequired()])
+    kind = SelectField("Kind", choices=[("ticketing", "Ticketing"), ("webhook", "Webhook"), ("inventory", "Inventory"), ("verification", "Verification")], validators=[DataRequired()])
+    enabled = BooleanField("Enabled", default=True)
+    config_json = TextAreaField("Config (JSON)", validators=[Optional(), Length(max=4000)])
+    submit = SubmitField("Save Integration")
+
+
+class NotificationRetentionForm(FlaskForm):
+    retain_until_eod = BooleanField("Clear read notifications at end of day (UTC)", default=True)
+    clear_after_choice = SelectField("Clear read after", choices=[("eod", "End of day (default)"), ("immediate", "When checked (immediately)"), ("5m", "5 minutes"), ("30m", "30 minutes"), ("1h", "1 hour"), ("24h", "24 hours"), ("custom", "Custom (days)")], default="eod")
+    custom_days = IntegerField("Custom days (1-7)", validators=[Optional()])
+    max_notifications_per_user = IntegerField("Max notifications per user", default=20)
+    submit = SubmitField("Save Retention")
+
+
+class SpecialEmailConfigForm(FlaskForm):
+    nudge_enabled = BooleanField("Enable nudges", default=False)
+    nudge_interval_hours = IntegerField("Nudge interval (hours)", default=24)
+    nudge_min_delay_hours = IntegerField("Minimum delay before first nudge (hours)", default=4)
+    submit = SubmitField("Save")
+
+
+class FeatureFlagsForm(FlaskForm):
+    enable_notifications = BooleanField("Enable in-app notifications", default=True)
+    enable_nudges = BooleanField("Enable automated nudges", default=True)
+    allow_user_nudges = BooleanField("Allow users to push nudges to others", default=False)
+    submit = SubmitField("Save Flags")

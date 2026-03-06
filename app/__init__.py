@@ -158,23 +158,27 @@ def create_app():
     @app.context_processor
     def _theme_context():
         try:
-            from .models import AppTheme
             from .models import SiteConfig
             from flask import url_for
-            t = AppTheme.query.filter_by(active=True).first()
-            css = t.css if t and t.css else ''
-            logo = None
-            if t and t.logo_filename:
-                try:
-                    # if stored value is an external URL, use it directly
-                    if t.logo_filename.startswith('http'):
-                        logo = t.logo_filename
-                    else:
-                        logo = url_for('static', filename=t.logo_filename)
-                except Exception:
-                    logo = None
-            if not logo:
-                logo = current_app.config.get('LOGO_URL')
+            css = ''
+            logo = current_app.config.get('LOGO_URL')
+
+            # Theme model is optional in some environments/tests.
+            try:
+                from .models import AppTheme
+                t = AppTheme.query.filter_by(active=True).first()
+                css = t.css if t and t.css else ''
+                if t and t.logo_filename:
+                    try:
+                        if t.logo_filename.startswith('http'):
+                            logo = t.logo_filename
+                        else:
+                            logo = url_for('static', filename=t.logo_filename)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
             # site config (singleton)
             try:
                 cfg = SiteConfig.get()

@@ -182,7 +182,7 @@ a:hover { color: var(--accent-2); }
   color: #000000; /* primary text for notifications set to black */
 }
 .notif-dropdown.open { opacity: 1; visibility: visible; transform: translateY(0); }
-.notif-dropdown .card-body { max-height: 60vh; overflow: auto; }
+.notif-dropdown .card-body { max-height: 360px; overflow: auto; }
 .notif-item { cursor: pointer; }
 .notif-item:hover { background: rgba(255,255,255,0.04); }
 

@@ -55,6 +55,8 @@ from .workflow import transition_allowed, owner_for_status, handoff_for_transiti
 from ..services.verification import VerificationService
 from ..notifcations import notify_users, users_in_department
 from .. import metrics as metrics_module
+from ..services.ticketing import TicketingClient
+import json
 
 
 
@@ -569,16 +571,20 @@ def search_requests():
             Artifact.instructions_url.ilike(f"%{q}%"),
         ])
 
-        # Search comments and submissions text
+        # Search submission text (public-to-submitter only) and other request fields
         filters.extend([
-            Comment.body.ilike(f"%{q}%"),
             Submission.summary.ilike(f"%{q}%"),
             Submission.details.ilike(f"%{q}%"),
+            ReqModel.request_type.ilike(f"%{q}%"),
+            ReqModel.pricebook_status.ilike(f"%{q}%"),
+            ReqModel.sales_list_reference.ilike(f"%{q}%"),
         ])
 
         qry = base.outerjoin(Artifact, Artifact.request_id == ReqModel.id)
-        qry = qry.outerjoin(Comment, Comment.request_id == ReqModel.id)
-        qry = qry.outerjoin(Submission, Submission.request_id == ReqModel.id)
+        qry = qry.outerjoin(
+            Submission,
+            and_(Submission.request_id == ReqModel.id, Submission.is_public_to_submitter == True),
+        )
 
         if q.isdigit():
             # include exact id matches as well
@@ -712,21 +718,25 @@ def request_new():
     template = None
     if assigned:
         template = FormTemplate.query.get(assigned.template_id)
-    template_fields = template.fields.order_by(FormField.order.asc()).all() if template else None
+    template_fields = None
+    if template:
+        # `template.fields` is an InstrumentedList; sort in-Python by created_at
+        template_fields = sorted(list(template.fields), key=lambda f: getattr(f, 'created_at', getattr(f, 'id', 0)))
     template_spec = None
     if template and template_fields:
         template_spec = []
         for f in template_fields:
             opts = []
-            for o in f.options.order_by(FormFieldOption.order.asc()).all():
-                opts.append({'value': o.value, 'label': o.label})
+            # f.options is an InstrumentedList; iterate safely
+            for o in getattr(f, 'options', []) or []:
+                opts.append({'value': getattr(o, 'value', None), 'label': getattr(o, 'value', None)})
             template_spec.append({
                 'id': f.id,
-                'name': f.name,
-                'label': f.label,
-                'field_type': f.field_type,
-                'required': bool(f.required),
-                'hint': f.hint,
+                'name': getattr(f, 'name', None),
+                'label': getattr(f, 'label', None),
+                'field_type': getattr(f, 'field_type', None),
+                'required': bool(getattr(f, 'required', False)),
+                'hint': getattr(f, 'verification', None),
                 'options': opts,
             })
 
@@ -764,14 +774,22 @@ def request_new():
         # If dynamic template provided, gather submitted values
         submission_data = {}
         if template is not None:
-            for f in template.fields.order_by(FormField.order.asc()).all():
-                val = request.form.get(f.name)
+            for f in template_fields:
+                # prefer form values for text inputs, files for file inputs
+                if getattr(f, 'field_type', '') == 'file':
+                    val = request.files.get(f.name)
+                else:
+                    val = request.form.get(f.name)
                 # basic presence check for required fields
-                if f.required and (val is None or str(val).strip() == ''):
-                    flash(f"Field {f.label} is required.", 'danger')
+                if f.required and (val is None or (not getattr(val, 'filename', None) and str(val).strip() == '')):
+                    flash(f"Field {getattr(f, 'label', f.name)} is required.", 'danger')
                     db.session.rollback()
                     return render_template('request_new.html', form=form, template=template, template_fields=template_fields, template_spec=template_spec)
-                submission_data[f.name] = val
+                # For files, store filename placeholder; actual file saved later
+                if getattr(f, 'field_type', '') == 'file':
+                    submission_data[f.name] = getattr(val, 'filename', None) if val else None
+                else:
+                    submission_data[f.name] = val
 
             # Map common fields into Request model where possible
             req.title = (submission_data.get('title') or submission_data.get('summary') or f'Dynamic request {int(time.time())}')
@@ -1884,6 +1902,9 @@ def do_transition(request_id: int):
             opt = None
 
         if send_notification:
+            allow_email = True
+            if opt:
+                allow_email = bool(getattr(opt, 'email_enabled', False))
             notify_users(
                 owner_recipients,
                 title=f"Request #{req.id} moved to {req.status}",
@@ -1891,7 +1912,39 @@ def do_transition(request_id: int):
                 url=url_for("requests.request_detail", request_id=req.id),
                 ntype="status_change",
                 request_id=req.id,
+                allow_email=allow_email,
             )
+            # Also emit department-specific integrations (ticketing/webhook) if configured.
+            try:
+                from ..models import IntegrationConfig
+                configs = IntegrationConfig.query.filter_by(department=req.owner_department, enabled=True).all()
+                tc = TicketingClient()
+                for cfg in configs:
+                    try:
+                        cfg_data = json.loads(cfg.config) if cfg.config else {}
+                    except Exception:
+                        cfg_data = {}
+                    if cfg.kind == 'ticketing':
+                        # create a ticket representing the handoff/status change
+                        summary = f"Request #{req.id} moved to {req.status}"
+                        desc = body_text
+                        try:
+                            tc.create_ticket(summary, desc, metadata={'request_id': req.id, 'dept': req.owner_department, **cfg_data})
+                        except Exception:
+                            current_app.logger.exception('Failed to create ticket via TicketingClient')
+                    elif cfg.kind == 'webhook' and cfg_data.get('url'):
+                        try:
+                            # best-effort POST
+                            requests = __import__('requests')
+                            headers = {'Content-Type': 'application/json'}
+                            if cfg_data.get('token'):
+                                headers['Authorization'] = f"Bearer {cfg_data.get('token')}"
+                            payload = {'event': 'status_change', 'request_id': req.id, 'from_status': from_status, 'to_status': to_status, 'department': req.owner_department}
+                            requests.post(cfg_data.get('url'), json=payload, headers=headers, timeout=5)
+                        except Exception:
+                            current_app.logger.exception('Failed to POST webhook for integration')
+            except Exception:
+                current_app.logger.exception('Failed to process integration configs')
 
     # Notify creator (if exists, and not actor)
     if req.created_by_user_id and req.created_by_user_id != current_user.id:
