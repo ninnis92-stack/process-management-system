@@ -124,6 +124,17 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(text("ALTER TABLE site_config ADD COLUMN theme_preset VARCHAR(40) DEFAULT 'default'"))
                     print('schema_fix=site_config.theme_preset_added')
+                # Ensure feature_flags has expected columns added in recent releases.
+                if 'feature_flags' in insp.get_table_names():
+                    ff_cols = {c['name'] for c in insp.get_columns('feature_flags')}
+                    if 'vibe_enabled' not in ff_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE feature_flags ADD COLUMN vibe_enabled BOOLEAN DEFAULT TRUE"))
+                        print('schema_fix=feature_flags.vibe_enabled_added')
+                    if 'sso_admin_sync_enabled' not in ff_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE feature_flags ADD COLUMN sso_admin_sync_enabled BOOLEAN DEFAULT TRUE"))
+                        print('schema_fix=feature_flags.sso_admin_sync_enabled_added')
         except Exception as exc:
             print('schema_fix_failed', exc, file=sys.stderr)
 
