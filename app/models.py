@@ -394,6 +394,9 @@ class AuditLog(db.Model):
 class SiteConfig(db.Model):
     """Singleton site configuration for banner and rolling quotes."""
     id = db.Column(db.Integer, primary_key=True)
+    brand_name = db.Column(db.String(120), nullable=True)
+    logo_filename = db.Column(db.String(255), nullable=True)
+    theme_preset = db.Column(db.String(40), nullable=False, default='default')
     navbar_banner = db.Column(db.String(500), nullable=True)
     show_banner = db.Column(db.Boolean, nullable=False, default=False)
     _rolling_quotes = db.Column("rolling_quotes", db.Text, nullable=True)  # JSON list of strings

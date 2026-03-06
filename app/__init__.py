@@ -158,10 +158,13 @@ def create_app():
     @app.context_processor
     def _theme_context():
         try:
-            from .models import SiteConfig
+            from .models import SiteConfig, Department
             from flask import url_for
             css = ''
             logo = current_app.config.get('LOGO_URL')
+            brand_name = 'FreshProcess'
+            site_theme_preset = 'default'
+            dept_labels = {'A': 'Dept A', 'B': 'Dept B', 'C': 'Dept C'}
 
             # Theme model is optional in some environments/tests.
             try:
@@ -185,17 +188,44 @@ def create_app():
                 banner_html = cfg.banner_html or ''
                 rolling_quotes_enabled = bool(cfg.rolling_quotes_enabled)
                 rolling_quotes = cfg.rolling_quotes or []
+                if getattr(cfg, 'logo_filename', None):
+                    try:
+                        logo = url_for('static', filename=cfg.logo_filename)
+                    except Exception:
+                        pass
+                if getattr(cfg, 'brand_name', None):
+                    brand_name = cfg.brand_name
+                if getattr(cfg, 'theme_preset', None):
+                    site_theme_preset = (cfg.theme_preset or 'default').strip().lower()
+                    if site_theme_preset not in ('default', 'ocean', 'forest', 'sunset', 'midnight'):
+                        site_theme_preset = 'default'
             except Exception:
                 banner_html = ''
                 rolling_quotes_enabled = False
                 rolling_quotes = []
 
+            try:
+                rows = Department.query.filter_by(is_active=True).order_by(Department.order.asc(), Department.code.asc()).all()
+                for d in rows:
+                    code = (d.code or '').upper().strip()
+                    label = (d.label or '').strip()
+                    if code and label:
+                        dept_labels[code] = label
+            except Exception:
+                pass
+
             return dict(active_theme_css=css, theme_logo_url=logo,
+                        site_brand_name=brand_name,
+                        site_theme_preset=site_theme_preset,
+                        department_labels=dept_labels,
                         site_banner_html=banner_html,
                         rolling_quotes_enabled=rolling_quotes_enabled,
                         rolling_quotes=rolling_quotes)
         except Exception:
             return dict(active_theme_css='', theme_logo_url=current_app.config.get('LOGO_URL'),
+                        site_brand_name='FreshProcess',
+                        site_theme_preset='default',
+                        department_labels={'A': 'Dept A', 'B': 'Dept B', 'C': 'Dept C'},
                         site_banner_html='', rolling_quotes_enabled=False, rolling_quotes=[])
 
     # Track the last successfully rendered GET URL in the session so that

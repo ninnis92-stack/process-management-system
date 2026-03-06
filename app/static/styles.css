@@ -15,6 +15,42 @@
   --focus: rgba(11,97,238,0.14);
 }
 
+.theme-preset-ocean {
+  --nav-bg: #082032;
+  --accent: #3ec1d3;
+  --accent-2: #7ad7f0;
+  --page-bg: radial-gradient(circle at 20% 20%, rgba(62,193,211,0.15), transparent 30%),
+             radial-gradient(circle at 80% 0%, rgba(122,215,240,0.14), transparent 28%),
+             #f1fbff;
+}
+
+.theme-preset-forest {
+  --nav-bg: #1f3b2d;
+  --accent: #7bc96f;
+  --accent-2: #b6d7a8;
+  --page-bg: radial-gradient(circle at 20% 20%, rgba(123,201,111,0.16), transparent 30%),
+             radial-gradient(circle at 80% 0%, rgba(182,215,168,0.14), transparent 28%),
+             #f4fbf5;
+}
+
+.theme-preset-sunset {
+  --nav-bg: #3b1f2b;
+  --accent: #ff8a5b;
+  --accent-2: #ffb26b;
+  --page-bg: radial-gradient(circle at 20% 20%, rgba(255,138,91,0.16), transparent 30%),
+             radial-gradient(circle at 80% 0%, rgba(255,178,107,0.14), transparent 28%),
+             #fff8f3;
+}
+
+.theme-preset-midnight {
+  --nav-bg: #0a0f1f;
+  --accent: #8ea7ff;
+  --accent-2: #7a5cff;
+  --page-bg: radial-gradient(circle at 20% 20%, rgba(142,167,255,0.15), transparent 30%),
+             radial-gradient(circle at 80% 0%, rgba(122,92,255,0.14), transparent 28%),
+             #eef1fb;
+}
+
 *,
 *::before,
 *::after {

@@ -2,8 +2,37 @@
 
 {% block content %}
   <h2>Site Configuration</h2>
-  <form method="post">
+  <form method="post" enctype="multipart/form-data">
     {{ form.hidden_tag() }}
+
+    <div class="mb-3">
+      {{ form.brand_name.label(class_='form-label') }}
+      {{ form.brand_name(class_='form-control', placeholder='Your Company Name') }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.theme_preset.label(class_='form-label') }}
+      {{ form.theme_preset(class_='form-select') }}
+      <div class="form-text">Choose a preset theme for internal branding.</div>
+    </div>
+
+    <div class="mb-3">
+      {{ form.logo_upload.label(class_='form-label') }}
+      {{ form.logo_upload(class_='form-control') }}
+      <div class="form-text">Supported formats: png, jpg, jpeg, webp, svg.</div>
+      {% if cfg and cfg.logo_filename %}
+        <div class="mt-2 d-flex align-items-center gap-2">
+          <img src="{{ url_for('static', filename=cfg.logo_filename) }}" alt="Current logo" style="height:40px;" />
+          <span class="small text-muted">Current logo</span>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="form-check mb-3">
+      {{ form.clear_logo(class_='form-check-input') }}
+      {{ form.clear_logo.label(class_='form-check-label') }}
+    </div>
+
     <div class="mb-3">
       {{ form.navbar_banner.label(class_='form-label') }}
       {{ form.navbar_banner(class_='form-control') }}

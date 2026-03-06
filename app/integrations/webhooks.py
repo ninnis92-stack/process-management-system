@@ -1,6 +1,7 @@
 import os
 import hmac
 import hashlib
+import re
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, current_app, abort, jsonify
 
@@ -8,6 +9,7 @@ from app import csrf
 from flask_wtf.csrf import generate_csrf
 from ..extensions import db
 from ..models import SpecialEmailConfig, User, Request as ReqModel, REQUEST_TYPES, PRIORITIES
+from ..models import DepartmentFormAssignment, FormTemplate
 from .. import notifcations as notifications
 from ..services.inventory import InventoryService
 
@@ -103,10 +105,22 @@ def inbound_mail():
 
     cfg = SpecialEmailConfig.get()
 
-    # Optional mailbox routing guard: if request_form_email is configured,
-    # only handle messages addressed to that inbox.
-    if cfg.request_form_email:
+    # Optional mailbox routing guard: resolve explicit request_form_email first,
+    # then fall back to configured SSO owner email when available.
+    target = None
+    if getattr(cfg, 'request_form_email', None):
         target = cfg.request_form_email.strip().lower()
+    else:
+        try:
+            owner_id = int(getattr(cfg, 'request_form_user_id', 0) or 0)
+        except Exception:
+            owner_id = 0
+        if owner_id:
+            owner_user = User.query.get(owner_id)
+            if owner_user and owner_user.email:
+                target = owner_user.email.strip().lower()
+
+    if target:
         if recipient and target not in recipient:
             return jsonify({'ok': True, 'skipped': 'recipient_mismatch'})
 
@@ -200,6 +214,44 @@ def inbound_mail():
                 if parsed.get(field_name) and is_valid is False:
                     invalid_fields.append(field_name)
 
+            # Verify against admin-edited department form fields when strict mode is enabled.
+            strict_validation = bool(getattr(cfg, 'request_form_field_validation_enabled', False))
+            dept = (getattr(cfg, 'request_form_department', 'A') or 'A').strip().upper()
+            if strict_validation and dept in ('A', 'B', 'C'):
+                try:
+                    assigned = DepartmentFormAssignment.query.filter_by(department_name=dept).order_by(DepartmentFormAssignment.created_at.desc()).first()
+                    template = FormTemplate.query.get(assigned.template_id) if assigned else None
+                    if template:
+                        template_fields = sorted(list(getattr(template, 'fields', []) or []), key=lambda f: getattr(f, 'created_at', getattr(f, 'id', 0)))
+                        for field in template_fields:
+                            field_name = (getattr(field, 'name', '') or '').strip()
+                            if not field_name:
+                                continue
+                            field_type = (getattr(field, 'field_type', '') or '').strip().lower()
+                            if field_type == 'file':
+                                continue
+
+                            value = (parsed.get(field_name) or '').strip()
+                            is_required = bool(getattr(field, 'required', False))
+                            if is_required and not value:
+                                invalid_fields.append(field_name)
+                                continue
+                            if not value:
+                                continue
+
+                            options = [str(getattr(o, 'value', '')).strip() for o in (getattr(field, 'options', []) or []) if str(getattr(o, 'value', '')).strip()]
+                            if options and value not in options:
+                                invalid_fields.append(field_name)
+                                continue
+
+                            verification = getattr(field, 'verification', None) or {}
+                            if isinstance(verification, dict) and verification.get('type') == 'regex' and verification.get('pattern'):
+                                pattern = str(verification.get('pattern'))
+                                if not re.match(pattern, value or ''):
+                                    invalid_fields.append(field_name)
+                except Exception:
+                    current_app.logger.exception('Failed to verify inbound fields against assigned department form template')
+
             out_of_stock_fields = [
                 field_name
                 for field_name, is_valid in checks.items()
@@ -252,7 +304,6 @@ def inbound_mail():
 
             # Preserve order while removing duplicates
             invalid_fields = list(dict.fromkeys(invalid_fields))
-            strict_validation = bool(getattr(cfg, 'request_form_field_validation_enabled', False))
             if strict_validation and invalid_fields:
                 validation_rejected = True
                 try:

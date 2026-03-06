@@ -29,6 +29,14 @@
           <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.reject_request_config') }}">Reject Request Settings</a>
         </div>
       </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Email Form Generation</h5>
+          <p class="card-text">Configure request-by-email form generation, field verification, and automated requester notifications.</p>
+          <a class="btn btn-primary" href="{{ url_for('admin.special_email') }}">Manage Email Form Settings</a>
+        </div>
+      </div>
     </div>
 
     <div class="col-md-6">

@@ -14,6 +14,8 @@ from flask import request as flask_request
 from ..models import Notification, AuditLog, NotificationRetention, StatusBucket, BucketStatus
 from ..models import FeatureFlags, RejectRequestConfig
 from urllib.parse import unquote
+import os
+from werkzeug.utils import secure_filename
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -425,6 +427,8 @@ def site_config():
     cfg = SiteConfig.query.first()
     form = SiteConfigForm(obj=cfg)
     if flask_request.method == 'GET' and cfg:
+        form.brand_name.data = getattr(cfg, 'brand_name', None)
+        form.theme_preset.data = (getattr(cfg, 'theme_preset', 'default') or 'default')
         form.navbar_banner.data = getattr(cfg, 'banner_html', None) or getattr(cfg, 'navbar_banner', None)
         try:
             rq = getattr(cfg, 'rolling_quotes', []) or []
@@ -449,6 +453,28 @@ def site_config():
         rolling_input = form.rolling_quotes.data
         if not rolling_input:
             rolling_input = flask_request.form.get('rolling_csv')
+
+        cfg.brand_name = (form.brand_name.data or '').strip() or None
+        cfg.theme_preset = (form.theme_preset.data or 'default').strip().lower()
+        if cfg.theme_preset not in ('default', 'ocean', 'forest', 'sunset', 'midnight'):
+            cfg.theme_preset = 'default'
+
+        remove_logo = bool(form.clear_logo.data)
+        uploaded_logo = flask_request.files.get('logo_upload')
+        if remove_logo:
+            cfg.logo_filename = None
+        if uploaded_logo and uploaded_logo.filename:
+            filename = secure_filename(uploaded_logo.filename)
+            if filename:
+                ext = os.path.splitext(filename)[1].lower()
+                stamp = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
+                stored_name = f"logo_{stamp}{ext}"
+                rel_dir = os.path.join('uploads', 'branding')
+                static_dir = current_app.static_folder or os.path.join(current_app.root_path, 'static')
+                abs_dir = os.path.join(static_dir, rel_dir)
+                os.makedirs(abs_dir, exist_ok=True)
+                uploaded_logo.save(os.path.join(abs_dir, stored_name))
+                cfg.logo_filename = f"uploads/branding/{stored_name}"
 
         cfg.banner_html = banner or None
         cfg.rolling_quotes_enabled = rolling_enabled
@@ -551,9 +577,12 @@ def special_email():
         cfg = None
 
     form = SpecialEmailConfigForm()
+    sso_users = User.query.filter(User.sso_sub.isnot(None)).order_by(User.email.asc()).all()
+    form.request_form_user_id.choices = [(0, '-- None --')] + [(u.id, f"{u.email} (Dept {u.department})") for u in sso_users]
     if flask_request.method == 'GET' and cfg:
         form.enabled.data = bool(getattr(cfg, 'enabled', False))
         form.request_form_email.data = getattr(cfg, 'request_form_email', None)
+        form.request_form_user_id.data = int(getattr(cfg, 'request_form_user_id', 0) or 0)
         form.request_form_first_message.data = getattr(cfg, 'request_form_first_message', None)
         form.request_form_department.data = (getattr(cfg, 'request_form_department', 'A') or 'A')
         form.request_form_field_validation_enabled.data = bool(getattr(cfg, 'request_form_field_validation_enabled', False))
@@ -571,9 +600,19 @@ def special_email():
             db.session.add(cfg)
 
         cfg.enabled = bool(form.enabled.data)
-        cfg.request_form_email = (form.request_form_email.data or '').strip() or None
+        selected_owner_id = int(form.request_form_user_id.data or 0)
+        selected_owner = User.query.get(selected_owner_id) if selected_owner_id else None
+        if selected_owner and not selected_owner.sso_sub:
+            selected_owner = None
+            selected_owner_id = 0
+
+        cfg.request_form_user_id = (selected_owner_id or None)
+        manual_inbox = (form.request_form_email.data or '').strip() or None
+        cfg.request_form_email = manual_inbox or (selected_owner.email if selected_owner else None)
         cfg.request_form_first_message = (form.request_form_first_message.data or '').strip() or None
         cfg.request_form_department = (form.request_form_department.data or 'A').strip().upper()
+        if selected_owner:
+            cfg.request_form_department = (selected_owner.department or cfg.request_form_department or 'A').strip().upper()
         if cfg.request_form_department not in ('A', 'B', 'C'):
             cfg.request_form_department = 'A'
         cfg.request_form_field_validation_enabled = bool(form.request_form_field_validation_enabled.data)

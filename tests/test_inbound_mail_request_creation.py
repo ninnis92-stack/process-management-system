@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from app.extensions import db
 from app.models import SpecialEmailConfig, Request as ReqModel, User
+from app.models import FormTemplate, FormField, DepartmentFormAssignment
 
 
 def _sig(secret: str, payload: bytes) -> str:
@@ -292,3 +293,131 @@ def test_out_of_stock_email_only_mode_uses_custom_message(monkeypatch, app, clie
     assert calls["notify"] == 0
     assert calls["email"] == 1
     assert calls["message"] == "Custom OOS message:\n{out_of_stock_fields}"
+
+
+def test_inbound_mail_uses_sso_owner_email_when_inbox_not_set(app, client):
+    secret = "test-secret"
+    app.config["WEBHOOK_SHARED_SECRET"] = secret
+
+    with app.app_context():
+        owner = User(
+            sso_sub="sso-owner-1",
+            email="owner.sso@example.com",
+            name="Owner",
+            password_hash="x",
+            department="B",
+            is_active=True,
+        )
+        db.session.add(owner)
+        db.session.commit()
+
+        cfg = SpecialEmailConfig.get()
+        cfg.enabled = True
+        cfg.request_form_email = None
+        cfg.request_form_user_id = owner.id
+        db.session.commit()
+
+    payload_ok = {
+        "from": "guest.sender@example.com",
+        "to": "owner.sso@example.com",
+        "subject": "title=Owner Inbox Request;request_type=both",
+        "body": "should be accepted through owner email fallback",
+    }
+    raw_ok = json.dumps(payload_ok).encode("utf-8")
+    rv_ok = client.post(
+        "/integrations/inbound-mail",
+        data=raw_ok,
+        content_type="application/json",
+        headers={"X-Webhook-Signature": _sig(secret, raw_ok)},
+    )
+    assert rv_ok.status_code == 200
+    data_ok = rv_ok.get_json()
+    assert data_ok.get("created_request_id") is not None
+
+    payload_skip = {
+        "from": "guest.sender@example.com",
+        "to": "other-inbox@example.com",
+        "subject": "title=Wrong Inbox Request;request_type=both",
+        "body": "should be skipped by recipient guard",
+    }
+    raw_skip = json.dumps(payload_skip).encode("utf-8")
+    rv_skip = client.post(
+        "/integrations/inbound-mail",
+        data=raw_skip,
+        content_type="application/json",
+        headers={"X-Webhook-Signature": _sig(secret, raw_skip)},
+    )
+    assert rv_skip.status_code == 200
+    data_skip = rv_skip.get_json()
+    assert data_skip.get("skipped") == "recipient_mismatch"
+
+
+def test_autoresponder_uses_department_template_fields(monkeypatch, app):
+    from app import notifcations
+
+    with app.app_context():
+        cfg = SpecialEmailConfig.get()
+        cfg.enabled = True
+        cfg.request_form_department = "A"
+
+        template = FormTemplate(name="Dept A Email Template", description="")
+        db.session.add(template)
+        db.session.flush()
+        db.session.add(FormField(template_id=template.id, name="part_code", label="Part Code", field_type="text", required=True))
+        db.session.add(FormField(template_id=template.id, name="priority", label="Priority", field_type="select", required=True))
+        db.session.flush()
+        db.session.add(DepartmentFormAssignment(template_id=template.id, department_name="A"))
+        db.session.commit()
+
+    sent = {"subject": None, "body": None}
+
+    def _mock_send(recipients_map, subject, body, html=None, request_id=None):
+        sent["subject"] = subject
+        sent["body"] = body
+        return None
+
+    monkeypatch.setattr("app.notifcations._send_emails_async", _mock_send)
+
+    ok = notifcations.send_request_form_autoresponder("guest.sender@example.com")
+    assert ok is True
+    assert sent["subject"] == "Request form: instructions to submit via subject"
+    assert "part_code=" in (sent["body"] or "")
+    assert "priority=" in (sent["body"] or "")
+
+
+def test_inbound_mail_rejects_missing_required_department_field_when_strict(app, client):
+    secret = "test-secret"
+    app.config["WEBHOOK_SHARED_SECRET"] = secret
+
+    with app.app_context():
+        cfg = SpecialEmailConfig.get()
+        cfg.enabled = True
+        cfg.request_form_email = "requests@example.com"
+        cfg.request_form_department = "A"
+        cfg.request_form_field_validation_enabled = True
+
+        template = FormTemplate(name="Dept A Validation Template", description="")
+        db.session.add(template)
+        db.session.flush()
+        db.session.add(FormField(template_id=template.id, name="part_code", label="Part Code", field_type="text", required=True))
+        db.session.add(DepartmentFormAssignment(template_id=template.id, department_name="A"))
+        db.session.commit()
+
+    payload = {
+        "from": "guest.sender@example.com",
+        "to": "requests@example.com",
+        "subject": "title=Missing Dept Field",
+        "body": "This should fail strict template validation",
+    }
+    raw = json.dumps(payload).encode("utf-8")
+
+    rv = client.post(
+        "/integrations/inbound-mail",
+        data=raw,
+        content_type="application/json",
+        headers={"X-Webhook-Signature": _sig(secret, raw)},
+    )
+    assert rv.status_code == 200
+    data = rv.get_json()
+    assert data["rejected"] is True
+    assert "part_code" in data["invalid_fields"]

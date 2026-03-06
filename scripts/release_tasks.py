@@ -110,6 +110,20 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(text('ALTER TABLE department ADD COLUMN "order" INTEGER DEFAULT 0'))
                     print('schema_fix=department.order_added')
+
+                site_cols = {c['name'] for c in insp.get_columns('site_config')} if 'site_config' in insp.get_table_names() else set()
+                if 'site_config' in insp.get_table_names() and 'brand_name' not in site_cols:
+                    with engine.begin() as conn:
+                        conn.execute(text('ALTER TABLE site_config ADD COLUMN brand_name VARCHAR(120)'))
+                    print('schema_fix=site_config.brand_name_added')
+                if 'site_config' in insp.get_table_names() and 'logo_filename' not in site_cols:
+                    with engine.begin() as conn:
+                        conn.execute(text('ALTER TABLE site_config ADD COLUMN logo_filename VARCHAR(255)'))
+                    print('schema_fix=site_config.logo_filename_added')
+                if 'site_config' in insp.get_table_names() and 'theme_preset' not in site_cols:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE site_config ADD COLUMN theme_preset VARCHAR(40) DEFAULT 'default'"))
+                    print('schema_fix=site_config.theme_preset_added')
         except Exception as exc:
             print('schema_fix_failed', exc, file=sys.stderr)
 

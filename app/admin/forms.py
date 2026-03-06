@@ -4,6 +4,7 @@ from wtforms.fields import EmailField
 from wtforms.validators import DataRequired, Email, Optional, Length
 from wtforms.validators import AnyOf
 from wtforms import IntegerField
+from flask_wtf.file import FileField, FileAllowed
 
 
 class AdminCreateUserForm(FlaskForm):
@@ -16,6 +17,21 @@ class AdminCreateUserForm(FlaskForm):
 
 
 class SiteConfigForm(FlaskForm):
+    brand_name = StringField("Brand name", validators=[Optional(), Length(max=120)])
+    theme_preset = SelectField(
+        "Theme preset",
+        choices=[
+            ("default", "Default"),
+            ("ocean", "Ocean"),
+            ("forest", "Forest"),
+            ("sunset", "Sunset"),
+            ("midnight", "Midnight"),
+        ],
+        default="default",
+        validators=[Optional()],
+    )
+    logo_upload = FileField("Logo upload", validators=[Optional(), FileAllowed(["jpg", "jpeg", "png", "webp", "svg"], "Images only")])
+    clear_logo = BooleanField("Remove current logo", default=False)
     navbar_banner = StringField("Navbar banner text", validators=[Optional(), Length(max=500)])
     show_banner = BooleanField("Show banner", default=False)
     rolling_quotes = StringField("Rolling quotes (JSON list)", validators=[Optional(), Length(max=4000)])
@@ -72,6 +88,7 @@ class NotificationRetentionForm(FlaskForm):
 class SpecialEmailConfigForm(FlaskForm):
     enabled = BooleanField("Enable request-by-email feature", default=False)
     request_form_email = StringField("Request form inbox email", validators=[Optional(), Email(), Length(max=255)])
+    request_form_user_id = SelectField("Form generation owner (SSO user)", coerce=int, validators=[Optional()])
     request_form_first_message = TextAreaField("First autoresponder message", validators=[Optional(), Length(max=4000)])
     request_form_department = SelectField("SSO recognized sender department", choices=[("A", "A"), ("B", "B"), ("C", "C")], default="A")
     request_form_field_validation_enabled = BooleanField("Enable strict field verification (auto-reject invalid emails)", default=False)

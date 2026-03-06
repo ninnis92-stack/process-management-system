@@ -19,6 +19,12 @@ def test_departments_crud_and_site_config(app, client):
     rv = login_admin(client)
     assert rv.status_code == 200
 
+    # admin index exposes email form generation controls
+    rv = client.get('/admin/')
+    assert rv.status_code == 200
+    assert b'Email Form Generation' in rv.data
+    assert b'Manage Email Form Settings' in rv.data
+
     # departments list (empty)
     rv = client.get('/admin/departments')
     assert rv.status_code == 200
@@ -56,6 +62,8 @@ def test_departments_crud_and_site_config(app, client):
 
     # Save site config with banner and rolling quotes
     post_data = {
+        'brand_name': 'Acme Flow',
+        'theme_preset': 'forest',
         'banner_html': '<div class="site-banner">Welcome</div>',
         'rolling_enabled': 'y',
         'rolling_csv': 'Quote one\nQuote two',
@@ -67,6 +75,8 @@ def test_departments_crud_and_site_config(app, client):
     # Confirm site config persisted and visible in dashboard
     with app.app_context():
         cfg = SiteConfig.get()
+        assert cfg.brand_name == 'Acme Flow'
+        assert cfg.theme_preset == 'forest'
         assert cfg.banner_html is not None
         assert cfg.rolling_quotes_enabled is True
         assert isinstance(cfg.rolling_quotes, list)
@@ -74,4 +84,5 @@ def test_departments_crud_and_site_config(app, client):
     # Dashboard should include the banner or the first rolling quote
     rv = client.get('/dashboard')
     assert rv.status_code == 200
+    assert b'Acme Flow' in rv.data
     assert b'Welcome' in rv.data or b'Quote one' in rv.data

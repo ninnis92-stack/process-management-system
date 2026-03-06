@@ -315,7 +315,15 @@ These integration extension points are intentionally lightweight so you can buil
 
 This project now includes an admin-managed "Special Emails" feature, an inbound-mail webhook, and a safe inventory integration skeleton. These are all optional and safe for prototype use — nothing is enabled by default.
 
-- Admin UI: visit `/admin/special_emails` (admin only) to toggle the request-by-email feature, set the Help Email and Request Form Email, and edit the initial autoresponder message.
+- Site branding customization: Admin → Site Config now supports company branding with `Brand name`, `Theme preset` (default/ocean/forest/sunset/midnight), and `Logo upload` (png/jpg/jpeg/webp/svg). This allows internal deployment branding without code changes.
+
+- Department naming customization: Admin → Departments already supports editing department labels/codes and ordering. Updated labels are reflected in shared UI navigation so teams can use universal names instead of A/B/C semantics.
+
+- Admin dashboard entry point: Admin Console now includes an `Email Form Generation` card that links directly to the request-by-email controls.
+
+- Admin UI: visit `/admin/special_email` (admin only) to toggle the request-by-email feature, set the Help Email and Request Form Email, and edit the initial autoresponder message.
+
+- SSO integration for form-generation ownership: in Admin Special Email settings, set `Form generation owner (SSO user)` to designate the responsible SSO-linked user. If `Request form inbox email` is blank, the selected owner email is used for inbound mailbox matching and department routing defaults to the selected owner department.
 
 - Autoresponder: when enabled the app will send a reply to senders of the Request Form Email explaining how to submit requests by composing a subject line. The autoresponder uses the same EmailService used elsewhere (logs messages when `EMAIL_ENABLED` is false).
 

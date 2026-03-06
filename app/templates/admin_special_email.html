@@ -14,6 +14,13 @@
     <div class="mb-3">
       {{ form.request_form_email.label(class_='form-label') }}
       {{ form.request_form_email(class_='form-control', placeholder='requests@yourdomain.com') }}
+      <div class="form-text">Department inbox used for form-generation emails. If left blank and an SSO owner is selected below, the owner email is used.</div>
+    </div>
+
+    <div class="mb-3">
+      {{ form.request_form_user_id.label(class_='form-label') }}
+      {{ form.request_form_user_id(class_='form-select') }}
+      <div class="form-text">SSO integration: select the responsible SSO-linked user. Their email can act as the form-generation inbox and their department is applied for SSO-generated request routing.</div>
     </div>
 
     <div class="mb-3">

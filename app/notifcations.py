@@ -10,6 +10,7 @@ Keep the send path idempotent and non-blocking from request handlers.
 
 from .extensions import db
 from .models import Notification, User, SpecialEmailConfig, NotificationRetention
+from .models import DepartmentFormAssignment, FormTemplate
 from flask import current_app
 from threading import Thread
 from typing import Optional
@@ -213,19 +214,47 @@ def send_request_form_autoresponder(sender_email: str) -> bool:
     if not cfg or not cfg.enabled:
         return False
 
-    # Build a subject-line friendly template listing form fields
-    fields = [
-        "title=<TITLE>",
-        "request_type=part_number|instructions|both",
-        "donor_part_number=<DONOR>",
-        "target_part_number=<TARGET>",
-        "no_donor_reason=unknown|needs_create",
-        "sales_list=in_pricebook|not_in_pricebook|unknown",
-        "price_book_number=<NUMBER>",
-        "due_at=YYYY-mm-ddTHH:MM",
-        "description=<SHORT TEXT>",
-        "priority=low|medium|high",
-    ]
+    # Build a subject-line friendly template listing form fields.
+    # Prefer department-assigned dynamic form fields when present.
+    fields = []
+    try:
+        dept = (getattr(cfg, 'request_form_department', 'A') or 'A').strip().upper()
+        assigned = DepartmentFormAssignment.query.filter_by(department_name=dept).order_by(DepartmentFormAssignment.created_at.desc()).first()
+        template = FormTemplate.query.get(assigned.template_id) if assigned else None
+        if template:
+            template_fields = sorted(list(getattr(template, 'fields', []) or []), key=lambda f: getattr(f, 'created_at', getattr(f, 'id', 0)))
+            for field in template_fields:
+                field_type = (getattr(field, 'field_type', '') or '').strip().lower()
+                if field_type == 'file':
+                    continue
+                name = (getattr(field, 'name', '') or '').strip()
+                if not name:
+                    continue
+                options = [str(getattr(o, 'value', '')).strip() for o in (getattr(field, 'options', []) or []) if str(getattr(o, 'value', '')).strip()]
+                if options:
+                    placeholder = '|'.join(options)
+                elif field_type in ('date', 'datetime') or name in ('due_at', 'due'):
+                    placeholder = 'YYYY-mm-ddTHH:MM'
+                else:
+                    placeholder = '<VALUE>'
+                fields.append(f"{name}={placeholder}")
+    except Exception:
+        fields = []
+
+    # Fallback to baseline fields if no dynamic template fields are available.
+    if not fields:
+        fields = [
+            "title=<TITLE>",
+            "request_type=part_number|instructions|both",
+            "donor_part_number=<DONOR>",
+            "target_part_number=<TARGET>",
+            "no_donor_reason=unknown|needs_create",
+            "sales_list=in_pricebook|not_in_pricebook|unknown",
+            "price_book_number=<NUMBER>",
+            "due_at=YYYY-mm-ddTHH:MM",
+            "description=<SHORT TEXT>",
+            "priority=low|medium|high",
+        ]
     fields_for_subject = ";".join(fields)
 
     # Use configured first message, falling back to a default helper message
@@ -234,7 +263,7 @@ def send_request_form_autoresponder(sender_email: str) -> bool:
     else:
         body = (
             "Thanks for contacting the request form inbox. To open a request by email, reply with a subject line formatted like:\n"
-            "title=<TITLE>;<...fields as below...>"
+            f"{fields_for_subject}"
         )
 
     # Replace placeholder if present
