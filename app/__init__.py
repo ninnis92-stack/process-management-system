@@ -79,6 +79,20 @@ def create_app():
     from .auth.sso import init_oauth
     init_oauth(app)
 
+    # Optional Sentry initialization (guarded by SENTRY_DSN)
+    try:
+        from .extensions import init_sentry
+        init_sentry(app)
+    except Exception:
+        pass
+
+    # Optional security headers middleware (guarded by SECURITY_HEADERS_ENABLED env)
+    try:
+        from .middleware import init_security
+        init_security(app)
+    except Exception:
+        pass
+
     # Upload folder (best-effort; serverless may not allow writes)
     upload_folder = app.config.get("UPLOAD_FOLDER")
     if upload_folder:
