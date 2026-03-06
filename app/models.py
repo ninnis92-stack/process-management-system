@@ -79,6 +79,8 @@ class Notification(db.Model):
     url = db.Column(db.String(500), nullable=True)   # where to click
     dedupe_key = db.Column(db.String(200), nullable=True, index=True)
     is_read = db.Column(db.Boolean, nullable=False, default=False)
+    # Timestamp when the notification was marked read (used for daily clearing)
+    read_at = db.Column(db.DateTime, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
