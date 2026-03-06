@@ -214,7 +214,7 @@ Admin Hardening Checklist:
 
 ## Dev Notes
 - Run `python3 seed.py` to seed sample data.
-- Server entrypoint: `run.py` (Flask), Dockerfile provided; Fly/Vercel configs included for deployment experiments.
+- Server entrypoint: `run.py` (Flask), Dockerfile provided; Fly configs included for deployment experiments.
 
 Dev-only smoke-test scripts
 - Smoke-test helper scripts (creating sample requests, populating UI buckets, and a webhook sender) have been moved out of the main `scripts/` folder and restored on a dedicated branch and folder: `dev-scripts/` on the `dev-scripts` branch. This keeps `main` clean for deployments.

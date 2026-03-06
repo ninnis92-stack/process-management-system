@@ -4,8 +4,8 @@ from werkzeug.security import generate_password_hash
 
 from ..extensions import db
 from ..models import User
-from .forms import AdminCreateUserForm
-from ..models import Request as ReqModel, Artifact, Submission
+from .forms import AdminCreateUserForm, SiteConfigForm, DepartmentForm, SSOAssignForm
+from ..models import Request as ReqModel, Artifact, Submission, SiteConfig, Department
 from datetime import datetime, timedelta
 from flask import request as flask_request
 from ..models import Notification, AuditLog
@@ -356,3 +356,121 @@ def audit():
         audits = audits.filter(AuditLog.action_type.ilike(f"%{action}%"))
     audits = audits.limit(200).all()
     return render_template("admin_audit.html", audits=audits)
+
+
+
+@admin_bp.route('/assign_sso', methods=['GET', 'POST'])
+@login_required
+def assign_sso():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    form = SSOAssignForm()
+    if form.validate_on_submit():
+        raw = form.emails.data or ''
+        emails = [e.strip().lower() for e in raw.splitlines() if e.strip()]
+        dept = form.department.data
+        updated = []
+        skipped = []
+        for em in emails:
+            u = User.query.filter_by(email=em).first()
+            if not u:
+                skipped.append((em, 'not_found'))
+                continue
+            if not u.sso_sub:
+                skipped.append((em, 'no_sso'))
+                continue
+            u.department = dept
+            u.is_active = True
+            updated.append(em)
+        if updated:
+            db.session.commit()
+        flash(f'Assigned {len(updated)} users to Dept {dept}.', 'success')
+        if skipped:
+            flash('Skipped: ' + ', '.join([f'{e}({r})' for e, r in skipped]), 'warning')
+        return redirect(url_for('admin.list_users'))
+
+    return render_template('admin_assign_sso.html', form=form)
+
+
+
+@admin_bp.route('/site_config', methods=['GET', 'POST'])
+@login_required
+def site_config():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    cfg = SiteConfig.query.first()
+    form = SiteConfigForm(obj=cfg)
+    if form.validate_on_submit():
+        if not cfg:
+            cfg = SiteConfig()
+            db.session.add(cfg)
+        cfg.navbar_banner = form.navbar_banner.data or None
+        cfg.show_banner = bool(form.show_banner.data)
+        cfg.rolling_quotes = form.rolling_quotes.data or None
+        db.session.commit()
+        flash('Site configuration saved.', 'success')
+        return redirect(url_for('admin.site_config'))
+
+    return render_template('admin_site_config.html', form=form, cfg=cfg)
+
+
+@admin_bp.route('/departments')
+@login_required
+def list_departments():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    depts = Department.query.order_by(Department.code).all()
+    return render_template('admin_departments.html', departments=depts)
+
+
+@admin_bp.route('/departments/new', methods=['GET', 'POST'])
+@login_required
+def create_department():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    form = DepartmentForm()
+    if form.validate_on_submit():
+        d = Department(code=form.code.data.upper(), label=form.label.data, description=form.description.data, is_active=bool(form.is_active.data))
+        db.session.add(d)
+        db.session.commit()
+        flash('Department created.', 'success')
+        return redirect(url_for('admin.list_departments'))
+    return render_template('admin_department_edit.html', form=form)
+
+
+@admin_bp.route('/departments/<int:dept_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_department(dept_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    d = Department.query.get_or_404(dept_id)
+    form = DepartmentForm(obj=d)
+    if form.validate_on_submit():
+        d.code = form.code.data.upper()
+        d.label = form.label.data
+        d.description = form.description.data
+        d.is_active = bool(form.is_active.data)
+        db.session.commit()
+        flash('Department updated.', 'success')
+        return redirect(url_for('admin.list_departments'))
+    return render_template('admin_department_edit.html', form=form, dept=d)
+
+
+@admin_bp.route('/departments/<int:dept_id>/delete', methods=['POST'])
+@login_required
+def delete_department(dept_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    d = Department.query.get_or_404(dept_id)
+    db.session.delete(d)
+    db.session.commit()
+    flash('Department deleted.', 'success')
+    return redirect(url_for('admin.list_departments'))

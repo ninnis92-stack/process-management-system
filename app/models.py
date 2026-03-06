@@ -238,3 +238,22 @@ class AuditLog(db.Model):
 
     # explicit event timestamp for audit events (useful for indexing and queries)
     event_ts = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class SiteConfig(db.Model):
+    """Singleton site configuration for banner and rolling quotes."""
+    id = db.Column(db.Integer, primary_key=True)
+    navbar_banner = db.Column(db.String(500), nullable=True)
+    show_banner = db.Column(db.Boolean, nullable=False, default=False)
+    rolling_quotes = db.Column(db.Text, nullable=True)  # JSON list of strings
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Department(db.Model):
+    """Optional persisted department metadata (code A/B/C and display label)."""
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(2), nullable=False, unique=True, index=True)
+    label = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
