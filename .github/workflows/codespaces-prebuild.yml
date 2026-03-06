@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build devcontainer image
-        uses: devcontainers/ci@v0.2
+        uses: devcontainers/ci@v0.3
         with:
           working-directory: '.'
           image-name: process-management-prototype/devcontainer:latest
