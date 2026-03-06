@@ -319,6 +319,20 @@ This project now includes an admin-managed "Special Emails" feature, an inbound-
 
 - Department naming customization: Admin → Departments already supports editing department labels/codes and ordering. Updated labels are reflected in shared UI navigation so teams can use universal names instead of A/B/C semantics.
 
+## Email Form Generation (Admin)
+
+- Admin entry point: Admin dashboard includes an **Email Form Generation** card linking to Special Email settings.
+- Form ownership mailbox routing:
+  - Primary: `request_form_email` (explicit inbox)
+  - Fallback: selected SSO owner (`request_form_user_id`) email when explicit inbox is empty
+- Dynamic form instruction generation:
+  - Outbound request-form autoresponder reads the latest template assigned to the configured department.
+  - Subject instructions are generated as `field=value` pairs from that template (file fields are excluded).
+- Strict verification (toggleable):
+  - When enabled in Special Email settings, inbound `field=value` submissions are validated against the same assigned department template.
+  - Validation checks required fields, allowed options, and regex patterns configured on template fields.
+  - When disabled, template-field strict checks are skipped.
+
 - Admin dashboard entry point: Admin Console now includes an `Email Form Generation` card that links directly to the request-by-email controls.
 
 - Admin UI: visit `/admin/special_email` (admin only) to toggle the request-by-email feature, set the Help Email and Request Form Email, and edit the initial autoresponder message.

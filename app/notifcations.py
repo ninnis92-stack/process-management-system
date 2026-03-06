@@ -40,6 +40,21 @@ except Exception:  # pragma: no cover - tasks module may be unavailable to stati
     send_emails_task = None
 
 
+def _get_latest_department_template(department_code: str):
+    """Return the latest assigned form template for a department.
+
+    The autoresponder uses this so generated key/value instructions match the
+    current admin-configured department form.
+    """
+    assigned = (
+        DepartmentFormAssignment.query
+        .filter_by(department_name=department_code)
+        .order_by(DepartmentFormAssignment.created_at.desc())
+        .first()
+    )
+    return FormTemplate.query.get(assigned.template_id) if assigned else None
+
+
 def users_in_department(dept: str):
     return User.query.filter_by(department=dept, is_active=True).all()
 
@@ -219,8 +234,7 @@ def send_request_form_autoresponder(sender_email: str) -> bool:
     fields = []
     try:
         dept = (getattr(cfg, 'request_form_department', 'A') or 'A').strip().upper()
-        assigned = DepartmentFormAssignment.query.filter_by(department_name=dept).order_by(DepartmentFormAssignment.created_at.desc()).first()
-        template = FormTemplate.query.get(assigned.template_id) if assigned else None
+        template = _get_latest_department_template(dept)
         if template:
             template_fields = sorted(list(getattr(template, 'fields', []) or []), key=lambda f: getattr(f, 'created_at', getattr(f, 'id', 0)))
             for field in template_fields:

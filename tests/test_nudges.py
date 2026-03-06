@@ -1,7 +1,7 @@
 import pytest
 from app import create_app
 from app.extensions import db
-from app.models import User, Request as ReqModel, Notification, SpecialEmailConfig
+from app.models import User, Request as ReqModel, Notification, SpecialEmailConfig, FeatureFlags
 from datetime import datetime, timedelta
 from app.notifications.due import send_high_priority_nudges
 
@@ -23,6 +23,8 @@ def test_send_nudges_creates_notification(app):
     with app.app_context():
         # ensure config
         cfg = SpecialEmailConfig.get()
+        flags = FeatureFlags.get()
+        flags.enable_nudges = True
         cfg.nudge_enabled = True
         cfg.nudge_interval_hours = 1
         cfg.nudge_min_delay_hours = 4

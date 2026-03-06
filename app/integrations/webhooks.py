@@ -16,6 +16,21 @@ from ..services.inventory import InventoryService
 integrations_bp = Blueprint("integrations_bp", __name__, url_prefix="/integrations")
 
 
+def _get_latest_department_template(department_code: str):
+    """Return the latest assigned form template for a department.
+
+    This keeps inbound email validation aligned with whatever admins most
+    recently assigned in the department form setup UI.
+    """
+    assigned = (
+        DepartmentFormAssignment.query
+        .filter_by(department_name=department_code)
+        .order_by(DepartmentFormAssignment.created_at.desc())
+        .first()
+    )
+    return FormTemplate.query.get(assigned.template_id) if assigned else None
+
+
 def _get_shared_secret():
     # Prefer app config, then environment variable
     return current_app.config.get("WEBHOOK_SHARED_SECRET") or os.getenv("WEBHOOK_SHARED_SECRET")
@@ -219,8 +234,11 @@ def inbound_mail():
             dept = (getattr(cfg, 'request_form_department', 'A') or 'A').strip().upper()
             if strict_validation and dept in ('A', 'B', 'C'):
                 try:
-                    assigned = DepartmentFormAssignment.query.filter_by(department_name=dept).order_by(DepartmentFormAssignment.created_at.desc()).first()
-                    template = FormTemplate.query.get(assigned.template_id) if assigned else None
+                    # Validation contract:
+                    # - required fields must be present
+                    # - select/radio values must be one of configured options
+                    # - regex validators must match when configured on the field
+                    template = _get_latest_department_template(dept)
                     if template:
                         template_fields = sorted(list(getattr(template, 'fields', []) or []), key=lambda f: getattr(f, 'created_at', getattr(f, 'id', 0)))
                         for field in template_fields:

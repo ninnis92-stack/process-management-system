@@ -9,7 +9,24 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   {% if active_theme_css %}
-    <style id="active-theme-css">{{ active_theme_css|safe }}</style>
+    <script id="active-theme-css-data" type="application/json">{{ active_theme_css|tojson }}</script>
+    <script>
+      (function () {
+        const payload = document.getElementById('active-theme-css-data');
+        if (!payload) return;
+        let cssText = '';
+        try {
+          cssText = JSON.parse(payload.textContent || '""');
+        } catch (_) {
+          cssText = '';
+        }
+        if (!cssText) return;
+        const styleEl = document.createElement('style');
+        styleEl.id = 'active-theme-css';
+        styleEl.textContent = cssText;
+        document.head.appendChild(styleEl);
+      })();
+    </script>
   {% endif %}
 </head>
 <body class="{% block body_class %}theme-body top-nav-layout{% endblock %} theme-preset-{{ site_theme_preset or 'default' }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}">
