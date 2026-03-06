@@ -1522,6 +1522,19 @@ def do_transition(request_id: int):
     except Exception:
         current_app.logger.exception('Failed to record transition metric')
 
+    # Prometheus: if request closed, record whether closed before due date
+    try:
+        from datetime import datetime
+        if to_status == 'CLOSED' and getattr(req, 'due_at', None):
+            now = datetime.utcnow()
+            if req.due_at and now <= req.due_at:
+                try:
+                    metrics_module.requests_closed_before_due_total.labels(dept=req.owner_department).inc()
+                except Exception:
+                    current_app.logger.exception('Failed to record closed-before-due metric')
+    except Exception:
+        current_app.logger.exception('Failed to evaluate closed-before-due metric')
+
     # If Dept B is sending the request to Dept A, clear any assignment so
     # Dept A can decide to close or reopen/request review. Record an audit
     # entry and notify the previous assignee (if any).
