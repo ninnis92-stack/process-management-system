@@ -342,6 +342,32 @@ def debug_workspace():
     return render_template('admin_debug_workspace.html', path=path)
 
 
+@admin_bp.route('/debug/cleanup', methods=['POST'])
+@login_required
+def debug_cleanup():
+    # Admin-only maintenance endpoint to remove smoke or debug rows.
+    if not _is_admin_user():
+        return jsonify({'error': 'access_denied'}), 403
+
+    confirm = flask_request.args.get('confirm') or flask_request.form.get('confirm')
+    if str(confirm).lower() != 'true':
+        return jsonify({'error': 'missing_confirm', 'note': 'set confirm=true'}), 400
+
+    try:
+        days = int(flask_request.args.get('days') or 0)
+    except Exception:
+        days = 0
+
+    if days > 0:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        deleted = ReqModel.query.filter(ReqModel.is_debug == True, ReqModel.created_at < cutoff).delete(synchronize_session=False)
+    else:
+        deleted = ReqModel.query.filter(ReqModel.title.like('SMOKE_%')).delete(synchronize_session=False)
+
+    db.session.commit()
+    return jsonify({'deleted': int(deleted)})
+
+
 @admin_bp.route("/audit")
 @login_required
 def audit():
