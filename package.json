@@ -1,0 +1,12 @@
+{
+  "name": "process-management-prototype-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run --browser chrome"
+  },
+  "devDependencies": {
+    "cypress": "^12.10.0"
+  }
+}
