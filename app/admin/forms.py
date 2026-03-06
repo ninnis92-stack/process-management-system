@@ -2,6 +2,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SelectField, BooleanField, SubmitField, TextAreaField
 from wtforms.fields import EmailField
 from wtforms.validators import DataRequired, Email, Optional, Length
+from wtforms import IntegerField
 
 
 class AdminCreateUserForm(FlaskForm):
@@ -24,4 +25,10 @@ class AdminSpecialEmailsForm(FlaskForm):
     request_form_email = EmailField("Request Form Email", validators=[Optional(), Email(), Length(max=255)])
     request_form_user = SelectField("Request Form User (SSO)", choices=[], coerce=int, validators=[Optional()])
     request_form_first_message = TextAreaField("First autoresponder message", validators=[Optional(), Length(max=2000)])
+    nudge_enable = SelectField(
+        "High-priority nudges",
+        choices=[("false", "Off"), ("true", "On")],
+        validators=[DataRequired()],
+    )
+    nudge_interval_hours = IntegerField("Nudge interval (hours)", default=24, validators=[Optional()])
     submit = SubmitField("Save Special Emails")

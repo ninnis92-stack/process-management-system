@@ -39,6 +39,11 @@ def create_app():
         from .notifications.due import send_due_soon_notifications
         send_due_soon_notifications(current_app, hours=24)
 
+    @app.cli.command("notify-nudges")
+    def notify_nudges():
+        from .notifications.due import send_high_priority_nudges
+        send_high_priority_nudges(current_app)
+
     @app.cli.command("create-user")
     @click.option("--email", required=True, help="User email")
     @click.option("--name", default=None, help="Display name")

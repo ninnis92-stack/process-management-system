@@ -373,12 +373,23 @@ def special_emails():
     users = [(0, "-- none --")] + [(u.id, u.email) for u in User.query.order_by(User.email).all()]
     form.help_user.choices = users
     form.request_form_user.choices = users
+    # Prefill nudge choices
+    form.nudge_enable.choices = [("false", "Off"), ("true", "On")]
 
     if form.validate_on_submit():
         cfg.enabled = True if form.enable_feature.data == 'true' else False
         cfg.help_email = (form.help_email.data or '').strip().lower() or None
         cfg.request_form_email = (form.request_form_email.data or '').strip().lower() or None
         cfg.request_form_first_message = (form.request_form_first_message.data or '').strip() or None
+        # Nudge settings
+        try:
+            cfg.nudge_enabled = True if form.nudge_enable.data == 'true' else False
+        except Exception:
+            cfg.nudge_enabled = False
+        try:
+            cfg.nudge_interval_hours = int(form.nudge_interval_hours.data) if form.nudge_interval_hours.data else 24
+        except Exception:
+            cfg.nudge_interval_hours = 24
 
         # If an SSO user was selected, store the user id (0 means none)
         try:
@@ -402,6 +413,8 @@ def special_emails():
         form.request_form_first_message.data = cfg.request_form_first_message or ''
         form.help_user.data = cfg.help_user_id or 0
         form.request_form_user.data = cfg.request_form_user_id or 0
+        form.nudge_enable.data = 'true' if cfg.nudge_enabled else 'false'
+        form.nudge_interval_hours.data = cfg.nudge_interval_hours or 24
 
     return render_template('admin_special_emails.html', form=form, cfg=cfg)
 

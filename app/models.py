@@ -260,6 +260,10 @@ class SpecialEmailConfig(db.Model):
     help_user = db.relationship("User", foreign_keys=[help_user_id])
     request_form_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     request_form_user = db.relationship("User", foreign_keys=[request_form_user_id])
+    # Nudge feature: whether automated nudges for high-priority requests are enabled
+    nudge_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    # Interval (in hours) between nudge reminders for the same request/user
+    nudge_interval_hours = db.Column(db.Integer, nullable=False, default=24)
 
     @classmethod
     def get(cls):
