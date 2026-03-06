@@ -188,6 +188,11 @@ After deploying, clear any smoke/demo records if they were created remotely:
 flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command "python3 -c \"from app import create_app; from app.extensions import db; from app.models import Request as R; app=create_app(); ctx=app.app_context(); ctx.push(); cnt=R.query.filter(R.title.like('SMOKE_%')).delete(synchronize_session=False); db.session.commit(); print('deleted', cnt); ctx.pop()\""
 ```
 
+Deployment note (automated):
+
+- Last automated verification and smoke-clean ran on 2026-03-06 UTC: deployed, smoke login/dashboard validated, remote SMOKE_ rows cleared (0 deleted).
+
+
 ## Auto-reject for unavailable API-backed fields
 
 Admins can enable a special-email/request toggle that automatically closes a newly submitted request when a populated dynamic form field is verified against a connected system and that system definitively reports the value as unavailable/not found.
