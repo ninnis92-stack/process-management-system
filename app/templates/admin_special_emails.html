@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Special Email Settings</h3>
+<form method="post" class="card p-3" style="max-width: 900px;">
+  {{ form.hidden_tag() }}
+
+  <div class="mb-3">
+    <label class="form-label">Enable request-by-email feature</label>
+    {{ form.enable_feature(class="form-select") }}
+    <div class="form-text">When On, incoming mail to the configured Request Form Email may trigger an autoresponder and parsing flow (prototype: autoresponder only).</div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Help Email</label>
+    {{ form.help_email(class="form-control") }}
+    {% if config.SSO_ENABLED %}
+      <div class="mt-2">
+        <label class="form-label">Or select Help User (SSO)</label>
+        {{ form.help_user(class="form-select") }}
+        <div class="form-text">When an SSO user is selected, that account will act as the help recipient.</div>
+      </div>
+    {% endif %}
+    <div class="form-text">Email address designated to receive help/assistance requests. When set, admins may use this to route help inquiries.</div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Request Form Email</label>
+    {{ form.request_form_email(class="form-control") }}
+    {% if config.SSO_ENABLED %}
+      <div class="mt-2">
+        <label class="form-label">Or select Request Form User (SSO)</label>
+        {{ form.request_form_user(class="form-select") }}
+        <div class="form-text">When an SSO user is selected, that account will act as the request-form recipient.</div>
+      </div>
+    {% endif %}
+    <div class="form-text">Email address that acts as a request form inbox. Incoming mail can be replied-to with instructions for filling the request via subject line.</div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">First autoresponder message</label>
+    {{ form.request_form_first_message(class="form-control", rows=6) }}
+    <div class="form-text">This message will be sent to the requester when they contact the Request Form Email. Use the following placeholder to list form fields formatted for subject-line filling: <code>{fields_for_subject}</code></div>
+  </div>
+
+  <button class="btn btn-primary">Save</button>
+</form>
+{% endblock %}

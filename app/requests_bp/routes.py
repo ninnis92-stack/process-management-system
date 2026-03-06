@@ -778,6 +778,18 @@ def request_detail(request_id: int):
 
     has_part_number = any(a.artifact_type == "part_number" for a in req.artifacts)
     has_instructions = any(a.artifact_type == "instructions" for a in req.artifacts)
+    # Gather image attachments (screenshots) across submissions for quick viewing
+    try:
+        allowed = current_app.config.get('ALLOWED_IMAGE_MIMES', [])
+        image_attachments = (
+            Attachment.query.join(Submission)
+            .filter(Submission.request_id == req.id)
+            .filter(Attachment.content_type.in_(allowed))
+            .order_by(Attachment.created_at.desc())
+            .all()
+        )
+    except Exception:
+        image_attachments = []
 
     return render_template(
         "request_detail.html",
@@ -798,6 +810,7 @@ def request_detail(request_id: int):
         now=now,
         assigned_user=req.assigned_to_user,
         handoff_targets=[t for t, _ in possible if handoff_for_transition(req.status, t)],
+        image_attachments=image_attachments,
     )
 
 
@@ -1350,6 +1363,17 @@ def do_transition(request_id: int):
     if dept == "B":
         req.requires_c_review = bool(form.requires_c_review.data)
 
+        # If the UI requested executive approval and immediate send to A, honor it
+        try:
+            force_send = (hasattr(form, 'force_send_to_a') and (str(form.force_send_to_a.data or '').lower() in ('1','true','yes')))
+        except Exception:
+            force_send = False
+
+        if force_send and to_status == 'EXEC_APPROVAL':
+            # Treat this as an immediate send-to-A action
+            to_status = 'SENT_TO_A'
+            flash('Marked for executive approval — sending to Department A for review.', 'info')
+
         if req.requires_c_review and to_status in (
             "B_IN_PROGRESS",
             "WAITING_ON_A_RESPONSE",
@@ -1420,6 +1444,21 @@ def do_transition(request_id: int):
         except ValueError as e:
             flash(str(e), "danger")
             return redirect(url_for("requests.request_detail", request_id=req.id))
+
+        # SPECIAL RULE: If this request is currently owned by Department A and
+        # is being sent back to Department B, require at least one image
+        # attachment (screenshot) as part of the submission. This enforces
+        # that the assigned user includes supporting visuals when returning
+        # work to Dept B after executive/A-side review (e.g., after SENT_TO_A).
+        try:
+            if from_dept == 'A' and to_dept == 'B':
+                if not validated or len(validated) == 0:
+                    flash('A screenshot (PNG/JPEG/WebP) is required when returning this request to Department B.', 'danger')
+                    return redirect(url_for('requests.request_detail', request_id=req.id))
+        except Exception:
+            # Be conservative: if any error occurs while checking, reject the transition
+            flash('Submission validation failed; please attach a screenshot when sending back to Department B.', 'danger')
+            return redirect(url_for('requests.request_detail', request_id=req.id))
 
         is_public = (to_dept == "A") or (from_dept == "A")
 
@@ -1696,3 +1735,62 @@ def download_attachment(attachment_id: int):
         as_attachment=False,
         download_name=att.original_filename,
     )
+
+
+@requests_bp.route("/requests/<int:request_id>/upload_screenshots", methods=["POST"])
+@login_required
+def upload_screenshots(request_id: int):
+    req = ReqModel.query.get_or_404(request_id)
+    if not can_view_request(req):
+        abort(403)
+
+    # Require assignment for mutating actions
+    rv = _require_assigned_user(req)
+    if rv:
+        return rv
+
+    # Collect files from the form
+    files = request.files.getlist('screenshots')
+    try:
+        validated = _validate_files(files)
+    except ValueError as e:
+        flash(str(e), 'danger')
+        return redirect(url_for('requests.request_detail', request_id=req.id))
+
+    if not validated:
+        flash('No valid screenshot files provided.', 'warning')
+        return redirect(url_for('requests.request_detail', request_id=req.id))
+
+    # Create a lightweight submission to hold the screenshots
+    sub = Submission(
+        request_id=req.id,
+        from_department=current_user.department,
+        to_department=req.owner_department,
+        from_status=req.status,
+        to_status=req.status,
+        summary='Screenshots',
+        details='Uploaded screenshots',
+        is_public_to_submitter=False,
+        created_by_user_id=current_user.id,
+    )
+    db.session.add(sub)
+    db.session.flush()
+
+    for f, size in validated:
+        orig = secure_filename(f.filename)
+        stored = f"{uuid.uuid4().hex}_{orig}"
+        save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], stored)
+        f.save(save_path)
+        db.session.add(Attachment(
+            submission_id=sub.id,
+            uploaded_by_user_id=current_user.id,
+            original_filename=orig,
+            stored_filename=stored,
+            content_type=f.mimetype,
+            size_bytes=size,
+        ))
+
+    _log(req, 'submission_created', note='Screenshots uploaded')
+    db.session.commit()
+    flash('Screenshots uploaded.', 'success')
+    return redirect(url_for('requests.request_detail', request_id=req.id))

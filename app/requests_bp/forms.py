@@ -1,7 +1,7 @@
 from dataclasses import field
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, TextAreaField, SelectField, MultipleFileField, BooleanField
+from wtforms import StringField, TextAreaField, SelectField, MultipleFileField, BooleanField, HiddenField
 from wtforms.fields import DateTimeLocalField
 from wtforms.validators import DataRequired, Length, Optional, URL, ValidationError
 from datetime import datetime, timedelta
@@ -33,14 +33,15 @@ class NewRequestForm(FlaskForm):
         validators=[DataRequired()]
     )
     pricebook_status = SelectField(
-    "Price Book Status",
+    "Sales List",
     choices=[
-        ("in_pricebook", "In price book"),
-        ("not_in_pricebook", "Not in price book"),
+        ("in_pricebook", "On sales list"),
+        ("not_in_pricebook", "Not on sales list"),
         ("unknown", "Unknown / needs check"),
     ],
     validators=[DataRequired()],
     )
+    pricebook_number = StringField("Price Book Number", validators=[Optional(), Length(max=80)])
     description = TextAreaField("Description", validators=[Optional()])
     priority = SelectField("Priority", choices=[
         ("low", "Low"),
@@ -92,6 +93,10 @@ class NewRequestForm(FlaskForm):
             if donor and reason:
                 self.no_donor_reason.errors.append("Clear the reason if you provide a donor part number.")
                 return False
+        # If a Sales List selection is present, require a Price Book Number
+        if (self.pricebook_status.data or "").strip() and not (self.pricebook_number.data or "").strip():
+            self.pricebook_number.errors.append("Price Book Number is required when Sales List selection is provided.")
+            return False
 
         return True
 
@@ -197,6 +202,7 @@ class TransitionForm(FlaskForm):
     submission_details = TextAreaField("Submission Details")
     files = MultipleFileField("Attachments (images only)")
     requires_c_review = BooleanField("Requires C Review", validators=[Optional()])
+    force_send_to_a = HiddenField("Force send to A", default='0')
 
 class ToggleCReviewForm(FlaskForm):
     reason = TextAreaField("Reason (required)", validators=[DataRequired()])

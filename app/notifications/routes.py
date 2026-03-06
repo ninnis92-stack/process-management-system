@@ -31,3 +31,12 @@ def mark_read(notif_id: int):
     n.is_read = True
     db.session.commit()
     return jsonify({"ok": True})
+
+
+@notifications_bp.post("/mark_all_read")
+@login_required
+def mark_all_read():
+    # Mark all unread notifications for current user as read
+    Notification.query.filter_by(user_id=current_user.id, is_read=False).update({"is_read": True})
+    db.session.commit()
+    return jsonify({"ok": True})

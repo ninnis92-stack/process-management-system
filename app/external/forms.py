@@ -35,14 +35,15 @@ class ExternalNewRequestForm(FlaskForm):
     )
 
     pricebook_status = SelectField(
-        "Price Book Status",
+        "Sales List",
         choices=[
-            ("in_pricebook", "In price book"),
-            ("not_in_pricebook", "Not in price book"),
+            ("in_pricebook", "On sales list"),
+            ("not_in_pricebook", "Not on sales list"),
             ("unknown", "Unknown / needs check"),
         ],
         validators=[DataRequired()],
     )
+    pricebook_number = StringField("Price Book Number", validators=[Optional(), Length(max=80)])
 
     due_at = DateTimeLocalField(
         "Due Date (48+ hours required)",
@@ -110,6 +111,10 @@ class ExternalNewRequestForm(FlaskForm):
             if donor and reason:
                 self.no_donor_reason.errors.append("Clear the reason if you provide a donor part number.")
                 return False
+        # If a Sales List selection is required/present, require a Price Book Number
+        if (self.pricebook_status.data or "").strip() and not (self.pricebook_number.data or "").strip():
+            self.pricebook_number.errors.append("Price Book Number is required when Sales List selection is provided.")
+            return False
 
         return True
 

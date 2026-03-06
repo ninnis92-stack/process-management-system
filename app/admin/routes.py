@@ -4,12 +4,13 @@ from werkzeug.security import generate_password_hash
 
 from ..extensions import db
 from ..models import User
-from .forms import AdminCreateUserForm
-from ..models import Request as ReqModel, Artifact, Submission
+from .forms import AdminCreateUserForm, AdminSpecialEmailsForm
+from ..models import Request as ReqModel, Artifact, Submission, SpecialEmailConfig
 from datetime import datetime, timedelta
 from flask import request as flask_request
 from ..models import Notification, AuditLog
 from urllib.parse import unquote
+from .. import notifcations as notifications
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -356,3 +357,70 @@ def audit():
         audits = audits.filter(AuditLog.action_type.ilike(f"%{action}%"))
     audits = audits.limit(200).all()
     return render_template("admin_audit.html", audits=audits)
+
+
+@admin_bp.route('/special_emails', methods=['GET', 'POST'])
+@login_required
+def special_emails():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    cfg = SpecialEmailConfig.get()
+    form = AdminSpecialEmailsForm()
+
+    # Populate possible user choices for SSO-linked selection
+    users = [(0, "-- none --")] + [(u.id, u.email) for u in User.query.order_by(User.email).all()]
+    form.help_user.choices = users
+    form.request_form_user.choices = users
+
+    if form.validate_on_submit():
+        cfg.enabled = True if form.enable_feature.data == 'true' else False
+        cfg.help_email = (form.help_email.data or '').strip().lower() or None
+        cfg.request_form_email = (form.request_form_email.data or '').strip().lower() or None
+        cfg.request_form_first_message = (form.request_form_first_message.data or '').strip() or None
+
+        # If an SSO user was selected, store the user id (0 means none)
+        try:
+            cfg.help_user_id = int(form.help_user.data) if form.help_user.data else None
+        except Exception:
+            cfg.help_user_id = None
+        try:
+            cfg.request_form_user_id = int(form.request_form_user.data) if form.request_form_user.data else None
+        except Exception:
+            cfg.request_form_user_id = None
+
+        db.session.commit()
+        flash('Special email settings saved.', 'success')
+        return redirect(url_for('admin.special_emails'))
+
+    # Prefill on GET
+    if flask_request.method == 'GET':
+        form.enable_feature.data = 'true' if cfg.enabled else 'false'
+        form.help_email.data = cfg.help_email or ''
+        form.request_form_email.data = cfg.request_form_email or ''
+        form.request_form_first_message.data = cfg.request_form_first_message or ''
+        form.help_user.data = cfg.help_user_id or 0
+        form.request_form_user.data = cfg.request_form_user_id or 0
+
+    return render_template('admin_special_emails.html', form=form, cfg=cfg)
+
+
+@admin_bp.route('/special_emails/trigger', methods=['POST'])
+@login_required
+def trigger_autoresponder():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    sender = flask_request.form.get('sender') or flask_request.args.get('sender')
+    if not sender:
+        flash('Provide sender email via `sender` parameter.', 'warning')
+        return redirect(url_for('admin.special_emails'))
+
+    ok = notifications.send_request_form_autoresponder(sender)
+    if ok:
+        flash(f'Autoresponder queued to {sender}.', 'success')
+    else:
+        flash('Autoresponder not sent (feature disabled or misconfigured).', 'warning')
+    return redirect(url_for('admin.special_emails'))

@@ -109,6 +109,64 @@
   }
 })();
 
+/* Safe modal wrapper: prevents busted modals from leaving a blocking backdrop.
+   - Appends modal elements to document.body before showing (avoids z-index/sandbox issues)
+   - Wraps show/hide in try/catch and removes stray backdrops on failure
+   - Adds a global `safeShowModal(id, opts)` helper for templates/scripts to call
+*/
+(function installSafeModalWrapper(){
+  function localCleanup(){
+    try{
+      document.querySelectorAll('.modal-backdrop').forEach(b=>b.remove());
+      document.querySelectorAll('.modal').forEach(m=>{ m.classList.remove('show'); m.style.display='none'; m.setAttribute('aria-hidden','true'); });
+      document.body.classList.remove('modal-open');
+      document.body.style.paddingRight = '';
+    }catch(e){ console.warn('localCleanup error', e); }
+  }
+
+  if(window.bootstrap && bootstrap.Modal && bootstrap.Modal.prototype){
+    try{
+      const proto = bootstrap.Modal.prototype;
+      const _show = proto.show;
+      const _hide = proto.hide;
+
+      proto.show = function(){
+        try{
+          if(this._element && this._element.parentNode !== document.body){
+            document.body.appendChild(this._element);
+          }
+          return _show.apply(this, arguments);
+        }catch(e){
+          console.warn('bootstrap.Modal.show failed', e);
+          localCleanup();
+        }
+      };
+
+      proto.hide = function(){
+        try{ return _hide.apply(this, arguments); }catch(e){ console.warn('bootstrap.Modal.hide failed', e); localCleanup(); }
+      };
+    }catch(e){ console.warn('installSafeModalWrapper error', e); }
+  }
+
+  // helper for code that wants to show a modal safely by id
+  window.safeShowModal = function(id, opts){
+    try{
+      const el = document.getElementById(id);
+      if(!el) return console.warn('safeShowModal: element not found', id);
+      if(el.parentNode !== document.body) document.body.appendChild(el);
+      if(window.bootstrap && bootstrap.Modal){
+        const m = new bootstrap.Modal(el, opts || {});
+        try{ m.show(); }catch(e){ console.warn('safeShowModal show failed', e); localCleanup(); }
+        return m;
+      } else {
+        // fallback: reveal the element without backdrop
+        el.style.display = 'block'; el.classList.add('show'); el.removeAttribute('aria-hidden');
+        return null;
+      }
+    }catch(e){ console.warn('safeShowModal error', e); }
+  };
+})();
+
 (function initHandoffHint(){
   document.addEventListener('DOMContentLoaded', function(){
     try{
@@ -466,6 +524,13 @@
     btn.classList.toggle("open", willOpen);
     if (willOpen) {
       await loadLatest();
+      // Mark all as read when the user clicks to check their notifications
+      try{
+        await fetch('/notifications/mark_all_read', { method: 'POST' });
+        badge.style.display = 'none';
+        setActive(false);
+      }catch(e){ console.warn('mark_all_read failed', e); }
+      // Refresh server count in background
       await refreshCount();
     }
   });
@@ -480,6 +545,33 @@
   refreshCount();
   setInterval(refreshCount, 30000);
 })();
+
+// Attach handler for the 'Requires Executive Approval' button if present
+document.addEventListener('DOMContentLoaded', function(){
+  try{
+    const btn = document.getElementById('execApprovalBtn');
+    if(!btn) return;
+    btn.addEventListener('click', function(){
+      try{
+        // Set the to_status select to EXEC_APPROVAL if present
+        const select = document.getElementById('toStatusSelect') || document.querySelector('select[name="to_status"]');
+        if(select){
+          // Try to set to EXEC_APPROVAL if available, otherwise set to SENT_TO_A
+          const execOption = Array.from(select.options).find(o => o.value === 'EXEC_APPROVAL');
+          const sendOption = Array.from(select.options).find(o => o.value === 'SENT_TO_A');
+          if(execOption) select.value = 'EXEC_APPROVAL';
+          else if(sendOption) select.value = 'SENT_TO_A';
+        }
+        // set hidden field to indicate immediate send to A
+        const hidden = document.getElementById('forceSendToA') || document.querySelector('input[name="force_send_to_a"]');
+        if(hidden) hidden.value = '1';
+        // submit the form
+        const form = btn.closest('form');
+        if(form) form.submit();
+      }catch(e){ console.warn('execApprovalBtn click failed', e); }
+    });
+  }catch(e){ console.warn('execApprovalBtn init failed', e); }
+});
 
 (function initFilePreview() {
   const fileInput = document.getElementById("fileInput");
@@ -535,6 +627,142 @@
   fileInput.addEventListener("change", () => {
     dt.items.clear();
     for (const f of fileInput.files) addFile(f);
+  });
+})();
+
+// Screenshot uploader (drag & drop + preview) for the request detail page
+(function initScreenshotUploader(){
+  document.addEventListener('DOMContentLoaded', function(){
+    try{
+      const fileInput = document.getElementById('screenshotFileInput');
+      const dropZone = document.getElementById('screenshotDropZone');
+      const preview = document.getElementById('screenshotPreview');
+      if(!fileInput || !dropZone || !preview) return;
+
+      const dt = new DataTransfer();
+
+      function refreshPreview(){
+        preview.innerHTML = '';
+        for(const file of dt.files){
+          const img = document.createElement('img');
+          img.className = 'preview-img';
+          img.alt = file.name;
+          img.src = URL.createObjectURL(file);
+          preview.appendChild(img);
+        }
+        fileInput.files = dt.files;
+      }
+
+      function addFile(file){
+        if(!file.type.startsWith('image/')) return;
+        dt.items.add(file);
+        refreshPreview();
+      }
+
+      dropZone.addEventListener('click', ()=> fileInput.click());
+      dropZone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropZone.classList.add('paste-zone-hover'); });
+      dropZone.addEventListener('dragleave', ()=> dropZone.classList.remove('paste-zone-hover'));
+      dropZone.addEventListener('drop', (e)=>{
+        e.preventDefault(); dropZone.classList.remove('paste-zone-hover');
+        const files = e.dataTransfer?.files || [];
+        for(const f of files) addFile(f);
+        // show confirm modal with previews and submit on confirmation
+        try{
+          const confirmPreview = document.getElementById('screenshotConfirmPreview');
+          if(confirmPreview){
+            confirmPreview.innerHTML = '';
+            for(const file of dt.files){
+              const img = document.createElement('img');
+              img.className = 'preview-img'; img.alt = file.name; img.src = URL.createObjectURL(file);
+              confirmPreview.appendChild(img);
+            }
+          }
+          if(typeof safeShowModal === 'function'){
+            safeShowModal('screenshotConfirmModal');
+          } else {
+            var m = new bootstrap.Modal(document.getElementById('screenshotConfirmModal'));
+            m.show();
+          }
+        }catch(e){ console.warn('show confirm modal failed', e); }
+      });
+
+      fileInput.addEventListener('change', ()=>{
+        for(const f of fileInput.files) addFile(f);
+      });
+
+      // Wire confirm/cancel handlers for the confirm modal
+      const confirmBtn = document.getElementById('confirmScreenshotUploadBtn');
+      const cancelBtn = document.getElementById('cancelScreenshotUploadBtn');
+      const confirmModalEl = document.getElementById('screenshotConfirmModal');
+      function clearDt(){
+        while(dt.items.length) dt.items.remove(0);
+        refreshPreview();
+      }
+      if(confirmBtn){
+        confirmBtn.addEventListener('click', function(){
+          try{
+            // submit the closest form
+            const form = fileInput.closest('form');
+            if(form) form.submit();
+          }catch(e){ console.warn('confirm upload failed', e); }
+        });
+      }
+      if(cancelBtn){
+        cancelBtn.addEventListener('click', function(){
+          try{ clearDt(); if(confirmModalEl){ /* ensure modal is hidden */ if(typeof bootstrap !== 'undefined' && bootstrap.Modal){ const inst = bootstrap.Modal.getInstance(confirmModalEl); if(inst) inst.hide(); } } }catch(e){}
+        });
+      }
+
+    }catch(e){ console.warn('initScreenshotUploader error', e); }
+  });
+})();
+
+// Monitor transition select and require screenshot when sending from A -> B
+(function monitorTransitionScreenshotRequirement(){
+  document.addEventListener('DOMContentLoaded', function(){
+    try{
+      const select = document.getElementById('toStatusSelect') || document.querySelector('select[name="to_status"]');
+      if(!select) return;
+      const form = select.closest('form');
+      if(!form) return;
+      const applyBtn = form.querySelector('button[type="submit"]') || form.querySelector('button');
+      const hint = document.createElement('div');
+      hint.id = 'screenshotRequiredHint';
+      hint.className = 'text-danger small mt-2 d-none';
+      hint.textContent = 'A screenshot is required to send this request back to Department B.';
+      applyBtn.parentNode.insertBefore(hint, applyBtn.nextSibling);
+
+      function hasScreenshotAvailable(){
+        try{
+          const meta = document.getElementById('screenshotMeta');
+          const existing = meta ? Number(meta.dataset.count || 0) : 0;
+          const input = document.getElementById('screenshotFileInput');
+          const staged = input && input.files ? input.files.length : 0;
+          return (existing + staged) > 0;
+        }catch(e){ return false; }
+      }
+
+      function update(){
+        try{
+          // For Dept A: selecting B_IN_PROGRESS indicates sending back to B
+          const requires = String(select.value) === 'B_IN_PROGRESS';
+          if(requires && !hasScreenshotAvailable()){
+            applyBtn.disabled = true;
+            hint.classList.remove('d-none');
+          } else {
+            applyBtn.disabled = false;
+            hint.classList.add('d-none');
+          }
+        }catch(e){ }
+      }
+
+      select.addEventListener('change', update);
+      // Also watch screenshot file input changes to re-evaluate
+      const screenshotInput = document.getElementById('screenshotFileInput');
+      if(screenshotInput) screenshotInput.addEventListener('change', update);
+      // Initial update
+      update();
+    }catch(e){ console.warn('monitorTransitionScreenshotRequirement error', e); }
   });
 })();
 

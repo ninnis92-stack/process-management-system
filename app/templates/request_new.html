@@ -63,8 +63,13 @@
         </div>
 
         <div class="col-md-4 mb-3">
-          <label class="form-label">Price Book Status</label>
+          <label class="form-label">Sales List</label>
           {{ form.pricebook_status(class="form-select") }}
+          <div class="mt-2">
+            <label class="form-label">Price Book Number</label>
+            {{ form.pricebook_number(class="form-control") }}
+            <div class="form-text">Required when a Sales List selection is provided.</div>
+          </div>
         </div>
       </div>
 
@@ -107,10 +112,13 @@
 
       <script>
         (function(){
-          // Wait for Bootstrap to be available then show the modal
           try {
-            var m = new bootstrap.Modal(document.getElementById('createdModal'));
-            m.show();
+            if (typeof safeShowModal === 'function') {
+              safeShowModal('createdModal');
+            } else {
+              var m = new bootstrap.Modal(document.getElementById('createdModal'));
+              m.show();
+            }
           } catch (e) {
             console.warn('Could not show createdModal', e);
           }

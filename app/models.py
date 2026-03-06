@@ -23,8 +23,8 @@ STATUSES = (
 REQUEST_TYPES = ("part_number", "instructions", "both")
 PRIORITIES = ("low", "medium", "high")
 PRICEBOOK_LABELS = {
-    "in_pricebook": "In price book",
-    "not_in_pricebook": "Not in price book",
+    "in_pricebook": "On sales list",
+    "not_in_pricebook": "Not on sales list",
     "unknown": "Unknown / needs check",
 }
 
@@ -127,7 +127,7 @@ class Request(db.Model):
 
     @property
     def pricebook_display(self) -> str:
-        """User-facing price book label with safe fallback for unexpected values."""
+        """User-facing sales list label with safe fallback for unexpected values."""
         return PRICEBOOK_LABELS.get(self.pricebook_status, PRICEBOOK_LABELS["unknown"])
 
 class Artifact(db.Model):
@@ -238,3 +238,35 @@ class AuditLog(db.Model):
 
     # explicit event timestamp for audit events (useful for indexing and queries)
     event_ts = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class SpecialEmailConfig(db.Model):
+    """Singleton-style table to store admin-configured special emails and behavior.
+
+    Fields:
+      - enabled: whether the request-by-email feature is active
+      - help_email: designated email for help requests
+      - request_form_email: email address that acts as a request form inbox
+      - request_form_first_message: initial autoresponder message body
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=False)
+    help_email = db.Column(db.String(255), nullable=True)
+    request_form_email = db.Column(db.String(255), nullable=True)
+    request_form_first_message = db.Column(db.Text, nullable=True)
+    help_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    help_user = db.relationship("User", foreign_keys=[help_user_id])
+    request_form_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    request_form_user = db.relationship("User", foreign_keys=[request_form_user_id])
+
+    @classmethod
+    def get(cls):
+        cfg = cls.query.first()
+        if not cfg:
+            cfg = cls()
+            db.session.add(cfg)
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        return cfg
