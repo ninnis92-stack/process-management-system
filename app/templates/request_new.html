@@ -63,8 +63,13 @@
         </div>
 
         <div class="col-md-4 mb-3">
-          <label class="form-label">Price Book Status</label>
+          <label class="form-label">Sales List</label>
           {{ form.pricebook_status(class="form-select") }}
+        </div>
+        <div class="col-md-12 mb-3">
+          <label class="form-label">Sales list reference</label>
+          {{ form.sales_list_reference(class="form-control") }}
+          <div class="form-text">If you selected "On the sales list", provide the sales list SKU or reference.</div>
         </div>
       </div>
 

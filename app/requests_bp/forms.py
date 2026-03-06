@@ -33,14 +33,15 @@ class NewRequestForm(FlaskForm):
         validators=[DataRequired()]
     )
     pricebook_status = SelectField(
-    "Price Book Status",
+    "Sales List",
     choices=[
-        ("in_pricebook", "In price book"),
-        ("not_in_pricebook", "Not in price book"),
+        ("in_pricebook", "On the sales list"),
+        ("not_in_pricebook", "Not on the sales list"),
         ("unknown", "Unknown / needs check"),
     ],
     validators=[DataRequired()],
     )
+    sales_list_reference = StringField("Sales list reference (required if on the sales list)", validators=[Optional(), Length(max=200)])
     description = TextAreaField("Description", validators=[Optional()])
     priority = SelectField("Priority", choices=[
         ("low", "Low"),
@@ -54,6 +55,17 @@ class NewRequestForm(FlaskForm):
     def validate(self, extra_validators=None):
         ok = super().validate(extra_validators=extra_validators)
         if not ok:
+            return False
+
+        # Enforce sales_list_reference when Sales List == on the sales list
+        try:
+            price_sel = (self.pricebook_status.data or "").strip()
+        except Exception:
+            price_sel = None
+        ref = (getattr(self, 'sales_list_reference', None).data or "").strip() if getattr(self, 'sales_list_reference', None) else ""
+        if price_sel == 'in_pricebook' and not ref:
+            if getattr(self, 'sales_list_reference', None):
+                self.sales_list_reference.errors.append("Sales list reference is required when item is on the sales list.")
             return False
 
         req_type = (self.request_type.data or "").strip()
@@ -94,6 +106,7 @@ class NewRequestForm(FlaskForm):
                 return False
 
         return True
+        
 
 class CommentForm(FlaskForm):
     visibility_scope = SelectField("Visibility", choices=[], validators=[DataRequired()])

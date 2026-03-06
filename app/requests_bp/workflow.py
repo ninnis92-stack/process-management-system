@@ -1,4 +1,5 @@
 from typing import Optional, Tuple
+from ..models import StatusOption
 
 OWNER_BY_STATUS = {
     "PENDING_C_REVIEW": "C",
@@ -6,7 +7,17 @@ OWNER_BY_STATUS = {
 }
 DEFAULT_OWNER = "B"
 
+
 def owner_for_status(status: str) -> str:
+    # Prefer admin-configured StatusOption.target_department when present.
+    try:
+        opt = StatusOption.query.filter_by(code=status).first()
+        if opt and opt.target_department:
+            return opt.target_department
+    except Exception:
+        # If DB unavailable or misconfigured, fall back to hardcoded mapping.
+        pass
+
     if status == "CLOSED":
         return "B"
     return OWNER_BY_STATUS.get(status, DEFAULT_OWNER)
@@ -19,15 +30,22 @@ ALLOWED_TRANSITIONS = {
     },
     "B": {
         ("NEW_FROM_A", "B_IN_PROGRESS"),
+        ("NEW_FROM_A", "UNDER_REVIEW"),
         ("NEW_FROM_A", "PENDING_C_REVIEW"),
         ("NEW_FROM_A", "B_FINAL_REVIEW"),
         ("NEW_FROM_A", "CLOSED"),
         ("B_IN_PROGRESS", "PENDING_C_REVIEW"),
+        ("B_IN_PROGRESS", "UNDER_REVIEW"),
         ("B_IN_PROGRESS", "WAITING_ON_A_RESPONSE"),
         ("B_IN_PROGRESS", "B_FINAL_REVIEW"),  # bypass C (only if requires_c_review == False)
         ("WAITING_ON_A_RESPONSE", "B_IN_PROGRESS"),
         ("C_NEEDS_CHANGES", "B_IN_PROGRESS"),
         ("C_APPROVED", "B_FINAL_REVIEW"),
+        ("C_APPROVED", "UNDER_REVIEW"),
+        ("UNDER_REVIEW", "B_IN_PROGRESS"),
+        ("UNDER_REVIEW", "B_FINAL_REVIEW"),
+        ("UNDER_REVIEW", "SENT_TO_A"),
+        ("UNDER_REVIEW", "CLOSED"),
         ("B_FINAL_REVIEW", "EXEC_APPROVAL"),
         ("B_FINAL_REVIEW", "SENT_TO_A"),
         ("EXEC_APPROVAL", "B_FINAL_REVIEW"),

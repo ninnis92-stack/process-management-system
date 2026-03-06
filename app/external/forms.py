@@ -35,14 +35,15 @@ class ExternalNewRequestForm(FlaskForm):
     )
 
     pricebook_status = SelectField(
-        "Price Book Status",
+        "Sales List",
         choices=[
-            ("in_pricebook", "In price book"),
-            ("not_in_pricebook", "Not in price book"),
+            ("in_pricebook", "On the sales list"),
+            ("not_in_pricebook", "Not on the sales list"),
             ("unknown", "Unknown / needs check"),
         ],
         validators=[DataRequired()],
     )
+    sales_list_reference = StringField("Sales list reference (required if on the sales list)", validators=[Optional(), Length(max=200)])
 
     due_at = DateTimeLocalField(
         "Due Date (48+ hours required)",
@@ -62,10 +63,18 @@ class ExternalNewRequestForm(FlaskForm):
         validators=[DataRequired()],
     )
 
-    # Enforce donor/target rules based on request_type
+    # Enforce donor/target rules based on request_type and sales list reference
     def validate(self, extra_validators=None):
         ok = super().validate(extra_validators=extra_validators)
         if not ok:
+            return False
+
+        # Enforce sales_list_reference when Sales List == on the sales list
+        price_sel = (self.pricebook_status.data or "").strip()
+        ref = (getattr(self, 'sales_list_reference', None).data or "").strip() if getattr(self, 'sales_list_reference', None) else ""
+        if price_sel == 'in_pricebook' and not ref:
+            if getattr(self, 'sales_list_reference', None):
+                self.sales_list_reference.errors.append("Sales list reference is required when item is on the sales list.")
             return False
 
         req_type = (self.request_type.data or "").strip()
@@ -74,10 +83,6 @@ class ExternalNewRequestForm(FlaskForm):
         reason = (self.no_donor_reason.data or "").strip()
 
         # Method (stored as "instructions") requires donor + target.
-        # When selecting "both" the Method portion requires a donor but the
-        # target part number is optional (the requester may be asking for a
-        # target to be created along with the method). Also, the "needs_create"
-        # reason only applies to pure Part Number requests.
         if req_type == "instructions":
             if not donor:
                 self.donor_part_number.errors.append("Donor part number is required for Method.")
@@ -90,7 +95,6 @@ class ExternalNewRequestForm(FlaskForm):
                 return False
 
         if req_type == "both":
-            # Both: donor required, target optional; reason not allowed
             if not donor:
                 self.donor_part_number.errors.append("Donor part number is required for Both.")
                 return False
@@ -98,15 +102,12 @@ class ExternalNewRequestForm(FlaskForm):
                 self.no_donor_reason.errors.append("This reason is only valid for Part Number requests. Provide a donor part number instead.")
                 return False
 
-        # Part Number request: donor required unless reason == needs_create
         if req_type == "part_number":
             if not donor and reason != "needs_create":
                 self.donor_part_number.errors.append(
                     "Donor part number is required unless the part number needs to be created."
                 )
                 return False
-
-            # Optional: if donor is provided, reason should be blank
             if donor and reason:
                 self.no_donor_reason.errors.append("Clear the reason if you provide a donor part number.")
                 return False

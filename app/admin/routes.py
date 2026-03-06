@@ -6,6 +6,7 @@ from ..extensions import db
 from ..models import User
 from .forms import AdminCreateUserForm, SiteConfigForm, DepartmentForm, SSOAssignForm
 from ..models import Request as ReqModel, Artifact, Submission, SiteConfig, Department
+from ..models import StatusOption, DepartmentEditor
 from datetime import datetime, timedelta
 from flask import request as flask_request
 from ..models import Notification, AuditLog
@@ -440,6 +441,110 @@ def list_departments():
         return redirect(url_for('requests.dashboard'))
     depts = Department.query.order_by(Department.code).all()
     return render_template('admin_departments.html', departments=depts)
+
+
+@admin_bp.route('/status_options')
+@login_required
+def list_status_options():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    opts = StatusOption.query.order_by(StatusOption.code).all()
+    return render_template('admin_status_options.html', status_options=opts)
+
+
+@admin_bp.route('/status_options/new', methods=['GET', 'POST'])
+@login_required
+def create_status_option():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    from .forms import StatusOptionForm
+    form = StatusOptionForm()
+    if form.validate_on_submit():
+        code = form.code.data.strip()
+        opt = StatusOption(code=code, label=form.label.data.strip(), target_department=(form.target_department.data or None), notify_enabled=bool(form.notify_enabled.data), notify_on_transfer_only=bool(form.notify_on_transfer_only.data))
+        db.session.add(opt)
+        db.session.commit()
+        flash('Status option created.', 'success')
+        return redirect(url_for('admin.list_status_options'))
+    return render_template('admin_status_edit.html', form=form)
+
+
+@admin_bp.route('/status_options/<int:opt_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_status_option(opt_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    from .forms import StatusOptionForm
+    opt = StatusOption.query.get_or_404(opt_id)
+    form = StatusOptionForm(obj=opt)
+    if form.validate_on_submit():
+        opt.code = form.code.data.strip()
+        opt.label = form.label.data.strip()
+        opt.target_department = form.target_department.data or None
+        opt.notify_enabled = bool(form.notify_enabled.data)
+        opt.notify_on_transfer_only = bool(form.notify_on_transfer_only.data)
+        db.session.commit()
+        flash('Status option updated.', 'success')
+        return redirect(url_for('admin.list_status_options'))
+    return render_template('admin_status_edit.html', form=form, opt=opt)
+
+
+@admin_bp.route('/status_options/<int:opt_id>/delete', methods=['POST'])
+@login_required
+def delete_status_option(opt_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    opt = StatusOption.query.get_or_404(opt_id)
+    db.session.delete(opt)
+    db.session.commit()
+    flash('Status option deleted.', 'success')
+    return redirect(url_for('admin.list_status_options'))
+
+
+@admin_bp.route('/dept_editors')
+@login_required
+def list_dept_editors():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    editors = DepartmentEditor.query.order_by(DepartmentEditor.department, DepartmentEditor.assigned_at.desc()).all()
+    return render_template('admin_dept_editors.html', editors=editors)
+
+
+@admin_bp.route('/dept_editors/new', methods=['GET', 'POST'])
+@login_required
+def create_dept_editor():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    from .forms import DepartmentEditorForm
+    form = DepartmentEditorForm()
+    # populate user choices
+    form.user_id.choices = [(u.id, u.email) for u in User.query.order_by(User.email).all()]
+    if form.validate_on_submit():
+        de = DepartmentEditor(user_id=form.user_id.data, department=form.department.data, can_edit=bool(form.can_edit.data))
+        db.session.add(de)
+        db.session.commit()
+        flash('Department editor created.', 'success')
+        return redirect(url_for('admin.list_dept_editors'))
+    return render_template('admin_dept_editor_edit.html', form=form)
+
+
+@admin_bp.route('/dept_editors/<int:de_id>/delete', methods=['POST'])
+@login_required
+def delete_dept_editor(de_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    de = DepartmentEditor.query.get_or_404(de_id)
+    db.session.delete(de)
+    db.session.commit()
+    flash('Department editor removed.', 'success')
+    return redirect(url_for('admin.list_dept_editors'))
 
 
 @admin_bp.route('/departments/new', methods=['GET', 'POST'])

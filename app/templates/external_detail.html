@@ -22,7 +22,7 @@
     {% else %}
       <div class="text-muted mb-2">Assigned to: Unassigned</div>
     {% endif %}
-    <div><strong>Price Book:</strong> {{ req.pricebook_display }}</div>
+    <div><strong>Sales List:</strong> {{ req.pricebook_display }}</div>
     <div><strong>Due:</strong> {{ req.due_at.strftime("%b %d, %Y %I:%M %p") if req.due_at else "—" }}</div>
     <hr/>
     <div style="white-space:pre-wrap">{{ req.description or "No description provided." }}</div>

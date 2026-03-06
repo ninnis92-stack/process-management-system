@@ -9,6 +9,7 @@ DEPARTMENTS = ("A", "B", "C")
 
 STATUSES = (
     "NEW_FROM_A",
+    "UNDER_REVIEW",
     "B_IN_PROGRESS",
     "WAITING_ON_A_RESPONSE",
     "PENDING_C_REVIEW",
@@ -23,8 +24,8 @@ STATUSES = (
 REQUEST_TYPES = ("part_number", "instructions", "both")
 PRIORITIES = ("low", "medium", "high")
 PRICEBOOK_LABELS = {
-    "in_pricebook": "In price book",
-    "not_in_pricebook": "Not in price book",
+    "in_pricebook": "On the sales list",
+    "not_in_pricebook": "Not on the sales list",
     "unknown": "Unknown / needs check",
 }
 
@@ -89,6 +90,8 @@ class Request(db.Model):
     title = db.Column(db.String(200), nullable=False)
     request_type = db.Column(db.String(30), nullable=False)
     pricebook_status = db.Column(db.String(30), nullable=False, default="unknown")
+    # Optional reference identifier when item is on the sales list (e.g., SKU/price id)
+    sales_list_reference = db.Column(db.String(200), nullable=True)
     description = db.Column(db.Text, nullable=False)
     priority = db.Column(db.String(20), nullable=False)
 
@@ -127,7 +130,7 @@ class Request(db.Model):
 
     @property
     def pricebook_display(self) -> str:
-        """User-facing price book label with safe fallback for unexpected values."""
+        """User-facing sales list label with safe fallback for unexpected values."""
         return PRICEBOOK_LABELS.get(self.pricebook_status, PRICEBOOK_LABELS["unknown"])
 
 class Artifact(db.Model):
@@ -257,3 +260,36 @@ class Department(db.Model):
     description = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class StatusOption(db.Model):
+    """Admin-manageable metadata for status selections.
+
+    Each row corresponds to a status code and can control where the
+    request should route (target department) and whether notifications
+    should be emitted only when the transition results in a department
+    transfer.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(80), nullable=False, unique=True, index=True)
+    label = db.Column(db.String(200), nullable=False)
+    # optional override for which department will own the request when this
+    # status is selected. If null, the application fallbacks are used.
+    target_department = db.Column(db.String(2), nullable=True)
+    # When true, notifications for this status change will only be sent when
+    # the transition also transfers ownership between departments.
+    notify_on_transfer_only = db.Column(db.Boolean, nullable=False, default=False)
+    # If false, status selection will not trigger notifications at all.
+    notify_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class DepartmentEditor(db.Model):
+    """Per-department edit privileges assigned to users by admins."""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref='dept_editor_roles')
+    department = db.Column(db.String(2), nullable=False, index=True)
+    can_edit = db.Column(db.Boolean, nullable=False, default=True)
+    assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('user_id', 'department', name='uq_user_dept_editor'),)

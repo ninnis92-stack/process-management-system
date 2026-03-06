@@ -212,6 +212,27 @@ Admin Hardening Checklist:
 - Ticketing: set `TICKETING_ENABLED=true` and `TICKETING_URL`/`TICKETING_TOKEN` to enable creating tickets in an external system. When disabled the app returns prototype ticket ids.
 - Part/Method verification APIs: set `PART_API_ENABLED`/`METHOD_API_ENABLED` and respective `*_API_URL`/`*_API_TOKEN` to enable remote validation. When disabled the verification endpoint logs and returns non-blocking feedback.
 
+## External Integrations & Extensibility
+
+- The application is designed to integrate with external management systems (PM tools, ticketing, and verification databases). Integration options include:
+  - Email hooks: real email sending (SMTP) can be enabled and used by downstream systems to create tasks or tickets.
+  - Ticketing adapters: configure `TICKETING_ENABLED`, `TICKETING_URL`, and `TICKETING_TOKEN` to post structured tickets when a status transition or handoff occurs.
+  - Webhooks: administrators can wire webhooks (or consume the `notify_users` output) to notify external services when transitions occur — the admin-configurable `StatusOption` controls when notifications should be emitted (always / on transfer only / disabled).
+  - SSO + provisioned users: SSO linkage (`sso_sub`) is used for integrating with identity-aware third-party apps; admin bulk-assign SSO flow helps align department ownership with external tooling.
+
+- Notification toggles: each status option can be configured in the Admin UI to enable/disable notifications or limit them to cross-department transfers only. This prevents noisy emails for intra-department updates while ensuring handoffs create external tasks.
+
+- Verification integrations: the verification service abstraction (`app/services/verification.py`) is pluggable — swap or extend with connectors that query internal ERP/parts DBs or external APIs and return structured verification results to the form renderer.
+
+Integration guidance:
+
+1. Decide whether external systems should be driven by emails, a ticketing API, or webhooks. Configure the corresponding settings and enable the `TICKETING_ENABLED` or webhook endpoint.
+2. Use `StatusOption` (Admin → Status Options) to map statuses to `target_department` and control `notify_enabled` / `notify_on_transfer_only` behavior so only relevant transitions trigger external tasks.
+3. Ensure SSO accounts are provisioned for users who should receive external task assignments; use the Admin SSO assign UI to align `User.department` and `sso_sub` values.
+4. For verification, implement a connector under `app/services/verification.py` that reads env-configured endpoints/tokens and returns verification results used by the request forms.
+
+These integration extension points are intentionally lightweight so you can build adapters (webhook forwarders, ticketing connectors, or direct API callers) without changing core workflow logic.
+
 ## Dev Notes
 - Run `python3 seed.py` to seed sample data.
 - Server entrypoint: `run.py` (Flask), Dockerfile provided; Fly configs included for deployment experiments.

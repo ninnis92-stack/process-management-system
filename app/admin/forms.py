@@ -2,6 +2,8 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SelectField, BooleanField, SubmitField, TextAreaField
 from wtforms.fields import EmailField
 from wtforms.validators import DataRequired, Email, Optional, Length
+from wtforms.validators import AnyOf
+from wtforms import IntegerField
 
 
 class AdminCreateUserForm(FlaskForm):
@@ -32,3 +34,19 @@ class SSOAssignForm(FlaskForm):
     emails = TextAreaField("SSO-linked emails (one per line)", validators=[DataRequired()])
     department = SelectField("Assign department", choices=[("A", "A"), ("B", "B"), ("C", "C")], validators=[DataRequired()])
     submit = SubmitField("Assign")
+
+
+class StatusOptionForm(FlaskForm):
+    code = StringField("Status code", validators=[DataRequired(), Length(max=80)])
+    label = StringField("Label", validators=[DataRequired(), Length(max=200)])
+    target_department = SelectField("Target department (optional)", choices=[("", "-- default --"), ("A", "A"), ("B", "B"), ("C", "C")], validators=[Optional()])
+    notify_enabled = BooleanField("Enable notifications for this status", default=True)
+    notify_on_transfer_only = BooleanField("Only notify when request transfers departments", default=False)
+    submit = SubmitField("Save Status")
+
+
+class DepartmentEditorForm(FlaskForm):
+    user_id = SelectField("User", coerce=int, validators=[DataRequired()])
+    department = SelectField("Department", choices=[("A", "A"), ("B", "B"), ("C", "C")], validators=[DataRequired()])
+    can_edit = BooleanField("Can edit selections / form fields", default=True)
+    submit = SubmitField("Save Editor")
