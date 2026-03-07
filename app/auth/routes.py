@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, current_app, session, request as flask_request
+from flask import Blueprint, render_template, redirect, url_for, flash, current_app, session, request, jsonify
 from werkzeug.security import check_password_hash
 try:
     import pyotp
@@ -16,7 +16,6 @@ from .sso import sso_user_is_admin
 from sqlalchemy.exc import OperationalError
 from flask import session as _session
 from ..models import UserDepartment, Department
-from flask import render_template
 
 
 def _restore_last_active_dept_for_user(user):
@@ -365,14 +364,14 @@ def totp_setup():
         return redirect(url_for('requests.dashboard'))
 
     # Generate a secret and show provisioning URI; require confirmation with a code
-    if flask_request.method == 'GET':
+    if request.method == 'GET':
         secret = pyotp.random_base32()
         session['new_totp_secret'] = secret
         provisioning_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=current_user.email, issuer_name=current_app.config.get('APP_NAME','ProcessMgmt'))
         return render_template('totp_setup.html', secret=secret, provisioning_uri=provisioning_uri)
 
     # POST: verify provided code and enable TOTP
-    code = flask_request.form.get('code')
+    code = request.form.get('code')
     secret = session.get('new_totp_secret')
     if not secret or not code:
         flash('Missing verification code.', 'danger')
@@ -410,10 +409,10 @@ def totp_verify():
         session.pop('pre_2fa_userid', None)
         return redirect(url_for('auth.login'))
 
-    if flask_request.method == 'GET':
+    if request.method == 'GET':
         return render_template('totp_verify.html')
 
-    code = flask_request.form.get('code')
+    code = request.form.get('code')
     if not code:
         flash('Enter the code from your authenticator app.', 'warning')
         return render_template('totp_verify.html')
@@ -450,11 +449,11 @@ def set_vibe():
     """Persist per-user vibe/theme index (expects form or JSON 'vibe_index')."""
     try:
         v = None
-        if flask_request.is_json:
-            data = flask_request.get_json()
+        if request.is_json:
+            data = request.get_json()
             v = int(data.get('vibe_index'))
         else:
-            v = int(flask_request.form.get('vibe_index'))
+            v = int(request.form.get('vibe_index'))
     except Exception:
         return ("Invalid payload", 400)
 
