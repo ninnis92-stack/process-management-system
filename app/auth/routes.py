@@ -46,8 +46,16 @@ def _restore_last_active_dept_for_user(user):
                 allowed = True
 
         if allowed:
+            try:
+                current_app.logger.info('Restoring last_active_dept for user %s -> %s', getattr(user, 'email', getattr(user, 'id', 'unknown')), dept)
+            except Exception:
+                pass
             _session['active_dept'] = dept
     except Exception:
+        try:
+            current_app.logger.exception('Failed to restore last_active_dept for user %s', getattr(user, 'email', getattr(user, 'id', 'unknown')))
+        except Exception:
+            pass
         # Fail silently; restoring department is a convenience only.
         return
 
@@ -282,19 +290,31 @@ def login():
         try:
             user = User.query.filter_by(email=form.email.data.strip().lower()).first()
         except OperationalError as err:
-            current_app.logger.exception("Database unavailable during login")
+            try:
+                current_app.logger.exception("Database unavailable during login")
+            except Exception:
+                pass
             try:
                 db.session.rollback()
             except Exception:
-                current_app.logger.exception('Failed to rollback after OperationalError in login')
+                try:
+                    current_app.logger.exception('Failed to rollback after OperationalError in login')
+                except Exception:
+                    pass
             flash("Temporary database error. Please try again shortly.", "warning")
             return render_template("login.html", form=form)
         except Exception as err:
-            current_app.logger.exception('Unexpected DB error during login')
+            try:
+                current_app.logger.exception('Unexpected DB error during login')
+            except Exception:
+                pass
             try:
                 db.session.rollback()
             except Exception:
-                current_app.logger.exception('Failed to rollback after unexpected error in login')
+                try:
+                    current_app.logger.exception('Failed to rollback after unexpected error in login')
+                except Exception:
+                    pass
             flash("Temporary database error. Please try again shortly.", "warning")
             return render_template("login.html", form=form)
         if not user or not user.is_active or not check_password_hash(user.password_hash, form.password.data):
@@ -310,7 +330,19 @@ def login():
                 session['pre_2fa_userid'] = user.id
                 return redirect(url_for('auth.totp_verify'))
 
-        login_user(user)
+        try:
+            login_user(user)
+        except Exception:
+            try:
+                current_app.logger.exception('Failed during login_user() for %s', getattr(user, 'email', getattr(user, 'id', 'unknown')))
+            except Exception:
+                pass
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            flash('Login failed due to an internal error; try again.', 'danger')
+            return render_template('login.html', form=form)
         # If the user has multiple departments available, prompt them to choose;
         # otherwise restore last-active or set primary department into session.
         try:
