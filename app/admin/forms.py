@@ -179,3 +179,11 @@ class RejectRequestConfigForm(FlaskForm):
     dept_b_enabled = BooleanField("Allow Dept B to reject", default=True)
     dept_c_enabled = BooleanField("Allow Dept C to reject", default=False)
     submit = SubmitField("Save Reject Settings")
+
+
+class StatusBucketForm(FlaskForm):
+    name = StringField("Bucket name", validators=[DataRequired(), Length(max=200)])
+    department_name = SelectField("Department (optional)", choices=[("", "-- global --"), ("A", "A"), ("B", "B"), ("C", "C")], validators=[Optional()])
+    order = IntegerField("Order", default=0, validators=[Optional()])
+    active = BooleanField("Active", default=True)
+    submit = SubmitField("Save Bucket")

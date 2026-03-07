@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>{{ 'Edit Bucket' if bucket else 'New Bucket' }}</h2>
+
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+      <label class="form-label">Name</label>
+      {{ form.name(class="form-control") }}
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Department</label>
+      {{ form.department_name(class="form-select") }}
+      <div class="form-text">Leave blank for a global bucket visible to all departments.</div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Order</label>
+      {{ form.order(class="form-control") }}
+    </div>
+    <div class="mb-3 form-check">
+      {{ form.active(class="form-check-input") }}
+      <label class="form-check-label">Active</label>
+    </div>
+    <button class="btn btn-primary">{{ 'Save' }}</button>
+    <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.list_buckets') }}">Cancel</a>
+  </form>
+
+  {% if bucket %}
+    <hr/>
+    <h4>Statuses</h4>
+    <ul class="list-group mb-3">
+      {% for s in statuses %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>{{ s.status_code }} <small class="text-muted">(order {{ s.order }})</small></div>
+          <form method="post" action="{{ url_for('admin.buckets_status_delete', bucket_id=bucket.id, status_id=s.id) }}" style="display:inline">
+            <button class="btn btn-sm btn-danger">Remove</button>
+          </form>
+        </li>
+      {% else %}
+        <li class="list-group-item text-muted">No statuses configured.</li>
+      {% endfor %}
+    </ul>
+
+    <form method="post">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-6">
+          <label class="form-label">Status code</label>
+          <input name="new_status_code" class="form-control" placeholder="e.g. B_IN_PROGRESS">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Order</label>
+          <input name="new_status_order" class="form-control" type="number" value="0">
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-outline-primary w-100">Add Status</button>
+        </div>
+      </div>
+    </form>
+  {% endif %}
+
+{% endblock %}

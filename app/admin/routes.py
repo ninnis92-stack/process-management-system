@@ -18,6 +18,7 @@ import os
 from werkzeug.utils import secure_filename
 from ..models import Workflow
 from .forms import WorkflowForm
+from .forms import StatusBucketForm
 from .forms import FormTemplateAdminForm, FormFieldInlineForm
 from .forms import DepartmentAssignmentForm
 from .forms import BulkDepartmentAssignForm
@@ -1349,6 +1350,94 @@ def import_default_buckets():
         current_app.logger.exception('Failed to import default buckets')
         flash('Failed to import buckets.', 'danger')
     return redirect(url_for('admin.list_departments'))
+
+
+@admin_bp.route('/buckets')
+@login_required
+def list_buckets():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    buckets = StatusBucket.query.order_by(StatusBucket.department_name.asc().nullsfirst(), StatusBucket.order.asc()).all()
+    return render_template('admin_buckets.html', buckets=buckets)
+
+
+@admin_bp.route('/buckets/new', methods=['GET', 'POST'])
+@login_required
+def buckets_new():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    form = StatusBucketForm()
+    if form.validate_on_submit():
+        b = StatusBucket(name=form.name.data.strip(), department_name=(form.department_name.data or None) or None,
+                         order=int(form.order.data or 0), active=bool(form.active.data))
+        db.session.add(b)
+        db.session.commit()
+        flash('Bucket created.', 'success')
+        return redirect(url_for('admin.list_buckets'))
+    return render_template('admin_bucket_form.html', form=form)
+
+
+@admin_bp.route('/buckets/<int:bucket_id>/edit', methods=['GET', 'POST'])
+@login_required
+def buckets_edit(bucket_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    b = get_or_404(StatusBucket, bucket_id)
+    form = StatusBucketForm(obj=b)
+    if form.validate_on_submit():
+        b.name = form.name.data.strip()
+        b.department_name = (form.department_name.data or None) or None
+        b.order = int(form.order.data or 0)
+        b.active = bool(form.active.data)
+        db.session.commit()
+        flash('Bucket updated.', 'success')
+        return redirect(url_for('admin.list_buckets'))
+
+    # handle adding a new status code via POST param
+    if flask_request.method == 'POST' and flask_request.form.get('new_status_code'):
+        code = (flask_request.form.get('new_status_code') or '').strip()
+        try:
+            ordv = int(flask_request.form.get('new_status_order') or 0)
+        except Exception:
+            ordv = 0
+        if code:
+            ns = BucketStatus(bucket_id=b.id, status_code=code, order=ordv)
+            db.session.add(ns)
+            db.session.commit()
+            flash('Added status to bucket.', 'success')
+        return redirect(url_for('admin.buckets_edit', bucket_id=b.id))
+
+    statuses = b.statuses.order_by(BucketStatus.order.asc()).all()
+    return render_template('admin_bucket_form.html', form=form, bucket=b, statuses=statuses)
+
+
+@admin_bp.route('/buckets/<int:bucket_id>/delete', methods=['POST'])
+@login_required
+def buckets_delete(bucket_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    b = get_or_404(StatusBucket, bucket_id)
+    db.session.delete(b)
+    db.session.commit()
+    flash('Bucket deleted.', 'success')
+    return redirect(url_for('admin.list_buckets'))
+
+
+@admin_bp.route('/buckets/<int:bucket_id>/status/<int:status_id>/delete', methods=['POST'])
+@login_required
+def buckets_status_delete(bucket_id: int, status_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    s = get_or_404(BucketStatus, status_id)
+    db.session.delete(s)
+    db.session.commit()
+    flash('Bucket status removed.', 'success')
+    return redirect(url_for('admin.buckets_edit', bucket_id=bucket_id))
 
 
 @admin_bp.route('/integrations/new', methods=['GET', 'POST'])
