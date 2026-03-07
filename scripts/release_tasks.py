@@ -35,7 +35,20 @@ def main():
             if rc.returncode == 0:
                 print("alembic_upgrade=ok")
             else:
-                print("alembic_upgrade=failed", rc.returncode)
+                # Some repos have multiple heads (merge commits). If the
+                # single 'head' target fails, attempt to upgrade all heads
+                # which is a safe idempotent fallback.
+                print("alembic_upgrade=head_failed", rc.returncode)
+                try:
+                    rc2 = subprocess.run(["alembic", "upgrade", "heads"], check=False)
+                    if rc2.returncode == 0:
+                        print("alembic_upgrade=heads_ok")
+                    else:
+                        print("alembic_upgrade=heads_failed", rc2.returncode)
+                except FileNotFoundError:
+                    print("alembic not found on fallback; skipping migrations")
+                except Exception as exc2:
+                    print("alembic_upgrade_heads_exception", exc2, file=sys.stderr)
         except FileNotFoundError:
             # Alembic binary not available; skip with a warning.
             print("alembic not found; skipping migrations")
@@ -304,6 +317,19 @@ def main():
                                 )
                             )
                         print("schema_fix=user.last_active_dept_added")
+                # Ensure new deployments have `dark_mode` column expected by
+                # recent releases; create it if missing to avoid seed failures.
+                try:
+                    if "user" in insp.get_table_names():
+                        user_cols = {c["name"] for c in insp.get_columns("user")}
+                        if "dark_mode" not in user_cols:
+                            with engine.begin() as conn:
+                                conn.execute(text('ALTER TABLE "user" ADD COLUMN dark_mode BOOLEAN DEFAULT FALSE'))
+                            print("schema_fix=user.dark_mode_added")
+                except Exception:
+                    # Don't fail the whole release if this ALTER can't be run;
+                    # downstream steps will surface the error and be logged.
+                    pass
                 # Ensure request.is_denied exists when the model expects it
                 if "request" in insp.get_table_names():
                     req_cols = {c["name"] for c in insp.get_columns("request")}
