@@ -2,6 +2,7 @@
 
 {% block content %}
 <h2>{% if wf %}Edit{% else %}New{% endif %} Workflow</h2>
+{% set rendered_spec = editor_spec if editor_spec is defined and editor_spec else (wf.spec if wf and wf.spec else none) %}
 <form method="post">
   {{ form.hidden_tag() }}
   <div class="form-group">
@@ -22,8 +23,8 @@
   <div class="form-group">
     <label class="form-label">Workflow steps</label>
     <div id="workflow-steps" class="list-group mb-2" aria-label="Workflow steps">
-      {% if wf and wf.spec and wf.spec.steps %}
-        {% for s in wf.spec.steps %}
+      {% if rendered_spec and rendered_spec.steps %}
+        {% for s in rendered_spec.steps %}
           {# support legacy step as string or new step as mapping with from_dept/to_dept/status #}
           {% set step = s if s is mapping else ({'status': s} if s is string else {}) %}
           <div class="list-group-item d-flex align-items-center" data-from-dept="{{ step.from_dept if step.from_dept is defined else '' }}" data-to-dept="{{ step.to_dept if step.to_dept is defined else '' }}" data-status="{{ step.status if step.status is defined else '' }}">

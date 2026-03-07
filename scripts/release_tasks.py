@@ -23,6 +23,30 @@ from sqlalchemy import inspect, text
 import json
 
 
+def _default_workflow_spec():
+    steps = [
+        {"from_dept": "A", "to_dept": "B", "status": "NEW_FROM_A"},
+        {"from_dept": "B", "to_dept": "B", "status": "B_IN_PROGRESS"},
+        {"from_dept": "B", "to_dept": "C", "status": "PENDING_C_REVIEW"},
+        {"from_dept": "C", "to_dept": "B", "status": "B_FINAL_REVIEW"},
+        {"from_dept": "B", "to_dept": "A", "status": "SENT_TO_A"},
+        {"from_dept": "A", "to_dept": "B", "status": "CLOSED"},
+    ]
+    transitions = []
+    for i in range(len(steps) - 1):
+        transitions.append(
+            {
+                "from": steps[i]["status"],
+                "to": steps[i + 1]["status"],
+                "from_status": steps[i]["status"],
+                "to_status": steps[i + 1]["status"],
+                "from_dept": steps[i].get("to_dept") or steps[i].get("from_dept"),
+                "to_dept": steps[i + 1].get("to_dept") or steps[i + 1].get("from_dept"),
+            }
+        )
+    return {"steps": steps, "transitions": transitions}
+
+
 def main():
     app = create_app()
     with app.app_context():
@@ -386,27 +410,8 @@ def main():
                         existing = Workflow.query.filter_by(
                             name="Default A→B→C"
                         ).first()
+                        spec = _default_workflow_spec()
                         if not existing:
-                            spec = {
-                                "steps": [
-                                    "NEW_FROM_A",
-                                    "B_IN_PROGRESS",
-                                    "PENDING_C_REVIEW",
-                                    "B_FINAL_REVIEW",
-                                    "SENT_TO_A",
-                                    "CLOSED",
-                                ],
-                                "transitions": [
-                                    {"from": "NEW_FROM_A", "to": "B_IN_PROGRESS"},
-                                    {"from": "B_IN_PROGRESS", "to": "PENDING_C_REVIEW"},
-                                    {
-                                        "from": "PENDING_C_REVIEW",
-                                        "to": "B_FINAL_REVIEW",
-                                    },
-                                    {"from": "B_FINAL_REVIEW", "to": "SENT_TO_A"},
-                                    {"from": "SENT_TO_A", "to": "CLOSED"},
-                                ],
-                            }
                             w = Workflow(
                                 name="Default A→B→C",
                                 description="Default handoff workflow between A→B→C",
@@ -419,6 +424,20 @@ def main():
                                 print("schema_fix=workflow.default_created")
                             except Exception:
                                 db.session.rollback()
+                        else:
+                            existing_steps = []
+                            if isinstance(existing.spec, dict):
+                                existing_steps = existing.spec.get("steps") or []
+                            if any(isinstance(step, str) for step in existing_steps) or not any(
+                                isinstance(step, dict) and (step.get("from_dept") or step.get("to_dept"))
+                                for step in existing_steps
+                            ):
+                                existing.spec = spec
+                                try:
+                                    db.session.commit()
+                                    print("schema_fix=workflow.default_normalized")
+                                except Exception:
+                                    db.session.rollback()
                 except Exception:
                     pass
         except Exception as exc:

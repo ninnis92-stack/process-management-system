@@ -44,8 +44,147 @@ from ..models import FieldVerification
 from ..models import UserDepartment
 from .forms import GuestFormAdminForm
 from ..models import GuestForm
+from ..requests_bp.workflow import owner_for_status
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
+
+
+def _normalize_department_code(value):
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    upper = raw.upper()
+    if upper in {"A", "B", "C"}:
+        return upper
+    compact = upper.replace("DEPARTMENT", "").replace("DEPT", "").strip()
+    return compact if compact in {"A", "B", "C"} else ""
+
+
+def _default_workflow_spec():
+    steps = [
+        {"from_dept": "A", "to_dept": "B", "status": "NEW_FROM_A"},
+        {"from_dept": "B", "to_dept": "B", "status": "B_IN_PROGRESS"},
+        {"from_dept": "B", "to_dept": "C", "status": "PENDING_C_REVIEW"},
+        {"from_dept": "C", "to_dept": "B", "status": "B_FINAL_REVIEW"},
+        {"from_dept": "B", "to_dept": "A", "status": "SENT_TO_A"},
+        {"from_dept": "A", "to_dept": "B", "status": "CLOSED"},
+    ]
+    transitions = []
+    for i in range(len(steps) - 1):
+        transitions.append(
+            {
+                "from": steps[i]["status"],
+                "to": steps[i + 1]["status"],
+                "from_status": steps[i]["status"],
+                "to_status": steps[i + 1]["status"],
+                "from_dept": steps[i].get("to_dept") or steps[i].get("from_dept"),
+                "to_dept": steps[i + 1].get("to_dept") or steps[i + 1].get("from_dept"),
+            }
+        )
+    return {"steps": steps, "transitions": transitions}
+
+
+def _normalize_workflow_spec(spec, workflow_name=None):
+    if not isinstance(spec, dict):
+        return spec
+
+    steps = spec.get("steps") or []
+    if not steps:
+        return spec
+    if any(
+        isinstance(step, dict) and (step.get("from_dept") or step.get("to_dept"))
+        for step in steps
+    ):
+        return spec
+
+    statuses = [str(step).strip() for step in steps if isinstance(step, str) and step.strip()]
+    if not statuses:
+        return spec
+
+    default_statuses = [step["status"] for step in _default_workflow_spec()["steps"]]
+    if statuses == default_statuses:
+        normalized = dict(spec)
+        normalized.update(_default_workflow_spec())
+        return normalized
+
+    rich_steps = []
+    prev_status = None
+    prev_to_dept = None
+    for status in statuses:
+        to_dept = _normalize_department_code(owner_for_status(status)) or prev_to_dept or "B"
+        if prev_status is None:
+            from_dept = "A" if status == "NEW_FROM_A" else to_dept
+        else:
+            from_dept = prev_to_dept or _normalize_department_code(owner_for_status(prev_status)) or to_dept
+        rich_steps.append(
+            {"from_dept": from_dept, "to_dept": to_dept, "status": status}
+        )
+        prev_status = status
+        prev_to_dept = to_dept
+
+    transitions = []
+    for i in range(len(rich_steps) - 1):
+        transitions.append(
+            {
+                "from": rich_steps[i]["status"],
+                "to": rich_steps[i + 1]["status"],
+                "from_status": rich_steps[i]["status"],
+                "to_status": rich_steps[i + 1]["status"],
+                "from_dept": rich_steps[i].get("to_dept") or rich_steps[i].get("from_dept"),
+                "to_dept": rich_steps[i + 1].get("to_dept") or rich_steps[i + 1].get("from_dept"),
+            }
+        )
+
+    normalized = dict(spec)
+    normalized["steps"] = rich_steps
+    normalized["transitions"] = transitions
+    return normalized
+
+
+def _build_status_options_map(workflow=None):
+    status_options_map = {"A": set(), "B": set(), "C": set()}
+
+    try:
+        for bs in BucketStatus.query.all():
+            dept = _normalize_department_code(
+                (bs.bucket.department_name or "") if bs.bucket else ""
+            )
+            if dept:
+                status_options_map.setdefault(dept, set()).add(bs.status_code)
+    except Exception:
+        pass
+
+    try:
+        for opt in StatusOption.query.order_by(StatusOption.code.asc()).all():
+            dept = _normalize_department_code(opt.target_department) or _normalize_department_code(owner_for_status(opt.code))
+            if dept:
+                status_options_map.setdefault(dept, set()).add(opt.code)
+    except Exception:
+        pass
+
+    try:
+        workflows = [workflow] if workflow is not None else Workflow.query.all()
+        for wf in workflows:
+            normalized = _normalize_workflow_spec(
+                getattr(wf, "spec", None), getattr(wf, "name", None)
+            ) or {}
+            for step in normalized.get("steps") or []:
+                if not isinstance(step, dict):
+                    continue
+                code = (step.get("status") or step.get("code") or "").strip()
+                depts = {
+                    _normalize_department_code(step.get("from_dept")),
+                    _normalize_department_code(step.get("to_dept")),
+                    _normalize_department_code(step.get("department")),
+                    _normalize_department_code(step.get("department_code")),
+                }
+                for dept in {d for d in depts if d}:
+                    if code:
+                        status_options_map.setdefault(dept, set()).add(code)
+    except Exception:
+        pass
+
+    return {dept: sorted(values) for dept, values in status_options_map.items() if values}
 
 
 def _workflow_scope_label(workflow):
@@ -1217,21 +1356,10 @@ def create_workflow():
             return redirect(url_for('admin.list_workflows'))
         flash("Workflow created.", "success")
         return redirect(url_for("admin.list_workflows"))
-    # Build status options map from existing bucket statuses grouped by department
-    status_options_map = {}
-    try:
-        for bs in BucketStatus.query.all():
-            dept = (bs.bucket.department_name or "").strip() if bs.bucket else ""
-            if not dept:
-                continue
-            status_options_map.setdefault(dept, set()).add(bs.status_code)
-        # convert sets to sorted lists
-        status_options_map = {k: sorted(list(v)) for k, v in status_options_map.items()}
-    except Exception:
-        status_options_map = {}
-
     return render_template(
-        "admin_workflow_form.html", form=form, status_options_map=status_options_map
+        "admin_workflow_form.html",
+        form=form,
+        status_options_map=_build_status_options_map(),
     )
 
 
@@ -1248,7 +1376,9 @@ def edit_workflow(wf_id: int):
         import json
 
         try:
-            form.spec_json.data = json.dumps(wf.spec, indent=2)
+            form.spec_json.data = json.dumps(
+                _normalize_workflow_spec(wf.spec, wf.name), indent=2
+            )
         except Exception:
             form.spec_json.data = str(wf.spec)
 
@@ -1314,23 +1444,12 @@ def edit_workflow(wf_id: int):
             return redirect(url_for('admin.list_workflows'))
         flash("Workflow updated.", "success")
         return redirect(url_for("admin.list_workflows"))
-    # Build status options map from existing bucket statuses grouped by department
-    status_options_map = {}
-    try:
-        for bs in BucketStatus.query.all():
-            dept = (bs.bucket.department_name or "").strip() if bs.bucket else ""
-            if not dept:
-                continue
-            status_options_map.setdefault(dept, set()).add(bs.status_code)
-        status_options_map = {k: sorted(list(v)) for k, v in status_options_map.items()}
-    except Exception:
-        status_options_map = {}
-
     return render_template(
         "admin_workflow_form.html",
         form=form,
         wf=wf,
-        status_options_map=status_options_map,
+        editor_spec=_normalize_workflow_spec(wf.spec, wf.name),
+        status_options_map=_build_status_options_map(wf),
     )
 
 
