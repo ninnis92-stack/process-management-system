@@ -8,6 +8,7 @@ Create Date: 2026-03-07 01:00:00.000000
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
 revision = "0028_add_feature_flags_enable_external_forms"
@@ -16,28 +17,45 @@ branch_labels = None
 depends_on = None
 
 
+def _has_column(conn, table_name, column_name):
+    insp = inspect(conn)
+    try:
+        cols = [c["name"] for c in insp.get_columns(table_name)]
+        return column_name in cols
+    except Exception:
+        return False
+
+
 def upgrade():
-    # Use idempotent Postgres DDL to add the missing column if it's absent.
-    op.execute(
-        "ALTER TABLE feature_flags ADD COLUMN IF NOT EXISTS enable_external_forms boolean NOT NULL DEFAULT false;"
-    )
-    # Note: this uses raw DDL for portability and to avoid failures when
-    # Alembic's model metadata may be out-of-sync with the DB. Applying
-    # the raw ALTER is safe (it is `IF NOT EXISTS`) and idempotent.
-    # Ensure the server_default is present for SQLAlchemy metadata alignment.
+    conn = op.get_bind()
+    if not _has_column(conn, "feature_flags", "enable_external_forms"):
+        col = sa.Column(
+            "enable_external_forms",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("0" if conn.dialect.name == "sqlite" else "false"),
+        )
+        if conn.dialect.name == "sqlite":
+            with op.batch_alter_table("feature_flags") as batch_op:
+                batch_op.add_column(col)
+        else:
+            op.add_column("feature_flags", col)
     try:
         op.alter_column(
             "feature_flags",
             "enable_external_forms",
-            server_default=sa.text("false"),
+            server_default=sa.text("0" if conn.dialect.name == "sqlite" else "false"),
             existing_type=sa.Boolean(),
         )
     except Exception:
-        # alter_column may fail on some DB versions; it's safe to ignore here
-        # because the raw ALTER above created the column with a default.
         pass
 
 
 def downgrade():
-    # Remove the column if it exists (safe for rollbacks on staging).
-    op.execute("ALTER TABLE feature_flags DROP COLUMN IF EXISTS enable_external_forms;")
+    conn = op.get_bind()
+    if _has_column(conn, "feature_flags", "enable_external_forms"):
+        if conn.dialect.name == "sqlite":
+            with op.batch_alter_table("feature_flags") as batch_op:
+                batch_op.drop_column("enable_external_forms")
+        else:
+            op.drop_column("feature_flags", "enable_external_forms")

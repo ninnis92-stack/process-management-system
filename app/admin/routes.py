@@ -48,6 +48,36 @@ from ..models import GuestForm
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
+def _workflow_scope_label(workflow):
+    explicit = (getattr(workflow, "department_code", None) or "").strip()
+    if explicit:
+        return explicit
+
+    spec = getattr(workflow, "spec", None) or {}
+    steps = spec.get("steps") if isinstance(spec, dict) else []
+    departments = []
+    seen = set()
+
+    for step in steps or []:
+        if not isinstance(step, dict):
+            continue
+        for key in ("from_dept", "to_dept", "department", "department_code"):
+            value = (step.get(key) or "").strip() if isinstance(step.get(key), str) else ""
+            if value and value not in seen:
+                seen.add(value)
+                departments.append(value)
+
+    if departments:
+        return " / ".join(departments)
+
+    name = (getattr(workflow, "name", None) or "").upper()
+    inferred = [dept for dept in ("A", "B", "C") if dept in name]
+    if inferred:
+        return " / ".join(inferred)
+
+    return "Global"
+
+
 def _is_admin_user():
     # Basic admin check
     if not (current_user.is_authenticated and getattr(current_user, "is_admin", False)):
@@ -1106,7 +1136,12 @@ def list_workflows():
         flash("Access denied.", "danger")
         return redirect(url_for("requests.dashboard"))
     wfs = Workflow.query.order_by(Workflow.name.asc()).all()
-    return render_template("admin_workflows.html", workflows=wfs)
+    workflow_scope_labels = {wf.id: _workflow_scope_label(wf) for wf in wfs}
+    return render_template(
+        "admin_workflows.html",
+        workflows=wfs,
+        workflow_scope_labels=workflow_scope_labels,
+    )
 
 
 @admin_bp.route("/workflows/new", methods=["GET", "POST"])

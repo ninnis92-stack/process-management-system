@@ -738,15 +738,19 @@ The handler will parse semicolon-separated `key=value` pairs from the subject an
 
 ### Migrations / Alembic notes
 
-Two migration files for the new `special_email_config` table are included under `migrations/versions/`:
+The migration chain has been normalized so `alembic upgrade head` now works against the local SQLite database without manual stamping.
 
-- `0006_add_special_email_config.py` (hand-crafted)
-- `0007_autogen_add_special_email_config.py` (autogenerate-style)
+- `0008_add_guest_form.py` is now chained from the existing `0006_add_special_email_config.py` revision and is safe to run repeatedly.
+- `0030_add_missing_workflow_and_status_flags.py` adds the missing `workflow.implementation_pending`, `status_option.executive_approval_required`, and `status_option.sales_list_number_required` columns.
+- `0031_merge_guest_form_head.py` merges the guest-form branch back into the main head so there is a single Alembic head again.
 
-Do not run both of these in the same release sequence — they'll attempt to create the same table twice and conflict. Recommended options:
+If the admin UI reports workflow or status-option schema mismatches locally, run:
 
-- Development/autogenerate workflow (preferred): install Alembic/Flask-Migrate, remove or ignore `0006_*`, then run `alembic upgrade head` (or `flask db upgrade`) to apply the autogen migration.
-- Handcrafted workflow: keep `0006_*` and do not run `0007_*`; run `alembic upgrade head` (or use `db.create_all()` for local dev convenience).
+```bash
+alembic upgrade head
+```
+
+That applies the feature-flag, workflow, guest-form, and status-option schema updates in one pass.
 
 Quick local steps to test everything without altering remote deployments:
 
@@ -781,7 +785,9 @@ with create_app().app_context():
 PY
 ```
 
-If you'd like, I can delete the handcrafted migration or the autogen file and then run `alembic upgrade head` here locally; tell me which migration you prefer to keep and I'll apply it and update the README accordingly.
+Recent admin fixes
+- Dark mode admin tables and muted helper text were tightened so pages like Departments and Workflows keep the same dark background while avoiding washed-out copy.
+- The workflow list now surfaces inferred cross-department scope labels like `A / B / C` when a workflow spans multiple departments instead of showing only `Global`.
 
 Dev-only smoke-test scripts
 - Smoke-test helper scripts (creating sample requests, populating UI buckets, and a webhook sender) have been moved out of the main `scripts/` folder and restored on a dedicated branch and folder: `dev-scripts/` on the `dev-scripts` branch. This keeps `main` clean for deployments.

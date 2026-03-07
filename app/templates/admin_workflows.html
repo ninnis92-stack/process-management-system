@@ -11,7 +11,7 @@
   {% for wf in workflows %}
     <tr id="wf-row-{{ wf.id }}">
       <td>{{ wf.name }}</td>
-      <td>{{ wf.department_code or 'Global' }}</td>
+      <td>{{ workflow_scope_labels.get(wf.id, wf.department_code or 'Global') }}</td>
       <td>
         <div class="form-check form-switch">
           <input class="form-check-input wf-toggle" type="checkbox" role="switch" id="wfToggle{{ wf.id }}" data-wf-id="{{ wf.id }}" {% if wf.active %}checked{% endif %}>
