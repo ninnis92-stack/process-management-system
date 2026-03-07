@@ -401,6 +401,36 @@ def main():
                                 )
                             )
                         print("schema_fix=status_bucket.workflow_id_added")
+                # Ensure workflow columns expected by the model exist before any ORM query
+                if "workflow" in insp.get_table_names():
+                    workflow_cols = {c["name"] for c in insp.get_columns("workflow")}
+                    if "implementation_pending" not in workflow_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE workflow ADD COLUMN implementation_pending BOOLEAN DEFAULT FALSE"
+                                )
+                            )
+                        print("schema_fix=workflow.implementation_pending_added")
+                # Ensure newer status_option flags exist for admin pages and forms
+                if "status_option" in insp.get_table_names():
+                    status_cols = {c["name"] for c in insp.get_columns("status_option")}
+                    if "executive_approval_required" not in status_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE status_option ADD COLUMN executive_approval_required BOOLEAN DEFAULT FALSE"
+                                )
+                            )
+                        print("schema_fix=status_option.executive_approval_required_added")
+                    if "sales_list_number_required" not in status_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE status_option ADD COLUMN sales_list_number_required BOOLEAN DEFAULT FALSE"
+                                )
+                            )
+                        print("schema_fix=status_option.sales_list_number_required_added")
                 # Ensure a default workflow exists so guest forms have sensible choices
                 try:
                     from app.models import Workflow

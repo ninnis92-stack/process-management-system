@@ -13,6 +13,8 @@
   --border: #e6e9ee;
   --surface: #ffffff;
   --focus: rgba(11,97,238,0.14);
+}
+
 /* Dark-mode variables and adjustments for improved contrast */
 .dark-mode {
   /* Accessible dark-mode color tokens (WCAG-aware) */
@@ -51,10 +53,6 @@
 .dark-mode .notif-dropdown .notif-item { color: var(--body-text); }
 .dark-mode .notif-dropdown .notif-item strong { color: var(--body-text); }
 .dark-mode .notif-dropdown .notif-item .small, .dark-mode .notif-dropdown .notif-item small { color: rgba(255,255,255,0.72); }
-  --border: #e6e9ee;
-  --surface: #ffffff;
-  --focus: rgba(11,97,238,0.14);
-}
 
 /* When the global Vibe feature is disabled, force the entire UI to use
    the login page color theme so pages don't retain a previously-selected
