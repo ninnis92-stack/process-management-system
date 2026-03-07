@@ -888,6 +888,61 @@ def site_config():
     return render_template("admin_site_config.html", form=form, cfg=cfg)
 
 
+def _sanitize_banner_html(raw: str) -> str:
+    """Sanitize admin-provided banner HTML for safe display.
+
+    This function performs light cleaning to remove markdown code fences
+    (```...```) and stray triple-backticks that sometimes get pasted into
+    the banner content. We deliberately avoid heavy HTML sanitization here
+    because banner content is expected to be HTML; this helper focuses on
+    removing accidental code fences and obvious artifacts that break the
+    navbar rendering.
+    """
+    if not raw:
+        return raw
+    import re
+
+    s = str(raw)
+    # Remove fenced code blocks ```...``` including language hints
+    s = re.sub(r"```[\s\S]*?```", "", s)
+    # Remove any leftover inline triple-backticks
+    s = s.replace('```', '')
+    # Trim whitespace
+    s = s.strip()
+    return s
+
+
+@admin_bp.route('/site_config/clean_banner', methods=['POST'])
+@login_required
+def clean_banner():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    cfg = SiteConfig.query.first()
+    if not cfg or not getattr(cfg, 'banner_html', None):
+        flash('No banner content found to clean.', 'info')
+        return redirect(url_for('admin.site_config'))
+
+    cleaned = _sanitize_banner_html(cfg.banner_html or '')
+    if cleaned == (cfg.banner_html or ''):
+        flash('Banner content appears clean (no changes made).', 'info')
+        return redirect(url_for('admin.site_config'))
+
+    try:
+        cfg.banner_html = cleaned or None
+        db.session.commit()
+        flash('Banner content cleaned successfully.', 'success')
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        flash('Failed to save cleaned banner content.', 'danger')
+
+    return redirect(url_for('admin.site_config'))
+
+
 @admin_bp.route("/workflows")
 @login_required
 def list_workflows():

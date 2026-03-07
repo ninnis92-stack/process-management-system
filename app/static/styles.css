@@ -16,27 +16,38 @@
 /* Dark-mode variables and adjustments for improved contrast */
 .dark-mode {
   --nav-bg: #06101a;
-  --nav-text: #dbe9f7;
+  --nav-text: #ffffff;
   --page-bg: #071016;
-  --body-text: #dbe9f7;
+  --body-text: #ffffff;
   --muted: #9fb3c8;
-  --border: rgba(255,255,255,0.06);
-  --surface: #0b1220;
-  --focus: rgba(142,167,255,0.12);
+  --border: rgba(255,255,255,0.12);
+  --surface: #07101a;
+  --focus: rgba(142,167,255,0.14);
 }
 
 .dark-mode .card { background: var(--surface) !important; border-color: var(--border) !important; box-shadow: 0 12px 28px rgba(0,0,0,0.45); }
-.dark-mode .theme-nav { background-color: var(--nav-bg) !important; border-color: rgba(255,255,255,0.03) !important; }
+.dark-mode .theme-nav { background-color: var(--nav-bg) !important; border-color: rgba(255,255,255,0.06) !important; }
 .dark-mode .navbar-brand, .dark-mode .navbar-nav .nav-link { color: var(--nav-text) !important; }
-.dark-mode .brand-quote { color: rgba(219,233,247,0.9) !important; }
+.dark-mode .brand-quote { color: rgba(255,255,255,0.92) !important; }
 .dark-mode a { color: #8eb8ff; }
 .dark-mode .btn-primary { color: #07101a; }
 
+/* When an external/imported theme is active we should not let the
+   dark-mode overrides change the navbar/banner/logo visuals. The
+   `external-theme` body class is added when `active_theme_css` is present. */
+.external-theme.dark-mode .theme-nav,
+.external-theme.dark-mode .navbar-brand,
+.external-theme.dark-mode .brand-quote {
+  background-color: unset !important;
+  color: unset !important;
+  border-color: unset !important;
+}
+
 /* Improve contrast for notifications dropdown in dark mode */
-.dark-mode .notif-dropdown { background: rgba(6,12,20,0.95); color: var(--body-text); border: 1px solid rgba(255,255,255,0.03); }
+.dark-mode .notif-dropdown { background: rgba(6,12,20,0.95); color: var(--body-text); border: 1px solid rgba(255,255,255,0.06); }
 .dark-mode .notif-dropdown .notif-item { color: var(--body-text); }
 .dark-mode .notif-dropdown .notif-item strong { color: var(--body-text); }
-.dark-mode .notif-dropdown .notif-item .small, .dark-mode .notif-dropdown .notif-item small { color: rgba(219,233,247,0.7); }
+.dark-mode .notif-dropdown .notif-item .small, .dark-mode .notif-dropdown .notif-item small { color: rgba(255,255,255,0.72); }
   --border: #e6e9ee;
   --surface: #ffffff;
   --focus: rgba(11,97,238,0.14);
@@ -354,19 +365,12 @@ a:hover { color: var(--accent-2); }
 
 .search-hit { background: rgba(255,230,140,0.95); padding: 0 2px; border-radius: 2px; }
 
-img,
-svg,
-video,
-.dark-mode {
-  background: #071016 !important;
-  color: #dbe9f7 !important;
-}
-.dark-mode .card { background: #0b1220 !important; border-color: rgba(255,255,255,0.04) !important; }
-.dark-mode .theme-nav { background-color: #06101a !important; border-color: rgba(255,255,255,0.03) !important; }
-.dark-mode .navbar-brand, .dark-mode .navbar-nav .nav-link { color: #dbe9f7 !important; }
-.dark-mode .brand-quote { color: rgba(219,233,247,0.9) !important; }
-.dark-mode a { color: #8eb8ff; }
-.dark-mode .btn-primary { color: #07101a; }
+/* Avoid applying dark-mode to global media elements and rely on
+   scoped rules above. Make text brighter and borders more visible. */
+.dark-mode { color: var(--body-text) !important; background: var(--page-bg) !important; }
+.dark-mode .card { background: var(--surface) !important; border-color: var(--border) !important; }
+.dark-mode .theme-nav { background-color: var(--nav-bg) !important; border-color: var(--border) !important; }
+.dark-mode .navbar-brand, .dark-mode .navbar-nav .nav-link { color: var(--nav-text) !important; }
 canvas {
   max-width: 100%;
 }

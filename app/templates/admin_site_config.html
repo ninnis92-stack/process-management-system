@@ -37,6 +37,11 @@
     <div class="mb-3">
       {{ form.navbar_banner.label(class_='form-label') }}
       {{ form.navbar_banner(class_='form-control') }}
+      <div class="form-text mt-1">Tip: avoid pasting code fences (```), they may render verbatim.</div>
+      <form method="post" action="{{ url_for('admin.clean_banner') }}" class="d-inline mt-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm btn-outline-secondary">Clean Banner</button>
+      </form>
     </div>
     <div class="form-check mb-3">
       {{ form.show_banner(class_='form-check-input') }}

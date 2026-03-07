@@ -56,7 +56,7 @@
   {% endif %}
 </head>
 {% set global_no_vibe = (not FeatureFlags.get().vibe_enabled) %}
-<body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if global_no_vibe %} no-vibe{% endif %} theme-preset-{{ site_theme_preset or 'default' }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if (current_user.is_authenticated and (current_user.dark_mode or False)) else '0' }}">
+<body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if global_no_vibe %} no-vibe{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if (current_user.is_authenticated and (current_user.dark_mode or False)) else '0' }}">
   <a href="#content" class="skip-link">Skip to content</a>
 
   {% set ep = request.endpoint or '' %}
