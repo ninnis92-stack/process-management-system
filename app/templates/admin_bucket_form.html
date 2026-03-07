@@ -114,10 +114,13 @@
 
     try{
       if(typeof Sortable !== 'undefined'){
+        // allow dragging the whole item (handle-only fallback sometimes fails
+        // in some browsers/containers). Keep the visual handle for affordance.
         Sortable.create(list, {
-          handle: '.drag-handle',
           animation: 120,
           fallbackOnBody: true,
+          chosenClass: 'active',
+          dragClass: 'dragging',
           onEnd: function(){
           const ids = Array.from(list.querySelectorAll('li[data-id]')).map(li=>li.dataset.id);
           fetch('{{ url_for('admin.buckets_reorder_statuses', bucket_id=bucket.id) }}', {
