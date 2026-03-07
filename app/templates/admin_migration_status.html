@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2>Migration Status</h2>
+  {% if not status %}
+    <div class="alert alert-danger">Unable to determine migration status.</div>
+  {% else %}
+    <div class="mb-3">
+      <strong>DB migration versions:</strong>
+      <div>
+        {% if status.db_versions %}
+          <ul>
+            {% for v in status.db_versions %}
+              <li>{{ v }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div><em>No alembic_version entries found.</em></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <strong>Migration files:</strong>
+      <div>
+        {% if status.migration_files %}
+          <small>{{ status.migration_files | length }} files</small>
+        {% else %}
+          <div><em>No migration files found under migrations/versions.</em></div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if status.unapplied and status.unapplied | length > 0 %}
+      <div class="alert alert-warning">
+        <strong>Unapplied migrations detected:</strong>
+        <ul>
+          {% for m in status.unapplied %}
+            <li>{{ m }}</li>
+          {% endfor %}
+        </ul>
+        To apply these, run:
+        <pre>alembic upgrade head</pre>
+        or, when using the Flask app environment:
+        <pre>FLASK_APP=app flask db upgrade</pre>
+      </div>
+    {% else %}
+      <div class="alert alert-success">No unapplied migrations detected.</div>
+    {% endif %}
+  {% endif %}
+
+{% endblock %}

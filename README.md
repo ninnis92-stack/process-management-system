@@ -219,6 +219,26 @@ flask db upgrade
 FLASK_APP=app flask notify-nudges
 ```
 
+### Admin migration-status page
+
+An admin-only helper is available at `/admin/migrations/status` that lists migration
+files under `migrations/versions` and reports entries present in the database's
+`alembic_version` table. If unapplied migrations are detected the page suggests
+the exact command to apply them:
+
+```bash
+alembic upgrade head
+```
+
+or when using the Flask CLI environment:
+
+```bash
+FLASK_APP=app flask db upgrade
+```
+
+This is a diagnostic aid and does not automatically apply migrations; run the
+command above in your deployment environment to bring the DB schema up-to-date.
+
 - Refresh metrics (owner counts and overdue gauge):
 
 ```bash

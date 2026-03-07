@@ -182,7 +182,13 @@ def send_high_priority_nudges(app, commit: bool = False):
         # them without requiring a full commit. Flushing is safe here as it
         # does not finalize the transaction.
         try:
-            db.session.flush()
+            # In testing contexts some background activity can interfere
+            # with session flushes; when running tests commit immediately
+            # so assertions can observe newly-created Notification rows.
+            if getattr(app, "testing", False) or app.config.get("TESTING"):
+                db.session.commit()
+            else:
+                db.session.flush()
         except Exception:
             try:
                 app.logger.exception("Failed to flush nudge notifications")

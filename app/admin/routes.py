@@ -1676,12 +1676,98 @@ def list_status_options():
         current_app.logger.exception(
             "Failed to load StatusOption rows for admin list; DB schema may be missing migrations"
         )
-        flash(
-            "Status options could not be loaded. Ensure DB migrations have been applied (run alembic upgrade head).",
-            "danger",
-        )
-        opts = []
+        try:
+            inspector = db.inspect(db.engine)
+            table_name = StatusOption.__tablename__
+            if not inspector.has_table(table_name):
+                try:
+                    StatusOption.__table__.create(bind=db.engine)
+                    flash(
+                        "Status options table was missing and has been created. Please run `alembic upgrade head` to synchronize migrations.",
+                        "warning",
+                    )
+                except Exception:
+                    current_app.logger.exception("Failed to create StatusOption table")
+                    flash(
+                        "Status options could not be loaded. Ensure DB migrations have been applied (run alembic upgrade head).",
+                        "danger",
+                    )
+                opts = []
+            else:
+                existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
+                model_cols = {c.name for c in StatusOption.__table__.columns}
+                missing = model_cols - existing_cols
+                if missing:
+                    flash(
+                        f"Status options schema mismatch: missing columns: {', '.join(sorted(missing))}. Run `alembic upgrade head`.",
+                        "danger",
+                    )
+                else:
+                    flash(
+                        "Status options could not be loaded due to an unexpected database error. Check application logs for details.",
+                        "danger",
+                    )
+                opts = []
+        except Exception:
+            current_app.logger.exception("Failed to inspect DB schema for StatusOption")
+            flash(
+                "Status options could not be loaded. Ensure DB migrations have been applied (run alembic upgrade head).",
+                "danger",
+            )
+            opts = []
     return render_template("admin_status_options.html", status_options=opts)
+
+
+@admin_bp.route("/migrations/status")
+@login_required
+def migration_status():
+    """Admin helper: show applied DB alembic version(s) and migration files.
+
+    This view is read-only and intended to help administrators detect
+    unapplied migrations and provide the exact command to run (alembic upgrade head).
+    """
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    try:
+        inspector = db.inspect(db.engine)
+    except Exception:
+        current_app.logger.exception("Failed to inspect DB engine for migration status")
+        flash(
+            "Unable to inspect database engine. Check server logs.", "danger"
+        )
+        return render_template("admin_migration_status.html", status=None)
+
+    # gather migration scripts from migrations/versions
+    import os
+    versions_dir = os.path.join(current_app.root_path, "..", "migrations", "versions")
+    migrations = []
+    try:
+        for fn in sorted(os.listdir(versions_dir)):
+            if fn.endswith('.py') and not fn.startswith('__'):
+                migrations.append(fn[:-3])
+    except Exception:
+        migrations = []
+
+    db_versions = []
+    try:
+        if inspector.has_table('alembic_version'):
+            res = db.session.execute('SELECT version_num FROM alembic_version')
+            db_versions = [r[0] for r in res.fetchall()]
+    except Exception:
+        current_app.logger.exception('Failed to read alembic_version table')
+
+    status = {
+        'migration_files': migrations,
+        'db_versions': db_versions,
+    }
+
+    # Determine if any migration files look unapplied by comparing names.
+    unapplied = [m for m in migrations if m not in db_versions]
+    status['unapplied'] = unapplied
+
+    return render_template("admin_migration_status.html", status=status)
 
 
 @admin_bp.route("/status_options/new", methods=["GET", "POST"])

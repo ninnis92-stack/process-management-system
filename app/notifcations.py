@@ -17,6 +17,7 @@ from typing import Optional
 
 from .services.emailer import EmailService
 import importlib
+from sqlalchemy.orm import sessionmaker
 
 # Use importlib to import optional dependencies at runtime. Add explicit Pylance
 # suppression on the dynamic import calls so editors that don't have the optional
@@ -113,41 +114,60 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
                 skipped = res.get("skipped") or []
                 error = res.get("error")
 
-                for e in skipped:
-                    uid = recipients_map.get(e)
-                    if uid:
-                        db.session.add(
-                            Notification(
-                                user_id=uid,
-                                request_id=request_id,
-                                type="email_skipped",
-                                title="Email skipped (test account)",
-                                body=f"Email to {e} skipped because it is in the test domains.",
-                                url=None,
-                            )
-                        )
-
-                if error:
-                    for e, uid in recipients_map.items():
-                        if uid:
-                            db.session.add(
-                                Notification(
-                                    user_id=uid,
-                                    request_id=request_id,
-                                    type="email_failed",
-                                    title="Email delivery failed",
-                                    body=f"Email delivery to {e} failed: {error}",
-                                    url=None,
-                                )
-                            )
-
+                # Persist notification rows about skipped or failed deliveries
+                # using a fresh SQLAlchemy session to avoid interfering with the
+                # main thread's session/transaction state. Committing from the
+                # background thread on the shared `db.session` can reset active
+                # cursors in the main thread and cause InterfaceError when tests
+                # or callers attempt to fetch results concurrently.
                 if skipped or error:
                     try:
-                        db.session.commit()
+                        Session = sessionmaker(bind=db.engine)
+                        session = Session()
+                        try:
+                            for e in skipped:
+                                uid = recipients_map.get(e)
+                                if uid:
+                                    session.add(
+                                        Notification(
+                                            user_id=uid,
+                                            request_id=request_id,
+                                            type="email_skipped",
+                                            title="Email skipped (test account)",
+                                            body=(
+                                                f"Email to {e} skipped because it is in the test domains."
+                                            ),
+                                            url=None,
+                                        )
+                                    )
+
+                            if error:
+                                for e, uid in recipients_map.items():
+                                    if uid:
+                                        session.add(
+                                            Notification(
+                                                user_id=uid,
+                                                request_id=request_id,
+                                                type="email_failed",
+                                                title="Email delivery failed",
+                                                body=f"Email delivery to {e} failed: {error}",
+                                                url=None,
+                                            )
+                                        )
+
+                            session.commit()
+                        finally:
+                            try:
+                                session.close()
+                            except Exception:
+                                pass
                     except Exception:
-                        _current.logger.exception(
-                            "Failed to commit email-send notifications"
-                        )
+                        try:
+                            _current.logger.exception(
+                                "Failed to commit email-send notifications"
+                            )
+                        except Exception:
+                            pass
 
             except Exception:
                 _current.logger.exception("Email sending failed")
