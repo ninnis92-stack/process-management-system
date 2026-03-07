@@ -19,10 +19,10 @@
   --nav-bg: #0b1720;
   --nav-text: #ffffff;
   --page-bg: #0f1720; /* slightly lighter dark background to reduce eye strain */
-  --body-text: #f4f7fb;
-  --body-text-soft: #e7edf5;
-  --body-text-muted: #d5deea;
-  --muted: #d5deea;
+  --body-text: #e6edf3;
+  --body-text-soft: #d8e1eb;
+  --body-text-muted: #c2ccd8;
+  --muted: #c2ccd8;
   --border: rgba(255,255,255,0.08);
   --surface: #0b1318; /* card/surface slightly lighter than page bg */
   --focus: rgba(142,167,255,0.18);
@@ -515,6 +515,18 @@ a:hover { color: var(--accent-2); }
   color: var(--body-text-muted) !important;
 }
 
+.dark-mode .lead,
+.dark-mode .table,
+.dark-mode .card-body,
+.dark-mode .modal-body,
+.dark-mode .dropdown-item:focus,
+.dark-mode .dropdown-item:hover,
+.dark-mode .list-group-item,
+.dark-mode .accordion-body,
+.dark-mode .offcanvas-body {
+  color: var(--body-text-soft) !important;
+}
+
 .dark-mode .form-control,
 .dark-mode .form-select,
 .dark-mode textarea,
@@ -523,6 +535,16 @@ a:hover { color: var(--accent-2); }
   color: var(--body-text) !important;
   background-color: rgba(255,255,255,0.04) !important;
   border-color: rgba(255,255,255,0.1) !important;
+}
+
+.dark-mode .form-check-input {
+  background-color: rgba(255,255,255,0.08) !important;
+  border-color: rgba(255,255,255,0.18) !important;
+}
+
+.dark-mode .form-check-input:checked {
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
 }
 
 .dark-mode .form-control::placeholder,
@@ -543,6 +565,16 @@ a:hover { color: var(--accent-2); }
 .dark-mode option {
   color: var(--body-text) !important;
   background: #0f1720 !important;
+}
+
+.dark-mode hr,
+.dark-mode .dropdown-divider,
+.dark-mode .border,
+.dark-mode .border-top,
+.dark-mode .border-bottom,
+.dark-mode .border-start,
+.dark-mode .border-end {
+  border-color: rgba(255,255,255,0.08) !important;
 }
 
 .dark-mode .card { background: var(--surface) !important; border-color: var(--border) !important; }

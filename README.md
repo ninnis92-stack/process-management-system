@@ -396,6 +396,7 @@ flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command
 
 Deployment note (automated):
 
+- 2026-03-07 UTC: dark-mode readability was refined again to keep the existing background theme while brightening only muted/helper/subtext copy to a more realistic live-app dark palette; redeployed to Fly and `/health` returned `{"status":"ok"}`.
 - 2026-03-07 UTC: dark-mode typography was unified across the app for readable, consistent text on forms, tables, cards, modals, and helper copy; redeployed to Fly and `/health` returned `{"status":"ok"}`.
 - 2026-03-07 UTC: local full suite passed (`35 passed`), deployed to Fly, `/health` returned `{"status":"ok"}`, live home page loaded, and remote `SMOKE_` rows were cleared (`0 deleted`).
 - Last automated verification and smoke-clean ran on 2026-03-06 UTC: deployed, smoke login/dashboard validated, remote SMOKE_ rows cleared (0 deleted).
