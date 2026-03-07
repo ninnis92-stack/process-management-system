@@ -2,6 +2,7 @@
 
 {% block content %}
 <h2>Audit Log</h2>
+<a class="btn btn-sm btn-outline-secondary admin-back-btn mb-2" href="{{ url_for('admin.index') }}">← Admin dashboard</a>
 
 <form method="get" class="form-inline mb-3">
   <input class="form-control mr-2" name="user" placeholder="user email" value="{{ request.args.get('user','') }}">
