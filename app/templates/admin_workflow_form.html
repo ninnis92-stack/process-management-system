@@ -53,8 +53,25 @@
   (function(){
     const list = document.getElementById('workflow-steps');
     if(!list) return;
-    // init Sortable
-    try{ Sortable.create(list, { handle: '.drag-handle', animation: 120 }); }catch(e){ console.warn('Sortable init failed', e); }
+    // small CSS tweaks to improve drag affordance
+    const style = document.createElement('style');
+    style.textContent = '.drag-handle{cursor:grab; user-select:none; padding-right:8px;} .list-group-item{touch-action:none;}';
+    document.head.appendChild(style);
+
+    // init Sortable with robust fallback and diagnostics
+    try{
+      if(typeof Sortable !== 'undefined'){
+        Sortable.create(list, { handle: '.drag-handle', animation: 120, fallbackOnBody: true, swapThreshold: 0.65 });
+        console.log('Sortable initialized; items=', list.children.length);
+      }else{
+        console.warn('Sortable not present; attempting forceFallback');
+        // attempt to load a JS fallback by forcing Sortable to use its fallback mode
+        try{ Sortable.create(list, { handle: '.drag-handle', animation: 120, forceFallback: true }); }catch(e){ console.error('Fallback Sortable init failed', e); }
+      }
+    }catch(e){
+      console.warn('Sortable init failed', e);
+      try{ Sortable.create(list, { handle: '.drag-handle', animation: 120, forceFallback: true }); }catch(e2){ console.error('Sortable final init failed', e2); }
+    }
 
     document.getElementById('add-step-btn').addEventListener('click', function(){
       const v = String(document.getElementById('new-step-input').value || '').trim();
