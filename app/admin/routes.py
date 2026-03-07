@@ -667,7 +667,7 @@ def create_workflow():
             spec=None,
             active=bool(form.active.data),
         )
-        # attempt to parse JSON if provided
+        # attempt to parse JSON if provided, otherwise accept steps[] fallback
         import json
         if form.spec_json.data:
             try:
@@ -675,6 +675,14 @@ def create_workflow():
             except Exception:
                 flash('Invalid JSON for workflow spec.', 'danger')
                 return render_template('admin_workflow_form.html', form=form)
+        else:
+            steps = flask_request.form.getlist('steps[]') or flask_request.form.getlist('steps')
+            if steps:
+                steps = [s.strip() for s in steps if s and s.strip()]
+                transitions = []
+                for i in range(len(steps) - 1):
+                    transitions.append({'from': steps[i], 'to': steps[i+1]})
+                wf.spec = {'steps': steps, 'transitions': transitions}
         db.session.add(wf)
         db.session.commit()
         flash('Workflow created.', 'success')
@@ -711,7 +719,15 @@ def edit_workflow(wf_id: int):
                 flash('Invalid JSON for workflow spec.', 'danger')
                 return render_template('admin_workflow_form.html', form=form, wf=wf)
         else:
-            wf.spec = None
+            steps = flask_request.form.getlist('steps[]') or flask_request.form.getlist('steps')
+            if steps:
+                steps = [s.strip() for s in steps if s and s.strip()]
+                transitions = []
+                for i in range(len(steps) - 1):
+                    transitions.append({'from': steps[i], 'to': steps[i+1]})
+                wf.spec = {'steps': steps, 'transitions': transitions}
+            else:
+                wf.spec = None
         db.session.commit()
         flash('Workflow updated.', 'success')
         return redirect(url_for('admin.list_workflows'))

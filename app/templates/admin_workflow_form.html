@@ -20,13 +20,70 @@
     {{ form.active() }} {{ form.active.label }}
   </div>
   <div class="form-group">
-    {{ form.spec_json.label }}
-    {{ form.spec_json(class='form-control', rows=12) }}
-    <small class="form-text text-muted">Enter a JSON object describing steps and transitions. Example: {"steps": ["NEW","IN_PROGRESS"], "transitions": [{"from":"NEW","to":"IN_PROGRESS"}]}</small>
+    <label class="form-label">Workflow steps</label>
+    <div id="workflow-steps" class="list-group mb-2" aria-label="Workflow steps">
+      {% if wf and wf.spec and wf.spec.steps %}
+        {% for s in wf.spec.steps %}
+          <div class="list-group-item d-flex align-items-center" data-code="{{ s }}">
+            <span class="me-2 drag-handle" aria-hidden>≡</span>
+            <input class="form-control form-control-sm me-2 step-label" value="{{ s }}">
+            <button type="button" class="btn btn-sm btn-danger remove-step">Remove</button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    <div class="input-group mb-2">
+      <input id="new-step-input" class="form-control" placeholder="Enter step code (e.g. B_IN_PROGRESS)">
+      <button id="add-step-btn" type="button" class="btn btn-outline-primary">Add</button>
+    </div>
+    {{ form.spec_json(class='form-control d-none', id='spec_json') }}
+    <small class="form-text text-muted">Drag to reorder steps; they will be serialized to JSON on save.</small>
   </div>
   <div class="form-group">
     {{ form.submit(class='btn btn-primary') }}
     <a class="btn btn-secondary" href="{{ url_for('admin.list_workflows') }}">Cancel</a>
   </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script>
+  (function(){
+    const list = document.getElementById('workflow-steps');
+    if(!list) return;
+    // init Sortable
+    try{ Sortable.create(list, { handle: '.drag-handle', animation: 120 }); }catch(e){ console.warn('Sortable init failed', e); }
+
+    document.getElementById('add-step-btn').addEventListener('click', function(){
+      const v = String(document.getElementById('new-step-input').value || '').trim();
+      if(!v) return;
+      const el = document.createElement('div');
+      el.className = 'list-group-item d-flex align-items-center';
+      el.innerHTML = '<span class="me-2 drag-handle" aria-hidden>≡</span>' +
+                     '<input class="form-control form-control-sm me-2 step-label" value="'+v+'">' +
+                     '<button type="button" class="btn btn-sm btn-danger remove-step">Remove</button>';
+      list.appendChild(el);
+      document.getElementById('new-step-input').value = '';
+    });
+
+    list.addEventListener('click', function(e){
+      const rem = e.target.closest && e.target.closest('.remove-step');
+      if(rem) rem.closest('.list-group-item').remove();
+    });
+
+    const form = list.closest('form');
+    if(form){
+      form.addEventListener('submit', function(){
+        const steps = Array.from(list.querySelectorAll('.step-label')).map(i=>String(i.value||'').trim()).filter(Boolean);
+        const transitions = [];
+        for(let i=0;i+1<steps.length;i++) transitions.push({ from: steps[i], to: steps[i+1] });
+        const spec = { steps: steps, transitions: transitions };
+        const hidden = document.getElementById('spec_json');
+        if(hidden) hidden.value = JSON.stringify(spec, null, 2);
+      });
+    }
+  })();
+  </script>
 {% endblock %}
