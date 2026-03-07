@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="container" style="max-width:800px;margin-top:24px;">
+    <h3>Bulk Assign Report — Dept {{ dept }}</h3>
+
+    <div class="mb-3">
+      <h5>Assigned ({{ assigned|length }})</h5>
+      {% if assigned %}
+        <ul>
+          {% for e in assigned %}
+            <li>{{ e }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-muted">No assignments created.</p>
+      {% endif %}
+    </div>
+
+    <div class="mb-3">
+      <h5>Skipped — Primary department ({{ skipped_primary|length }})</h5>
+      {% if skipped_primary %}
+        <ul>
+          {% for e in skipped_primary %}
+            <li>{{ e }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-muted">None</p>
+      {% endif %}
+    </div>
+
+    <div class="mb-3">
+      <h5>Skipped — Existing assignment ({{ skipped_existing|length }})</h5>
+      {% if skipped_existing %}
+        <ul>
+          {% for e in skipped_existing %}
+            <li>{{ e }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-muted">None</p>
+      {% endif %}
+    </div>
+
+    <div class="mb-3">
+      <h5>Missing emails ({{ missing|length }})</h5>
+      {% if missing %}
+        <ul>
+          {% for e in missing %}
+            <li>{{ e }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-muted">None</p>
+      {% endif %}
+    </div>
+
+    <div class="mb-3">
+      <h5>Errors ({{ errors|length }})</h5>
+      {% if errors %}
+        <ul>
+          {% for item in errors %}
+            <li><strong>{{ item.email }}</strong>: {{ item.error }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-muted">None</p>
+      {% endif %}
+    </div>
+
+    <div class="text-end">
+      <a class="btn btn-link" href="{{ url_for('admin.list_users') }}">Back to users</a>
+    </div>
+  </div>
+{% endblock %}

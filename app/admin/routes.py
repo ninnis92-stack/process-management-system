@@ -497,39 +497,49 @@ def bulk_assign_departments():
                 if token:
                     parts.append(token)
 
-        success = 0
-        missing = []
+        report_assigned = []
+        report_missing = []
+        report_skipped_primary = []
+        report_skipped_existing = []
+        report_errors = []
+
         for em in parts:
             try:
                 u = User.query.filter_by(email=em).first()
-            except Exception:
-                u = None
+            except Exception as exc:
+                report_errors.append({'email': em, 'error': str(exc)})
+                continue
             if not u:
-                missing.append(em)
+                report_missing.append(em)
                 continue
-            # Don't add if matches primary department
+
             if getattr(u, 'department', None) == dept:
+                report_skipped_primary.append(em)
                 continue
-            # create assignment if not exists
+
             existing = UserDepartment.query.filter_by(user_id=u.id, department=dept).first()
             if existing:
+                report_skipped_existing.append(em)
                 continue
+
             try:
                 ud = UserDepartment(user_id=u.id, department=dept)
                 db.session.add(ud)
                 db.session.commit()
-                success += 1
-            except Exception:
+                report_assigned.append(em)
+            except Exception as exc:
                 try:
                     db.session.rollback()
                 except Exception:
                     pass
+                report_errors.append({'email': em, 'error': str(exc)})
 
-        msg = f'Assigned {success} users to Dept {dept}.'
-        if missing:
-            msg += f' Unknown emails: {len(missing)}.'
-        flash(msg, 'success')
-        return redirect(url_for('admin.list_users'))
+        return render_template('admin_bulk_assign_report.html', dept=dept,
+                               assigned=report_assigned,
+                               missing=report_missing,
+                               skipped_primary=report_skipped_primary,
+                               skipped_existing=report_skipped_existing,
+                               errors=report_errors)
 
     return render_template('admin_bulk_assign_departments.html', form=form)
 
