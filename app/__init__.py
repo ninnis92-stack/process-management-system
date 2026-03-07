@@ -518,8 +518,34 @@ def create_app():
                     app.logger.info('Seeded default departments and Dept B buckets')
             except Exception:
                 app.logger.exception('Failed to seed default Dept B buckets or departments')
+
+    
     except Exception:
         # Best-effort; avoid failing app startup if env inspection or imports fail.
         pass
+
+    # Ensure DB session is clean at the end of each request. If an exception
+    # occurred during request handling, roll back the session to clear any
+    # aborted transaction state so subsequent requests don't fail with
+    # "current transaction is aborted" errors.
+    @app.teardown_request
+    def _teardown_db_session(exc):
+        # If an exception occurred during request handling, roll back the
+        # session to clear any aborted transaction state. Do NOT call
+        # `db.session.remove()` here because some test code expects ORM
+        # instances created before a client request to remain refreshable
+        # in the test's session. Rolling back is sufficient to return the
+        # connection to a clean state without detaching test instances.
+        try:
+            if exc is not None:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    try:
+                        app.logger.exception('Failed to rollback DB session in teardown')
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
     return app
