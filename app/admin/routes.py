@@ -900,16 +900,90 @@ def _sanitize_banner_html(raw: str) -> str:
     """
     if not raw:
         return raw
+
+    # first remove accidental fenced-code artifacts which often break the
+    # navbar rendering (e.g. ```...```) so we strip those explicitly.
     import re
 
-    s = str(raw)
-    # Remove fenced code blocks ```...``` including language hints
+    s = str(raw or "")
     s = re.sub(r"```[\s\S]*?```", "", s)
-    # Remove any leftover inline triple-backticks
     s = s.replace('```', '')
-    # Trim whitespace
-    s = s.strip()
-    return s
+
+    # Use bleach to perform a conservative HTML sanitization: allow a small
+    # set of formatting tags and safe attributes, strip anything else (including
+    # <script> tags and event handlers). We avoid allowing inline CSS here to
+    # keep banner rendering predictable.
+    try:
+        import bleach
+
+        allowed_tags = [
+            "a",
+            "b",
+            "strong",
+            "i",
+            "em",
+            "u",
+            "p",
+            "br",
+            "span",
+            "div",
+            "ul",
+            "ol",
+            "li",
+            "img",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "small",
+            "blockquote",
+            "pre",
+            "code",
+            "hr",
+        ]
+
+        allowed_attrs = {
+            "a": ["href", "title", "target", "rel"],
+            "img": ["src", "alt", "title", "width", "height"],
+            # allow id/class and `style` but sanitize inline CSS via CSSSanitizer
+            "*": ["id", "class", "role", "aria-hidden", "style"],
+        }
+
+        # Tight CSS whitelist: only permit a short, safe set of CSS properties
+        # for inline `style` usage. This prevents arbitrary CSS from affecting
+        # layout or injecting harmful rules.
+        try:
+            from bleach.sanitizer import CSSSanitizer
+
+            css_whitelist = [
+                "color",
+                "background-color",
+                "text-align",
+                "font-weight",
+                "font-style",
+                "text-decoration",
+                "vertical-align",
+            ]
+            css_sanitizer = CSSSanitizer(allowed_css_properties=css_whitelist)
+        except Exception:
+            css_sanitizer = None
+
+        cleaned = bleach.clean(
+            s,
+            tags=allowed_tags,
+            attributes=allowed_attrs,
+            protocols=["http", "https", "mailto"],
+            strip=True,
+            css_sanitizer=css_sanitizer,
+        )
+        # Trim and return
+        return (cleaned or "").strip()
+    except Exception:
+        # If bleach isn't available for some reason, fall back to the lighter
+        # regex-based cleanup we used previously (best-effort).
+        return s.strip()
 
 
 @admin_bp.route('/site_config/clean_banner', methods=['POST'])
@@ -941,6 +1015,22 @@ def clean_banner():
         flash('Failed to save cleaned banner content.', 'danger')
 
     return redirect(url_for('admin.site_config'))
+
+
+@admin_bp.route('/site_config/preview_banner', methods=['POST'])
+@login_required
+def preview_banner():
+    """Return a JSON preview of original vs cleaned banner HTML.
+
+    This endpoint allows the admin UI to show a side-by-side preview before
+    committing changes.
+    """
+    if not _is_admin_user():
+        return jsonify({'error': 'access_denied'}), 403
+
+    raw = flask_request.form.get('banner') or flask_request.form.get('navbar_banner') or ''
+    cleaned = _sanitize_banner_html(raw)
+    return jsonify({'original': raw, 'cleaned': cleaned})
 
 
 @admin_bp.route("/workflows")

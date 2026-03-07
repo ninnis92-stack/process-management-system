@@ -25,3 +25,4 @@ rq>=1.13.0,<3.0
 prometheus_client==0.16.0
 alembic==1.11.1
 pyotp==2.8.0
+bleach==6.0.0

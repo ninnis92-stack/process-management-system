@@ -38,10 +38,13 @@
       {{ form.navbar_banner.label(class_='form-label') }}
       {{ form.navbar_banner(class_='form-control') }}
       <div class="form-text mt-1">Tip: avoid pasting code fences (```), they may render verbatim.</div>
-      <form method="post" action="{{ url_for('admin.clean_banner') }}" class="d-inline mt-2">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="btn btn-sm btn-outline-secondary">Clean Banner</button>
-      </form>
+      <div class="mt-2 d-flex gap-2">
+        <form method="post" action="{{ url_for('admin.clean_banner') }}" class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm btn-outline-secondary">Clean Banner</button>
+        </form>
+        <button id="preview-banner-btn" type="button" class="btn btn-sm btn-outline-primary">Preview Clean</button>
+      </div>
     </div>
     <div class="form-check mb-3">
       {{ form.show_banner(class_='form-check-input') }}
@@ -54,4 +57,74 @@
     </div>
     <button class="btn btn-primary">Save</button>
   </form>
+
+  <!-- Preview Modal -->
+  <div class="modal fade" id="bannerPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Banner Preview — Original vs Cleaned</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h6>Original (raw)</h6>
+              <div id="banner-preview-original" class="border p-2" style="min-height:120px;white-space:pre-wrap;overflow:auto;background:#f8f9fa;"></div>
+            </div>
+            <div class="col-md-6">
+              <h6>Cleaned (sanitized)</h6>
+              <div id="banner-preview-cleaned" class="border p-2" style="min-height:120px;overflow:auto;background:#fff;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const btn = document.getElementById('preview-banner-btn');
+      if(!btn) return;
+      btn.addEventListener('click', async function(){
+        // find the textarea/input for navbar_banner
+        const field = document.querySelector('[name="navbar_banner"]') || document.querySelector('[name="banner_html"]');
+        const val = field ? field.value : '';
+        const fd = new FormData();
+        fd.append('banner', val);
+        // include CSRF token if present
+        const csrf = document.querySelector('input[name="csrf_token"]');
+        if(csrf) fd.append('csrf_token', csrf.value);
+
+        try{
+          const resp = await fetch('{{ url_for('admin.preview_banner') }}', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: fd,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+          if(!resp.ok) throw new Error('Preview request failed');
+          const j = await resp.json();
+          const origEl = document.getElementById('banner-preview-original');
+          const cleanEl = document.getElementById('banner-preview-cleaned');
+          origEl.textContent = j.original || '';
+          // inject cleaned HTML into preview pane (already sanitized server-side)
+          cleanEl.innerHTML = j.cleaned || '';
+          // show bootstrap modal
+          const modalEl = document.getElementById('bannerPreviewModal');
+          if(modalEl){
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+          }
+        }catch(e){
+          alert('Failed to preview banner: '+(e&&e.message?e.message:e));
+        }
+      });
+    })();
+  </script>
 {% endblock %}

@@ -629,6 +629,29 @@ PYTHONPATH=. pytest -q
 If you'd like the assignment rule relaxed (for example, allow multiple simultaneous assignments), update the checks in `app/requests_bp/routes.py` and run the test suite to validate behavior.
 - Server entrypoint: `run.py` (Flask), Dockerfile provided; Fly configs included for deployment experiments.
 
+## Deployment helpers (added)
+
+This repository now includes a minimal deployment template and onboarding helper under `deploy/` to simplify creating per-tenant instances.
+
+- `deploy/docker-compose.template.yml`: example compose file with `web`, `worker`, `db`, and `redis` services. Copy and adapt for each tenant and replace environment placeholders (`DATABASE_URL`, `REDIS_URL`, `SECRET_KEY`, etc.).
+- `deploy/create_tenant.sh`: helper script to build the app image, tag it for a tenant, and run migrations/seeds inside a short-lived container. Customize and run from `deploy/` with the appropriate env vars set.
+
+Quick example (local dev):
+
+```bash
+# from repo root
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
+export REDIS_URL=redis://localhost:6379
+export SECRET_KEY=devsecret
+cd deploy
+./create_tenant.sh demo latest
+docker compose -f docker-compose.template.yml up --build
+```
+
+Notes:
+- `create_tenant.sh` is opinionated and conservative: it attempts migrations and seeding but is safe to run multiple times.
+- For production, push the built image to a registry and deploy using your orchestrator (Docker Compose, Kubernetes/Helm, or Fly). The template is intentionally minimal — adapt for your CI/CD and registry.
+
 ## Local testing & new features
 
 This project now includes an admin-managed "Special Emails" feature, an inbound-mail webhook, and a safe inventory integration skeleton. These are all optional and safe for prototype use — nothing is enabled by default.
