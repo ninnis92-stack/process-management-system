@@ -17,6 +17,9 @@ from app import create_app
 from app.extensions import db
 
 app = create_app()
+# Ensure an application context is available when Alembic runs so
+# Flask-SQLAlchemy can provide the engine/metadata.
+app.app_context().push()
 
 # Interpret the config file for Python logging.
 config = context.config

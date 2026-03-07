@@ -59,6 +59,7 @@ from .workflow import transition_allowed, owner_for_status, handoff_for_transiti
 from ..services.verification import VerificationService
 from ..services.inventory import InventoryService
 from ..notifcations import notify_users, users_in_department
+from .. import notifcations as notifications_module
 from .. import metrics as metrics_module
 from ..services.ticketing import TicketingClient
 import json
@@ -1570,6 +1571,141 @@ def reject_request(request_id: int):
     return redirect(url_for('requests.request_detail', request_id=req.id))
 
 
+@requests_bp.route("/requests/<int:request_id>/admin_nudge", methods=["POST"])
+@login_required
+def admin_nudge(request_id: int):
+    """Admin-only debug endpoint: trigger a 30s admin nudge for a request.
+
+    This creates in-app `Notification` rows for the assignee (or all users in
+    the owner department) and attempts to send email notifications in the
+    background. Visible only to admin users.
+    """
+    if not getattr(current_user, 'is_admin', False):
+        abort(403)
+
+    req = get_or_404(ReqModel, request_id)
+    if not can_view_request(req):
+        abort(403)
+
+    # Determine recipients: prefer assigned user, otherwise active users in owner dept
+    targets = []
+    if req.assigned_to_user_id:
+        u = db.session.get(User, req.assigned_to_user_id)
+        if u and getattr(u, 'is_active', False):
+            targets.append(u)
+    else:
+        try:
+            targets = users_in_department(req.owner_department)
+        except Exception:
+            targets = []
+
+    if not targets:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False, "message": "No recipients found for nudge."}), 400
+        flash("No recipients found for nudge.", "warning")
+        return redirect(url_for("requests.request_detail", request_id=req.id))
+
+    link = url_for('requests.request_detail', request_id=req.id, _external=False)
+
+    for u in {t.id: t for t in targets}.values():
+        try:
+            db.session.add(Notification(
+                user_id=u.id,
+                request_id=req.id,
+                type='nudge',
+                title=f'Admin reminder: Request #{req.id}',
+                body=f"Admin triggered reminder for request #{req.id}.",
+                url=link,
+                dedupe_key=f'admin_nudge:req_{req.id}',
+            ))
+
+            if getattr(u, 'email', None):
+                recipients_map = {u.email: u.id}
+                subject = f"Admin reminder: Request #{req.id} still open"
+                text_body = f"An administrator triggered a reminder for request #{req.id} ({req.title}).\n\n{link}"
+                try:
+                    notifications_module._send_emails_async(recipients_map, subject, text_body, html=None, request_id=req.id)
+                except Exception:
+                    try:
+                        current_app.logger.exception('Failed to queue admin nudge email')
+                    except Exception:
+                        pass
+        except Exception:
+            try:
+                current_app.logger.exception('Failed to create admin nudge notification')
+            except Exception:
+                pass
+
+    try:
+        db.session.commit()
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to commit admin nudge notifications')
+        except Exception:
+            pass
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"ok": True, "message": "Admin nudge sent."}), 200
+    flash('Admin nudge sent.', 'success')
+    return redirect(url_for('requests.request_detail', request_id=req.id))
+
+
+@requests_bp.route("/admin/workflows/<int:workflow_id>/reset_requests", methods=["POST"])
+@login_required
+def reset_workflow_requests(workflow_id: int):
+    """Admin-only: delete all requests belonging to the given workflow.
+
+    This action is destructive and requires an admin account. The caller may
+    include a `ref_request_id` form field to redirect back to a request detail
+    page after completion.
+    """
+    if not getattr(current_user, 'is_admin', False):
+        abort(403)
+
+    from ..models import Workflow
+
+    wf = db.session.get(Workflow, workflow_id)
+    if not wf:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False, "message": "Workflow not found"}), 404
+        flash('Workflow not found.', 'warning')
+        return redirect(url_for('requests.request_list'))
+
+    refs = ReqModel.query.filter_by(workflow_id=workflow_id).all()
+    count = len(refs)
+    if count == 0:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": True, "message": "No requests to delete"}), 200
+        flash('No requests to delete for this workflow.', 'info')
+        ref_id = request.form.get('ref_request_id')
+        if ref_id:
+            return redirect(url_for('requests.request_detail', request_id=ref_id))
+        return redirect(url_for('requests.request_list'))
+
+    try:
+        for r in refs:
+            db.session.delete(r)
+        db.session.commit()
+        msg = f"Deleted {count} requests for workflow '{wf.name or wf.id}'."
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": True, "message": msg}), 200
+        flash(msg, 'success')
+    except Exception:
+        db.session.rollback()
+        try:
+            current_app.logger.exception('Failed to reset workflow requests')
+        except Exception:
+            pass
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False, "message": "Failed to reset requests"}), 500
+        flash('Failed to reset workflow requests.', 'danger')
+
+    ref_id = request.form.get('ref_request_id')
+    if ref_id:
+        return redirect(url_for('requests.request_detail', request_id=ref_id))
+    return redirect(url_for('requests.request_list'))
+
+
 def _clean_presence():
     cutoff = time.time() - 70
     for rid in list(_presence.keys()):
@@ -2292,6 +2428,20 @@ def do_transition(request_id: int):
             opt = None
 
         if send_notification:
+            # If admin opted to notify only the originator for this status,
+            # restrict recipients to the request creator (if present and active).
+            try:
+                if opt and bool(getattr(opt, 'notify_to_originator_only', False)):
+                    originator = None
+                    if req.created_by_user_id:
+                        originator = db.session.get(User, req.created_by_user_id)
+                    if originator and getattr(originator, 'is_active', True) and originator.id != current_user.id:
+                        owner_recipients = [originator]
+                    else:
+                        owner_recipients = []
+            except Exception:
+                current_app.logger.exception('Failed to apply originator-only notify rule')
+
             allow_email = True
             if opt:
                 allow_email = bool(getattr(opt, 'email_enabled', False))

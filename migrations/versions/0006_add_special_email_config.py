@@ -1,7 +1,7 @@
 """add special email config
 
 Revision ID: 0006_add_special_email_config
-Revises: 0005_vibe_index
+Revises: 0005_add_vibe_index
 Create Date: 2026-03-05 00:00:00.000000
 """
 from alembic import op
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '0006_add_special_email_config'
-down_revision = '0005_vibe_index'
+down_revision = '0005_add_vibe_index'
 branch_labels = None
 depends_on = None
 

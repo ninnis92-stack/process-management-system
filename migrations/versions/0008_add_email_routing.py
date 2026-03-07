@@ -1,7 +1,7 @@
 """add email_routing table
 
 Revision ID: 0008_add_email_routing
-Revises: 0007_autogen_add_special_email_config
+Revises: 0006_add_special_email_config
 Create Date: 2026-03-05 00:00:00.000000
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '0008_add_email_routing'
-down_revision = '0007_autogen_add_special_email_config'
+down_revision = '0006_add_special_email_config'
 branch_labels = None
 depends_on = None
 

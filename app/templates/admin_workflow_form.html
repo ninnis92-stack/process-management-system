@@ -24,20 +24,53 @@
     <div id="workflow-steps" class="list-group mb-2" aria-label="Workflow steps">
       {% if wf and wf.spec and wf.spec.steps %}
         {% for s in wf.spec.steps %}
-          <div class="list-group-item d-flex align-items-center" data-code="{{ s }}">
+          <div class="list-group-item d-flex align-items-center" data-from-dept="{{ (wf.spec.steps[loop.index0].from_dept) if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].from_dept is defined) else '' }}" data-to-dept="{{ (wf.spec.steps[loop.index0].to_dept) if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].to_dept is defined) else '' }}" data-status="{{ (wf.spec.steps[loop.index0].status) if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].status is defined) else '' }}">
             <span class="me-2 drag-handle" aria-hidden>≡</span>
-            <input class="form-control form-control-sm me-2 step-label" value="{{ s }}">
+            <select class="form-select form-select-sm me-2 step-from-dept" style="width:120px">
+              <option value="">(From)</option>
+              <option value="A" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].from_dept == 'A') %}selected{% endif %}>A</option>
+              <option value="B" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].from_dept == 'B') %}selected{% endif %}>B</option>
+              <option value="C" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].from_dept == 'C') %}selected{% endif %}>C</option>
+            </select>
+            <select class="form-select form-select-sm me-2 step-to-dept" style="width:120px">
+              <option value="">(To)</option>
+              <option value="A" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].to_dept == 'A') %}selected{% endif %}>A</option>
+              <option value="B" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].to_dept == 'B') %}selected{% endif %}>B</option>
+              <option value="C" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].to_dept == 'C') %}selected{% endif %}>C</option>
+            </select>
+            <input class="form-control form-control-sm me-2 step-status" style="max-width:220px" placeholder="Status code" value="{{ (wf.spec.steps[loop.index0].status) if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].status is defined) else '' }}" list="" />
+            <div class="btn-group ms-2 me-2" role="group" aria-label="Move">
+              <button type="button" class="btn btn-sm btn-light move-up" title="Move up">▲</button>
+              <button type="button" class="btn btn-sm btn-light move-down" title="Move down">▼</button>
+            </div>
             <button type="button" class="btn btn-sm btn-danger remove-step">Remove</button>
           </div>
         {% endfor %}
       {% endif %}
     </div>
     <div class="input-group mb-2">
-      <input id="new-step-input" class="form-control" placeholder="Enter step code (e.g. B_IN_PROGRESS)">
+      <select id="new-step-from" class="form-select" style="width:120px">
+        <option value="">(From)</option>
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+      </select>
+      <select id="new-step-to" class="form-select" style="width:120px">
+        <option value="">(To)</option>
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+      </select>
+      <input id="new-step-status" class="form-control" style="max-width:220px" placeholder="Status code" list="" />
       <button id="add-step-btn" type="button" class="btn btn-outline-primary">Add</button>
     </div>
     {{ form.spec_json(class='form-control d-none', id='spec_json') }}
-    <small class="form-text text-muted">Drag to reorder steps; they will be serialized to JSON on save.</small>
+    <script>window.ADMIN_STATUS_OPTIONS = {{ status_options_map|default({})|tojson }};</script>
+    <datalist id="status-options-A"></datalist>
+    <datalist id="status-options-B"></datalist>
+    <datalist id="status-options-C"></datalist>
+    <datalist id="status-options-all"></datalist>
+    <small class="form-text text-muted">Use the arrows to reorder steps; they will be serialized to JSON on save.</small>
   </div>
   <div class="form-group">
     {{ form.submit(class='btn btn-primary') }}
@@ -48,57 +81,209 @@
 
 {% block scripts %}
   {{ super() }}
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script>
   (function(){
     const list = document.getElementById('workflow-steps');
     if(!list) return;
-    // small CSS tweaks to improve drag affordance
+    // small CSS tweaks to improve affordance and disable text selection on non-interactive parts
     const style = document.createElement('style');
-    style.textContent = '.drag-handle{cursor:grab; user-select:none; padding-right:8px;} .list-group-item{touch-action:none;}';
+    style.textContent = '.drag-handle{cursor:default; user-select:none; -webkit-user-select:none; padding-right:8px;} .list-group-item{touch-action:none;} .list-group-item input, .list-group-item button{user-select:text; -webkit-user-select:text;}';
     document.head.appendChild(style);
 
-    // init Sortable with robust fallback and diagnostics
     try{
-      if(typeof Sortable !== 'undefined'){
-        Sortable.create(list, { handle: '.drag-handle', animation: 120, fallbackOnBody: true, swapThreshold: 0.65 });
-        console.log('Sortable initialized; items=', list.children.length);
-      }else{
-        console.warn('Sortable not present; attempting forceFallback');
-        // attempt to load a JS fallback by forcing Sortable to use its fallback mode
-        try{ Sortable.create(list, { handle: '.drag-handle', animation: 120, forceFallback: true }); }catch(e){ console.error('Fallback Sortable init failed', e); }
+      // guard against selectstart (text selection) interfering with controls
+      list.addEventListener('selectstart', function(e){ const interactive = e.target.closest && e.target.closest('a,button,input,textarea,select,label'); if(!interactive) e.preventDefault(); });
+
+      function syncSteps(){
+          const items = Array.from(list.querySelectorAll('.list-group-item'));
+        const form = list.closest('form');
+        if(!form) return;
+        const existing = document.getElementById('steps_hidden_container');
+        if(existing) existing.remove();
+        const hiddenContainer = document.createElement('div');
+        hiddenContainer.id = 'steps_hidden_container';
+        hiddenContainer.style.display = 'none';
+        const steps = [];
+        items.forEach(function(item){
+          const fromEl = item.querySelector('.step-from-dept');
+          const toEl = item.querySelector('.step-to-dept');
+          const statusEl = item.querySelector('.step-status');
+          const from = fromEl ? String(fromEl.value || '').trim() : (item.dataset.fromDept || item.dataset.fromDept || item.dataset.fromDept || (item.dataset.fromDept || ''));
+          const to = toEl ? String(toEl.value || '').trim() : (item.dataset.toDept || item.dataset.toDept || '');
+          const status = statusEl ? String(statusEl.value || '').trim() : (item.dataset.status || '').trim();
+          if(status){
+            steps.push({ from_dept: from, to_dept: to, status: status });
+            const h = document.createElement('input');
+            h.type = 'hidden';
+            h.name = 'steps[]';
+            h.value = status;
+            hiddenContainer.appendChild(h);
+            const hf = document.createElement('input');
+            hf.type = 'hidden';
+            hf.name = 'step_from_dept[]';
+            hf.value = from;
+            hiddenContainer.appendChild(hf);
+            const ht = document.createElement('input');
+            ht.type = 'hidden';
+            ht.name = 'step_to_dept[]';
+            ht.value = to;
+            hiddenContainer.appendChild(ht);
+            const hs = document.createElement('input');
+            hs.type = 'hidden';
+            hs.name = 'step_status[]';
+            hs.value = status;
+            hiddenContainer.appendChild(hs);
+          }
+        });
+        form.appendChild(hiddenContainer);
+
+        // Build rich transitions describing department+status handoffs
+        const transitions = [];
+        for(let i=0;i+1<steps.length;i++){
+          transitions.push({
+            from_dept: steps[i].from_dept || '',
+            to_dept: steps[i+1].to_dept || '',
+            from_status: steps[i].status || '',
+            to_status: steps[i+1].status || ''
+          });
+        }
+        const spec = { steps: steps, transitions: transitions };
+        const hidden = document.getElementById('spec_json');
+        if(hidden) hidden.value = JSON.stringify(spec, null, 2);
       }
+
+      function populateStatusDatalists(){
+        // fill department datalists from ADMIN_STATUS_OPTIONS and also an "all" combined list
+        const statusMap = window.ADMIN_STATUS_OPTIONS || {};
+        const combined = new Set();
+        ['A','B','C'].forEach(function(dept){
+          const listEl = document.getElementById('status-options-' + dept);
+          if(!listEl) return;
+          // clear
+          listEl.innerHTML = '';
+          const opts = Array.isArray(statusMap[dept]) ? statusMap[dept] : [];
+          opts.forEach(function(code){
+            const o = document.createElement('option');
+            o.value = code;
+            listEl.appendChild(o);
+            combined.add(code);
+          });
+        });
+        // populate combined datalist
+        const allEl = document.getElementById('status-options-all');
+        if(allEl){
+          allEl.innerHTML = '';
+          Array.from(combined).sort().forEach(function(code){
+            const o = document.createElement('option'); o.value = code; allEl.appendChild(o);
+          });
+        }
+      }
+
+      function bindStatusInputLists(root){
+        // ensure each step's status input has its list attribute bound to the 'to' dept datalist
+        const container = root || document;
+        const items = Array.from(container.querySelectorAll('.list-group-item'));
+        items.forEach(function(item){
+          const toEl = item.querySelector('.step-to-dept');
+          const statusEl = item.querySelector('.step-status');
+          if(!statusEl) return;
+          const dept = toEl ? String(toEl.value || '').trim() : (item.dataset.toDept || '').trim();
+          if(dept) statusEl.setAttribute('list', 'status-options-' + dept);
+          else statusEl.setAttribute('list', 'status-options-all');
+          const desired = (item.dataset.status || '').trim();
+          if(desired) statusEl.value = desired;
+        });
+        // also bind the new-step-status input if present
+        const newTo = document.getElementById('new-step-to');
+        const newStatus = document.getElementById('new-step-status');
+        if(newStatus){
+          const dept = newTo ? String(newTo.value || '').trim() : '';
+          if(dept) newStatus.setAttribute('list', 'status-options-' + dept); else newStatus.setAttribute('list', 'status-options-all');
+        }
+      }
+
+      // initial populate + bind + sync
+      populateStatusDatalists();
+      bindStatusInputLists(list);
+      syncSteps();
+      console.log('Workflow step controls initialized; items=', list.children.length);
     }catch(e){
-      console.warn('Sortable init failed', e);
-      try{ Sortable.create(list, { handle: '.drag-handle', animation: 120, forceFallback: true }); }catch(e2){ console.error('Sortable final init failed', e2); }
+      console.warn('Workflow init failed', e);
     }
 
     document.getElementById('add-step-btn').addEventListener('click', function(){
-      const v = String(document.getElementById('new-step-input').value || '').trim();
-      if(!v) return;
+      const from = String(document.getElementById('new-step-from').value || '').trim();
+      const to = String(document.getElementById('new-step-to').value || '').trim();
+      const status = String(document.getElementById('new-step-status').value || '').trim();
+      // require at least a status to add
+      if(!status) return;
       const el = document.createElement('div');
       el.className = 'list-group-item d-flex align-items-center';
       el.innerHTML = '<span class="me-2 drag-handle" aria-hidden>≡</span>' +
-                     '<input class="form-control form-control-sm me-2 step-label" value="'+v+'">' +
+                     '<select class="form-select form-select-sm me-2 step-from-dept" style="width:120px">' +
+                       '<option value="">(From)</option>' +
+                       '<option value="A" '+(from==='A'?'selected':'')+'>A</option>' +
+                       '<option value="B" '+(from==='B'?'selected':'')+'>B</option>' +
+                       '<option value="C" '+(from==='C'?'selected':'')+'>C</option>' +
+                     '</select>' +
+                     '<select class="form-select form-select-sm me-2 step-to-dept" style="width:120px">' +
+                       '<option value="">(To)</option>' +
+                       '<option value="A" '+(to==='A'?'selected':'')+'>A</option>' +
+                       '<option value="B" '+(to==='B'?'selected':'')+'>B</option>' +
+                       '<option value="C" '+(to==='C'?'selected':'')+'>C</option>' +
+                     '</select>' +
+                     '<input class="form-control form-control-sm me-2 step-status" placeholder="Status code" value="'+(status||'')+'">' +
+                     '<div class="btn-group ms-2 me-2" role="group" aria-label="Move">' +
+                       '<button type="button" class="btn btn-sm btn-light move-up" title="Move up">▲</button>' +
+                       '<button type="button" class="btn btn-sm btn-light move-down" title="Move down">▼</button>' +
+                     '</div>' +
                      '<button type="button" class="btn btn-sm btn-danger remove-step">Remove</button>';
       list.appendChild(el);
-      document.getElementById('new-step-input').value = '';
+      // populate datalists and bind the new item's status input
+      populateStatusDatalists();
+      bindStatusInputLists(el);
+      document.getElementById('new-step-from').value = '';
+      document.getElementById('new-step-to').value = '';
+      document.getElementById('new-step-status').value = '';
+      try{ syncSteps(); }catch(e){}
+    });
+
+    // react when a step's 'to' department changes so the status input suggestions follow
+    list.addEventListener('change', function(e){
+      const sel = e.target.closest && e.target.closest('.step-to-dept');
+      if(!sel) return;
+      const item = sel.closest('.list-group-item');
+      if(!item) return;
+      bindStatusInputLists(item);
     });
 
     list.addEventListener('click', function(e){
       const rem = e.target.closest && e.target.closest('.remove-step');
-      if(rem) rem.closest('.list-group-item').remove();
+      const up = e.target.closest && e.target.closest('.move-up');
+      const down = e.target.closest && e.target.closest('.move-down');
+      if(rem){
+        const li = rem.closest('.list-group-item');
+        if(li) li.remove();
+        try{ syncSteps(); }catch(e){}
+      } else if(up || down){
+        const btn = up || down;
+        const li = btn.closest('.list-group-item');
+        if(!li) return;
+        if(up){
+          const prev = li.previousElementSibling;
+          if(prev) li.parentNode.insertBefore(li, prev);
+        } else {
+          const next = li.nextElementSibling;
+          if(next) li.parentNode.insertBefore(next, li);
+        }
+        try{ syncSteps(); }catch(e){}
+      }
     });
 
     const form = list.closest('form');
     if(form){
       form.addEventListener('submit', function(){
-        const steps = Array.from(list.querySelectorAll('.step-label')).map(i=>String(i.value||'').trim()).filter(Boolean);
-        const transitions = [];
-        for(let i=0;i+1<steps.length;i++) transitions.push({ from: steps[i], to: steps[i+1] });
-        const spec = { steps: steps, transitions: transitions };
-        const hidden = document.getElementById('spec_json');
-        if(hidden) hidden.value = JSON.stringify(spec, null, 2);
+        try{ syncSteps(); }catch(e){}
       });
     }
   })();

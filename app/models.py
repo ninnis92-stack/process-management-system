@@ -571,6 +571,10 @@ class StatusOption(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     # Whether this status should produce email deliveries (when mailer/SSO is active)
     email_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    # When True, notifications for this status should be delivered only to
+    # the originator (the user who created the request) rather than the
+    # entire owner department. Admin toggle exposed in the UI.
+    notify_to_originator_only = db.Column(db.Boolean, nullable=False, default=False)
 
 
 class Workflow(db.Model):

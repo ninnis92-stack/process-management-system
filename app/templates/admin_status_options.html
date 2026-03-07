@@ -4,7 +4,18 @@
 <h2>Status options</h2>
 <p><a href="{{ url_for('admin.create_status_option') }}" class="btn btn-primary">New status option</a></p>
 <table class="table">
-  <thead><tr><th>Code</th><th>Label</th><th>Target dept</th><th>Notify</th><th>Screenshot</th><th>Actions</th></tr></thead>
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Label</th>
+      <th>Target dept</th>
+      <th>Notify</th>
+      <th>Notify Scope</th>
+      <th>Email</th>
+      <th>Screenshot</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
   <tbody>
   {% for s in status_options %}
     <tr>
@@ -12,6 +23,8 @@
       <td>{{ s.label }}</td>
       <td>{{ s.target_department or '-' }}</td>
       <td>{{ 'on transfer only' if s.notify_on_transfer_only else ( 'enabled' if s.notify_enabled else 'disabled') }}</td>
+      <td>{{ 'originator only' if s.notify_to_originator_only else 'department' }}</td>
+      <td>{{ 'email' if s.email_enabled else 'no email' }}</td>
       <td>{{ 'required' if s.screenshot_required else 'no' }}</td>
       <td>
         <a href="{{ url_for('admin.edit_status_option', opt_id=s.id) }}">Edit</a>
@@ -20,6 +33,12 @@
         </form>
         <form method="post" action="{{ url_for('admin.toggle_status_screenshot', opt_id=s.id) }}" style="display:inline; margin-left:6px">
           <button class="btn btn-link">{{ 'Disable' if s.screenshot_required else 'Enable' }} screenshot</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.toggle_status_notify_scope', opt_id=s.id) }}" style="display:inline; margin-left:6px">
+          <button class="btn btn-link">{{ 'Set Department' if s.notify_to_originator_only else 'Set Originator Only' }}</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.toggle_status_email', opt_id=s.id) }}" style="display:inline; margin-left:6px">
+          <button class="btn btn-link">{{ 'Disable Email' if s.email_enabled else 'Enable Email' }}</button>
         </form>
       </td>
     </tr>

@@ -60,6 +60,7 @@ class StatusOptionForm(FlaskForm):
     target_department = SelectField("Target department (optional)", choices=[("", "-- default --"), ("A", "A"), ("B", "B"), ("C", "C")], validators=[Optional()])
     notify_enabled = BooleanField("Enable notifications for this status", default=True)
     notify_on_transfer_only = BooleanField("Only notify when request transfers departments", default=False)
+    notify_to_originator_only = BooleanField("Notify only request originator (not whole dept)", default=False)
     email_enabled = BooleanField("Send email for this status (when mailer/SSO enabled)", default=False)
     screenshot_required = BooleanField("Require screenshot when this status sends back to Dept B", default=False)
     submit = SubmitField("Save Status")

@@ -687,7 +687,20 @@ def create_workflow():
         db.session.commit()
         flash('Workflow created.', 'success')
         return redirect(url_for('admin.list_workflows'))
-    return render_template('admin_workflow_form.html', form=form)
+    # Build status options map from existing bucket statuses grouped by department
+    status_options_map = {}
+    try:
+        for bs in BucketStatus.query.all():
+            dept = (bs.bucket.department_name or '').strip() if bs.bucket else ''
+            if not dept:
+                continue
+            status_options_map.setdefault(dept, set()).add(bs.status_code)
+        # convert sets to sorted lists
+        status_options_map = {k: sorted(list(v)) for k, v in status_options_map.items()}
+    except Exception:
+        status_options_map = {}
+
+    return render_template('admin_workflow_form.html', form=form, status_options_map=status_options_map)
 
 
 @admin_bp.route('/workflows/<int:wf_id>/edit', methods=['GET', 'POST'])
@@ -731,7 +744,19 @@ def edit_workflow(wf_id: int):
         db.session.commit()
         flash('Workflow updated.', 'success')
         return redirect(url_for('admin.list_workflows'))
-    return render_template('admin_workflow_form.html', form=form, wf=wf)
+    # Build status options map from existing bucket statuses grouped by department
+    status_options_map = {}
+    try:
+        for bs in BucketStatus.query.all():
+            dept = (bs.bucket.department_name or '').strip() if bs.bucket else ''
+            if not dept:
+                continue
+            status_options_map.setdefault(dept, set()).add(bs.status_code)
+        status_options_map = {k: sorted(list(v)) for k, v in status_options_map.items()}
+    except Exception:
+        status_options_map = {}
+
+    return render_template('admin_workflow_form.html', form=form, wf=wf, status_options_map=status_options_map)
 
 
 @admin_bp.route('/workflows/<int:wf_id>/delete', methods=['POST'])
@@ -1229,7 +1254,14 @@ def list_status_options():
     if not _is_admin_user():
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
-    opts = StatusOption.query.order_by(StatusOption.code).all()
+    try:
+        opts = StatusOption.query.order_by(StatusOption.code).all()
+    except Exception:
+        # Defensive: if DB schema is out-of-date (missing columns), avoid 500
+        # and show an empty list with a helpful admin notice.
+        current_app.logger.exception('Failed to load StatusOption rows for admin list; DB schema may be missing migrations')
+        flash('Status options could not be loaded. Ensure DB migrations have been applied (run alembic upgrade head).', 'danger')
+        opts = []
     return render_template('admin_status_options.html', status_options=opts)
 
 
@@ -1249,6 +1281,7 @@ def create_status_option():
             target_department=(form.target_department.data or None),
             notify_enabled=bool(form.notify_enabled.data),
             notify_on_transfer_only=bool(form.notify_on_transfer_only.data),
+            notify_to_originator_only=bool(getattr(form, 'notify_to_originator_only', False).data if getattr(form, 'notify_to_originator_only', None) else False),
             email_enabled=bool(getattr(form, 'email_enabled', False).data if getattr(form, 'email_enabled', None) else False),
             screenshot_required=bool(getattr(form, 'screenshot_required', False).data if getattr(form, 'screenshot_required', None) else False),
         )
@@ -1274,6 +1307,7 @@ def edit_status_option(opt_id: int):
         opt.target_department = form.target_department.data or None
         opt.notify_enabled = bool(form.notify_enabled.data)
         opt.notify_on_transfer_only = bool(form.notify_on_transfer_only.data)
+        opt.notify_to_originator_only = bool(getattr(form, 'notify_to_originator_only', False).data if getattr(form, 'notify_to_originator_only', None) else False)
         opt.email_enabled = bool(getattr(form, 'email_enabled', False).data if getattr(form, 'email_enabled', None) else False)
         opt.screenshot_required = bool(getattr(form, 'screenshot_required', False).data if getattr(form, 'screenshot_required', None) else False)
         db.session.commit()
@@ -1309,6 +1343,40 @@ def toggle_status_screenshot(opt_id: int):
     except Exception:
         db.session.rollback()
         flash('Failed to update screenshot requirement.', 'danger')
+    return redirect(url_for('admin.list_status_options'))
+
+
+@admin_bp.route('/status_options/<int:opt_id>/toggle_notify_scope', methods=['POST'])
+@login_required
+def toggle_status_notify_scope(opt_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    opt = get_or_404(StatusOption, opt_id)
+    try:
+        opt.notify_to_originator_only = not bool(getattr(opt, 'notify_to_originator_only', False))
+        db.session.commit()
+        flash('Notification scope updated.', 'success')
+    except Exception:
+        db.session.rollback()
+        flash('Failed to update notification scope.', 'danger')
+    return redirect(url_for('admin.list_status_options'))
+
+
+@admin_bp.route('/status_options/<int:opt_id>/toggle_email', methods=['POST'])
+@login_required
+def toggle_status_email(opt_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    opt = get_or_404(StatusOption, opt_id)
+    try:
+        opt.email_enabled = not bool(getattr(opt, 'email_enabled', False))
+        db.session.commit()
+        flash('Email setting updated for that status.', 'success')
+    except Exception:
+        db.session.rollback()
+        flash('Failed to update email setting.', 'danger')
     return redirect(url_for('admin.list_status_options'))
 
 

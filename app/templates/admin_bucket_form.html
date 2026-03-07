@@ -102,26 +102,34 @@
 
 {% block scripts %}
   {{ super() }}
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/dragula@3.7.3/dist/dragula.min.css">
+  <script src="https://unpkg.com/dragula@3.7.3/dist/dragula.min.js"></script>
   <script>
   (function(){
     const list = document.getElementById('bucket-status-list');
     if(!list) return;
-    // affordance
+    // affordance + selection prevention
     const style = document.createElement('style');
-    style.textContent = '.drag-handle{cursor:grab; user-select:none; padding-right:8px;} .list-group-item{touch-action:none;}';
+    style.textContent = '.drag-handle{cursor:grab; user-select:none; -webkit-user-select:none; -webkit-user-drag:none; padding-right:8px;} .list-group-item{touch-action:none; user-select:none; -webkit-user-select:none; -ms-user-select:none; -webkit-user-drag:none;} .list-group-item, .list-group-item *{user-select:none; -webkit-user-select:none; -ms-user-select:none;} .list-group-item a, .list-group-item input, .list-group-item button, .list-group-item textarea, .list-group-item select{user-select:text; -webkit-user-select:text;}';
     document.head.appendChild(style);
 
     try{
-      if(typeof Sortable !== 'undefined'){
-        // allow dragging the whole item (handle-only fallback sometimes fails
-        // in some browsers/containers). Keep the visual handle for affordance.
-        Sortable.create(list, {
-          animation: 120,
-          fallbackOnBody: true,
-          chosenClass: 'active',
-          dragClass: 'dragging',
-          onEnd: function(){
+      if(typeof dragula !== 'undefined'){
+        const drake = dragula([list], {
+          direction: 'vertical',
+          mirrorContainer: document.body,
+          copy: false,
+          revertOnSpill: true,
+          removeOnSpill: false,
+          moves: function(el, container, handle){
+            // allow dragging by handle or anywhere on the item
+            // but don't start drag when interacting with controls
+            const interactive = (handle && handle.closest) ? handle.closest('a,button,input,textarea,select,label') : null;
+            return !interactive;
+          }
+        });
+
+        function postOrder(){
           const ids = Array.from(list.querySelectorAll('li[data-id]')).map(li=>li.dataset.id);
           fetch('{{ url_for('admin.buckets_reorder_statuses', bucket_id=bucket.id) }}', {
             method: 'POST',
@@ -131,13 +139,24 @@
             if(!r.ok) console.error('Reorder failed', r.status);
           }).catch(e=>console.error('Reorder request failed', e));
         }
+
+        drake.on('drop', function(el, target, source, sibling){
+          // slight delay to ensure DOM updated
+          setTimeout(postOrder, 20);
         });
-        console.log('Bucket statuses Sortable initialized, items=', list.children.length);
+
+        // Guard against selectstart (text selection) interfering with dragging
+        list.addEventListener('selectstart', function(e){
+          const interactive = e.target.closest && e.target.closest('a,button,input,textarea,select,label');
+          if(!interactive) e.preventDefault();
+        });
+
+        console.log('Bucket statuses Dragula initialized, items=', list.children.length);
       }else{
-        console.warn('Sortable library not loaded for bucket statuses');
+        console.warn('Dragula library not loaded for bucket statuses');
       }
     }catch(e){
-      console.warn('Sortable init failed for bucket statuses', e);
+      console.warn('Dragula init failed for bucket statuses', e);
     }
   })();
   </script>
