@@ -355,6 +355,13 @@ def switch_department():
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     form = LoginForm()
+    # Clear any pre-filled email when rendering the login page via GET so
+    # refreshing the page doesn't leave the previous email visible in the form.
+    if request.method == "GET":
+        try:
+            form.email.data = ""
+        except Exception:
+            pass
     if form.validate_on_submit():
         try:
             user = User.query.filter_by(email=form.email.data.strip().lower()).first()

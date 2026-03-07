@@ -14,7 +14,7 @@
           {{ form.csrf_token }}
           <div class="mb-3">
             <label class="form-label">Email</label>
-            {{ form.email(class="form-control") }}
+            {{ form.email(class="form-control", autocomplete="off", autocapitalize="off", spellcheck="false") }}
           </div>
           <div class="mb-3">
             <label class="form-label">Password</label>
