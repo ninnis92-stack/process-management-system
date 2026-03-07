@@ -1369,9 +1369,20 @@ def buckets_new():
         flash('Access denied.', 'danger')
         return redirect(url_for('requests.dashboard'))
     form = StatusBucketForm()
+    # populate workflow choices (global + any department-scoped active workflows)
+    wfs = Workflow.query.filter(Workflow.active == True).order_by(Workflow.name.asc()).all()
+    form.workflow_id.choices = [(0, '-- None --')] + [(w.id, w.name + (f" (Dept {w.department_code})" if w.department_code else '')) for w in wfs]
+
     if form.validate_on_submit():
         b = StatusBucket(name=form.name.data.strip(), department_name=(form.department_name.data or None) or None,
                          order=int(form.order.data or 0), active=bool(form.active.data))
+        # assign workflow if selected
+        try:
+            sel = int(form.workflow_id.data or 0)
+        except Exception:
+            sel = 0
+        if sel:
+            b.workflow_id = sel
         db.session.add(b)
         db.session.commit()
         flash('Bucket created.', 'success')
@@ -1387,18 +1398,49 @@ def buckets_edit(bucket_id: int):
         return redirect(url_for('requests.dashboard'))
     b = get_or_404(StatusBucket, bucket_id)
     form = StatusBucketForm(obj=b)
+    # populate workflow choices scoped to department (or global)
+    if b.department_name:
+        wfs = Workflow.query.filter((Workflow.department_code == None) | (Workflow.department_code == b.department_name)).filter(Workflow.active == True).order_by(Workflow.name.asc()).all()
+    else:
+        wfs = Workflow.query.filter(Workflow.active == True).order_by(Workflow.name.asc()).all()
+    form.workflow_id.choices = [(0, '-- None --')] + [(w.id, w.name + (f" (Dept {w.department_code})" if w.department_code else '')) for w in wfs]
+    # prefill selected workflow in form when GET
+    if flask_request.method == 'GET':
+        try:
+            form.workflow_id.data = int(b.workflow_id) if b.workflow_id else 0
+        except Exception:
+            form.workflow_id.data = 0
+
     if form.validate_on_submit():
         b.name = form.name.data.strip()
         b.department_name = (form.department_name.data or None) or None
         b.order = int(form.order.data or 0)
         b.active = bool(form.active.data)
+        try:
+            sel = int(form.workflow_id.data or 0)
+        except Exception:
+            sel = 0
+        b.workflow_id = sel or None
         db.session.commit()
         flash('Bucket updated.', 'success')
+        # handle bulk-add statuses if provided
+        bulk = (form.bulk_statuses.data or '').strip()
+        if bulk:
+            lines = [l.strip() for l in bulk.splitlines() if l.strip()]
+            if lines:
+                # compute next order base
+                existing = b.statuses.order_by(BucketStatus.order.desc()).first()
+                base = existing.order + 1 if existing else 0
+                for idx, code in enumerate(lines):
+                    ns = BucketStatus(bucket_id=b.id, status_code=code, order=base + idx)
+                    db.session.add(ns)
+                db.session.commit()
+                flash(f'Added {len(lines)} statuses to bucket.', 'success')
         return redirect(url_for('admin.list_buckets'))
 
-    # handle adding a new status code via POST param
-    if flask_request.method == 'POST' and flask_request.form.get('new_status_code'):
-        code = (flask_request.form.get('new_status_code') or '').strip()
+    # handle adding a new status code via POST param (supports select or free text)
+    if flask_request.method == 'POST' and (flask_request.form.get('new_status_code') or flask_request.form.get('new_status_code_select')):
+        code = (flask_request.form.get('new_status_code_select') or flask_request.form.get('new_status_code') or '').strip()
         try:
             ordv = int(flask_request.form.get('new_status_order') or 0)
         except Exception:
@@ -1411,7 +1453,16 @@ def buckets_edit(bucket_id: int):
         return redirect(url_for('admin.buckets_edit', bucket_id=b.id))
 
     statuses = b.statuses.order_by(BucketStatus.order.asc()).all()
-    return render_template('admin_bucket_form.html', form=form, bucket=b, statuses=statuses)
+
+    # Load available status options and workflows scoped to this bucket's department
+    if b.department_name:
+        status_opts = StatusOption.query.filter((StatusOption.target_department == None) | (StatusOption.target_department == b.department_name)).order_by(StatusOption.code.asc()).all()
+        workflows = Workflow.query.filter((Workflow.department_code == None) | (Workflow.department_code == b.department_name)).filter(Workflow.active == True).order_by(Workflow.name.asc()).all()
+    else:
+        status_opts = StatusOption.query.order_by(StatusOption.code.asc()).all()
+        workflows = Workflow.query.filter(Workflow.active == True).order_by(Workflow.name.asc()).all()
+
+    return render_template('admin_bucket_form.html', form=form, bucket=b, statuses=statuses, status_options=status_opts, workflows=workflows)
 
 
 @admin_bp.route('/buckets/<int:bucket_id>/delete', methods=['POST'])
@@ -1438,6 +1489,33 @@ def buckets_status_delete(bucket_id: int, status_id: int):
     db.session.commit()
     flash('Bucket status removed.', 'success')
     return redirect(url_for('admin.buckets_edit', bucket_id=bucket_id))
+
+
+@admin_bp.route('/buckets/<int:bucket_id>/reorder_statuses', methods=['POST'])
+@login_required
+def buckets_reorder_statuses(bucket_id: int):
+    if not _is_admin_user():
+        return jsonify({'error': 'access_denied'}), 403
+
+    b = get_or_404(StatusBucket, bucket_id)
+    try:
+        payload = flask_request.get_json(force=True)
+    except Exception:
+        payload = None
+    if not payload or 'order' not in payload or not isinstance(payload.get('order'), list):
+        return jsonify({'error': 'invalid_payload'}), 400
+
+    ids = [int(x) for x in payload.get('order') if str(x).isdigit()]
+    # ensure all ids belong to this bucket
+    items = {s.id: s for s in BucketStatus.query.filter(BucketStatus.bucket_id == b.id, BucketStatus.id.in_(ids)).all()}
+    # apply new order
+    for idx, sid in enumerate(ids):
+        s = items.get(sid)
+        if s:
+            s.order = int(idx)
+            db.session.add(s)
+    db.session.commit()
+    return jsonify({'ok': True})
 
 
 @admin_bp.route('/integrations/new', methods=['GET', 'POST'])

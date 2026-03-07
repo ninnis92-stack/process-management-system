@@ -160,6 +160,13 @@ def main():
                         with engine.begin() as conn:
                             conn.execute(text('ALTER TABLE request ADD COLUMN workflow_id INTEGER'))
                         print('schema_fix=request.workflow_id_added')
+                # Ensure status_bucket.workflow_id exists when the model expects it
+                if 'status_bucket' in insp.get_table_names():
+                    sb_cols = {c['name'] for c in insp.get_columns('status_bucket')}
+                    if 'workflow_id' not in sb_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text('ALTER TABLE status_bucket ADD COLUMN workflow_id INTEGER'))
+                        print('schema_fix=status_bucket.workflow_id_added')
                 # Ensure a default workflow exists so guest forms have sensible choices
                 try:
                     from app.models import Workflow

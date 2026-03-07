@@ -405,6 +405,9 @@ class StatusBucket(db.Model):
     order = db.Column(db.Integer, nullable=False, default=0)
     active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Optional workflow assigned to this bucket (scoped by department or global)
+    workflow_id = db.Column(db.Integer, db.ForeignKey('workflow.id'), nullable=True)
+    workflow = db.relationship('Workflow', backref='buckets')
     statuses = db.relationship('BucketStatus', backref='bucket', lazy='dynamic', cascade='all, delete-orphan')
 
 

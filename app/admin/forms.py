@@ -186,4 +186,6 @@ class StatusBucketForm(FlaskForm):
     department_name = SelectField("Department (optional)", choices=[("", "-- global --"), ("A", "A"), ("B", "B"), ("C", "C")], validators=[Optional()])
     order = IntegerField("Order", default=0, validators=[Optional()])
     active = BooleanField("Active", default=True)
+    workflow_id = SelectField("Assign workflow (optional)", coerce=int, choices=[], validators=[Optional()])
+    bulk_statuses = TextAreaField("Bulk add statuses (one per line)", validators=[Optional()])
     submit = SubmitField("Save Bucket")

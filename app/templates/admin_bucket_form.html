@@ -21,6 +21,11 @@
       {{ form.active(class="form-check-input") }}
       <label class="form-check-label">Active</label>
     </div>
+          <div class="mb-3">
+            <label class="form-label">Assign Workflow</label>
+            {{ form.workflow_id(class="form-select") }}
+            <div class="form-text">Optional: choose a workflow to associate with this bucket.</div>
+          </div>
     <button class="btn btn-primary">{{ 'Save' }}</button>
     <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.list_buckets') }}">Cancel</a>
   </form>
@@ -45,7 +50,18 @@
       <div class="row g-2 align-items-end">
         <div class="col-md-6">
           <label class="form-label">Status code</label>
-          <input name="new_status_code" class="form-control" placeholder="e.g. B_IN_PROGRESS">
+          {% if status_options %}
+            <select name="new_status_code_select" class="form-select">
+              <option value="">-- choose from existing --</option>
+              {% for so in status_options %}
+                <option value="{{ so.code }}">{{ so.code }} — {{ so.label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Or enter a custom status code below.</div>
+            <input name="new_status_code" class="form-control mt-2" placeholder="Custom status code (optional)">
+          {% else %}
+            <input name="new_status_code" class="form-control" placeholder="e.g. B_IN_PROGRESS">
+          {% endif %}
         </div>
         <div class="col-md-3">
           <label class="form-label">Order</label>
@@ -56,6 +72,27 @@
         </div>
       </div>
     </form>
+
+    {% if workflows %}
+      <hr/>
+      <h4>Workflows available for this department</h4>
+      <ul class="list-group mb-3">
+        {% for wf in workflows %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <strong>{{ wf.name }}</strong>
+              {% if wf.department_code %}<br/><small class="text-muted">Dept: {{ wf.department_code }}</small>{% endif %}
+              {% if wf.description %}<div class="small">{{ wf.description }}</div>{% endif %}
+            </div>
+            <div>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.edit_workflow', wf_id=wf.id) }}">Edit</a>
+            </div>
+          </li>
+        {% else %}
+          <li class="list-group-item text-muted">No workflows available.</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
   {% endif %}
 
 {% endblock %}
