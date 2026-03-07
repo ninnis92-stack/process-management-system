@@ -20,9 +20,11 @@ from ..models import Workflow
 from .forms import WorkflowForm
 from .forms import FormTemplateAdminForm, FormFieldInlineForm
 from .forms import DepartmentAssignmentForm
+from .forms import BulkDepartmentAssignForm
 from ..models import FormTemplate, FormField, DepartmentFormAssignment
 from .forms import FieldVerificationForm
 from ..models import FieldVerification
+from ..models import UserDepartment
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -451,6 +453,7 @@ def assign_sso():
     if form.validate_on_submit():
         raw = form.emails.data or ''
         emails = [e.strip().lower() for e in raw.splitlines() if e.strip()]
+        return redirect(url_for('admin.list_users'))
         dept = form.department.data
         updated = []
         skipped = []
@@ -473,6 +476,62 @@ def assign_sso():
         return redirect(url_for('admin.list_users'))
 
     return render_template('admin_assign_sso.html', form=form)
+
+
+@admin_bp.route('/bulk_assign_departments', methods=['GET', 'POST'])
+@login_required
+def bulk_assign_departments():
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    form = BulkDepartmentAssignForm()
+    if form.validate_on_submit():
+        dept = (form.department.data or '').strip().upper()
+        raw = form.emails.data or ''
+        # Accept newline or comma separated
+        parts = []
+        for line in raw.splitlines():
+            for token in line.split(','):
+                token = token.strip().lower()
+                if token:
+                    parts.append(token)
+
+        success = 0
+        missing = []
+        for em in parts:
+            try:
+                u = User.query.filter_by(email=em).first()
+            except Exception:
+                u = None
+            if not u:
+                missing.append(em)
+                continue
+            # Don't add if matches primary department
+            if getattr(u, 'department', None) == dept:
+                continue
+            # create assignment if not exists
+            existing = UserDepartment.query.filter_by(user_id=u.id, department=dept).first()
+            if existing:
+                continue
+            try:
+                ud = UserDepartment(user_id=u.id, department=dept)
+                db.session.add(ud)
+                db.session.commit()
+                success += 1
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+
+        msg = f'Assigned {success} users to Dept {dept}.'
+        if missing:
+            msg += f' Unknown emails: {len(missing)}.'
+        flash(msg, 'success')
+        return redirect(url_for('admin.list_users'))
+
+    return render_template('admin_bulk_assign_departments.html', form=form)
 
 
 

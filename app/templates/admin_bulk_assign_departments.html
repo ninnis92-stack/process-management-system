@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="container" style="max-width:700px;margin-top:24px;">
+    <h3>Bulk Assign Departments</h3>
+    <p>Provide a list of user emails and select a department to assign. This creates additional department assignments (does not change users' primary department).</p>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label class="form-label">Department</label>
+        {{ form.department(class="form-select") }}
+      </div>
+      <div class="mb-3">
+        <label class="form-label">User emails</label>
+        {{ form.emails(class="form-control", rows=8) }}
+        <small class="form-text text-muted">One email per line, or comma-separated values.</small>
+      </div>
+      <div class="text-end">
+        <a class="btn btn-link" href="{{ url_for('admin.list_users') }}">Back</a>
+        <button class="btn btn-primary" type="submit">Assign</button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

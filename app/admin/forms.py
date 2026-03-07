@@ -146,6 +146,12 @@ class DepartmentAssignmentForm(FlaskForm):
     submit = SubmitField("Assign Template")
 
 
+class BulkDepartmentAssignForm(FlaskForm):
+    department = SelectField("Department to assign", choices=[("A", "A"), ("B", "B"), ("C", "C")], validators=[DataRequired()])
+    emails = TextAreaField("User emails (one per line or comma-separated)", validators=[DataRequired()])
+    submit = SubmitField("Assign Departments")
+
+
 class FieldVerificationForm(FlaskForm):
     provider = SelectField("Provider", choices=[('inventory', 'Inventory Service')], validators=[DataRequired()])
     external_key = StringField("External key", validators=[Optional(), Length(max=200)])
