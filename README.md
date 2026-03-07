@@ -610,6 +610,23 @@ These integration extension points are intentionally lightweight so you can buil
 
 ## Dev Notes
 - Run `python3 seed.py` to seed sample data.
+
+## Assignment semantics (2026-03-07)
+
+- **Per-department multiple users:** Each department may have many active users who can view requests owned by their department.
+- **Single active assignment per user:** A user may only be assigned to one active request at a time. "Active" excludes requests in the `CLOSED` state or those explicitly marked `is_denied`.
+- **Department-level visibility & reassignment:** Any active user in the request's owner department may view the request and assign or reassign it to any other active user in that department (subject to the one-assignment-per-user constraint).
+
+Implementation notes:
+
+- The backend enforces the one-assignment-per-user rule in the assignment endpoints (`assign_self` and `assign_request`). Attempts to assign a user who already has an active assignment will be rejected with a helpful UI message.
+- Unit tests were added/updated to cover assignment behaviors and related transitions. Run the test suite with:
+
+```bash
+PYTHONPATH=. pytest -q
+```
+
+If you'd like the assignment rule relaxed (for example, allow multiple simultaneous assignments), update the checks in `app/requests_bp/routes.py` and run the test suite to validate behavior.
 - Server entrypoint: `run.py` (Flask), Dockerfile provided; Fly configs included for deployment experiments.
 
 ## Local testing & new features

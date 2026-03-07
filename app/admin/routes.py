@@ -41,6 +41,8 @@ from ..models import FormTemplate, FormField, DepartmentFormAssignment
 from .forms import FieldVerificationForm
 from ..models import FieldVerification
 from ..models import UserDepartment
+from .forms import GuestFormAdminForm
+from ..models import GuestForm
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -397,6 +399,120 @@ def monitor():
             admin_count=admin_count,
             recent_email_issues=recent_email_issues,
         )
+
+
+@admin_bp.route("/guest_forms")
+@login_required
+def list_guest_forms():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+    forms = GuestForm.query.order_by(GuestForm.created_at.desc()).all()
+    return render_template("admin_guest_forms.html", forms=forms)
+
+
+@admin_bp.route("/guest_forms/new", methods=["GET", "POST"])
+@login_required
+def create_guest_form():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    templates = FormTemplate.query.order_by(FormTemplate.name.asc()).all()
+    choices = [(0, "-- none --")] + [(t.id, t.name) for t in templates]
+    form = GuestFormAdminForm()
+    form.template_id.choices = choices
+
+    if form.validate_on_submit():
+        slug = form.slug.data.strip()
+        g = GuestForm(
+            name=form.name.data.strip(),
+            slug=slug,
+            template_id=(form.template_id.data or None) or None,
+            require_sso=bool(form.require_sso.data),
+            owner_department=form.owner_department.data or "B",
+            is_default=bool(form.is_default.data),
+            active=bool(form.active.data),
+        )
+        if g.is_default:
+            # unset other defaults
+            try:
+                GuestForm.query.update({GuestForm.is_default: False})
+                db.session.flush()
+            except Exception:
+                db.session.rollback()
+        db.session.add(g)
+        try:
+            db.session.commit()
+            flash("Guest form created.", "success")
+            return redirect(url_for("admin.list_guest_forms"))
+        except Exception:
+            db.session.rollback()
+            flash("Failed to create guest form.", "danger")
+
+    return render_template("admin_guest_form_edit.html", form=form)
+
+
+@admin_bp.route("/guest_forms/<int:gf_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_guest_form(gf_id: int):
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    g = get_or_404(GuestForm, gf_id)
+    templates = FormTemplate.query.order_by(FormTemplate.name.asc()).all()
+    choices = [(0, "-- none --")] + [(t.id, t.name) for t in templates]
+    form = GuestFormAdminForm(obj=g)
+    form.template_id.choices = choices
+    form.template_id.data = g.template_id or 0
+    form.owner_department.data = g.owner_department or "B"
+
+    if form.validate_on_submit():
+        g.name = form.name.data.strip()
+        g.slug = form.slug.data.strip()
+        g.template_id = (form.template_id.data or None) or None
+        g.require_sso = bool(form.require_sso.data)
+        g.owner_department = form.owner_department.data or "B"
+        g.active = bool(form.active.data)
+        if form.is_default.data:
+            try:
+                GuestForm.query.update({GuestForm.is_default: False})
+                db.session.flush()
+            except Exception:
+                db.session.rollback()
+            g.is_default = True
+        else:
+            g.is_default = False
+        try:
+            db.session.commit()
+            flash("Guest form updated.", "success")
+            return redirect(url_for("admin.list_guest_forms"))
+        except Exception:
+            db.session.rollback()
+            flash("Failed to update guest form.", "danger")
+
+    return render_template("admin_guest_form_edit.html", form=form, edit=g)
+
+
+@admin_bp.route("/guest_forms/<int:gf_id>/delete", methods=["POST"])
+@login_required
+def delete_guest_form(gf_id: int):
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+    g = get_or_404(GuestForm, gf_id)
+    try:
+        db.session.delete(g)
+        db.session.commit()
+        flash("Guest form deleted.", "success")
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        flash("Failed to delete guest form.", "danger")
+    return redirect(url_for("admin.list_guest_forms"))
 
     if dept == "B":
         # Build buckets similar to Dept B dashboard but for monitoring

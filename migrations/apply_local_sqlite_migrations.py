@@ -116,6 +116,35 @@ def main():
     con.close()
     print("Local migrations applied")
 
+    # Ensure GuestForm table exists for local dev when model was added
+    con = sqlite3.connect(path)
+    cur = con.cursor()
+    try:
+        tbls = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        if 'guest_form' not in tbls:
+            print('Creating guest_form table...')
+            cur.execute(
+                '''
+                CREATE TABLE guest_form (
+                    id INTEGER PRIMARY KEY,
+                    name VARCHAR(200) NOT NULL,
+                    slug VARCHAR(200) NOT NULL UNIQUE,
+                    template_id INTEGER,
+                    require_sso INTEGER NOT NULL DEFAULT 0,
+                    owner_department VARCHAR(2) NOT NULL DEFAULT 'B',
+                    is_default INTEGER NOT NULL DEFAULT 0,
+                    active INTEGER NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT (CURRENT_TIMESTAMP)
+                )
+                '''
+            )
+            con.commit()
+            print('guest_form table created')
+    except Exception as e:
+        print('Failed to ensure guest_form table:', e)
+    finally:
+        con.close()
+
 
 if __name__ == "__main__":
     main()

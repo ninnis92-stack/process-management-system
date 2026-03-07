@@ -24,6 +24,8 @@ from ..models import (
     Notification,
     Workflow,
 )
+from ..models import GuestForm
+from ..models import SpecialEmailConfig
 from ..notifcations import notify_users, users_in_department
 from types import SimpleNamespace
 from werkzeug.routing import BuildError
@@ -96,26 +98,52 @@ def external_new():
     wfs = Workflow.query.filter_by(active=True).order_by(Workflow.name.asc()).all()
     wf_choices = [(0, "-- none --")] + [(w.id, w.name) for w in wfs]
     form.workflow_id.choices = wf_choices
+    # Expose active guest forms to the template so the public UI can allow
+    # submitters to pick a specific GuestForm (by slug).
+    guest_forms = GuestForm.query.filter_by(active=True).order_by(GuestForm.name.asc()).all()
     if form.validate_on_submit():
         desc = (form.description.data or "").strip()
         # Normalize guest email early for checks
         guest_email = (form.guest_email.data or "").strip().lower()
 
-        # If the app is configured to require SSO-linked accounts for guest
-        # submissions, enforce that the provided email matches a user with
-        # an SSO subject (`sso_sub`)
-        if current_app.config.get("REQUIRE_SSO_FOR_GUEST", False):
+        # Determine whether this particular guest form requires SSO.
+        # Prefer an explicit GuestForm selected by slug (query param `guest_form`),
+        # otherwise use the active default GuestForm, then fall back to the
+        # global `REQUIRE_SSO_FOR_GUEST` config flag.
+        require_sso = False
+        guest_form = None
+        slug = request.args.get("guest_form") or request.form.get("guest_form")
+        if slug:
+            guest_form = GuestForm.query.filter_by(slug=slug, active=True).first()
+        if not guest_form:
+            guest_form = GuestForm.query.filter_by(active=True, is_default=True).first()
+        if guest_form:
+            require_sso = bool(guest_form.require_sso)
+        else:
+            require_sso = bool(current_app.config.get("REQUIRE_SSO_FOR_GUEST", False))
+
+        if require_sso:
             u = User.query.filter_by(email=guest_email).first()
             if not u or not u.sso_sub:
-                flash("Guest email must be an SSO-linked account.", "warning")
-                return render_template("external_new.html", form=form)
+                flash("Guest email must be an SSO-linked account for this form.", "warning")
+                return render_template("external_new.html", form=form, guest_forms=guest_forms)
 
-        # prefer explicit owner_department from form if provided
-        owner_dept = (
-            (form.owner_department.data or "B").strip().upper()
-            if getattr(form, "owner_department", None)
-            else "B"
-        )
+        # Determine owner department precedence:
+        # 1. GuestForm.owner_department (if a specific guest_form was selected)
+        # 2. Explicit owner_department field from the submitted form
+        # 3. SpecialEmailConfig.request_form_department (for email-generated forms)
+        # 4. Fallback to Dept B
+        owner_dept = "B"
+        if guest_form and getattr(guest_form, "owner_department", None):
+            owner_dept = (guest_form.owner_department or "B").strip().upper()
+        elif getattr(form, "owner_department", None) and form.owner_department.data:
+            owner_dept = (form.owner_department.data or "B").strip().upper()
+        else:
+            try:
+                cfg = SpecialEmailConfig.get()
+                owner_dept = (cfg.request_form_department or "B").strip().upper()
+            except Exception:
+                owner_dept = "B"
 
         req = ReqModel(
             title=form.title.data.strip(),
@@ -301,6 +329,7 @@ def external_new():
         created_req=created_req,
         guest_email=(created_req.guest_email if created_req else None),
         tracking_link=tracking_link,
+        guest_forms=guest_forms,
     )
 
 

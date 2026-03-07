@@ -1,0 +1,39 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<div class="container">
+  <h3>Guest Forms</h3>
+  <a href="{{ url_for('admin.create_guest_form') }}" class="btn btn-primary mb-3">New Guest Form</a>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Slug</th>
+        <th>Department</th>
+        <th>Require SSO</th>
+        <th>Default</th>
+        <th>Active</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in forms %}
+      <tr>
+        <td>{{ f.name }}</td>
+        <td>{{ f.slug }}</td>
+        <td>{{ f.owner_department or 'B' }}</td>
+        <td>{{ 'Yes' if f.require_sso else 'No' }}</td>
+        <td>{{ 'Yes' if f.is_default else 'No' }}</td>
+        <td>{{ 'Yes' if f.active else 'No' }}</td>
+        <td>
+          <a href="{{ url_for('admin.edit_guest_form', gf_id=f.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+          <form method="post" action="{{ url_for('admin.delete_guest_form', gf_id=f.id) }}" style="display:inline">
+            {{ csrf_token() }}
+            <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this guest form?')">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

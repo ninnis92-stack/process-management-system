@@ -29,6 +29,19 @@
       </div>
 
       <div class="row">
+        <div class="col-12 mb-3">
+          <label class="form-label">Guest Form (optional)</label>
+          <select name="guest_form" class="form-select">
+            <option value="">-- Default form --</option>
+            {% for gf in (guest_forms or []) %}
+              <option value="{{ gf.slug }}" {% if request.args.get('guest_form') == gf.slug %}selected{% endif %}>{{ gf.name }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Select a specific guest form if you have a link or want to target a particular workflow.</div>
+        </div>
+      </div>
+
+      <div class="row">
         <div class="col-md-6 mb-3">
           <label class="form-label">Owner Department</label>
           {{ form.owner_department(class="form-select") }}

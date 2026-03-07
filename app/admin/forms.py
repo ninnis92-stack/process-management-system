@@ -327,6 +327,22 @@ class FeatureFlagsForm(FlaskForm):
     submit = SubmitField("Save Flags")
 
 
+class GuestFormAdminForm(FlaskForm):
+    name = StringField("Guest form name", validators=[DataRequired(), Length(max=200)])
+    slug = StringField("Slug (unique)", validators=[DataRequired(), Length(max=200)])
+    template_id = SelectField("Template (optional)", coerce=int, validators=[Optional()])
+    require_sso = BooleanField("Require SSO-linked account to submit", default=False)
+    owner_department = SelectField(
+        "Owner department",
+        choices=[("A", "A"), ("B", "B"), ("C", "C")],
+        default="B",
+        validators=[DataRequired()],
+    )
+    is_default = BooleanField("Set as default guest form", default=False)
+    active = BooleanField("Active", default=True)
+    submit = SubmitField("Save Guest Form")
+
+
 class RejectRequestConfigForm(FlaskForm):
     enabled = BooleanField("Enable reject request feature", default=True)
     button_label = StringField(

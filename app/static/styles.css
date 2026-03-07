@@ -13,19 +13,30 @@
   --border: #e6e9ee;
   --surface: #ffffff;
   --focus: rgba(11,97,238,0.14);
+/* Dark-mode variables and adjustments for improved contrast */
+.dark-mode {
+  --nav-bg: #06101a;
+  --nav-text: #dbe9f7;
+  --page-bg: #071016;
+  --body-text: #dbe9f7;
+  --muted: #9fb3c8;
+  --border: rgba(255,255,255,0.06);
+  --surface: #0b1220;
+  --focus: rgba(142,167,255,0.12);
 }
 
-/* Force logged-out pages (guests and login) to use the same color theme
-   as the login page so guest flows appear visually consistent. We use the
-   data attribute `data-user-logged-in` set on <body> in `base.html`. */
-body[data-user-logged-in="0"] {
-  --nav-bg: #0b1726;
-  --nav-text: #eef2f7;
-  --accent: #79c0ff;
-  --accent-2: #a78bfa;
-  --page-bg: radial-gradient(circle at 20% 20%, rgba(121,192,255,0.12), transparent 30%), radial-gradient(circle at 80% 0%, rgba(167,139,250,0.12), transparent 28%), #f6f7fb;
-  --body-text: #0b1220;
-  --muted: #525f6b;
+.dark-mode .card { background: var(--surface) !important; border-color: var(--border) !important; box-shadow: 0 12px 28px rgba(0,0,0,0.45); }
+.dark-mode .theme-nav { background-color: var(--nav-bg) !important; border-color: rgba(255,255,255,0.03) !important; }
+.dark-mode .navbar-brand, .dark-mode .navbar-nav .nav-link { color: var(--nav-text) !important; }
+.dark-mode .brand-quote { color: rgba(219,233,247,0.9) !important; }
+.dark-mode a { color: #8eb8ff; }
+.dark-mode .btn-primary { color: #07101a; }
+
+/* Improve contrast for notifications dropdown in dark mode */
+.dark-mode .notif-dropdown { background: rgba(6,12,20,0.95); color: var(--body-text); border: 1px solid rgba(255,255,255,0.03); }
+.dark-mode .notif-dropdown .notif-item { color: var(--body-text); }
+.dark-mode .notif-dropdown .notif-item strong { color: var(--body-text); }
+.dark-mode .notif-dropdown .notif-item .small, .dark-mode .notif-dropdown .notif-item small { color: rgba(219,233,247,0.7); }
   --border: #e6e9ee;
   --surface: #ffffff;
   --focus: rgba(11,97,238,0.14);

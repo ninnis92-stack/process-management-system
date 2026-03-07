@@ -266,6 +266,24 @@ class FormTemplate(db.Model):
     external_form_id = db.Column(db.String(255), nullable=True)
 
 
+class GuestForm(db.Model):
+    """Admin-manageable guest form instance used for public/guest submissions.
+
+    Allows per-form toggles such as requiring an SSO-linked account to submit.
+    """
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    slug = db.Column(db.String(200), nullable=False, unique=True, index=True)
+    template_id = db.Column(db.Integer, db.ForeignKey("form_template.id"), nullable=True)
+    template = db.relationship("FormTemplate", backref="guest_forms")
+    require_sso = db.Column(db.Boolean, nullable=False, default=False)
+    owner_department = db.Column(db.String(2), nullable=False, default="B")
+    is_default = db.Column(db.Boolean, nullable=False, default=False)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class FormField(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     template_id = db.Column(

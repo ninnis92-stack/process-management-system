@@ -2041,6 +2041,24 @@ def assign_self(request_id: int):
         flash("This request is already assigned.", "warning")
         return redirect(url_for("requests.request_detail", request_id=request_id))
 
+    # Enforce: a user may only have one active assigned request at a time.
+    existing = (
+        ReqModel.query.filter(
+            ReqModel.assigned_to_user_id == current_user.id,
+            ReqModel.id != req.id,
+            ReqModel.status != "CLOSED",
+            ReqModel.is_denied == False,
+        )
+        .order_by(ReqModel.created_at.asc())
+        .first()
+    )
+    if existing:
+        flash(
+            f"You are already assigned to Request #{existing.id}. Complete or clear that assignment before taking another.",
+            "warning",
+        )
+        return redirect(url_for("requests.request_detail", request_id=request_id))
+
     req.assigned_to_user_id = current_user.id
 
     _log(req, "assignment_changed", note=f"Assigned to {current_user.email}")
@@ -3298,6 +3316,25 @@ def assign_request(request_id: int):
         ).first()
         if not new_assignee:
             flash("Invalid assignee for your department.", "danger")
+            return redirect(url_for("requests.request_detail", request_id=req.id))
+
+    # Enforce: assignees may only have one active assigned request at a time.
+    if new_assignee:
+        existing = (
+            ReqModel.query.filter(
+                ReqModel.assigned_to_user_id == new_assignee.id,
+                ReqModel.id != req.id,
+                ReqModel.status != "CLOSED",
+                ReqModel.is_denied == False,
+            )
+            .order_by(ReqModel.created_at.asc())
+            .first()
+        )
+        if existing:
+            flash(
+                f"{new_assignee.name or new_assignee.email} is already assigned to Request #{existing.id}. Clear that assignment first.",
+                "warning",
+            )
             return redirect(url_for("requests.request_detail", request_id=req.id))
 
     previous = req.assigned_to_user
