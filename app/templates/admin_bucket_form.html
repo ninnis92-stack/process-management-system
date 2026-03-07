@@ -113,10 +113,12 @@
     document.head.appendChild(style);
 
     try{
-      Sortable.create(list, {
-        handle: '.drag-handle',
-        animation: 120,
-        onEnd: function(){
+      if(typeof Sortable !== 'undefined'){
+        Sortable.create(list, {
+          handle: '.drag-handle',
+          animation: 120,
+          fallbackOnBody: true,
+          onEnd: function(){
           const ids = Array.from(list.querySelectorAll('li[data-id]')).map(li=>li.dataset.id);
           fetch('{{ url_for('admin.buckets_reorder_statuses', bucket_id=bucket.id) }}', {
             method: 'POST',
@@ -126,7 +128,11 @@
             if(!r.ok) console.error('Reorder failed', r.status);
           }).catch(e=>console.error('Reorder request failed', e));
         }
-      });
+        });
+        console.log('Bucket statuses Sortable initialized, items=', list.children.length);
+      }else{
+        console.warn('Sortable library not loaded for bucket statuses');
+      }
     }catch(e){
       console.warn('Sortable init failed for bucket statuses', e);
     }
