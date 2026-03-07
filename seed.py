@@ -14,6 +14,19 @@ def main():
             engine = getattr(db, "engine", None) or db.get_engine(app)
             inspector = inspect(engine)
             cols = [c.get("name") for c in inspector.get_columns("user")]
+            # Ensure columns added by recent migrations exist so ORM queries
+            # that reference them don't fail when seed runs on deployed DBs.
+            if "dark_mode" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(text("ALTER TABLE \"user\" ADD COLUMN dark_mode BOOLEAN DEFAULT FALSE"))
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
             if "is_admin" not in cols:
                 try:
                     # Use a connection and SQLAlchemy `text()` to execute safely across
