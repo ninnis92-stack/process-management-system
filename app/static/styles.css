@@ -19,8 +19,10 @@
   --nav-bg: #0b1720;
   --nav-text: #ffffff;
   --page-bg: #0f1720; /* slightly lighter dark background to reduce eye strain */
-  --body-text: #ffffff; /* primary text should be pure white for max contrast */
-  --muted: #c0c7cd; /* readable muted text while keeping contrast */
+  --body-text: #f4f7fb;
+  --body-text-soft: #e7edf5;
+  --body-text-muted: #d5deea;
+  --muted: #d5deea;
   --border: rgba(255,255,255,0.08);
   --surface: #0b1318; /* card/surface slightly lighter than page bg */
   --focus: rgba(142,167,255,0.18);
@@ -445,9 +447,104 @@ a:hover { color: var(--accent-2); }
 
 .search-hit { background: rgba(255,230,140,0.95); padding: 0 2px; border-radius: 2px; }
 
-/* Avoid applying dark-mode to global media elements and rely on
-   scoped rules above. Make text brighter and borders more visible. */
-.dark-mode { color: var(--body-text) !important; background: var(--page-bg) !important; }
+/* App-wide dark-mode typography: keep body, labels, helper text and table text
+   on a single readable palette instead of letting Bootstrap utility grays leak in. */
+.dark-mode {
+  color: var(--body-text) !important;
+  background: var(--page-bg) !important;
+}
+
+.dark-mode .card,
+.dark-mode .modal-content,
+.dark-mode .dropdown-menu,
+.dark-mode .list-group-item,
+.dark-mode .accordion-item,
+.dark-mode .offcanvas,
+.dark-mode .popover,
+.dark-mode .input-group-text,
+.dark-mode .table,
+.dark-mode .table-responsive {
+  color: var(--body-text) !important;
+}
+
+.dark-mode h1,
+.dark-mode h2,
+.dark-mode h3,
+.dark-mode h4,
+.dark-mode h5,
+.dark-mode h6,
+.dark-mode p,
+.dark-mode li,
+.dark-mode dt,
+.dark-mode dd,
+.dark-mode label,
+.dark-mode legend,
+.dark-mode th,
+.dark-mode td,
+.dark-mode .card-title,
+.dark-mode .card-text,
+.dark-mode .modal-title,
+.dark-mode .dropdown-item,
+.dark-mode .list-group-item-action,
+.dark-mode .form-label,
+.dark-mode .form-check-label,
+.dark-mode .col-form-label,
+.dark-mode .input-group-text,
+.dark-mode .accordion-button,
+.dark-mode .page-link,
+.dark-mode .nav-link,
+.dark-mode .navbar-text,
+.dark-mode .alert,
+.dark-mode .toast,
+.dark-mode .toast-body {
+  color: var(--body-text) !important;
+}
+
+.dark-mode .text-muted,
+.dark-mode .form-text,
+.dark-mode small,
+.dark-mode .small,
+.dark-mode .text-secondary,
+.dark-mode .text-body-secondary,
+.dark-mode .text-body-tertiary,
+.dark-mode .table-secondary,
+.dark-mode .table-light,
+.dark-mode .card-subtitle,
+.dark-mode .text-black-50,
+.dark-mode .text-white-50 {
+  color: var(--body-text-muted) !important;
+}
+
+.dark-mode .form-control,
+.dark-mode .form-select,
+.dark-mode textarea,
+.dark-mode input,
+.dark-mode select {
+  color: var(--body-text) !important;
+  background-color: rgba(255,255,255,0.04) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+
+.dark-mode .form-control::placeholder,
+.dark-mode textarea::placeholder,
+.dark-mode input::placeholder {
+  color: var(--body-text-muted) !important;
+  opacity: 1;
+}
+
+.dark-mode .form-control:disabled,
+.dark-mode .form-select:disabled,
+.dark-mode input:disabled,
+.dark-mode textarea:disabled {
+  color: var(--body-text-muted) !important;
+  background-color: rgba(255,255,255,0.03) !important;
+}
+
+.dark-mode option {
+  color: var(--body-text) !important;
+  background: #0f1720 !important;
+}
+
 .dark-mode .card { background: var(--surface) !important; border-color: var(--border) !important; }
 .dark-mode .theme-nav { background-color: var(--nav-bg) !important; border-color: var(--border) !important; }
 .dark-mode .navbar-brand, .dark-mode .navbar-nav .nav-link { color: var(--nav-text) !important; }
@@ -455,14 +552,12 @@ canvas {
   max-width: 100%;
 }
 
-/* Enforce no dark text when dark-mode is active: force primary body text (white) */
-.dark-mode :is(.text-dark, .text-reset, .text-muted, .small.text-muted, .meta, .title, .bucket-item, .list-group-item, .badge, .btn, .btn-primary, .btn-outline-primary, .status-pill, .navbar-brand, .navbar-nav .nav-link) {
+/* Block Bootstrap text utility classes from pushing dark or washed-out copy. */
+.dark-mode :is(.text-dark, .text-reset, .meta, .title, .bucket-item) {
   color: var(--body-text) !important;
 }
 
 /* Specific overrides to handle elements with hard-coded dark colors */
-.dark-mode .btn-primary { color: var(--body-text) !important; }
-.dark-mode .btn-primary:hover, .dark-mode .btn-primary:focus { color: var(--body-text) !important; }
 .dark-mode .btn-outline-primary { color: var(--body-text) !important; border-color: rgba(255,255,255,0.12) !important; }
 .dark-mode .badge.bg-light, .dark-mode .bg-light { background: rgba(255,255,255,0.06) !important; color: var(--body-text) !important; border: 1px solid rgba(255,255,255,0.06) !important; }
 .dark-mode .status-pill.bg-dark, .dark-mode .status-pill.bg-info, .dark-mode .status-pill.bg-warning.text-dark { color: var(--body-text) !important; }
