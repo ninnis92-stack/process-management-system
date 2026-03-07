@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField
 from wtforms.validators import DataRequired, Email
 
 
@@ -10,4 +10,5 @@ class LoginForm(FlaskForm):
 
 class SettingsForm(FlaskForm):
     dark_mode = BooleanField("Enable dark mode")
+    vibe_index = SelectField("Theme", coerce=int, choices=[])
     submit = SubmitField("Save settings")

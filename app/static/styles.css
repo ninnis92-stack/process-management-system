@@ -31,6 +31,23 @@ body[data-user-logged-in="0"] {
   --focus: rgba(11,97,238,0.14);
 }
 
+/* When the global Vibe feature is disabled, force the entire UI to use
+   the login page color theme so pages don't retain a previously-selected
+   per-user vibe. This is applied by adding `no-vibe` to <body> in
+   `base.html` when FeatureFlags.vibe_enabled is false. */
+body.no-vibe {
+  --nav-bg: #0b1726;
+  --nav-text: #eef2f7;
+  --accent: #79c0ff;
+  --accent-2: #a78bfa;
+  --page-bg: radial-gradient(circle at 20% 20%, rgba(121,192,255,0.12), transparent 30%), radial-gradient(circle at 80% 0%, rgba(167,139,250,0.12), transparent 28%), #f6f7fb;
+  --body-text: #0b1220;
+  --muted: #525f6b;
+  --border: #e6e9ee;
+  --surface: #ffffff;
+  --focus: rgba(11,97,238,0.14);
+}
+
 .theme-preset-ocean {
   --nav-bg: #082032;
   --accent: #3ec1d3;

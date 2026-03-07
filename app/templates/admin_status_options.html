@@ -22,10 +22,10 @@
       <td>{{ s.code }}</td>
       <td>{{ s.label }}</td>
       <td>{{ s.target_department or '-' }}</td>
-      <td>{{ 'on transfer only' if s.notify_on_transfer_only else ( 'enabled' if s.notify_enabled else 'disabled') }}</td>
-      <td>{{ 'originator only' if s.notify_to_originator_only else 'department' }}</td>
-      <td>{{ 'email' if s.email_enabled else 'no email' }}</td>
-      <td>{{ 'required' if s.screenshot_required else 'no' }}</td>
+      <td>{{ 'on transfer only' if (s.notify_on_transfer_only|default(false)) else ( 'enabled' if (s.notify_enabled|default(false)) else 'disabled') }}</td>
+      <td>{{ 'originator only' if (s.notify_to_originator_only|default(false)) else 'department' }}</td>
+      <td>{{ 'email' if (s.email_enabled|default(false)) else 'no email' }}</td>
+      <td>{{ 'required' if (s.screenshot_required|default(false)) else 'no' }}</td>
       <td>
         <a href="{{ url_for('admin.edit_status_option', opt_id=s.id) }}">Edit</a>
         <form method="post" action="{{ url_for('admin.delete_status_option', opt_id=s.id) }}" style="display:inline">
@@ -35,10 +35,10 @@
           <button class="btn btn-link">{{ 'Disable' if s.screenshot_required else 'Enable' }} screenshot</button>
         </form>
         <form method="post" action="{{ url_for('admin.toggle_status_notify_scope', opt_id=s.id) }}" style="display:inline; margin-left:6px">
-          <button class="btn btn-link">{{ 'Set Department' if s.notify_to_originator_only else 'Set Originator Only' }}</button>
+          <button class="btn btn-link">{{ 'Set Department' if (s.notify_to_originator_only|default(false)) else 'Set Originator Only' }}</button>
         </form>
         <form method="post" action="{{ url_for('admin.toggle_status_email', opt_id=s.id) }}" style="display:inline; margin-left:6px">
-          <button class="btn btn-link">{{ 'Disable Email' if s.email_enabled else 'Enable Email' }}</button>
+          <button class="btn btn-link">{{ 'Disable Email' if (s.email_enabled|default(false)) else 'Enable Email' }}</button>
         </form>
       </td>
     </tr>

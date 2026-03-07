@@ -17,6 +17,18 @@ A small prototype app.
 - Deployment: changes were deployed to Fly — app available at
   https://process-management-prototype-lingering-bush-6175.fly.dev/
 
+- Theme & vibe updates: added server-side support for per-user theme selection
+  (`vibe_index`) in the user settings page. When no external/imported theme is
+  active, users can choose from the same set of palettes exposed by the UI
+  "Vibe" button.
+- Global no-vibe mode: when the global `vibe_enabled` feature is disabled by
+  admins, the app forces the entire UI to the login color theme (prevents guest
+  or user pages retaining a previously-selected vibe). See `app/static/styles.css`
+  and `app/templates/base.html` for how `no-vibe` is applied.
+- DB/Deployment safety: added a release-time fallback to ensure
+  `status_option.notify_to_originator_only` exists to avoid admin pages erroring
+  on older DBs; this logic lives in `scripts/release_tasks.py`.
+
 ## Feature Flags (quick reference)
 
 - `vibe_enabled`: Enable the Vibe theme picker and per-user theme persistence.

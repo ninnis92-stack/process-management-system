@@ -239,11 +239,65 @@ def choose_dept():
 def settings():
     """Per-user settings page (theme/preferences)."""
     form = SettingsForm(obj=current_user)
+    # Palette options mirror the client-side `palettes` defined in app/static/app.js
+    palettes = [
+        (0, "Soft Coral · Cozy Coral"),
+        (1, "Warm Sand · Warm Morning"),
+        (2, "Moss · Quiet Grove"),
+        (3, "Sage · Sage Retreat"),
+        (4, "Muted Teal · Calm Teal"),
+        (5, "Sky · Clear Sky"),
+        (6, "Powder Blue · Soft Powder"),
+        (7, "Lavender · Lavender Dream"),
+        (8, "Lilac · Lilac Haze"),
+        (9, "Muted Pink · Blush"),
+        (10, "Peach · Peach Sunrise"),
+        (11, "Butter · Buttercream"),
+        (12, "Pistachio · Pistachio Grove"),
+        (13, "Mint · Fresh Mint"),
+        (14, "Seafoam · Seafoam Breeze"),
+        (15, "Aqua · Aqua Calm"),
+        (16, "Robin Egg · Robin's Dawn"),
+        (17, "Periwinkle · Periwinkle Morning"),
+        (18, "Dusty Blue · Dusty Blue"),
+        (19, "Slate Rose · Slate Rose"),
+        (20, "Tea · Tea Garden"),
+        (21, "Stone · Stone Whisper"),
+        (22, "Soft Gray · Soft Gray"),
+        (23, "Charcoal Mist · Charcoal Mist"),
+        (24, "Aurora · Aurora")
+    ]
+    form.vibe_index.choices = palettes
     if form.validate_on_submit():
         try:
             u = db.session.get(User, current_user.id)
             if u:
                 u.dark_mode = bool(form.dark_mode.data)
+                # Determine whether an external/imported theme is active; when
+                # an external theme is present, we do not persist per-user vibe.
+                external_theme_loaded = False
+                try:
+                    from ..models import AppTheme, SiteConfig
+
+                    t_check = AppTheme.query.filter_by(active=True).first()
+                    if t_check and (getattr(t_check, "logo_filename", None) or getattr(t_check, "css", None)):
+                        external_theme_loaded = True
+                except Exception:
+                    pass
+                try:
+                    cfg_check = SiteConfig.get()
+                    if getattr(cfg_check, "logo_filename", None):
+                        external_theme_loaded = True
+                    if getattr(cfg_check, "theme_preset", None) and (cfg_check.theme_preset or "").strip().lower() != "default":
+                        external_theme_loaded = True
+                except Exception:
+                    pass
+                # Only persist the user's vibe choice when external theme is not loaded
+                if not external_theme_loaded and hasattr(form, 'vibe_index'):
+                    try:
+                        u.vibe_index = int(form.vibe_index.data)
+                    except Exception:
+                        pass
                 db.session.add(u)
                 db.session.commit()
                 flash("Settings saved.", "success")

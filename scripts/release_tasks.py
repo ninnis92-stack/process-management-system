@@ -230,6 +230,22 @@ def main():
                             )
                         )
                     print("schema_fix=status_option.screenshot_required_added")
+                # Ensure notify_to_originator_only exists on status options
+                if (
+                    "status_option" in insp.get_table_names()
+                    and "notify_to_originator_only" not in status_cols
+                ):
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE status_option ADD COLUMN notify_to_originator_only BOOLEAN DEFAULT FALSE"
+                                )
+                            )
+                        print("schema_fix=status_option.notify_to_originator_only_added")
+                    except Exception:
+                        # Don't fail the whole release on this ALTER; log and continue.
+                        print("schema_fix=status_option.notify_to_originator_only_failed")
 
                 department_cols = (
                     {c["name"] for c in insp.get_columns("department")}
