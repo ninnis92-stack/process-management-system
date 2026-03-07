@@ -15,14 +15,15 @@
   --focus: rgba(11,97,238,0.14);
 /* Dark-mode variables and adjustments for improved contrast */
 .dark-mode {
-  --nav-bg: #06101a;
+  /* Accessible dark-mode color tokens (WCAG-aware) */
+  --nav-bg: #0b1720;
   --nav-text: #ffffff;
-  --page-bg: #071016;
-  --body-text: #ffffff;
-  --muted: #9fb3c8;
-  --border: rgba(255,255,255,0.12);
-  --surface: #07101a;
-  --focus: rgba(142,167,255,0.14);
+  --page-bg: #0f1720; /* slightly lighter dark background to reduce eye strain */
+  --body-text: #ffffff; /* primary text should be pure white for max contrast */
+  --muted: #c0c7cd; /* readable muted text while keeping contrast */
+  --border: rgba(255,255,255,0.08);
+  --surface: #0b1318; /* card/surface slightly lighter than page bg */
+  --focus: rgba(142,167,255,0.18);
 }
 
 .dark-mode .card { background: var(--surface) !important; border-color: var(--border) !important; box-shadow: 0 12px 28px rgba(0,0,0,0.45); }
@@ -257,7 +258,7 @@ a:hover { color: var(--accent-2); }
 .notif-btn.open .notif-ico { color: #ffc107; }
 .notif-btn.notif-active { border-color: rgba(255,193,7,0.7); box-shadow: 0 0 0 6px rgba(255,193,7,0.18), 0 10px 24px rgba(0,0,0,0.22); color: #ffd566; }
 
-.notif-dropdown {
+.notif-dropdown { 
   position: fixed;
   right: 1rem;
   top: 3.5rem;
@@ -270,7 +271,7 @@ a:hover { color: var(--accent-2); }
   box-shadow: 0 18px 44px rgba(0,0,0,0.24);
   border: 1px solid rgba(255,255,255,0.05);
   background: rgba(13,23,38,0.95);
-  color: #000000; /* primary text for notifications set to black */
+  color: var(--body-text);
 }
 .notif-dropdown.open { opacity: 1; visibility: visible; transform: translateY(0); }
 .notif-dropdown .card-body { max-height: 360px; overflow: auto; }
@@ -278,9 +279,9 @@ a:hover { color: var(--accent-2); }
 .notif-item:hover { background: rgba(255,255,255,0.04); }
 
 /* Improve contrast for notification item text */
-.notif-dropdown .notif-item { color: #000000; }
-.notif-dropdown .notif-item strong { color: #000000; font-weight:700; }
-.notif-dropdown .notif-item .small, .notif-dropdown .notif-item small { color: rgba(0,0,0,0.7); }
+.notif-dropdown .notif-item { color: var(--body-text); }
+.notif-dropdown .notif-item strong { color: var(--body-text); font-weight:700; }
+.notif-dropdown .notif-item .small, .notif-dropdown .notif-item small { color: rgba(255,255,255,0.78); }
 
 .card { background: rgba(255,255,255,0.92); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 28px rgba(15,23,42,0.08); }
 .card { border-top: 3px solid var(--accent); }
@@ -328,6 +329,53 @@ a:hover { color: var(--accent-2); }
 .bucket-list .small.text-muted { margin-top: 6px; display: block; }
 .d-flex.flex-wrap.gap-2.mb-3 a.status-pill { text-decoration: none; color: inherit; }
 
+/* Dark-mode: make status pills and bucket text use primary white text
+   while giving them a subtle, darker background for contrast. */
+.dark-mode .status-pill {
+  background: rgba(255,255,255,0.06) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+}
+.dark-mode .status-pill.bg-dark,
+.dark-mode .status-pill.bg-info,
+.dark-mode .status-pill.bg-warning.text-dark {
+  background: rgba(255,255,255,0.04) !important;
+  color: var(--body-text) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+/* Admin cards should reflect the status bucket color in dark-mode.
+   Use a subtle tinted top border and a faint background tint derived
+   from the status color while keeping text accessible. */
+.dark-mode .card.status-new { border-top-color: rgba(11,94,215,0.28) !important; background: linear-gradient(180deg, rgba(11,94,215,0.03), var(--surface)) !important; }
+.dark-mode .card.status-progress { border-top-color: rgba(192,118,0,0.28) !important; background: linear-gradient(180deg, rgba(192,118,0,0.03), var(--surface)) !important; }
+.dark-mode .card.status-waiting { border-top-color: rgba(133,100,4,0.28) !important; background: linear-gradient(180deg, rgba(133,100,4,0.03), var(--surface)) !important; }
+.dark-mode .card.status-c-review { border-top-color: rgba(111,66,193,0.28) !important; background: linear-gradient(180deg, rgba(111,66,193,0.03), var(--surface)) !important; }
+.dark-mode .card.status-exec { border-top-color: rgba(60,30,138,0.28) !important; background: linear-gradient(180deg, rgba(60,30,138,0.03), var(--surface)) !important; }
+.dark-mode .card.status-final { border-top-color: rgba(15,81,50,0.28) !important; background: linear-gradient(180deg, rgba(15,81,50,0.03), var(--surface)) !important; }
+.dark-mode .card.status-sent { border-top-color: rgba(27,94,32,0.28) !important; background: linear-gradient(180deg, rgba(27,94,32,0.03), var(--surface)) !important; }
+.dark-mode .card.status-closed { border-top-color: rgba(73,80,87,0.28) !important; background: linear-gradient(180deg, rgba(73,80,87,0.03), var(--surface)) !important; }
+.dark-mode .card.status-default { border-top-color: rgba(73,80,87,0.18) !important; background: linear-gradient(180deg, rgba(73,80,87,0.02), var(--surface)) !important; }
+
+/* Ensure card body text remains high-contrast in dark-mode even when tinted */
+.dark-mode .card.status-new *,
+.dark-mode .card.status-progress *,
+.dark-mode .card.status-waiting *,
+.dark-mode .card.status-c-review *,
+.dark-mode .card.status-exec *,
+.dark-mode .card.status-final *,
+.dark-mode .card.status-sent *,
+.dark-mode .card.status-closed *,
+.dark-mode .card.status-default * {
+  color: var(--body-text) !important;
+}
+
+/* Ensure bucket items and small muted text follow dark-mode color tokens */
+.dark-mode .bucket-list .list-group-item,
+.dark-mode .bucket-item,
+.dark-mode .bucket-list .status-pill { color: var(--body-text) !important; }
+.dark-mode .bucket-list .small.text-muted { color: var(--muted) !important; }
+
 /* Make bucket cards arrange nicely on wide screens */
 @media (min-width: 992px) {
   .card.mb-3 { margin-bottom: 1rem; }
@@ -374,6 +422,51 @@ a:hover { color: var(--accent-2); }
 canvas {
   max-width: 100%;
 }
+
+/* Enforce no dark text when dark-mode is active: force primary body text (white) */
+.dark-mode :is(.text-dark, .text-reset, .text-muted, .small.text-muted, .meta, .title, .bucket-item, .list-group-item, .badge, .btn, .btn-primary, .btn-outline-primary, .status-pill, .navbar-brand, .navbar-nav .nav-link) {
+  color: var(--body-text) !important;
+}
+
+/* Specific overrides to handle elements with hard-coded dark colors */
+.dark-mode .btn-primary { color: var(--body-text) !important; }
+.dark-mode .btn-primary:hover, .dark-mode .btn-primary:focus { color: var(--body-text) !important; }
+.dark-mode .btn-outline-primary { color: var(--body-text) !important; border-color: rgba(255,255,255,0.12) !important; }
+.dark-mode .badge.bg-light, .dark-mode .bg-light { background: rgba(255,255,255,0.06) !important; color: var(--body-text) !important; border: 1px solid rgba(255,255,255,0.06) !important; }
+.dark-mode .status-pill.bg-dark, .dark-mode .status-pill.bg-info, .dark-mode .status-pill.bg-warning.text-dark { color: var(--body-text) !important; }
+
+/* Ensure links remain visible and accessible */
+.dark-mode a { color: #8eb8ff !important; }
+
+/* Fix bucket badges and list backgrounds in dark-mode (override Bootstrap utilities) */
+.dark-mode .text-bg-light,
+.dark-mode .badge.text-bg-light,
+.dark-mode .text-bg-light.badge {
+  background: rgba(255,255,255,0.06) !important;
+  color: var(--body-text) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+/* Ensure utility text-dark doesn't force dark text in dark-mode */
+.dark-mode .text-dark {
+  color: var(--body-text) !important;
+}
+
+/* Bucket list items should not have an opaque white surface */
+.dark-mode .bucket-list .list-group-item,
+.dark-mode .list-group-item {
+  background: transparent !important;
+  color: var(--body-text) !important;
+  border-color: rgba(255,255,255,0.04) !important;
+}
+
+/* Card header for buckets: avoid white header blocking content */
+.dark-mode .card-header {
+  background: transparent !important;
+  color: var(--body-text) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+}
+
 
 /* Make tables horizontally scrollable on small screens */
 .table-responsive {
