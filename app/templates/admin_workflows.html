@@ -9,10 +9,15 @@
   </thead>
   <tbody>
   {% for wf in workflows %}
-    <tr>
+    <tr id="wf-row-{{ wf.id }}">
       <td>{{ wf.name }}</td>
       <td>{{ wf.department_code or 'Global' }}</td>
-      <td>{{ 'Yes' if wf.active else 'No' }}</td>
+      <td>
+        <div class="form-check form-switch">
+          <input class="form-check-input wf-toggle" type="checkbox" role="switch" id="wfToggle{{ wf.id }}" data-wf-id="{{ wf.id }}" {% if wf.active %}checked{% endif %}>
+          <label class="form-check-label" for="wfToggle{{ wf.id }}">{{ 'Active' if wf.active else 'Inactive' }}</label>
+        </div>
+      </td>
       <td>
         <a href="{{ url_for('admin.edit_workflow', wf_id=wf.id) }}">Edit</a>
         <form style="display:inline" method="post" action="{{ url_for('admin.delete_workflow', wf_id=wf.id) }}">
@@ -23,4 +28,28 @@
   {% endfor %}
   </tbody>
 </table>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('.wf-toggle').forEach(function(el){
+    el.addEventListener('change', function(e){
+      const wfId = e.target.getAttribute('data-wf-id');
+      fetch(`{{ url_for('admin.list_workflows') }}`.replace('/workflows','/workflows/'+wfId+'/toggle'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      }).then(r=>r.json()).then(js=>{
+        if(js && js.ok){
+          const label = document.querySelector('label[for="wfToggle'+wfId+'"]');
+          if(label) label.textContent = js.active ? 'Active' : 'Inactive';
+        } else {
+          // revert checkbox on failure
+          e.target.checked = !e.target.checked;
+          alert('Failed to toggle workflow state');
+        }
+      }).catch(()=>{ e.target.checked = !e.target.checked; alert('Failed to toggle workflow state'); });
+    });
+  });
+});
+</script>
 {% endblock %}

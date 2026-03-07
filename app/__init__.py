@@ -188,6 +188,20 @@ def create_app():
         # If Flask-Migrate isn't installed in this environment, skip init
         pass
 
+    @app.teardown_request
+    def _teardown_request(exc):
+        # Ensure any failed/aborted DB transaction is rolled back so a
+        # subsequent request doesn't reuse a bad transaction state.
+        if exc:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+        try:
+            db.session.remove()
+        except Exception:
+            pass
+
     @login_manager.user_loader
     def load_user(user_id: str):
         try:
@@ -408,6 +422,30 @@ def create_app():
                 banner_html = ""
                 rolling_quotes_enabled = False
                 rolling_quotes = []
+
+            # If an external theme/logo is present we intentionally
+            # suppress the rolling quotes UI to preserve imported branding.
+            try:
+                if external_theme_loaded:
+                    rolling_quotes_enabled = False
+            except Exception:
+                pass
+
+            # Respect the global feature flag as well (admin toggle).
+            try:
+                ff = FeatureFlags.get()
+                # Respect both the admin rolling-quotes flag and the global
+                # vibe_enabled flag. If the vibe button is disabled we also
+                # suppress rolling quotes to keep the UI consistent.
+                if not getattr(ff, "rolling_quotes_enabled", True):
+                    rolling_quotes_enabled = False
+                if not getattr(ff, "vibe_enabled", True):
+                    rolling_quotes_enabled = False
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
 
             try:
                 rows = (

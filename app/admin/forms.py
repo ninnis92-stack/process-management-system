@@ -10,6 +10,7 @@ from wtforms import (
 from wtforms.fields import EmailField
 from wtforms.validators import DataRequired, Email, Optional, Length
 from wtforms.validators import AnyOf
+from wtforms import ValidationError
 from wtforms import IntegerField
 from flask_wtf.file import FileField, FileAllowed
 
@@ -60,6 +61,31 @@ class SiteConfigForm(FlaskForm):
     rolling_quotes = StringField(
         "Rolling quotes (JSON list)", validators=[Optional(), Length(max=4000)]
     )
+    rolling_quote_sets = TextAreaField(
+        "Rolling quote sets (JSON map)", validators=[Optional(), Length(max=8000)]
+    )
+    active_quote_set = SelectField(
+        "Active quote set", choices=[], validators=[Optional()]
+    )
+    def validate_rolling_quote_sets(form, field):
+        """Validate that `rolling_quote_sets` is a JSON object mapping names to lists of strings."""
+        raw = (field.data or "").strip()
+        if not raw:
+            return
+        try:
+            import json as _json
+
+            parsed = _json.loads(raw)
+        except Exception:
+            raise ValidationError("Rolling quote sets must be valid JSON.")
+        if not isinstance(parsed, dict):
+            raise ValidationError("Rolling quote sets must be a JSON object mapping names to lists.")
+        for name, val in parsed.items():
+            if not isinstance(val, list):
+                raise ValidationError(f"Set '{name}' must be a JSON array of strings.")
+            for item in val:
+                if not isinstance(item, str):
+                    raise ValidationError(f"All quotes must be strings (error in set '{name}').")
     submit = SubmitField("Save Site Config")
 
 
@@ -324,6 +350,9 @@ class FeatureFlagsForm(FlaskForm):
     enable_external_forms = BooleanField(
         "Enable external form integrations (3rd-party forms)", default=False
     )
+    rolling_quotes_enabled = BooleanField(
+        "Enable rolling quotes in the header/footer", default=True
+    )
     submit = SubmitField("Save Flags")
 
 
@@ -369,6 +398,8 @@ class StatusBucketForm(FlaskForm):
     workflow_id = SelectField(
         "Assign workflow (optional)", coerce=int, choices=[], validators=[Optional()]
     )
+    executive_approval_required = BooleanField("Require executive approval", default=False)
+    sales_list_number_required = BooleanField("Require sales list #", default=False)
     bulk_statuses = TextAreaField(
         "Bulk add statuses (one per line)", validators=[Optional()]
     )

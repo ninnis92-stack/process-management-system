@@ -284,6 +284,7 @@
 
   <!-- User state provided via data attributes on <body> to avoid JS parser diagnostics in templates -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script id="rolling-quotes-data" type="application/json">{{ rolling_quotes|tojson }}</script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
   <script>
     (function(){

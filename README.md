@@ -48,6 +48,31 @@ A small prototype app.
 - Models and migrations: `app/models.py` and `migrations/versions/0023_add_user_department_and_last_active.py`.
 - Smoke & helper scripts: `scripts/automated_role_smoke.py`, `scripts/transition_smoke.py`, `scripts/release_tasks.py`.
 
+## Migrations & Staging Smoke Tests
+
+If you encounter errors referencing missing DB columns (for example a missing
+`feature_flags.enable_external_forms`), there's a safe, idempotent SQL file at
+`migrations/sql/add_feature_flags_columns.sql` which can be applied to a staging
+or backup DB prior to deploying. An Alembic revision has also been added:
+`migrations/versions/0028_add_feature_flags_enable_external_forms.py` which
+executes the same `ALTER TABLE ... IF NOT EXISTS` statement.
+
+Run the SQL directly with `psql` against a non-production copy first:
+
+```bash
+psql "$DATABASE_URL" -f migrations/sql/add_feature_flags_columns.sql
+```
+
+Smoke-test helpers:
+
+- `scripts/deploy_staging.sh` — helper to deploy the current branch to a Fly
+  app (set `FLY_APP` or edit the script to target your staging app).
+- `scripts/smoke_test.sh` — basic HTTP checks against a provided URL.
+
+Example workflow (recommended): apply the SQL on a staging DB, push a branch,
+deploy that branch to your staging Fly app, and run `./scripts/smoke_test.sh`
+against the staging URL to confirm health.
+
 ## Troubleshooting checklist
 
 If you encounter errors in the UI or server (e.g., notifications stuck on "Loading…" or 500 on login), try these steps:
@@ -371,8 +396,8 @@ flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command
 
 Deployment note (automated):
 
+- 2026-03-07 UTC: local full suite passed (`35 passed`), deployed to Fly, `/health` returned `{"status":"ok"}`, live home page loaded, and remote `SMOKE_` rows were cleared (`0 deleted`).
 - Last automated verification and smoke-clean ran on 2026-03-06 UTC: deployed, smoke login/dashboard validated, remote SMOKE_ rows cleared (0 deleted).
- - Last automated verification and smoke-clean ran on 2026-03-06 UTC: deployed, smoke login/dashboard validated, remote SMOKE_ rows cleared (0 deleted).
  - 2026-03-06 UTC: Redeployed fix for `/admin/special_email`; automated admin smoke passed and `/health` returned 200.
 
 

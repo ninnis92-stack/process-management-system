@@ -55,7 +55,18 @@
       {{ form.rolling_quotes(class_='form-control', placeholder='JSON array of quotes e.g. ["a","b"]') }}
       <div class="form-text">Enter a JSON array of short strings to rotate in the navbar.</div>
     </div>
+    <div class="mb-3">
+      {{ form.rolling_quote_sets.label(class_='form-label') }}
+      {{ form.rolling_quote_sets(class_='form-control', rows=6, placeholder='{"default": ["a","b"], "sales": ["x","y"]}') }}
+      <div class="form-text">Optional: provide a JSON map of named quote sets. Example keys: <code>default</code>, <code>sales</code>, <code>motivational</code>, <code>riddles</code>.</div>
+    </div>
+    <div class="mb-3">
+      {{ form.active_quote_set.label(class_='form-label') }}
+      {{ form.active_quote_set(class_='form-select') }}
+      <div class="form-text">Choose which named set to display in the navbar. Defaults to <strong>default</strong>.</div>
+    </div>
     <button class="btn btn-primary">Save</button>
+    <button id="preview-quotes-btn" type="button" class="btn btn-outline-secondary ms-2">Preview Quotes</button>
   </form>
 
   <!-- Preview Modal -->
@@ -77,6 +88,25 @@
               <div id="banner-preview-cleaned" class="border p-2" style="min-height:120px;overflow:auto;background:#fff;"></div>
             </div>
           </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quotes Preview Modal -->
+  <div class="modal fade" id="quotesPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Rolling Quotes Preview</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="quotes-preview-info" class="mb-2 text-muted"></div>
+          <ul id="quotes-preview-list" class="list-group"></ul>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -123,6 +153,50 @@
           }
         }catch(e){
           alert('Failed to preview banner: '+(e&&e.message?e.message:e));
+        }
+      });
+    })();
+    (function(){
+      const btn = document.getElementById('preview-quotes-btn');
+      if(!btn) return;
+      btn.addEventListener('click', async function(){
+        const setsField = document.querySelector('[name="rolling_quote_sets"]');
+        const activeField = document.querySelector('[name="active_quote_set"]');
+        const data = new FormData();
+        if(setsField && setsField.value) data.append('rolling_quote_sets', setsField.value);
+        if(activeField && activeField.value) data.append('active_quote_set', activeField.value);
+        const csrf = document.querySelector('input[name="csrf_token"]');
+        if(csrf) data.append('csrf_token', csrf.value);
+
+        try{
+          const resp = await fetch('{{ url_for('admin.site_config_preview') }}', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: data,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+          const j = await resp.json();
+          if(!resp.ok){
+            alert('Preview error: '+(j && j.message? j.message : JSON.stringify(j)));
+            return;
+          }
+          const info = document.getElementById('quotes-preview-info');
+          const list = document.getElementById('quotes-preview-list');
+          info.textContent = `Active set: ${j.active} — ${j.count} quote(s)`;
+          list.innerHTML = '';
+          (j.sample || []).forEach(s => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.textContent = s;
+            list.appendChild(li);
+          });
+          const modalEl = document.getElementById('quotesPreviewModal');
+          if(modalEl){
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+          }
+        }catch(e){
+          alert('Failed to preview quotes: '+(e && e.message? e.message : e));
         }
       });
     })();

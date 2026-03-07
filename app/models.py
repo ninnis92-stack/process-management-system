@@ -395,7 +395,14 @@ class SpecialEmailConfig(db.Model):
 
     @classmethod
     def get(cls):
-        cfg = cls.query.first()
+        try:
+            cfg = cls.query.first()
+        except Exception:
+            try:
+                db.session.rollback()
+                cfg = cls.query.first()
+            except Exception:
+                cfg = None
         if not cfg:
             cfg = cls()
             db.session.add(cfg)
@@ -420,32 +427,62 @@ class FeatureFlags(db.Model):
     sso_admin_sync_enabled = db.Column(db.Boolean, nullable=False, default=True)
     # Allow admins to enable external form integrations (3rd-party forms -> webhook)
     enable_external_forms = db.Column(db.Boolean, nullable=False, default=False)
+    # Allow admins to enable/disable rolling quotes shown in the UI
+    rolling_quotes_enabled = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     @classmethod
     def get(cls):
+        from sqlalchemy import text
+
+        # First do a minimal raw query that only touches the table existence
+        # and primary key so we avoid referencing model columns that may be
+        # missing in an out-of-date production schema. If this fails, fall
+        # back to returning an in-memory default to keep admin pages working.
         try:
-            f = cls.query.first()
+            row = db.session.execute(text("SELECT id FROM feature_flags LIMIT 1")).fetchone()
         except Exception:
             try:
                 from flask import current_app
 
-                current_app.logger.exception("FeatureFlags: DB read failed")
+                current_app.logger.exception("FeatureFlags: quick probe failed")
             except Exception:
                 pass
-            # If the DB schema is out-of-date (column missing) or the DB is
-            # otherwise unavailable, return a default in-memory FeatureFlags
-            # instance rather than raising and causing a 500 in templates.
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
             return cls()
 
-        if not f:
-            f = cls()
-            db.session.add(f)
+        # If table exists but probe returned no rows, return or create a row.
+        if not row:
             try:
+                # Try to create a new DB-backed row; if this fails due to schema
+                # issues, fall back to an in-memory default.
+                f = cls()
+                db.session.add(f)
                 db.session.commit()
+                return f
             except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                return cls()
+
+        # If an id exists, attempt to load the ORM object but tolerate failures.
+        try:
+            # row[0] is the id
+            f = db.session.get(cls, row[0])
+            if f:
+                return f
+        except Exception:
+            try:
                 db.session.rollback()
-        return f
+            except Exception:
+                pass
+            return cls()
+        return cls()
 
 
 class RejectRequestConfig(db.Model):
@@ -462,7 +499,14 @@ class RejectRequestConfig(db.Model):
 
     @classmethod
     def get(cls):
-        cfg = cls.query.first()
+        try:
+            cfg = cls.query.first()
+        except Exception:
+            try:
+                db.session.rollback()
+                cfg = cls.query.first()
+            except Exception:
+                cfg = None
         if not cfg:
             cfg = cls()
             db.session.add(cfg)
@@ -547,9 +591,45 @@ class SiteConfig(db.Model):
     _rolling_quotes = db.Column(
         "rolling_quotes", db.Text, nullable=True
     )  # JSON list of strings
+    _rolling_quotes = db.Column(
+        "rolling_quotes", db.Text, nullable=True
+    )  # JSON list of strings (legacy single unnamed list)
+    _rolling_quote_sets = db.Column(
+        "rolling_quote_sets", db.Text, nullable=True
+    )  # JSON map of named sets -> list of strings
+    active_quote_set = db.Column(db.String(80), nullable=True, default="default")
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+    # Default quote sets shipped with the app. Admin may override via SiteConfig.
+    DEFAULT_QUOTE_SETS = {
+        "default": [
+            "Sort today: socks first, worries later.",
+            "A folded stack is a small victory.",
+            "One load at a time, one win at a time.",
+            "Fresh socks, fresh perspective.",
+            "Turn laundry into a tiny ritual of calm.",
+        ],
+        "sales": [
+            "Sell the problem you solve, not the product.",
+            "Follow up once is good; follow up twice closes deals.",
+            "People buy solutions, not features.",
+            "Ask more questions; you sell fewer assumptions.",
+        ],
+        "motivational": [
+            "Progress, not perfection.",
+            "Small habits compound into big results.",
+            "Show up today; momentum finds you tomorrow.",
+            "Focus on the next right step.",
+        ],
+        "riddles": [
+            "I speak without a mouth and hear without ears. What am I? (An echo)",
+            "I have keys but no locks. What am I? (A piano)",
+            "What has hands but cannot clap? (A clock)",
+            "The more you take, the more you leave behind. What are they? (Footsteps)",
+        ],
+    }
 
     @property
     def banner_html(self):
@@ -569,20 +649,77 @@ class SiteConfig(db.Model):
 
     @property
     def rolling_quotes(self):
-        if not self._rolling_quotes:
-            return []
+        # Prefer named quote sets when available and return the active set.
         try:
-            parsed = json.loads(self._rolling_quotes)
-            if isinstance(parsed, list):
-                return [str(x).strip() for x in parsed if str(x).strip()]
+            sets = {}
+            if self._rolling_quote_sets:
+                parsed = json.loads(self._rolling_quote_sets)
+                if isinstance(parsed, dict):
+                    for k, v in parsed.items():
+                        if isinstance(v, list):
+                            sets[str(k)] = [str(x).strip() for x in v if str(x).strip()]
+            # Legacy single list -> populate default set
+            if not sets and self._rolling_quotes:
+                try:
+                    parsed = json.loads(self._rolling_quotes)
+                    if isinstance(parsed, list):
+                        sets["default"] = [str(x).strip() for x in parsed if str(x).strip()]
+                except Exception:
+                    sets["default"] = [
+                        line.strip()
+                        for line in str(self._rolling_quotes).splitlines()
+                        if line.strip()
+                    ]
+            if not sets:
+                sets = type(self).DEFAULT_QUOTE_SETS.copy()
+
+            active = (self.active_quote_set or "default")
+            if active in sets:
+                return sets.get(active, [])
+            # fallback to the first available set
+            return next(iter(sets.values()))
+        except Exception:
+            # very defensive fallback to original single-string behaviour
+            if not self._rolling_quotes:
+                return []
+            try:
+                parsed = json.loads(self._rolling_quotes)
+                if isinstance(parsed, list):
+                    return [str(x).strip() for x in parsed if str(x).strip()]
+            except Exception:
+                return [
+                    line.strip()
+                    for line in str(self._rolling_quotes).splitlines()
+                    if line.strip()
+                ]
+
+    @property
+    def rolling_quote_sets(self):
+        """Return a dict of named quote-sets; never returns empty dict (falls back to defaults)."""
+        try:
+            if self._rolling_quote_sets:
+                parsed = json.loads(self._rolling_quote_sets)
+                if isinstance(parsed, dict):
+                    out = {}
+                    for k, v in parsed.items():
+                        if isinstance(v, list):
+                            out[str(k)] = [str(x).strip() for x in v if str(x).strip()]
+                    if out:
+                        return out
         except Exception:
             pass
-        # fallback for newline-delimited legacy storage
-        return [
-            line.strip()
-            for line in str(self._rolling_quotes).splitlines()
-            if line.strip()
-        ]
+        # fallback: if legacy single list exists, expose it as "default"
+        try:
+            if self._rolling_quotes:
+                parsed = json.loads(self._rolling_quotes)
+                if isinstance(parsed, list):
+                    return {"default": [str(x).strip() for x in parsed if str(x).strip()]}
+        except Exception:
+            if self._rolling_quotes:
+                return {"default": [
+                    line.strip() for line in str(self._rolling_quotes).splitlines() if line.strip()
+                ]}
+        return type(self).DEFAULT_QUOTE_SETS.copy()
 
     @rolling_quotes.setter
     def rolling_quotes(self, value):
@@ -614,7 +751,14 @@ class SiteConfig(db.Model):
 
     @classmethod
     def get(cls):
-        cfg = cls.query.first()
+        try:
+            cfg = cls.query.first()
+        except Exception:
+            try:
+                db.session.rollback()
+                cfg = cls.query.first()
+            except Exception:
+                cfg = None
         if not cfg:
             cfg = cls()
             db.session.add(cfg)
@@ -671,6 +815,10 @@ class StatusOption(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     # Whether this status should produce email deliveries (when mailer/SSO is active)
     email_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    # When True, selecting this status requires executive approval
+    executive_approval_required = db.Column(db.Boolean, nullable=False, default=False)
+    # When True, selecting this status requires specifying a sales list number
+    sales_list_number_required = db.Column(db.Boolean, nullable=False, default=False)
     # When True, notifications for this status should be delivered only to
     # the originator (the user who created the request) rather than the
     # entire owner department. Admin toggle exposed in the UI.
@@ -692,6 +840,9 @@ class Workflow(db.Model):
     department_code = db.Column(db.String(2), nullable=True)
     spec = db.Column(db.JSON, nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=True)
+    # When True, this workflow has been saved as a draft and awaits an
+    # explicit "implement" step to create status options or apply changes.
+    implementation_pending = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -768,7 +919,14 @@ class NotificationRetention(db.Model):
 
     @classmethod
     def get(cls):
-        cfg = cls.query.first()
+        try:
+            cfg = cls.query.first()
+        except Exception:
+            try:
+                db.session.rollback()
+                cfg = cls.query.first()
+            except Exception:
+                cfg = None
         if not cfg:
             cfg = cls()
             db.session.add(cfg)

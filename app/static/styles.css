@@ -344,6 +344,38 @@ a:hover { color: var(--accent-2); }
   border: 1px solid rgba(255,255,255,0.06) !important;
 }
 
+/* Per-status pill colors in dark-mode to match admin card tints */
+.dark-mode .status-pill.status-new,
+.dark-mode .status-pill.status-new.bg-dark { background: rgba(11,94,215,0.12) !important; color: #fff !important; border-color: rgba(11,94,215,0.18) !important; }
+.dark-mode .status-pill.status-progress { background: rgba(192,118,0,0.12) !important; color: #fff !important; border-color: rgba(192,118,0,0.18) !important; }
+.dark-mode .status-pill.status-waiting { background: rgba(133,100,4,0.12) !important; color: #fff !important; border-color: rgba(133,100,4,0.18) !important; }
+.dark-mode .status-pill.status-c-review { background: rgba(111,66,193,0.12) !important; color: #fff !important; border-color: rgba(111,66,193,0.18) !important; }
+.dark-mode .status-pill.status-exec { background: rgba(60,30,138,0.12) !important; color: #fff !important; border-color: rgba(60,30,138,0.18) !important; }
+.dark-mode .status-pill.status-final { background: rgba(15,81,50,0.12) !important; color: #fff !important; border-color: rgba(15,81,50,0.18) !important; }
+.dark-mode .status-pill.status-sent { background: rgba(27,94,32,0.12) !important; color: #fff !important; border-color: rgba(27,94,32,0.18) !important; }
+.dark-mode .status-pill.status-closed { background: rgba(73,80,87,0.10) !important; color: #fff !important; border-color: rgba(73,80,87,0.16) !important; }
+.dark-mode .status-pill.status-default { background: rgba(73,80,87,0.06) !important; color: #fff !important; border-color: rgba(73,80,87,0.12) !important; }
+
+/* If a card's header contains a status-pill with a given status, tint the
+  parent card to match the bucket pill so dashboard card and pill colors
+  remain visually consistent in dark-mode. Uses :has() for modern browsers
+  and falls back to explicit .card.status-* classes when present. */
+.dark-mode .card:has(.card-header .status-pill.status-new) { border-top-color: rgba(11,94,215,0.28) !important; background: linear-gradient(180deg, rgba(11,94,215,0.03), var(--surface)) !important; }
+.dark-mode .card:has(.card-header .status-pill.status-progress) { border-top-color: rgba(192,118,0,0.28) !important; background: linear-gradient(180deg, rgba(192,118,0,0.03), var(--surface)) !important; }
+.dark-mode .card:has(.card-header .status-pill.status-waiting) { border-top-color: rgba(133,100,4,0.28) !important; background: linear-gradient(180deg, rgba(133,100,4,0.03), var(--surface)) !important; }
+.dark-mode .card:has(.card-header .status-pill.status-c-review) { border-top-color: rgba(111,66,193,0.28) !important; background: linear-gradient(180deg, rgba(111,66,193,0.03), var(--surface)) !important; }
+.dark-mode .card:has(.card-header .status-pill.status-exec) { border-top-color: rgba(60,30,138,0.28) !important; background: linear-gradient(180deg, rgba(60,30,138,0.03), var(--surface)) !important; }
+.dark-mode .card:has(.card-header .status-pill.status-final) { border-top-color: rgba(15,81,50,0.28) !important; background: linear-gradient(180deg, rgba(15,81,50,0.03), var(--surface)) !important; }
+.dark-mode .card:has(.card-header .status-pill.status-sent) { border-top-color: rgba(27,94,32,0.28) !important; background: linear-gradient(180deg, rgba(27,94,32,0.03), var(--surface)) !important; }
+.dark-mode .card:has(.card-header .status-pill.status-closed) { border-top-color: rgba(73,80,87,0.28) !important; background: linear-gradient(180deg, rgba(73,80,87,0.03), var(--surface)) !important; }
+.dark-mode .card:has(.card-header .status-pill.status-default) { border-top-color: rgba(73,80,87,0.18) !important; background: linear-gradient(180deg, rgba(73,80,87,0.02), var(--surface)) !important; }
+
+/* Force the admin department selector to render with black text and a
+  white background in dark-mode so the selected department is always
+  readable and consistent with the requested appearance. */
+.dark-mode form#admin-dept-view-form .form-select { color: #000 !important; background: #ffffff !important; border-color: rgba(0,0,0,0.06) !important; }
+.dark-mode form#admin-dept-view-form .form-select option { color: #000 !important; background: #ffffff !important; }
+
 /* Admin cards should reflect the status bucket color in dark-mode.
    Use a subtle tinted top border and a faint background tint derived
    from the status color while keeping text accessible. */

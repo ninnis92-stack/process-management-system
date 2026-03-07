@@ -3,7 +3,18 @@
   if (!slot) return;
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const lines = [
+  // Read server-provided rolling quotes from the JSON script tag if present.
+  try {
+    const el = document.getElementById('rolling-quotes-data');
+    if (el && el.textContent) {
+      try {
+        const parsed = JSON.parse(el.textContent || '[]');
+        if (Array.isArray(parsed) && parsed.length) window.ROLLING_QUOTES = parsed;
+      } catch (e) { /* ignore parse errors */ }
+    }
+  } catch (e) {}
+  // Prefer server-injected rolling quotes; fall back to built-in lines.
+  let lines = (window && window.ROLLING_QUOTES && Array.isArray(window.ROLLING_QUOTES)) ? window.ROLLING_QUOTES.slice() : [
     "Sort today: socks first, worries later.",
     "A folded stack is a small victory.",
     "One load at a time, one win at a time.",

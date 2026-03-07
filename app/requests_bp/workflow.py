@@ -108,28 +108,33 @@ def transition_allowed(dept: str, from_status: str, to_status: str) -> bool:
     `ALLOWED_TRANSITIONS` for legacy behavior.
     """
     try:
-        # Prefer department-scoped workflow, then global
-        wf = Workflow.query.filter_by(active=True, department_code=dept).first()
-        if not wf:
-            wf = Workflow.query.filter_by(active=True, department_code=None).first()
-        # If a workflow spec exists, interpret mode and optional deny list
-        if wf and wf.spec:
-            spec = wf.spec or {}
-            spec_allowed = _allowed_from_spec(spec)
-            legacy_allowed = ALLOWED_TRANSITIONS.get(dept, set())
+        # Load any active workflow (dept-scoped first, then global)
+        active_wf = Workflow.query.filter_by(active=True, department_code=dept).first()
+        if not active_wf:
+            active_wf = Workflow.query.filter_by(active=True, department_code=None).first()
 
+        # Also load any inactive workflow for this scope (dept-scoped then global)
+        inactive_wf = Workflow.query.filter_by(active=False, department_code=dept).first()
+        if not inactive_wf:
+            inactive_wf = Workflow.query.filter_by(active=False, department_code=None).first()
+
+        legacy_allowed = ALLOWED_TRANSITIONS.get(dept, set())
+
+        # Start with legacy map, then augment/override with active workflow spec if present
+        allowed = set(legacy_allowed)
+        if active_wf and active_wf.spec:
+            spec = active_wf.spec or {}
+            spec_allowed = _allowed_from_spec(spec)
             mode = (spec.get("mode") or "augment").strip().lower()
             if mode == "override":
                 allowed = set(spec_allowed)
             else:
-                # default: augment/union
-                allowed = set(legacy_allowed).union(spec_allowed)
+                allowed = allowed.union(spec_allowed)
 
-            # Optional `deny` list in spec to explicitly remove transitions
+            # Apply any explicit deny entries from the active spec
             deny_raw = spec.get("deny") or spec.get("deny_transitions") or []
             deny_set = set()
             if isinstance(deny_raw, dict):
-                # mapping format: {"A": ["B","C"]}
                 for k, vals in deny_raw.items():
                     if isinstance(vals, (list, tuple)):
                         for v in vals:
@@ -147,7 +152,14 @@ def transition_allowed(dept: str, from_status: str, to_status: str) -> bool:
             if deny_set:
                 allowed = allowed.difference(deny_set)
 
-            return (from_status, to_status) in allowed
+        # If an inactive workflow exists for this scope with a spec, treat its
+        # transitions as explicitly disabled (remove them from allowed set).
+        if inactive_wf and inactive_wf.spec:
+            disabled = _allowed_from_spec(inactive_wf.spec)
+            if disabled:
+                allowed = allowed.difference(disabled)
+
+        return (from_status, to_status) in allowed
     except Exception:
         # On any DB/spec parse error, fall back to legacy map
         pass

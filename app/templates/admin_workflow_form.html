@@ -75,8 +75,9 @@
     <small class="form-text text-muted">Use the arrows to reorder steps; they will be serialized to JSON on save.</small>
   </div>
   <div class="form-group">
-    {{ form.submit(class='btn btn-primary') }}
-    <a class="btn btn-secondary" href="{{ url_for('admin.list_workflows') }}">Cancel</a>
+    <button name="action" value="save" class="btn btn-secondary">Save Draft</button>
+    <button name="action" value="implement" class="btn btn-primary">Save &amp; Implement</button>
+    <a class="btn btn-link" href="{{ url_for('admin.list_workflows') }}">Cancel</a>
   </div>
 </form>
 {% endblock %}
@@ -171,6 +172,29 @@
             combined.add(code);
           });
         });
+        // Also include any statuses currently present in the workflow steps
+        try{
+          const items = Array.from(document.querySelectorAll('#workflow-steps .list-group-item'));
+          items.forEach(function(item){
+            const statusEl = item.querySelector('.step-status');
+            const toEl = item.querySelector('.step-to-dept');
+            const code = statusEl ? String(statusEl.value || '').trim() : (item.dataset.status||'').trim();
+            const dept = toEl ? String(toEl.value || '').trim() : (item.dataset.toDept||'').trim();
+            if(code){
+              combined.add(code);
+              if(dept){
+                const deptList = document.getElementById('status-options-' + dept);
+                if(deptList){
+                  // avoid duplicates
+                  const exists = Array.from(deptList.children).some(opt=>opt.value===code);
+                  if(!exists){
+                    const o = document.createElement('option'); o.value = code; deptList.appendChild(o);
+                  }
+                }
+              }
+            }
+          });
+        }catch(e){ /* ignore DOM errors */ }
         // populate combined datalist
         const allEl = document.getElementById('status-options-all');
         if(allEl){

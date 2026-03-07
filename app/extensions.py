@@ -36,7 +36,7 @@ except Exception:  # pragma: no cover - optional dependency in dev
     Migrate = None
 
 
-db = SQLAlchemy()
+db = SQLAlchemy(session_options={"expire_on_commit": False})
 login_manager = LoginManager()
 # Cache instance (initialized in app factory if Flask-Caching is available)
 cache = Cache() if Cache is not None else None
@@ -148,7 +148,22 @@ def get_or_404(model, id_):
         from flask import abort
     except Exception:
         abort = None
-    obj = db.session.get(model, id_)
+    try:
+        obj = db.session.get(model, id_)
+    except Exception:
+        # If the session is in an aborted state (e.g. an earlier DB error
+        # during this request), rollback and attempt the lookup again. This
+        # helps avoid cascading "current transaction is aborted" errors and
+        # lets callers receive a proper 404 when the object truly doesn't exist.
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            obj = db.session.get(model, id_)
+        except Exception:
+            obj = None
+
     if obj is None:
         if abort:
             abort(404)

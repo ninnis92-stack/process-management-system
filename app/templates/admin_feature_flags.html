@@ -27,6 +27,12 @@
     </div>
 
     <div class="form-check mb-3">
+      {{ form.rolling_quotes_enabled(class_='form-check-input') }}
+      {{ form.rolling_quotes_enabled.label(class_='form-check-label') }}
+      <div class="form-text">When disabled, rolling quotes will not be shown anywhere in the UI.</div>
+    </div>
+
+    <div class="form-check mb-3">
       {{ form.sso_admin_sync_enabled(class_='form-check-input') }}
       {{ form.sso_admin_sync_enabled.label(class_='form-check-label') }}
       <div class="form-text">When enabled, users can be allocated admin access from organization-managed SSO claims or APIs. Manual admin assignment in the app still works either way.</div>

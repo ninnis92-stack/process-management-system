@@ -30,6 +30,7 @@ from ..models import (
 from ..models import FeatureFlags, RejectRequestConfig
 from urllib.parse import unquote
 import os
+import json
 from werkzeug.utils import secure_filename
 from ..models import Workflow
 from .forms import WorkflowForm
@@ -833,6 +834,24 @@ def site_config():
             )
         except Exception:
             form.rolling_quotes.data = None
+        try:
+            # expose named quote-sets to the admin UI (JSON map)
+            sets = getattr(cfg, "rolling_quote_sets", {}) or {}
+            form.rolling_quote_sets.data = json.dumps(sets, indent=2)
+        except Exception:
+            form.rolling_quote_sets.data = None
+        try:
+            # populate choices for active set selector
+            keys = list((getattr(cfg, "rolling_quote_sets", {}) or {}).keys())
+            if not keys:
+                keys = list(cfg.rolling_quote_sets.keys()) if cfg else ['default']
+            if 'default' not in keys:
+                keys.insert(0, 'default')
+            form.active_quote_set.choices = [(k, k.title()) for k in keys]
+            form.active_quote_set.data = getattr(cfg, 'active_quote_set', 'default')
+        except Exception:
+            form.active_quote_set.choices = [('default','Default')]
+            form.active_quote_set.data = getattr(cfg, 'active_quote_set', 'default')
         form.show_banner.data = bool(
             getattr(cfg, "rolling_quotes_enabled", getattr(cfg, "show_banner", False))
         )
@@ -881,11 +900,58 @@ def site_config():
         cfg.banner_html = banner or None
         cfg.rolling_quotes_enabled = rolling_enabled
         cfg.rolling_quotes = rolling_input or None
+        # save named quote sets if provided (expect JSON map string)
+        try:
+            if form.rolling_quote_sets.data:
+                parsed = json.loads(form.rolling_quote_sets.data)
+                if isinstance(parsed, dict):
+                    cfg._rolling_quote_sets = json.dumps(parsed)
+                else:
+                    cfg._rolling_quote_sets = None
+            else:
+                cfg._rolling_quote_sets = None
+        except Exception:
+            cfg._rolling_quote_sets = None
+        try:
+            cfg.active_quote_set = form.active_quote_set.data or 'default'
+        except Exception:
+            cfg.active_quote_set = 'default'
         db.session.commit()
         flash("Site configuration saved.", "success")
         return redirect(url_for("admin.site_config"))
 
     return render_template("admin_site_config.html", form=form, cfg=cfg)
+
+
+@admin_bp.route("/site_config/preview", methods=["POST"])
+@login_required
+def site_config_preview():
+    if not _is_admin_user():
+        return jsonify({"error": "access_denied"}), 403
+
+    # Accept multipart form or JSON payload
+    raw_sets = None
+    try:
+        raw_sets = flask_request.form.get("rolling_quote_sets") or flask_request.json and flask_request.json.get("rolling_quote_sets")
+    except Exception:
+        raw_sets = None
+
+    active = flask_request.form.get("active_quote_set") or (flask_request.json and flask_request.json.get("active_quote_set")) or "default"
+
+    try:
+        parsed = json.loads(raw_sets) if raw_sets else {}
+    except Exception:
+        return jsonify({"error": "invalid_json", "message": "Could not parse rolling_quote_sets as JSON."}), 400
+
+    if not isinstance(parsed, dict):
+        return jsonify({"error": "invalid_type", "message": "rolling_quote_sets must be a JSON object."}), 400
+
+    active_list = parsed.get(active) or parsed.get(str(active)) or []
+    if not isinstance(active_list, list):
+        return jsonify({"error": "invalid_set", "message": "Active set is not a list."}), 400
+
+    sample = [s for s in active_list if isinstance(s, str)][:20]
+    return jsonify({"active": active, "count": len(active_list), "sample": sample})
 
 
 def _sanitize_banner_html(raw: str) -> str:
@@ -1079,6 +1145,41 @@ def create_workflow():
                 wf.spec = {"steps": steps, "transitions": transitions}
         db.session.add(wf)
         db.session.commit()
+        action = flask_request.form.get('action') or 'save'
+        # If admin chose to implement, create any missing StatusOption rows
+        if action == 'implement':
+            try:
+                from ..models import StatusOption
+
+                steps = []
+                if isinstance(wf.spec, dict):
+                    steps = wf.spec.get('steps') or []
+                for s in steps:
+                    code = None
+                    target_dept = None
+                    if isinstance(s, str):
+                        code = s
+                    elif isinstance(s, dict):
+                        code = s.get('status') or s.get('code')
+                        target_dept = s.get('to_dept') or s.get('to')
+                    if not code:
+                        continue
+                    existing = StatusOption.query.filter_by(code=code).first()
+                    if not existing:
+                        label = code.replace('_', ' ').title()
+                        opt = StatusOption(code=code, label=label)
+                        if target_dept:
+                            opt.target_department = target_dept or None
+                        db.session.add(opt)
+                db.session.commit()
+                flash('Workflow created and status options implemented.', 'success')
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                flash('Workflow created but failed to implement status options.', 'warning')
+            return redirect(url_for('admin.list_workflows'))
         flash("Workflow created.", "success")
         return redirect(url_for("admin.list_workflows"))
     # Build status options map from existing bucket statuses grouped by department
@@ -1142,6 +1243,40 @@ def edit_workflow(wf_id: int):
             else:
                 wf.spec = None
         db.session.commit()
+        action = flask_request.form.get('action') or 'save'
+        if action == 'implement':
+            try:
+                from ..models import StatusOption
+
+                steps = []
+                if isinstance(wf.spec, dict):
+                    steps = wf.spec.get('steps') or []
+                for s in steps:
+                    code = None
+                    target_dept = None
+                    if isinstance(s, str):
+                        code = s
+                    elif isinstance(s, dict):
+                        code = s.get('status') or s.get('code')
+                        target_dept = s.get('to_dept') or s.get('to')
+                    if not code:
+                        continue
+                    existing = StatusOption.query.filter_by(code=code).first()
+                    if not existing:
+                        label = code.replace('_', ' ').title()
+                        opt = StatusOption(code=code, label=label)
+                        if target_dept:
+                            opt.target_department = target_dept or None
+                        db.session.add(opt)
+                db.session.commit()
+                flash('Workflow updated and status options implemented.', 'success')
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                flash('Workflow updated but failed to implement status options.', 'warning')
+            return redirect(url_for('admin.list_workflows'))
         flash("Workflow updated.", "success")
         return redirect(url_for("admin.list_workflows"))
     # Build status options map from existing bucket statuses grouped by department
@@ -1175,6 +1310,24 @@ def delete_workflow(wf_id: int):
     db.session.commit()
     flash("Workflow deleted.", "success")
     return redirect(url_for("admin.list_workflows"))
+
+
+@admin_bp.route("/workflows/<int:wf_id>/toggle", methods=["POST"])
+@login_required
+def toggle_workflow_active(wf_id: int):
+    if not _is_admin_user():
+        return jsonify({"error": "access_denied"}), 403
+    wf = get_or_404(Workflow, wf_id)
+    try:
+        wf.active = not bool(wf.active)
+        db.session.commit()
+        return jsonify({"ok": True, "active": bool(wf.active)})
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({"ok": False}), 500
 
 
 @admin_bp.route("/unmapped-submissions")
@@ -1844,7 +1997,19 @@ def feature_flags():
 
     from .forms import FeatureFlagsForm
 
-    flags = FeatureFlags.get()
+    # Ensure any prior aborted DB transaction is cleared before reading flags.
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
+    try:
+        flags = FeatureFlags.get()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        flags = FeatureFlags()
     form = FeatureFlagsForm()
     if flask_request.method == "GET":
         form.enable_notifications.data = bool(
@@ -1859,6 +2024,9 @@ def feature_flags():
         form.enable_external_forms.data = bool(
             getattr(flags, "enable_external_forms", False)
         )
+        form.rolling_quotes_enabled.data = bool(
+            getattr(flags, "rolling_quotes_enabled", True)
+        )
 
     if form.validate_on_submit():
         flags.enable_notifications = bool(form.enable_notifications.data)
@@ -1869,6 +2037,10 @@ def feature_flags():
         flags.enable_external_forms = bool(
             getattr(form, "enable_external_forms", None)
             and form.enable_external_forms.data
+        )
+        flags.rolling_quotes_enabled = bool(
+            getattr(form, "rolling_quotes_enabled", None)
+            and form.rolling_quotes_enabled.data
         )
         db.session.commit()
         flash("Feature flags updated.", "success")
