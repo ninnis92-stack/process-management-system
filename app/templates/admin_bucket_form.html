@@ -33,10 +33,13 @@
   {% if bucket %}
     <hr/>
     <h4>Statuses</h4>
-    <ul class="list-group mb-3">
+    <ul id="bucket-status-list" class="list-group mb-3" aria-label="Bucket statuses">
       {% for s in statuses %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <div>{{ s.status_code }} <small class="text-muted">(order {{ s.order }})</small></div>
+        <li class="list-group-item d-flex justify-content-between align-items-center" data-id="{{ s.id }}">
+          <div class="d-flex align-items-center">
+            <span class="me-2 drag-handle" aria-hidden>≡</span>
+            <div>{{ s.status_code }} <small class="text-muted">(order {{ s.order }})</small></div>
+          </div>
           <form method="post" action="{{ url_for('admin.buckets_status_delete', bucket_id=bucket.id, status_id=s.id) }}" style="display:inline">
             <button class="btn btn-sm btn-danger">Remove</button>
           </form>
@@ -95,4 +98,38 @@
     {% endif %}
   {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script>
+  (function(){
+    const list = document.getElementById('bucket-status-list');
+    if(!list) return;
+    // affordance
+    const style = document.createElement('style');
+    style.textContent = '.drag-handle{cursor:grab; user-select:none; padding-right:8px;} .list-group-item{touch-action:none;}';
+    document.head.appendChild(style);
+
+    try{
+      Sortable.create(list, {
+        handle: '.drag-handle',
+        animation: 120,
+        onEnd: function(){
+          const ids = Array.from(list.querySelectorAll('li[data-id]')).map(li=>li.dataset.id);
+          fetch('{{ url_for('admin.buckets_reorder_statuses', bucket_id=bucket.id) }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ order: ids }),
+          }).then(r=>{
+            if(!r.ok) console.error('Reorder failed', r.status);
+          }).catch(e=>console.error('Reorder request failed', e));
+        }
+      });
+    }catch(e){
+      console.warn('Sortable init failed for bucket statuses', e);
+    }
+  })();
+  </script>
 {% endblock %}
