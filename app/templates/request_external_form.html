@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>External Form: {{ template.name }}</h3>
+<p class="text-muted">This request form is hosted by an external provider ({{ template.external_provider or 'external' }}). To submit a request, please open the external form and complete it there.</p>
+<div class="mb-3">
+  {% if template.external_form_url %}
+    <a class="btn btn-primary" href="{{ template.external_form_url }}" target="_blank" rel="noopener">Open external form</a>
+  {% else %}
+    <div class="alert alert-warning">No external form URL configured.</div>
+  {% endif %}
+</div>
+<div class="small text-muted">After submitting the external form, you may return here. If you need automatic integration, configure a webhook in the external provider to post back to this application.</div>
+{% endblock %}

@@ -29,4 +29,25 @@
 
   <button class="btn btn-primary">Save fields</button>
 </form>
+<hr/>
+<h4>External Integration</h4>
+<form method="post">
+  <div class="form-check mb-2">
+    <input class="form-check-input" type="checkbox" id="external_enabled" name="external_enabled" value="1" {% if template.external_enabled %}checked{% endif %}>
+    <label class="form-check-label" for="external_enabled">Use external form (e.g. Microsoft Forms)</label>
+  </div>
+  <div class="mb-2">
+    <label class="form-label">External provider</label>
+    <input class="form-control" name="external_provider" value="{{ template.external_provider or '' }}" />
+  </div>
+  <div class="mb-2">
+    <label class="form-label">External form URL</label>
+    <input class="form-control" name="external_form_url" value="{{ template.external_form_url or '' }}" />
+  </div>
+  <div class="mb-2">
+    <label class="form-label">External form id</label>
+    <input class="form-control" name="external_form_id" value="{{ template.external_form_id or '' }}" />
+  </div>
+  <button class="btn btn-outline-primary">Save external settings</button>
+</form>
 {% endblock %}

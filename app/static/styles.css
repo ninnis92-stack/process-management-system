@@ -311,6 +311,16 @@ a:hover { color: var(--accent-2); }
 img,
 svg,
 video,
+.dark-mode {
+  background: #071016 !important;
+  color: #dbe9f7 !important;
+}
+.dark-mode .card { background: #0b1220 !important; border-color: rgba(255,255,255,0.04) !important; }
+.dark-mode .theme-nav { background-color: #06101a !important; border-color: rgba(255,255,255,0.03) !important; }
+.dark-mode .navbar-brand, .dark-mode .navbar-nav .nav-link { color: #dbe9f7 !important; }
+.dark-mode .brand-quote { color: rgba(219,233,247,0.9) !important; }
+.dark-mode a { color: #8eb8ff; }
+.dark-mode .btn-primary { color: #07101a; }
 canvas {
   max-width: 100%;
 }

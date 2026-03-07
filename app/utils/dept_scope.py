@@ -12,7 +12,9 @@ def scope_requests_for_department(query, dept: str):
     if not dept:
         return query
     sent_sel = select(Submission.request_id).where(Submission.to_department == dept)
-    return query.filter(or_(ReqModel.owner_department == dept, ReqModel.id.in_(sent_sel)))
+    return query.filter(
+        or_(ReqModel.owner_department == dept, ReqModel.id.in_(sent_sel))
+    )
 
 
 def enforce_dept_view(func):
@@ -23,6 +25,7 @@ def enforce_dept_view(func):
     centralize the visibility check. Functions that already call
     `can_view_request` need not add this decorator.
     """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         # Defer to the app-level permission helper if available.
@@ -35,7 +38,7 @@ def enforce_dept_view(func):
 
         # If we have a permission helper, call it after resolving the request.
         req = None
-        rid = kwargs.get('request_id') or (args[0] if args else None)
+        rid = kwargs.get("request_id") or (args[0] if args else None)
         if rid is not None:
             try:
                 req = db.session.get(ReqModel, int(rid))

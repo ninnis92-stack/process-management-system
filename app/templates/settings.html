@@ -1,0 +1,22 @@
+```html
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="card">
+    <div class="card-header">
+      <strong>Settings</strong>
+    </div>
+    <div class="card-body">
+      <form method="post" action="{{ url_for('auth.settings') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="dark_mode" name="dark_mode" value="1" {% if current_user.dark_mode %}checked{% endif %}>
+          <label class="form-check-label" for="dark_mode">Enable dark mode</label>
+        </div>
+        <button class="btn btn-primary" type="submit">Save settings</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+
+```

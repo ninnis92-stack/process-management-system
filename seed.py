@@ -4,6 +4,7 @@ from app.extensions import db
 from app.models import User
 from sqlalchemy import inspect, text
 
+
 def main():
     app = create_app()
     with app.app_context():
@@ -19,7 +20,11 @@ def main():
                     # SQLAlchemy versions. Use INTEGER DEFAULT 0 which is compatible
                     # with SQLite.
                     with engine.connect() as conn:
-                        conn.execute(text("ALTER TABLE user ADD COLUMN is_admin INTEGER DEFAULT 0"))
+                        conn.execute(
+                            text(
+                                "ALTER TABLE user ADD COLUMN is_admin INTEGER DEFAULT 0"
+                            )
+                        )
                         # Some DB/APIs require an explicit commit for DDL
                         try:
                             conn.commit()
@@ -61,7 +66,9 @@ def main():
                     name=name,
                     email=email,
                     department=dept,
-                    password_hash=generate_password_hash("password123", method="pbkdf2:sha256"),
+                    password_hash=generate_password_hash(
+                        "password123", method="pbkdf2:sha256"
+                    ),
                     is_active=active,
                 )
                 db.session.add(u)
@@ -82,7 +89,9 @@ def main():
                     name="Admin",
                     email=aemail,
                     department="A",
-                    password_hash=generate_password_hash("admin123", method="pbkdf2:sha256"),
+                    password_hash=generate_password_hash(
+                        "admin123", method="pbkdf2:sha256"
+                    ),
                     is_active=True,
                 )
                 try:
@@ -120,6 +129,7 @@ def main():
         print("Admin account(s):")
         for e in admin_emails:
             print(f"{e} / admin123")
+
 
 if __name__ == "__main__":
     main()

@@ -4,6 +4,7 @@ from authlib.integrations.flask_client import OAuth
 
 oauth = OAuth()
 
+
 def init_oauth(app):
     oauth.init_app(app)
 
@@ -11,9 +12,16 @@ def init_oauth(app):
         return False
 
     # Ensure required values exist to avoid runtime errors when disabled/misconfigured
-    required = ["OIDC_DISCOVERY_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_REDIRECT_URI"]
+    required = [
+        "OIDC_DISCOVERY_URL",
+        "OIDC_CLIENT_ID",
+        "OIDC_CLIENT_SECRET",
+        "OIDC_REDIRECT_URI",
+    ]
     if not all(app.config.get(k) for k in required):
-        app.logger.warning("SSO_ENABLED but OIDC config missing; skipping OIDC registration")
+        app.logger.warning(
+            "SSO_ENABLED but OIDC config missing; skipping OIDC registration"
+        )
         return False
 
     oauth.register(
@@ -35,8 +43,8 @@ def token_has_mfa(id_token: dict, config: Optional[dict] = None) -> bool:
     if not id_token:
         return False
     cfg = config or {}
-    claim_path = cfg.get('SSO_MFA_CLAIM', 'amr')
-    expected = set(cfg.get('SSO_MFA_CLAIM_VALUES', ['mfa', 'otp', '2fa', 'hwk']) or [])
+    claim_path = cfg.get("SSO_MFA_CLAIM", "amr")
+    expected = set(cfg.get("SSO_MFA_CLAIM_VALUES", ["mfa", "otp", "2fa", "hwk"]) or [])
     raw = _get_nested_claim(id_token, claim_path)
     actual = set(_normalize_claim_values(raw))
     if actual & expected:
@@ -57,7 +65,7 @@ def _get_nested_claim(claims: dict, claim_path: str):
     if not claims or not claim_path:
         return None
     cur = claims
-    for part in [p.strip() for p in claim_path.split('.') if p.strip()]:
+    for part in [p.strip() for p in claim_path.split(".") if p.strip()]:
         if isinstance(cur, dict) and part in cur:
             cur = cur.get(part)
         else:
@@ -81,16 +89,18 @@ def sso_user_is_admin(userinfo: dict, config: dict, email: str = "") -> bool:
     - `ADMIN_EMAILS`
     - configured claim path/value pair (`SSO_ADMIN_CLAIM`, `SSO_ADMIN_CLAIM_VALUES`)
     """
-    email_n = (email or userinfo.get('email') or '').strip().lower()
-    configured_emails = set(config.get('SSO_ADMIN_EMAILS', []) or []) | set(config.get('ADMIN_EMAILS', []) or [])
+    email_n = (email or userinfo.get("email") or "").strip().lower()
+    configured_emails = set(config.get("SSO_ADMIN_EMAILS", []) or []) | set(
+        config.get("ADMIN_EMAILS", []) or []
+    )
     if email_n and email_n in configured_emails:
         return True
 
-    if not config.get('SSO_ADMIN_SYNC_ENABLED', True):
+    if not config.get("SSO_ADMIN_SYNC_ENABLED", True):
         return False
 
-    claim_path = config.get('SSO_ADMIN_CLAIM')
-    expected = set(config.get('SSO_ADMIN_CLAIM_VALUES', []) or [])
+    claim_path = config.get("SSO_ADMIN_CLAIM")
+    expected = set(config.get("SSO_ADMIN_CLAIM_VALUES", []) or [])
     if not claim_path or not expected:
         return False
 

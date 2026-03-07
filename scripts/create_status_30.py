@@ -38,7 +38,9 @@ def main():
     cur = conn.cursor()
 
     # Ensure table exists and discover available columns
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='status_option'")
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='status_option'"
+    )
     if not cur.fetchone():
         print("status_option table does not exist in the database.")
         return

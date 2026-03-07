@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+
 def _future_due(hours=72):
     return (datetime.utcnow() + timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M")
 
@@ -7,7 +8,9 @@ def _future_due(hours=72):
 def test_guest_submission_without_description(client, app, monkeypatch):
     from app.models import Request, Submission
 
-    monkeypatch.setattr("app.external.routes._send_guest_email", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "app.external.routes._send_guest_email", lambda *args, **kwargs: None
+    )
 
     resp = client.post(
         "/external/new",

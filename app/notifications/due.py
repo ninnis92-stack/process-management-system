@@ -6,19 +6,22 @@ from ..models import SpecialEmailConfig
 from ..models import FeatureFlags
 from .. import notifcations as notifications_module
 
+
 def users_in_dept(dept: str):
     return User.query.filter_by(department=dept, is_active=True).all()
+
 
 def send_due_soon_notifications(app, hours=24, commit: bool = False):
     now = datetime.utcnow()
     soon = now + timedelta(hours=hours)
 
     # not closed + has due date within window
-    reqs = (ReqModel.query
-            .filter(ReqModel.due_at != None)
-            .filter(ReqModel.due_at <= soon)
-            .filter(ReqModel.status != "CLOSED")
-            .all())
+    reqs = (
+        ReqModel.query.filter(ReqModel.due_at != None)
+        .filter(ReqModel.due_at <= soon)
+        .filter(ReqModel.status != "CLOSED")
+        .all()
+    )
 
     for req in reqs:
         link = url_for("requests.request_detail", request_id=req.id, _external=False)
@@ -33,19 +36,23 @@ def send_due_soon_notifications(app, hours=24, commit: bool = False):
         dedupe = f"due_{hours}h:req_{req.id}"
 
         for u in {t.id: t for t in targets}.values():
-            exists = Notification.query.filter_by(user_id=u.id, dedupe_key=dedupe).first()
+            exists = Notification.query.filter_by(
+                user_id=u.id, dedupe_key=dedupe
+            ).first()
             if exists:
                 continue
 
-            db.session.add(Notification(
-                user_id=u.id,
-                request_id=req.id,
-                type="due_soon",
-                title=f"Due soon: Request #{req.id}",
-                body=f"Due at {req.due_at}",
-                url=link,
-                dedupe_key=dedupe,
-            ))
+            db.session.add(
+                Notification(
+                    user_id=u.id,
+                    request_id=req.id,
+                    type="due_soon",
+                    title=f"Due soon: Request #{req.id}",
+                    body=f"Due at {req.due_at}",
+                    url=link,
+                    dedupe_key=dedupe,
+                )
+            )
 
     if commit:
         db.session.commit()
@@ -73,7 +80,7 @@ def send_high_priority_nudges(app, commit: bool = False):
 
     if not cfg or not cfg.nudge_enabled:
         return
-    if flags and not getattr(flags, 'enable_nudges', True):
+    if flags and not getattr(flags, "enable_nudges", True):
         return
 
     interval = int(cfg.nudge_interval_hours or 24)
@@ -82,13 +89,17 @@ def send_high_priority_nudges(app, commit: bool = False):
     # Respect administrative minimum delay: do not nudge requests created
     # within `nudge_min_delay_hours` of their creation. Default is 4 hours.
     try:
-        raw_min_delay = getattr(cfg, 'nudge_min_delay_hours', None)
+        raw_min_delay = getattr(cfg, "nudge_min_delay_hours", None)
         min_delay = 4 if raw_min_delay is None else int(raw_min_delay)
     except Exception:
         min_delay = 4
 
     # Find high-priority requests still open
-    reqs = ReqModel.query.filter(ReqModel.priority == 'high').filter(ReqModel.status != 'CLOSED').all()
+    reqs = (
+        ReqModel.query.filter(ReqModel.priority == "high")
+        .filter(ReqModel.status != "CLOSED")
+        .all()
+    )
     for req in reqs:
         # determine targets: prefer explicit assignee
         targets = []
@@ -98,13 +109,21 @@ def send_high_priority_nudges(app, commit: bool = False):
                 targets.append(u)
         else:
             # fallback: all active users in owner department
-            targets = User.query.filter_by(department=req.owner_department, is_active=True).all()
+            targets = User.query.filter_by(
+                department=req.owner_department, is_active=True
+            ).all()
 
-        link = url_for('requests.request_detail', request_id=req.id, _external=False)
+        link = url_for("requests.request_detail", request_id=req.id, _external=False)
 
         for u in {t.id: t for t in targets}.values():
             # skip if we've sent a nudge within the interval
-            recent = Notification.query.filter_by(user_id=u.id, dedupe_key=f'nudge:req_{req.id}').filter(Notification.created_at >= cutoff).first()
+            recent = (
+                Notification.query.filter_by(
+                    user_id=u.id, dedupe_key=f"nudge:req_{req.id}"
+                )
+                .filter(Notification.created_at >= cutoff)
+                .first()
+            )
             if recent:
                 continue
 
@@ -121,27 +140,31 @@ def send_high_priority_nudges(app, commit: bool = False):
                 continue
 
             # create in-app notification
-            db.session.add(Notification(
-                user_id=u.id,
-                request_id=req.id,
-                type='nudge',
-                title=f'Reminder: High priority request #{req.id}',
-                body=f"Request '{req.title}' is still open.",
-                url=link,
-                dedupe_key=f'nudge:req_{req.id}',
-            ))
+            db.session.add(
+                Notification(
+                    user_id=u.id,
+                    request_id=req.id,
+                    type="nudge",
+                    title=f"Reminder: High priority request #{req.id}",
+                    body=f"Request '{req.title}' is still open.",
+                    url=link,
+                    dedupe_key=f"nudge:req_{req.id}",
+                )
+            )
 
             # send email in background (non-blocking)
-            if getattr(u, 'email', None):
+            if getattr(u, "email", None):
                 recipients_map = {u.email: u.id}
                 subject = f"Reminder: Request #{req.id} still open"
                 text_body = f"Your attention is requested: request #{req.id} ({req.title}) remains open.\n\n{link}"
                 try:
-                    notifications_module._send_emails_async(recipients_map, subject, text_body, html=None, request_id=req.id)
+                    notifications_module._send_emails_async(
+                        recipients_map, subject, text_body, html=None, request_id=req.id
+                    )
                 except Exception:
                     # best-effort; do not abort nudge loop
                     try:
-                        app.logger.exception('Failed to queue nudge email')
+                        app.logger.exception("Failed to queue nudge email")
                     except Exception:
                         pass
 
@@ -150,7 +173,7 @@ def send_high_priority_nudges(app, commit: bool = False):
             db.session.commit()
         except Exception:
             try:
-                app.logger.exception('Failed to commit nudge notifications')
+                app.logger.exception("Failed to commit nudge notifications")
             except Exception:
                 pass
     else:
@@ -162,6 +185,6 @@ def send_high_priority_nudges(app, commit: bool = False):
             db.session.flush()
         except Exception:
             try:
-                app.logger.exception('Failed to flush nudge notifications')
+                app.logger.exception("Failed to flush nudge notifications")
             except Exception:
                 pass

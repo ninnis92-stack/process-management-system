@@ -28,34 +28,40 @@ def send_emails_task(recipients_map, subject, body, html=None, request_id=None):
     for e in skipped:
         uid = recipients_map.get(e)
         if uid:
-            db.session.add(Notification(
-                user_id=uid,
-                request_id=request_id,
-                type="email_skipped",
-                title="Email skipped (test account)",
-                body=f"Email to {e} skipped because it is in the test domains.",
-                url=None,
-            ))
+            db.session.add(
+                Notification(
+                    user_id=uid,
+                    request_id=request_id,
+                    type="email_skipped",
+                    title="Email skipped (test account)",
+                    body=f"Email to {e} skipped because it is in the test domains.",
+                    url=None,
+                )
+            )
 
     if error:
         for e, uid in recipients_map.items():
             if uid:
-                db.session.add(Notification(
-                    user_id=uid,
-                    request_id=request_id,
-                    type="email_failed",
-                    title="Email delivery failed",
-                    body=f"Email delivery to {e} failed: {error}",
-                    url=None,
-                ))
+                db.session.add(
+                    Notification(
+                        user_id=uid,
+                        request_id=request_id,
+                        type="email_failed",
+                        title="Email delivery failed",
+                        body=f"Email delivery to {e} failed: {error}",
+                        url=None,
+                    )
+                )
 
-    if (skipped or error):
+    if skipped or error:
         try:
             db.session.commit()
         except Exception:
             try:
                 import logging
 
-                logging.getLogger(__name__).exception("Failed to commit email-send notifications")
+                logging.getLogger(__name__).exception(
+                    "Failed to commit email-send notifications"
+                )
             except Exception:
                 pass

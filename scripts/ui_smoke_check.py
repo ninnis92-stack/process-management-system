@@ -7,6 +7,7 @@ Run from the project root with the virtualenv active:
 This will create the app, make a few GET requests and exit with
 non-zero status if any request returns 5xx.
 """
+
 import sys
 from app import create_app
 
@@ -38,5 +39,5 @@ def main():
     print("Smoke check OK")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

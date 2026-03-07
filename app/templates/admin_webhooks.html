@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>External Form Submissions</h3>
+<table class="table">
+  <thead><tr><th>Time</th><th>Template</th><th>Request ID</th><th>Summary</th><th>Details</th></tr></thead>
+  <tbody>
+    {% for s in rows %}
+      <tr>
+        <td>{{ s.created_at }}</td>
+        <td>{{ templates.get(s.template_id).name if s.template_id and templates.get(s.template_id) else s.template_id }}</td>
+        <td>{% if s.request_id %}<a href="{{ url_for('requests.request_detail', request_id=s.request_id) }}">#{{ s.request_id }}</a>{% else %}-{% endif %}</td>
+        <td>{{ s.summary or '' }}</td>
+        <td style="white-space:pre-wrap">{{ s.data or '' }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="text-muted">No external submissions yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

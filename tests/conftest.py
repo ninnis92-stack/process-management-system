@@ -14,11 +14,13 @@ import hashlib
 # Some Python environments (notably older macOS builds) may not expose hashlib.scrypt.
 # Werkzeug's generate_password_hash uses scrypt by default; provide a lightweight
 # fallback that maps scrypt calls to pbkdf2_hmac so tests can run in CI/dev envs.
-if not hasattr(hashlib, 'scrypt'):
+if not hasattr(hashlib, "scrypt"):
+
     def _scrypt_fallback(password, *, salt, n, r, p, maxmem=None):
         # Use pbkdf2_hmac as a conservative fallback; parameters won't match
         # scrypt's semantics but are sufficient for tests that only need a hash.
-        return hashlib.pbkdf2_hmac('sha256', password, salt, 100000)
+        return hashlib.pbkdf2_hmac("sha256", password, salt, 100000)
+
     hashlib.scrypt = _scrypt_fallback
 
 

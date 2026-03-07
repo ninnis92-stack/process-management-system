@@ -15,17 +15,23 @@ point for later integration.
 Example:
   SSO_TEST_COOKIE="session=..." python3 scripts/smoke_sso_submit.py
 """
+
 from __future__ import annotations
 import os
 import re
 import requests
 
-BASE_URL = os.environ.get("BASE_URL", "https://process-management-prototype-lingering-bush-6175.fly.dev")
+BASE_URL = os.environ.get(
+    "BASE_URL", "https://process-management-prototype-lingering-bush-6175.fly.dev"
+)
 SSO_COOKIE = os.environ.get("SSO_TEST_COOKIE")
+
 
 def main():
     if not SSO_COOKIE:
-        print("SSO_TEST_COOKIE not set. Export a session cookie for a test SSO user and retry.")
+        print(
+            "SSO_TEST_COOKIE not set. Export a session cookie for a test SSO user and retry."
+        )
         print("This script is a placeholder for later SSO automation.")
         return
 
@@ -67,5 +73,6 @@ def main():
     else:
         print("Unexpected status", resp.status_code)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

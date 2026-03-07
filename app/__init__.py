@@ -24,6 +24,7 @@ csrf = CSRFProtect()
 
 load_dotenv()
 
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -37,38 +38,50 @@ def create_app():
     @app.cli.command("notify-due")
     def notify_due():
         from .notifications.due import send_due_soon_notifications
+
         # Persist notifications when run as a CLI command during deploy
         send_due_soon_notifications(current_app, hours=24, commit=True)
 
     @app.cli.command("notify-nudges")
     def notify_nudges():
         from .notifications.due import send_high_priority_nudges
+
         # Persist notifications when run as a CLI command during deploy
         send_high_priority_nudges(current_app, commit=True)
 
     @app.cli.command("clear-open-requests")
-    @click.confirmation_option(prompt='Are you sure you want to close all open requests?')
+    @click.confirmation_option(
+        prompt="Are you sure you want to close all open requests?"
+    )
     def clear_open_requests():
         """Close all non-closed requests by setting their status to CLOSED and clearing assignment."""
         from .models import Request
+
         with app.app_context():
             try:
-                q = Request.query.filter(Request.status != 'CLOSED')
+                q = Request.query.filter(Request.status != "CLOSED")
                 count = q.count()
                 if count == 0:
-                    click.echo('No open requests found.')
+                    click.echo("No open requests found.")
                     return
-                q.update({"status": 'CLOSED', "assigned_to_user_id": None}, synchronize_session=False)
+                q.update(
+                    {"status": "CLOSED", "assigned_to_user_id": None},
+                    synchronize_session=False,
+                )
                 db.session.commit()
-                click.echo(f'Closed {count} open requests.')
+                click.echo(f"Closed {count} open requests.")
             except Exception as e:
                 db.session.rollback()
-                click.echo(f'Failed to clear open requests: {e}')
+                click.echo(f"Failed to clear open requests: {e}")
 
     @app.cli.command("create-user")
     @click.option("--email", required=True, help="User email")
     @click.option("--name", default=None, help="Display name")
-    @click.option("--department", default="A", type=click.Choice(["A", "B", "C"], case_sensitive=False))
+    @click.option(
+        "--department",
+        default="A",
+        type=click.Choice(["A", "B", "C"], case_sensitive=False),
+    )
     @click.option("--password", default="password123", help="Password for local login")
     def create_user_cli(email, name, department, password):
         """Create a local user (dev/test)."""
@@ -76,11 +89,15 @@ def create_app():
         with app.app_context():
             existing = User.query.filter_by(email=email_n).first()
             if existing:
-                click.echo(f"User {email_n} already exists; updating department/name/password")
+                click.echo(
+                    f"User {email_n} already exists; updating department/name/password"
+                )
                 existing.department = department.upper()
                 existing.name = name or existing.name
                 # Avoid relying on environment-specific default hash methods (e.g. scrypt)
-                existing.password_hash = generate_password_hash(password, method="pbkdf2:sha256")
+                existing.password_hash = generate_password_hash(
+                    password, method="pbkdf2:sha256"
+                )
                 existing.is_active = True
                 db.session.commit()
                 return
@@ -98,11 +115,13 @@ def create_app():
 
     # Init OAuth (SSO)
     from .auth.sso import init_oauth
+
     init_oauth(app)
 
     # Optional Sentry initialization (guarded by SENTRY_DSN)
     try:
         from .extensions import init_sentry
+
         init_sentry(app)
     except Exception:
         pass
@@ -110,6 +129,7 @@ def create_app():
     # Optional security headers middleware (guarded by SECURITY_HEADERS_ENABLED env)
     try:
         from .middleware import init_security
+
         init_security(app)
     except Exception:
         pass
@@ -128,21 +148,28 @@ def create_app():
     # Enable CSRF protection for all forms (create module-level instance so
     # individual routes can be exempted when necessary)
     from . import csrf as _csrf  # local import to ensure module-level var exists
+
     _csrf.init_app(app)
 
     # Initialize optional caching and Redis client if available.
     try:
         from .extensions import cache, init_redis_client
+
         try:
-            cache.init_app(app, config={
-                'CACHE_TYPE': 'redis',
-                'CACHE_REDIS_URL': app.config.get('REDIS_URL'),
-                'CACHE_DEFAULT_TIMEOUT': app.config.get('CACHE_DEFAULT_TIMEOUT', 300),
-            })
+            cache.init_app(
+                app,
+                config={
+                    "CACHE_TYPE": "redis",
+                    "CACHE_REDIS_URL": app.config.get("REDIS_URL"),
+                    "CACHE_DEFAULT_TIMEOUT": app.config.get(
+                        "CACHE_DEFAULT_TIMEOUT", 300
+                    ),
+                },
+            )
         except Exception:
             # If Flask-Caching isn't installed or config invalid, continue without cache.
             try:
-                app.logger.info('Cache not initialized (missing package or config)')
+                app.logger.info("Cache not initialized (missing package or config)")
             except Exception:
                 pass
         try:
@@ -178,17 +205,23 @@ def create_app():
     @app.before_request
     def _apply_impersonation():
         from flask_login import current_user
+
         try:
-            if not current_user or not getattr(current_user, 'is_authenticated', False):
+            if not current_user or not getattr(current_user, "is_authenticated", False):
                 return
         except Exception:
             return
 
         imp_admin = None
         from flask import session as _session
-        imp_admin = _session.get('impersonate_admin_id')
-        imp_dept = _session.get('impersonate_dept')
-        if imp_admin and imp_dept and int(imp_admin) == int(getattr(current_user, 'id', -1)):
+
+        imp_admin = _session.get("impersonate_admin_id")
+        imp_dept = _session.get("impersonate_dept")
+        if (
+            imp_admin
+            and imp_dept
+            and int(imp_admin) == int(getattr(current_user, "id", -1))
+        ):
             # Override department for permission checks and templates for duration of request.
             try:
                 current_user.department = imp_dept
@@ -200,21 +233,24 @@ def create_app():
         # allows users assigned to multiple departments to switch their
         # active context without changing their stored primary department.
         try:
-            active_dept = _session.get('active_dept')
+            active_dept = _session.get("active_dept")
             if active_dept:
                 # Validate that the current user is allowed to view as this dept
                 try:
                     from .models import UserDepartment, Department
+
                     allowed = False
                     # Always allow switching to primary department
-                    if getattr(current_user, 'department', None) == active_dept:
+                    if getattr(current_user, "department", None) == active_dept:
                         allowed = True
                     # Admins may switch freely
-                    if getattr(current_user, 'is_admin', False):
+                    if getattr(current_user, "is_admin", False):
                         allowed = True
                     # Otherwise check explicit assignments
                     if not allowed:
-                        ud = UserDepartment.query.filter_by(user_id=current_user.id, department=active_dept).first()
+                        ud = UserDepartment.query.filter_by(
+                            user_id=current_user.id, department=active_dept
+                        ).first()
                         if ud:
                             allowed = True
                     if allowed:
@@ -251,23 +287,25 @@ def create_app():
         try:
             from .models import SiteConfig, Department, FeatureFlags
             from flask import url_for
-            css = ''
-            logo = current_app.config.get('LOGO_URL')
-            brand_name = 'FreshProcess'
-            site_theme_preset = 'default'
-            dept_labels = {'A': 'Dept A', 'B': 'Dept B', 'C': 'Dept C'}
+
+            css = ""
+            logo = current_app.config.get("LOGO_URL")
+            brand_name = "FreshProcess"
+            site_theme_preset = "default"
+            dept_labels = {"A": "Dept A", "B": "Dept B", "C": "Dept C"}
 
             # Theme model is optional in some environments/tests.
             try:
                 from .models import AppTheme
+
                 t = AppTheme.query.filter_by(active=True).first()
-                css = t.css if t and t.css else ''
+                css = t.css if t and t.css else ""
                 if t and t.logo_filename:
                     try:
-                        if t.logo_filename.startswith('http'):
+                        if t.logo_filename.startswith("http"):
                             logo = t.logo_filename
                         else:
-                            logo = url_for('static', filename=t.logo_filename)
+                            logo = url_for("static", filename=t.logo_filename)
                     except Exception:
                         pass
             except Exception:
@@ -283,17 +321,24 @@ def create_app():
                 try:
                     # AppTheme active with logo or css
                     from .models import AppTheme
+
                     t_check = AppTheme.query.filter_by(active=True).first()
-                    if t_check and (getattr(t_check, 'logo_filename', None) or getattr(t_check, 'css', None)):
+                    if t_check and (
+                        getattr(t_check, "logo_filename", None)
+                        or getattr(t_check, "css", None)
+                    ):
                         external_theme_loaded = True
                 except Exception:
                     pass
                 try:
                     # SiteConfig provides a logo or non-default preset
                     cfg_check = SiteConfig.get()
-                    if getattr(cfg_check, 'logo_filename', None):
+                    if getattr(cfg_check, "logo_filename", None):
                         external_theme_loaded = True
-                    if getattr(cfg_check, 'theme_preset', None) and (cfg_check.theme_preset or '').strip().lower() != 'default':
+                    if (
+                        getattr(cfg_check, "theme_preset", None)
+                        and (cfg_check.theme_preset or "").strip().lower() != "default"
+                    ):
                         external_theme_loaded = True
                 except Exception:
                     pass
@@ -307,6 +352,7 @@ def create_app():
                         f = self._real.get()
                         if self._force is None:
                             return f
+
                         # Return a lightweight view object that overrides
                         # `vibe_enabled` while delegating other attributes.
                         class _View:
@@ -319,55 +365,75 @@ def create_app():
 
                         return _View(f, self._force)
 
-                feature_flags_obj = _FeatureFlagsProxy(FeatureFlags, force_vibe=False if external_theme_loaded else None)
+                feature_flags_obj = _FeatureFlagsProxy(
+                    FeatureFlags, force_vibe=False if external_theme_loaded else None
+                )
 
             # site config (singleton)
             try:
                 cfg = SiteConfig.get()
-                banner_html = cfg.banner_html or ''
+                banner_html = cfg.banner_html or ""
                 rolling_quotes_enabled = bool(cfg.rolling_quotes_enabled)
                 rolling_quotes = cfg.rolling_quotes or []
-                if getattr(cfg, 'logo_filename', None):
+                if getattr(cfg, "logo_filename", None):
                     try:
-                        logo = url_for('static', filename=cfg.logo_filename)
+                        logo = url_for("static", filename=cfg.logo_filename)
                     except Exception:
                         pass
-                if getattr(cfg, 'brand_name', None):
+                if getattr(cfg, "brand_name", None):
                     brand_name = cfg.brand_name
-                if getattr(cfg, 'theme_preset', None):
-                    site_theme_preset = (cfg.theme_preset or 'default').strip().lower()
-                    if site_theme_preset not in ('default', 'ocean', 'forest', 'sunset', 'midnight'):
-                        site_theme_preset = 'default'
+                if getattr(cfg, "theme_preset", None):
+                    site_theme_preset = (cfg.theme_preset or "default").strip().lower()
+                    if site_theme_preset not in (
+                        "default",
+                        "ocean",
+                        "forest",
+                        "sunset",
+                        "midnight",
+                    ):
+                        site_theme_preset = "default"
             except Exception:
-                banner_html = ''
+                banner_html = ""
                 rolling_quotes_enabled = False
                 rolling_quotes = []
 
             try:
-                rows = Department.query.filter_by(is_active=True).order_by(Department.order.asc(), Department.code.asc()).all()
+                rows = (
+                    Department.query.filter_by(is_active=True)
+                    .order_by(Department.order.asc(), Department.code.asc())
+                    .all()
+                )
                 for d in rows:
-                    code = (d.code or '').upper().strip()
-                    label = (d.label or '').strip()
+                    code = (d.code or "").upper().strip()
+                    label = (d.label or "").strip()
                     if code and label:
                         dept_labels[code] = label
             except Exception:
                 pass
 
-            return dict(active_theme_css=css, theme_logo_url=logo,
-                        site_brand_name=brand_name,
-                        site_theme_preset=site_theme_preset,
-                        department_labels=dept_labels,
-                        site_banner_html=banner_html,
-                        rolling_quotes_enabled=rolling_quotes_enabled,
-                        rolling_quotes=rolling_quotes,
-                        FeatureFlags=FeatureFlags)
+            return dict(
+                active_theme_css=css,
+                theme_logo_url=logo,
+                site_brand_name=brand_name,
+                site_theme_preset=site_theme_preset,
+                department_labels=dept_labels,
+                site_banner_html=banner_html,
+                rolling_quotes_enabled=rolling_quotes_enabled,
+                rolling_quotes=rolling_quotes,
+                FeatureFlags=FeatureFlags,
+            )
         except Exception:
-            return dict(active_theme_css='', theme_logo_url=current_app.config.get('LOGO_URL'),
-                        site_brand_name='FreshProcess',
-                        site_theme_preset='default',
-                        department_labels={'A': 'Dept A', 'B': 'Dept B', 'C': 'Dept C'},
-                        site_banner_html='', rolling_quotes_enabled=False, rolling_quotes=[],
-                        FeatureFlags=None)
+            return dict(
+                active_theme_css="",
+                theme_logo_url=current_app.config.get("LOGO_URL"),
+                site_brand_name="FreshProcess",
+                site_theme_preset="default",
+                department_labels={"A": "Dept A", "B": "Dept B", "C": "Dept C"},
+                site_banner_html="",
+                rolling_quotes_enabled=False,
+                rolling_quotes=[],
+                FeatureFlags=None,
+            )
 
     # Track the last successfully rendered GET URL in the session so that
     # when the DB is temporarily unavailable we can redirect users back to
@@ -378,9 +444,9 @@ def create_app():
     def _store_last_good(response):
         try:
             # Only store successful GET responses (status < 400).
-            if _request.method == 'GET' and response.status_code < 400:
+            if _request.method == "GET" and response.status_code < 400:
                 try:
-                    _session['last_good_url'] = _request.url
+                    _session["last_good_url"] = _request.url
                 except Exception:
                     # Session may be unavailable in some contexts; ignore.
                     pass
@@ -411,15 +477,22 @@ def create_app():
             # a previously loaded page instead of repeatedly showing the 503.
             try:
                 from flask import session as _session, redirect, request as _request
-                last = _session.get('last_good_url')
+
+                last = _session.get("last_good_url")
                 # Avoid redirect loops: don't redirect back to the same failing URL
                 if last and last != _request.url:
-                    app.logger.info('Redirecting to last good URL after DB error: %s', last)
+                    app.logger.info(
+                        "Redirecting to last good URL after DB error: %s", last
+                    )
                     return redirect(last)
             except Exception:
                 pass
 
-            return ("Service temporarily unavailable — database initializing. Please try again shortly.", 503)
+            return (
+                "Service temporarily unavailable — database initializing. Please try again shortly.",
+                503,
+            )
+
     except Exception:
         # If SQLAlchemy isn't available for some reason, skip installing the handler.
         pass
@@ -433,8 +506,12 @@ def create_app():
         def _handle_csrf_error(err):
             app.logger.warning("CSRF error handled: %s", err)
             # Inform the user and redirect to login where a fresh token will be issued
-            flash("Session expired or invalid form submission — please try again.", "warning")
+            flash(
+                "Session expired or invalid form submission — please try again.",
+                "warning",
+            )
             return redirect(url_for("auth.login"))
+
     except Exception:
         pass
     except Exception:
@@ -450,6 +527,7 @@ def create_app():
         try:
             # Simple DB check — if this raises, the DB/tables are likely not ready.
             from sqlalchemy import text
+
             db.session.execute(text("SELECT 1"))
             return (jsonify({"status": "ok"}), 200)
         except Exception as e:
@@ -464,6 +542,7 @@ def create_app():
     if os.getenv("WAIT_FOR_DB", "False") == "True":
         import time
         from sqlalchemy import text
+
         with app.app_context():
             for _ in range(30):
                 try:
@@ -483,64 +562,135 @@ def create_app():
     try:
         if os.getenv("SEED_DEFAULT_BUCKETS", "True").lower() != "false":
             from .models import StatusBucket, BucketStatus, Department
+
             try:
                 with app.app_context():
                     # Ensure default Department rows exist (A/B/C) so code treating
                     # them as persisted departments behaves consistently.
-                    for code, label, order in (('A', 'Dept A', 0), ('B', 'Dept B', 1), ('C', 'Dept C', 2)):
+                    for code, label, order in (
+                        ("A", "Dept A", 0),
+                        ("B", "Dept B", 1),
+                        ("C", "Dept C", 2),
+                    ):
                         existing = Department.query.filter_by(code=code).first()
                         if not existing:
-                            d = Department(code=code, label=label, is_active=True, order=order)
+                            d = Department(
+                                code=code, label=label, is_active=True, order=order
+                            )
                             db.session.add(d)
                     db.session.flush()
 
                     # Only seed buckets if Dept B has no buckets configured.
-                    if StatusBucket.query.filter_by(department_name='B').count() == 0:
+                    if StatusBucket.query.filter_by(department_name="B").count() == 0:
                         # New
-                        nb = StatusBucket(name='New', department_name='B', order=0, active=True)
+                        nb = StatusBucket(
+                            name="New", department_name="B", order=0, active=True
+                        )
                         db.session.add(nb)
                         db.session.flush()
-                        db.session.add(BucketStatus(bucket_id=nb.id, status_code='NEW_FROM_A', order=0))
+                        db.session.add(
+                            BucketStatus(
+                                bucket_id=nb.id, status_code="NEW_FROM_A", order=0
+                            )
+                        )
 
                         # In Progress
-                        ip = StatusBucket(name='In Progress', department_name='B', order=1, active=True)
+                        ip = StatusBucket(
+                            name="In Progress",
+                            department_name="B",
+                            order=1,
+                            active=True,
+                        )
                         db.session.add(ip)
                         db.session.flush()
-                        db.session.add(BucketStatus(bucket_id=ip.id, status_code='B_IN_PROGRESS', order=0))
-                        db.session.add(BucketStatus(bucket_id=ip.id, status_code='PENDING_C_REVIEW', order=1))
-                        db.session.add(BucketStatus(bucket_id=ip.id, status_code='B_FINAL_REVIEW', order=2))
+                        db.session.add(
+                            BucketStatus(
+                                bucket_id=ip.id, status_code="B_IN_PROGRESS", order=0
+                            )
+                        )
+                        db.session.add(
+                            BucketStatus(
+                                bucket_id=ip.id, status_code="PENDING_C_REVIEW", order=1
+                            )
+                        )
+                        db.session.add(
+                            BucketStatus(
+                                bucket_id=ip.id, status_code="B_FINAL_REVIEW", order=2
+                            )
+                        )
 
                         # Needs Input / Waiting
-                        ni = StatusBucket(name='Needs Input', department_name='B', order=2, active=True)
+                        ni = StatusBucket(
+                            name="Needs Input",
+                            department_name="B",
+                            order=2,
+                            active=True,
+                        )
                         db.session.add(ni)
                         db.session.flush()
-                        db.session.add(BucketStatus(bucket_id=ni.id, status_code='WAITING_ON_A_RESPONSE', order=0))
-                        db.session.add(BucketStatus(bucket_id=ni.id, status_code='C_NEEDS_CHANGES', order=1))
+                        db.session.add(
+                            BucketStatus(
+                                bucket_id=ni.id,
+                                status_code="WAITING_ON_A_RESPONSE",
+                                order=0,
+                            )
+                        )
+                        db.session.add(
+                            BucketStatus(
+                                bucket_id=ni.id, status_code="C_NEEDS_CHANGES", order=1
+                            )
+                        )
 
                         # Pending Approval
-                        pa = StatusBucket(name='Pending Approval', department_name='B', order=3, active=True)
+                        pa = StatusBucket(
+                            name="Pending Approval",
+                            department_name="B",
+                            order=3,
+                            active=True,
+                        )
                         db.session.add(pa)
                         db.session.flush()
-                        db.session.add(BucketStatus(bucket_id=pa.id, status_code='EXEC_APPROVAL', order=0))
-                        db.session.add(BucketStatus(bucket_id=pa.id, status_code='C_APPROVED', order=1))
-                        db.session.add(BucketStatus(bucket_id=pa.id, status_code='SENT_TO_A', order=2))
+                        db.session.add(
+                            BucketStatus(
+                                bucket_id=pa.id, status_code="EXEC_APPROVAL", order=0
+                            )
+                        )
+                        db.session.add(
+                            BucketStatus(
+                                bucket_id=pa.id, status_code="C_APPROVED", order=1
+                            )
+                        )
+                        db.session.add(
+                            BucketStatus(
+                                bucket_id=pa.id, status_code="SENT_TO_A", order=2
+                            )
+                        )
 
                         # Completed
-                        comp = StatusBucket(name='Completed', department_name='B', order=4, active=True)
+                        comp = StatusBucket(
+                            name="Completed", department_name="B", order=4, active=True
+                        )
                         db.session.add(comp)
                         db.session.flush()
-                        db.session.add(BucketStatus(bucket_id=comp.id, status_code='CLOSED', order=0))
+                        db.session.add(
+                            BucketStatus(
+                                bucket_id=comp.id, status_code="CLOSED", order=0
+                            )
+                        )
 
                         # Archived (placeholder)
-                        arch = StatusBucket(name='Archived', department_name='B', order=5, active=True)
+                        arch = StatusBucket(
+                            name="Archived", department_name="B", order=5, active=True
+                        )
                         db.session.add(arch)
 
                     db.session.commit()
-                    app.logger.info('Seeded default departments and Dept B buckets')
+                    app.logger.info("Seeded default departments and Dept B buckets")
             except Exception:
-                app.logger.exception('Failed to seed default Dept B buckets or departments')
+                app.logger.exception(
+                    "Failed to seed default Dept B buckets or departments"
+                )
 
-    
     except Exception:
         # Best-effort; avoid failing app startup if env inspection or imports fail.
         pass
@@ -563,7 +713,9 @@ def create_app():
                     db.session.rollback()
                 except Exception:
                     try:
-                        app.logger.exception('Failed to rollback DB session in teardown')
+                        app.logger.exception(
+                            "Failed to rollback DB session in teardown"
+                        )
                     except Exception:
                         pass
         except Exception:

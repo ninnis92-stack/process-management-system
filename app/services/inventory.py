@@ -5,6 +5,7 @@ connect to an external inventory database or API. By default (no
 connector configured) methods return None to indicate "unknown" so the
 application continues to behave as a prototype.
 """
+
 from typing import Optional
 from flask import current_app
 
@@ -73,4 +74,3 @@ class InventoryService:
             return None
         except Exception:
             return None
-

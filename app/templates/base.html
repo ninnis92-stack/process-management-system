@@ -4,6 +4,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="csrf-token" content="{{ csrf_token() }}">
+  <style>
+    /* Small admin UI helper styles */
+    .admin-card { transition: opacity 0.12s ease; }
+    .admin-card.hidden-by-filter { opacity: 0.18; pointer-events: none; }
+    .admin-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
+    .admin-tile { display:flex; flex-direction:column; gap:6px; padding:12px; border-radius:8px; background:#fff; color:inherit; text-decoration:none; border:1px solid rgba(0,0,0,0.06); }
+    .admin-tile:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+    .tile-ico { font-size:22px }
+    .tile-title { font-weight:600 }
+    .tile-sub { font-size:0.85rem; color:rgba(0,0,0,0.6) }
+  </style>
   <title>{{ title or "Process Management Prototype" }}</title>
   <!-- Defensive shim early: avoid uncaught errors when third-party extensions expect a Sortable global -->
   <script>
@@ -44,7 +55,7 @@
     </script>
   {% endif %}
 </head>
-<body class="{% block body_class %}theme-body top-nav-layout{% endblock %} theme-preset-{{ site_theme_preset or 'default' }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}">
+<body class="{% block body_class %}theme-body top-nav-layout{% endblock %} theme-preset-{{ site_theme_preset or 'default' }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if (current_user.is_authenticated and (current_user.dark_mode or False)) else '0' }}">
   <a href="#content" class="skip-link">Skip to content</a>
 
   {% set ep = request.endpoint or '' %}
@@ -257,6 +268,14 @@
   <script>
     (function(){
       try{
+        const isDark = document.body.getAttribute('data-user-dark-mode') === '1';
+        if (isDark) document.body.classList.add('dark-mode');
+      }catch(e){}
+    })();
+  </script>
+  <script>
+    (function(){
+      try{
         const loggedIn = document.body.getAttribute('data-user-logged-in') === '1';
         const active = (document.body.getAttribute('data-active-dept') || '').trim();
         if (!loggedIn || active) return;
@@ -322,5 +341,23 @@
     })();
   </script>
   <!-- shim moved to head to be available earlier in page load -->
+  <script>
+    (function(){
+      const input = document.getElementById('adminQuickSearch');
+      if (!input) return;
+      const cards = Array.from(document.querySelectorAll('.admin-card'));
+      input.addEventListener('input', function(){
+        const q = (input.value || '').trim().toLowerCase();
+        if (!q) {
+          cards.forEach(c => c.classList.remove('hidden-by-filter'));
+          return;
+        }
+        cards.forEach(c => {
+          const text = (c.textContent || '').toLowerCase();
+          if (text.indexOf(q) === -1) c.classList.add('hidden-by-filter'); else c.classList.remove('hidden-by-filter');
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

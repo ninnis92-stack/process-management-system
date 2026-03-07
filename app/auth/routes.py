@@ -1,12 +1,23 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, current_app, session, request, jsonify
+from flask import (
+    Blueprint,
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    current_app,
+    session,
+    request,
+    jsonify,
+)
 from werkzeug.security import check_password_hash
+
 try:
     import pyotp
 except Exception:
     pyotp = None
 from flask_login import login_user, logout_user, login_required, current_user
 
-from .forms import LoginForm
+from .forms import LoginForm, SettingsForm
 from ..models import User
 from ..models import FeatureFlags
 from ..extensions import db
@@ -26,7 +37,7 @@ def _restore_last_active_dept_for_user(user):
     if not user:
         return
     try:
-        dept = (getattr(user, 'last_active_dept', None) or '').strip().upper()
+        dept = (getattr(user, "last_active_dept", None) or "").strip().upper()
         if not dept:
             return
 
@@ -36,24 +47,33 @@ def _restore_last_active_dept_for_user(user):
             return
 
         allowed = False
-        if getattr(user, 'department', None) == dept:
+        if getattr(user, "department", None) == dept:
             allowed = True
-        if getattr(user, 'is_admin', False):
+        if getattr(user, "is_admin", False):
             allowed = True
         if not allowed:
-            ud = UserDepartment.query.filter_by(user_id=user.id, department=dept).first()
+            ud = UserDepartment.query.filter_by(
+                user_id=user.id, department=dept
+            ).first()
             if ud:
                 allowed = True
 
         if allowed:
             try:
-                current_app.logger.info('Restoring last_active_dept for user %s -> %s', getattr(user, 'email', getattr(user, 'id', 'unknown')), dept)
+                current_app.logger.info(
+                    "Restoring last_active_dept for user %s -> %s",
+                    getattr(user, "email", getattr(user, "id", "unknown")),
+                    dept,
+                )
             except Exception:
                 pass
-            _session['active_dept'] = dept
+            _session["active_dept"] = dept
     except Exception:
         try:
-            current_app.logger.exception('Failed to restore last_active_dept for user %s', getattr(user, 'email', getattr(user, 'id', 'unknown')))
+            current_app.logger.exception(
+                "Failed to restore last_active_dept for user %s",
+                getattr(user, "email", getattr(user, "id", "unknown")),
+            )
         except Exception:
             pass
         # Fail silently; restoring department is a convenience only.
@@ -70,21 +90,26 @@ def _get_user_departments(user):
         return []
     try:
         depts = []
-        primary = getattr(user, 'department', None)
+        primary = getattr(user, "department", None)
         if primary:
             depts.append(primary)
         # include explicit assignments
-        for ud in getattr(user, 'departments', []) or []:
-            d = getattr(ud, 'department', None)
+        for ud in getattr(user, "departments", []) or []:
+            d = getattr(ud, "department", None)
             if d and d not in depts:
                 depts.append(d)
         # Admins may see all active departments
-        if getattr(user, 'is_admin', False):
-            rows = Department.query.filter_by(is_active=True).order_by(Department.order.asc()).all()
+        if getattr(user, "is_admin", False):
+            rows = (
+                Department.query.filter_by(is_active=True)
+                .order_by(Department.order.asc())
+                .all()
+            )
             depts = [r.code for r in rows]
         return depts
     except Exception:
-        return [getattr(user, 'department', None)]
+        return [getattr(user, "department", None)]
+
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -136,7 +161,7 @@ def sso_callback():
             sso_sub=sub,
             email=email,
             name=name,
-            department="A",   # default for prototype
+            department="A",  # default for prototype
             is_active=True,
         )
         db.session.add(user)
@@ -155,15 +180,23 @@ def sso_callback():
         except Exception:
             flags = None
 
-        sso_sync_enabled = bool(getattr(flags, 'sso_admin_sync_enabled', current_app.config.get('SSO_ADMIN_SYNC_ENABLED', True)))
+        sso_sync_enabled = bool(
+            getattr(
+                flags,
+                "sso_admin_sync_enabled",
+                current_app.config.get("SSO_ADMIN_SYNC_ENABLED", True),
+            )
+        )
         if sso_sync_enabled:
-            recognized_admin = sso_user_is_admin(userinfo, current_app.config, email=email)
+            recognized_admin = sso_user_is_admin(
+                userinfo, current_app.config, email=email
+            )
             if recognized_admin:
                 user.is_admin = True
-            elif current_app.config.get('SSO_ADMIN_SYNC_STRICT', False):
+            elif current_app.config.get("SSO_ADMIN_SYNC_STRICT", False):
                 user.is_admin = False
     except Exception:
-        current_app.logger.exception('Failed to sync SSO admin role for %s', email)
+        current_app.logger.exception("Failed to sync SSO admin role for %s", email)
 
     db.session.commit()
 
@@ -173,33 +206,59 @@ def sso_callback():
     # If the IdP indicated MFA in the id_token, set a session flag used by admin checks
     try:
         if token_has_mfa(userinfo, current_app.config):
-            session['sso_mfa'] = True
+            session["sso_mfa"] = True
     except Exception:
-        session.pop('sso_mfa', None)
+        session.pop("sso_mfa", None)
 
     login_user(user)
     try:
         depts = _get_user_departments(user)
         if len(depts) > 1:
-            return redirect(url_for('auth.choose_dept'))
-        if getattr(user, 'last_active_dept', None):
+            return redirect(url_for("auth.choose_dept"))
+        if getattr(user, "last_active_dept", None):
             _restore_last_active_dept_for_user(user)
         else:
-            _session['active_dept'] = depts[0] if depts else getattr(user, 'department', None)
+            _session["active_dept"] = (
+                depts[0] if depts else getattr(user, "department", None)
+            )
     except Exception:
         pass
     return redirect(url_for("requests.dashboard"))
 
 
-@auth_bp.route('/choose_dept', methods=['GET'])
+@auth_bp.route("/choose_dept", methods=["GET"])
 @login_required
 def choose_dept():
     """Render the department selection page when a user has multiple departments."""
     depts = _get_user_departments(current_user)
-    return render_template('choose_department.html', departments=depts)
+    return render_template("choose_department.html", departments=depts)
 
 
-@auth_bp.route('/departments', methods=['GET'])
+@auth_bp.route("/settings", methods=["GET", "POST"])
+@login_required
+def settings():
+    """Per-user settings page (theme/preferences)."""
+    form = SettingsForm(obj=current_user)
+    if form.validate_on_submit():
+        try:
+            u = db.session.get(User, current_user.id)
+            if u:
+                u.dark_mode = bool(form.dark_mode.data)
+                db.session.add(u)
+                db.session.commit()
+                flash("Settings saved.", "success")
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            flash("Failed to save settings.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    return render_template("settings.html", form=form)
+
+
+@auth_bp.route("/departments", methods=["GET"])
 @login_required
 def list_departments():
     """Return JSON list of departments the current user may switch to.
@@ -208,22 +267,30 @@ def list_departments():
     departments.
     """
     try:
-        if getattr(current_user, 'is_admin', False):
-            rows = Department.query.filter_by(is_active=True).order_by(Department.order.asc()).all()
+        if getattr(current_user, "is_admin", False):
+            rows = (
+                Department.query.filter_by(is_active=True)
+                .order_by(Department.order.asc())
+                .all()
+            )
             depts = [r.code for r in rows]
         else:
             # Primary dept + any UserDepartment rows
-            depts = [getattr(current_user, 'department', None)]
-            extra = [ud.department for ud in getattr(current_user, 'departments', []) if ud.department]
+            depts = [getattr(current_user, "department", None)]
+            extra = [
+                ud.department
+                for ud in getattr(current_user, "departments", [])
+                if ud.department
+            ]
             for d in extra:
                 if d not in depts:
                     depts.append(d)
-        return jsonify({'departments': depts})
+        return jsonify({"departments": depts})
     except Exception:
-        return jsonify({'departments': [getattr(current_user, 'department', None)]})
+        return jsonify({"departments": [getattr(current_user, "department", None)]})
 
 
-@auth_bp.route('/switch_dept', methods=['POST'])
+@auth_bp.route("/switch_dept", methods=["POST"])
 @login_required
 def switch_department():
     """Set the user's active department in session if allowed."""
@@ -232,7 +299,7 @@ def switch_department():
         data = request.get_json()
     else:
         data = request.form
-    dept = (data.get('department') or '').strip().upper()
+    dept = (data.get("department") or "").strip().upper()
     if not dept:
         return ("Missing department", 400)
 
@@ -246,13 +313,15 @@ def switch_department():
 
     # Allowed if primary, explicitly assigned, or admin
     allowed = False
-    if getattr(current_user, 'department', None) == dept:
+    if getattr(current_user, "department", None) == dept:
         allowed = True
-    if getattr(current_user, 'is_admin', False):
+    if getattr(current_user, "is_admin", False):
         allowed = True
     try:
         if not allowed:
-            ud = UserDepartment.query.filter_by(user_id=current_user.id, department=dept).first()
+            ud = UserDepartment.query.filter_by(
+                user_id=current_user.id, department=dept
+            ).first()
             if ud:
                 allowed = True
     except Exception:
@@ -261,10 +330,10 @@ def switch_department():
     if not allowed:
         return ("Not allowed to view that department", 403)
 
-    _session['active_dept'] = dept
+    _session["active_dept"] = dept
     # Persist the user's preference
     try:
-        if getattr(current_user, 'id', None):
+        if getattr(current_user, "id", None):
             u = db.session.get(User, current_user.id)
             if u:
                 u.last_active_dept = dept
@@ -277,9 +346,9 @@ def switch_department():
             pass
 
     # For convenience return JSON for AJAX callers
-    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify({'ok': True, 'active_dept': dept})
-    return redirect(url_for('requests.dashboard'))
+    if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"ok": True, "active_dept": dept})
+    return redirect(url_for("requests.dashboard"))
 
 
 # ---------- Local Login (fallback) ----------
@@ -298,67 +367,83 @@ def login():
                 db.session.rollback()
             except Exception:
                 try:
-                    current_app.logger.exception('Failed to rollback after OperationalError in login')
+                    current_app.logger.exception(
+                        "Failed to rollback after OperationalError in login"
+                    )
                 except Exception:
                     pass
             flash("Temporary database error. Please try again shortly.", "warning")
             return render_template("login.html", form=form)
         except Exception as err:
             try:
-                current_app.logger.exception('Unexpected DB error during login')
+                current_app.logger.exception("Unexpected DB error during login")
             except Exception:
                 pass
             try:
                 db.session.rollback()
             except Exception:
                 try:
-                    current_app.logger.exception('Failed to rollback after unexpected error in login')
+                    current_app.logger.exception(
+                        "Failed to rollback after unexpected error in login"
+                    )
                 except Exception:
                     pass
             flash("Temporary database error. Please try again shortly.", "warning")
             return render_template("login.html", form=form)
-        if not user or not user.is_active or not check_password_hash(user.password_hash, form.password.data):
+        if (
+            not user
+            or not user.is_active
+            or not check_password_hash(user.password_hash, form.password.data)
+        ):
             # Add a form-level error so the template can display it near the fields
             form.password.errors.append("Invalid email or password")
             return render_template("login.html", form=form), 401
 
         # If user has TOTP enabled, require TOTP verification before completing login
-        if getattr(user, 'totp_enabled', False):
+        if getattr(user, "totp_enabled", False):
             if pyotp is None:
-                flash('Two-factor authentication is not available; contact an administrator.', 'danger')
+                flash(
+                    "Two-factor authentication is not available; contact an administrator.",
+                    "danger",
+                )
             else:
-                session['pre_2fa_userid'] = user.id
-                return redirect(url_for('auth.totp_verify'))
+                session["pre_2fa_userid"] = user.id
+                return redirect(url_for("auth.totp_verify"))
 
         try:
             login_user(user)
         except Exception:
             try:
-                current_app.logger.exception('Failed during login_user() for %s', getattr(user, 'email', getattr(user, 'id', 'unknown')))
+                current_app.logger.exception(
+                    "Failed during login_user() for %s",
+                    getattr(user, "email", getattr(user, "id", "unknown")),
+                )
             except Exception:
                 pass
             try:
                 db.session.rollback()
             except Exception:
                 pass
-            flash('Login failed due to an internal error; try again.', 'danger')
-            return render_template('login.html', form=form)
+            flash("Login failed due to an internal error; try again.", "danger")
+            return render_template("login.html", form=form)
         # If the user has multiple departments available, prompt them to choose;
         # otherwise restore last-active or set primary department into session.
         try:
             depts = _get_user_departments(user)
             if len(depts) > 1:
-                return redirect(url_for('auth.choose_dept'))
+                return redirect(url_for("auth.choose_dept"))
             # single choice - restore last active if present and allowed
             restored = False
-            if getattr(user, 'last_active_dept', None):
+            if getattr(user, "last_active_dept", None):
                 try:
                     _restore_last_active_dept_for_user(user)
                     restored = True
                 except Exception:
                     restored = False
             if not restored:
-                _session['active_dept'] = depts[0] if depts else getattr(user, 'department', None)
+                _session["active_dept"] = (
+                    depts[0] if depts else getattr(user, "department", None)
+                )
         except Exception:
             pass
         return redirect(url_for("requests.dashboard"))
@@ -373,8 +458,8 @@ def logout():
     # Persist the last active department (if any) for this user so it can be
     # restored on next login.
     try:
-        active = _session.get('active_dept')
-        if active and getattr(current_user, 'id', None):
+        active = _session.get("active_dept")
+        if active and getattr(current_user, "id", None):
             u = db.session.get(User, current_user.id)
             if u:
                 u.last_active_dept = active
@@ -390,94 +475,107 @@ def logout():
 
 
 # ---------- TOTP 2FA for local accounts ----------
-@auth_bp.route('/totp/setup', methods=['GET', 'POST'])
+@auth_bp.route("/totp/setup", methods=["GET", "POST"])
 @login_required
 def totp_setup():
     if pyotp is None:
-        flash('Two-factor authentication support is not installed on this instance.', 'warning')
-        return redirect(url_for('requests.dashboard'))
+        flash(
+            "Two-factor authentication support is not installed on this instance.",
+            "warning",
+        )
+        return redirect(url_for("requests.dashboard"))
 
     # Generate a secret and show provisioning URI; require confirmation with a code
-    if request.method == 'GET':
+    if request.method == "GET":
         secret = pyotp.random_base32()
-        session['new_totp_secret'] = secret
-        provisioning_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=current_user.email, issuer_name=current_app.config.get('APP_NAME','ProcessMgmt'))
-        return render_template('totp_setup.html', secret=secret, provisioning_uri=provisioning_uri)
+        session["new_totp_secret"] = secret
+        provisioning_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+            name=current_user.email,
+            issuer_name=current_app.config.get("APP_NAME", "ProcessMgmt"),
+        )
+        return render_template(
+            "totp_setup.html", secret=secret, provisioning_uri=provisioning_uri
+        )
 
     # POST: verify provided code and enable TOTP
-    code = request.form.get('code')
-    secret = session.get('new_totp_secret')
+    code = request.form.get("code")
+    secret = session.get("new_totp_secret")
     if not secret or not code:
-        flash('Missing verification code.', 'danger')
-        return redirect(url_for('auth.totp_setup'))
+        flash("Missing verification code.", "danger")
+        return redirect(url_for("auth.totp_setup"))
 
     if pyotp.TOTP(secret).verify(code):
         u = db.session.get(User, current_user.id)
         u.totp_secret = secret
         u.totp_enabled = True
         db.session.commit()
-        session.pop('new_totp_secret', None)
-        flash('Two-factor authentication enabled for your account.', 'success')
-        return redirect(url_for('requests.dashboard'))
+        session.pop("new_totp_secret", None)
+        flash("Two-factor authentication enabled for your account.", "success")
+        return redirect(url_for("requests.dashboard"))
 
-    flash('Invalid code; try again.', 'danger')
-    return redirect(url_for('auth.totp_setup'))
+    flash("Invalid code; try again.", "danger")
+    return redirect(url_for("auth.totp_setup"))
 
 
-@auth_bp.route('/totp/verify', methods=['GET', 'POST'])
+@auth_bp.route("/totp/verify", methods=["GET", "POST"])
 def totp_verify():
     # Verify code for flow started after password login
-    pre_id = session.get('pre_2fa_userid')
+    pre_id = session.get("pre_2fa_userid")
     if not pre_id:
-        flash('No 2FA login pending.', 'warning')
-        return redirect(url_for('auth.login'))
+        flash("No 2FA login pending.", "warning")
+        return redirect(url_for("auth.login"))
 
     u = db.session.get(User, pre_id)
     if not u:
-        session.pop('pre_2fa_userid', None)
-        flash('User not found.', 'danger')
-        return redirect(url_for('auth.login'))
+        session.pop("pre_2fa_userid", None)
+        flash("User not found.", "danger")
+        return redirect(url_for("auth.login"))
 
     if pyotp is None:
-        flash('Two-factor authentication support is not installed on this instance.', 'warning')
-        session.pop('pre_2fa_userid', None)
-        return redirect(url_for('auth.login'))
+        flash(
+            "Two-factor authentication support is not installed on this instance.",
+            "warning",
+        )
+        session.pop("pre_2fa_userid", None)
+        return redirect(url_for("auth.login"))
 
-    if request.method == 'GET':
-        return render_template('totp_verify.html')
+    if request.method == "GET":
+        return render_template("totp_verify.html")
 
-    code = request.form.get('code')
+    code = request.form.get("code")
     if not code:
-        flash('Enter the code from your authenticator app.', 'warning')
-        return render_template('totp_verify.html')
+        flash("Enter the code from your authenticator app.", "warning")
+        return render_template("totp_verify.html")
 
     if not u.totp_secret:
-        flash('2FA not configured for this account.', 'danger')
-        session.pop('pre_2fa_userid', None)
-        return redirect(url_for('auth.login'))
+        flash("2FA not configured for this account.", "danger")
+        session.pop("pre_2fa_userid", None)
+        return redirect(url_for("auth.login"))
 
     if pyotp.TOTP(u.totp_secret).verify(code):
         # Successful, complete login
-        session.pop('pre_2fa_userid', None)
+        session.pop("pre_2fa_userid", None)
         login_user(u)
-        session['totp_verified'] = True
+        session["totp_verified"] = True
         try:
             depts = _get_user_departments(u)
             if len(depts) > 1:
-                return redirect(url_for('auth.choose_dept'))
-            if getattr(u, 'last_active_dept', None):
+                return redirect(url_for("auth.choose_dept"))
+            if getattr(u, "last_active_dept", None):
                 _restore_last_active_dept_for_user(u)
             else:
-                _session['active_dept'] = depts[0] if depts else getattr(u, 'department', None)
+                _session["active_dept"] = (
+                    depts[0] if depts else getattr(u, "department", None)
+                )
         except Exception:
             pass
-        return redirect(url_for('requests.dashboard'))
+        return redirect(url_for("requests.dashboard"))
 
-    flash('Invalid code.', 'danger')
-    return render_template('totp_verify.html')
+    flash("Invalid code.", "danger")
+    return render_template("totp_verify.html")
 
 
-@auth_bp.route('/vibe', methods=['POST'])
+@auth_bp.route("/vibe", methods=["POST"])
 @login_required
 def set_vibe():
     """Persist per-user vibe/theme index (expects form or JSON 'vibe_index')."""
@@ -485,9 +583,9 @@ def set_vibe():
         v = None
         if request.is_json:
             data = request.get_json()
-            v = int(data.get('vibe_index'))
+            v = int(data.get("vibe_index"))
         else:
-            v = int(request.form.get('vibe_index'))
+            v = int(request.form.get("vibe_index"))
     except Exception:
         return ("Invalid payload", 400)
 
@@ -497,4 +595,4 @@ def set_vibe():
     u = db.session.get(User, current_user.id)
     u.vibe_index = max(0, int(v))
     db.session.commit()
-    return ({'ok': True}, 200)
+    return ({"ok": True}, 200)

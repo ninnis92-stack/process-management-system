@@ -22,11 +22,12 @@ def owner_for_status(status: str) -> str:
         return "B"
     return OWNER_BY_STATUS.get(status, DEFAULT_OWNER)
 
+
 ALLOWED_TRANSITIONS = {
     "A": {
         ("SENT_TO_A", "B_IN_PROGRESS"),  # Reopen to Dept B
-        ("SENT_TO_A", "CLOSED"),         # Approve/close
-        ("CLOSED", "B_IN_PROGRESS"),     # Reopen after close
+        ("SENT_TO_A", "CLOSED"),  # Approve/close
+        ("CLOSED", "B_IN_PROGRESS"),  # Reopen after close
     },
     "B": {
         ("NEW_FROM_A", "B_IN_PROGRESS"),
@@ -37,7 +38,10 @@ ALLOWED_TRANSITIONS = {
         ("B_IN_PROGRESS", "PENDING_C_REVIEW"),
         ("B_IN_PROGRESS", "UNDER_REVIEW"),
         ("B_IN_PROGRESS", "WAITING_ON_A_RESPONSE"),
-        ("B_IN_PROGRESS", "B_FINAL_REVIEW"),  # bypass C (only if requires_c_review == False)
+        (
+            "B_IN_PROGRESS",
+            "B_FINAL_REVIEW",
+        ),  # bypass C (only if requires_c_review == False)
         ("WAITING_ON_A_RESPONSE", "B_IN_PROGRESS"),
         ("C_NEEDS_CHANGES", "B_IN_PROGRESS"),
         ("C_APPROVED", "B_FINAL_REVIEW"),
@@ -59,13 +63,14 @@ ALLOWED_TRANSITIONS = {
 }
 
 HANDOFF_TRANSITIONS = {
-    ("B_IN_PROGRESS", "PENDING_C_REVIEW"),   # B -> C
-    ("PENDING_C_REVIEW", "C_APPROVED"),      # C -> B
-    ("PENDING_C_REVIEW", "C_NEEDS_CHANGES"), # C -> B
-    ("B_FINAL_REVIEW", "SENT_TO_A"),         # B -> A/submitter
-    ("EXEC_APPROVAL", "SENT_TO_A"),          # B -> A/submitter after exec signoff
-    ("NEW_FROM_A", "PENDING_C_REVIEW"),      # B -> C (early send)
+    ("B_IN_PROGRESS", "PENDING_C_REVIEW"),  # B -> C
+    ("PENDING_C_REVIEW", "C_APPROVED"),  # C -> B
+    ("PENDING_C_REVIEW", "C_NEEDS_CHANGES"),  # C -> B
+    ("B_FINAL_REVIEW", "SENT_TO_A"),  # B -> A/submitter
+    ("EXEC_APPROVAL", "SENT_TO_A"),  # B -> A/submitter after exec signoff
+    ("NEW_FROM_A", "PENDING_C_REVIEW"),  # B -> C (early send)
 }
+
 
 def _allowed_from_spec(spec: dict) -> set:
     """Return a set of (from,to) tuples from a workflow spec dict.
@@ -76,7 +81,7 @@ def _allowed_from_spec(spec: dict) -> set:
     out = set()
     if not spec or not isinstance(spec, dict):
         return out
-    trans = spec.get('transitions') or spec.get('allowed_transitions') or []
+    trans = spec.get("transitions") or spec.get("allowed_transitions") or []
     if isinstance(trans, dict):
         # support mapping format {"A": ["B","C"]}
         for k, vals in trans.items():
@@ -86,8 +91,8 @@ def _allowed_from_spec(spec: dict) -> set:
     elif isinstance(trans, (list, tuple)):
         for item in trans:
             if isinstance(item, dict):
-                f = item.get('from') or item.get('source')
-                t = item.get('to') or item.get('target')
+                f = item.get("from") or item.get("source")
+                t = item.get("to") or item.get("target")
                 if f and t:
                     out.add((f, t))
             elif isinstance(item, (list, tuple)) and len(item) >= 2:
@@ -113,15 +118,15 @@ def transition_allowed(dept: str, from_status: str, to_status: str) -> bool:
             spec_allowed = _allowed_from_spec(spec)
             legacy_allowed = ALLOWED_TRANSITIONS.get(dept, set())
 
-            mode = (spec.get('mode') or 'augment').strip().lower()
-            if mode == 'override':
+            mode = (spec.get("mode") or "augment").strip().lower()
+            if mode == "override":
                 allowed = set(spec_allowed)
             else:
                 # default: augment/union
                 allowed = set(legacy_allowed).union(spec_allowed)
 
             # Optional `deny` list in spec to explicitly remove transitions
-            deny_raw = spec.get('deny') or spec.get('deny_transitions') or []
+            deny_raw = spec.get("deny") or spec.get("deny_transitions") or []
             deny_set = set()
             if isinstance(deny_raw, dict):
                 # mapping format: {"A": ["B","C"]}
@@ -132,8 +137,8 @@ def transition_allowed(dept: str, from_status: str, to_status: str) -> bool:
             elif isinstance(deny_raw, (list, tuple)):
                 for item in deny_raw:
                     if isinstance(item, dict):
-                        f = item.get('from') or item.get('source')
-                        t = item.get('to') or item.get('target')
+                        f = item.get("from") or item.get("source")
+                        t = item.get("to") or item.get("target")
                         if f and t:
                             deny_set.add((f, t))
                     elif isinstance(item, (list, tuple)) and len(item) >= 2:
@@ -163,14 +168,14 @@ def allowed_transitions_with_labels(dept: str, from_status: str) -> list:
         if not wf:
             wf = Workflow.query.filter_by(active=True, department_code=None).first()
         if wf and isinstance(wf.spec, dict):
-            steps = wf.spec.get('steps') or wf.spec.get('labels')
+            steps = wf.spec.get("steps") or wf.spec.get("labels")
             if isinstance(steps, dict):
                 label_map.update(steps)
             elif isinstance(steps, (list, tuple)):
                 for s in steps:
                     if isinstance(s, dict):
-                        code = s.get('code') or s.get('id') or s.get('name')
-                        lab = s.get('label') or s.get('title')
+                        code = s.get("code") or s.get("id") or s.get("name")
+                        lab = s.get("label") or s.get("title")
                         if code and lab:
                             label_map[code] = lab
     except Exception:
@@ -198,6 +203,7 @@ def allowed_transitions_with_labels(dept: str, from_status: str) -> list:
         if not lab:
             try:
                 from ..models import StatusOption
+
                 so = StatusOption.query.filter_by(code=t).first()
                 if so and so.label:
                     lab = so.label
@@ -208,14 +214,20 @@ def allowed_transitions_with_labels(dept: str, from_status: str) -> list:
         choices.append((t, lab))
     return choices
 
-def handoff_for_transition(from_status: str, to_status: str) -> Optional[Tuple[str, str]]:
+
+def handoff_for_transition(
+    from_status: str, to_status: str
+) -> Optional[Tuple[str, str]]:
     if (from_status, to_status) not in HANDOFF_TRANSITIONS:
         return None
     if (from_status, to_status) == ("B_IN_PROGRESS", "PENDING_C_REVIEW"):
         return ("B", "C")
     if (from_status, to_status) == ("NEW_FROM_A", "PENDING_C_REVIEW"):
         return ("B", "C")
-    if from_status == "PENDING_C_REVIEW" and to_status in ("C_APPROVED", "C_NEEDS_CHANGES"):
+    if from_status == "PENDING_C_REVIEW" and to_status in (
+        "C_APPROVED",
+        "C_NEEDS_CHANGES",
+    ):
         return ("C", "B")
     if (from_status, to_status) == ("B_FINAL_REVIEW", "SENT_TO_A"):
         return ("B", "A")

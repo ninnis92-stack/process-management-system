@@ -24,21 +24,23 @@
     <div id="workflow-steps" class="list-group mb-2" aria-label="Workflow steps">
       {% if wf and wf.spec and wf.spec.steps %}
         {% for s in wf.spec.steps %}
-          <div class="list-group-item d-flex align-items-center" data-from-dept="{{ (wf.spec.steps[loop.index0].from_dept) if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].from_dept is defined) else '' }}" data-to-dept="{{ (wf.spec.steps[loop.index0].to_dept) if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].to_dept is defined) else '' }}" data-status="{{ (wf.spec.steps[loop.index0].status) if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].status is defined) else '' }}">
+          {# support legacy step as string or new step as mapping with from_dept/to_dept/status #}
+          {% set step = s if s is mapping else ({'status': s} if s is string else {}) %}
+          <div class="list-group-item d-flex align-items-center" data-from-dept="{{ step.from_dept if step.from_dept is defined else '' }}" data-to-dept="{{ step.to_dept if step.to_dept is defined else '' }}" data-status="{{ step.status if step.status is defined else '' }}">
             <span class="me-2 drag-handle" aria-hidden>≡</span>
             <select class="form-select form-select-sm me-2 step-from-dept" style="width:120px">
               <option value="">(From)</option>
-              <option value="A" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].from_dept == 'A') %}selected{% endif %}>A</option>
-              <option value="B" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].from_dept == 'B') %}selected{% endif %}>B</option>
-              <option value="C" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].from_dept == 'C') %}selected{% endif %}>C</option>
+              <option value="A" {% if step.from_dept is defined and step.from_dept == 'A' %}selected{% endif %}>A</option>
+              <option value="B" {% if step.from_dept is defined and step.from_dept == 'B' %}selected{% endif %}>B</option>
+              <option value="C" {% if step.from_dept is defined and step.from_dept == 'C' %}selected{% endif %}>C</option>
             </select>
             <select class="form-select form-select-sm me-2 step-to-dept" style="width:120px">
               <option value="">(To)</option>
-              <option value="A" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].to_dept == 'A') %}selected{% endif %}>A</option>
-              <option value="B" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].to_dept == 'B') %}selected{% endif %}>B</option>
-              <option value="C" {% if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].to_dept == 'C') %}selected{% endif %}>C</option>
+              <option value="A" {% if step.to_dept is defined and step.to_dept == 'A' %}selected{% endif %}>A</option>
+              <option value="B" {% if step.to_dept is defined and step.to_dept == 'B' %}selected{% endif %}>B</option>
+              <option value="C" {% if step.to_dept is defined and step.to_dept == 'C' %}selected{% endif %}>C</option>
             </select>
-            <input class="form-control form-control-sm me-2 step-status" style="max-width:220px" placeholder="Status code" value="{{ (wf.spec.steps[loop.index0].status) if (wf.spec.steps[loop.index0] is defined and wf.spec.steps[loop.index0].status is defined) else '' }}" list="" />
+            <input class="form-control form-control-sm me-2 step-status" style="max-width:220px" placeholder="Status code" value="{{ step.status if step.status is defined else '' }}" list="" />
             <div class="btn-group ms-2 me-2" role="group" aria-label="Move">
               <button type="button" class="btn btn-sm btn-light move-up" title="Move up">▲</button>
               <button type="button" class="btn btn-sm btn-light move-down" title="Move down">▼</button>

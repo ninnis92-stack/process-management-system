@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Map Submission #{{ submission.id }}</h3>
+<p class="text-muted">Map incoming payload keys to template fields so automated extraction works.</p>
+<form method="post">
+  <table class="table table-sm">
+    <thead>
+      <tr><th style="width:40%">Payload Key</th><th>Value</th><th>Map to Field</th></tr>
+    </thead>
+    <tbody>
+      {% for pk in payload_keys %}
+        <tr>
+          <td>{{ pk }}</td>
+          <td style="white-space:pre-wrap">{{ submission.data[pk] }}</td>
+          <td>
+            <select name="map__{{ pk }}" class="form-select">
+              <option value="">(leave unmapped)</option>
+              {% for f in fields %}
+                <option value="{{ f.id }}">{{ f.label }} ({{ f.name }})</option>
+              {% endfor %}
+            </select>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="text-muted">No payload keys available to map.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button class="btn btn-primary">Save mapping</button>
+  <a href="{{ url_for('admin.unmapped_submissions') }}" class="btn btn-link">Cancel</a>
+</form>
+{% endblock %}

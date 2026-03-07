@@ -15,10 +15,20 @@ Metrics provided:
 import logging
 
 try:
-    from prometheus_client import Counter, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST, REGISTRY
+    from prometheus_client import (
+        Counter,
+        Gauge,
+        generate_latest,
+        CollectorRegistry,
+        CONTENT_TYPE_LATEST,
+        REGISTRY,
+    )
+
     METRICS_AVAILABLE = True
 except ImportError:
-    logging.getLogger(__name__).warning('prometheus_client not installed; metrics disabled')
+    logging.getLogger(__name__).warning(
+        "prometheus_client not installed; metrics disabled"
+    )
     METRICS_AVAILABLE = False
 
     # noop metric implementations so imports elsewhere don't fail
@@ -33,10 +43,10 @@ except ImportError:
             return None
 
     def generate_latest(registry=None):
-        return b''
+        return b""
 
     # minimal content-type to return
-    CONTENT_TYPE_LATEST = 'text/plain; version=0.0.4'
+    CONTENT_TYPE_LATEST = "text/plain; version=0.0.4"
     REGISTRY = None
 
     Counter = lambda *a, **k: _NoopMetric()
@@ -45,41 +55,37 @@ except ImportError:
 
 # Counters
 requests_created_total = Counter(
-    'app_requests_created_total',
-    'Total requests created',
-    ['dept']
+    "app_requests_created_total", "Total requests created", ["dept"]
 )
 
 request_transitions_total = Counter(
-    'app_request_transitions_total',
-    'Request transitions (by from->to and acting dept)',
-    ['from_status', 'to_status', 'dept']
+    "app_request_transitions_total",
+    "Request transitions (by from->to and acting dept)",
+    ["from_status", "to_status", "dept"],
 )
 
 assignment_changes_total = Counter(
-    'app_assignment_changes_total',
-    'Assignment changes (assigned/cleared) by dept',
-    ['dept', 'action']
+    "app_assignment_changes_total",
+    "Assignment changes (assigned/cleared) by dept",
+    ["dept", "action"],
 )
 
 # New metrics
 requests_closed_before_due_total = Counter(
-    'app_requests_closed_before_due_total',
-    'Requests closed on or before due date',
-    ['dept']
+    "app_requests_closed_before_due_total",
+    "Requests closed on or before due date",
+    ["dept"],
 )
 
 # Gauges
 requests_by_owner = Gauge(
-    'app_requests_by_owner',
-    'Current requests by owner department',
-    ['dept']
+    "app_requests_by_owner", "Current requests by owner department", ["dept"]
 )
 
 requests_overdue_by_owner = Gauge(
-    'app_requests_overdue_by_owner',
-    'Current requests overdue (past due date) by owner department',
-    ['dept']
+    "app_requests_overdue_by_owner",
+    "Current requests overdue (past due date) by owner department",
+    ["dept"],
 )
 
 
@@ -92,7 +98,7 @@ def metrics_output():
     try:
         return generate_latest(REGISTRY), CONTENT_TYPE_LATEST
     except Exception:
-        return b'', CONTENT_TYPE_LATEST
+        return b"", CONTENT_TYPE_LATEST
 
 
 def update_owner_gauge(session, ReqModel):
@@ -107,7 +113,9 @@ def update_owner_gauge(session, ReqModel):
 
     # Gather counts grouped by owner_department and update the gauge labels.
     counts = dict(
-        session.query(ReqModel.owner_department, __import__('sqlalchemy').func.count(ReqModel.id))
+        session.query(
+            ReqModel.owner_department, __import__("sqlalchemy").func.count(ReqModel.id)
+        )
         .group_by(ReqModel.owner_department)
         .all()
     )
@@ -116,25 +124,26 @@ def update_owner_gauge(session, ReqModel):
 
     # Make sure departments with zero items are explicitly set to 0 so Prometheus
     # scraped series don't linger with stale samples in the registry.
-    for d in ('A', 'B', 'C'):
+    for d in ("A", "B", "C"):
         if d not in counts:
             requests_by_owner.labels(dept=d).set(0)
 
     # Also update overdue counts: requests where due_at is set, due_at < now, and not CLOSED
     try:
         from datetime import datetime
-        func = __import__('sqlalchemy').func
+
+        func = __import__("sqlalchemy").func
         overdue_counts = dict(
             session.query(ReqModel.owner_department, func.count(ReqModel.id))
             .filter(ReqModel.due_at != None)
             .filter(ReqModel.due_at < datetime.utcnow())
-            .filter(ReqModel.status != 'CLOSED')
+            .filter(ReqModel.status != "CLOSED")
             .group_by(ReqModel.owner_department)
             .all()
         )
         for d, v in overdue_counts.items():
             requests_overdue_by_owner.labels(dept=d).set(v)
-        for d in ('A', 'B', 'C'):
+        for d in ("A", "B", "C"):
             if d not in overdue_counts:
                 requests_overdue_by_owner.labels(dept=d).set(0)
     except Exception:

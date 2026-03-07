@@ -38,7 +38,9 @@ def b_user(app):
                 name="Dept B User",
                 email="b@example.com",
                 department="B",
-                password_hash=generate_password_hash("password123", method="pbkdf2:sha256"),
+                password_hash=generate_password_hash(
+                    "password123", method="pbkdf2:sha256"
+                ),
                 is_active=True,
             )
             db.session.add(user)
@@ -70,18 +72,26 @@ def _seed_requests(app):
             db.session.add(req)
             db.session.flush()
             for art in artifacts or []:
-                db.session.add(Artifact(
-                    request_id=req.id,
-                    artifact_type=art.get("type"),
-                    target_part_number=art.get("target"),
-                    donor_part_number=art.get("donor"),
-                    created_by_department="B",
-                ))
+                db.session.add(
+                    Artifact(
+                        request_id=req.id,
+                        artifact_type=art.get("type"),
+                        target_part_number=art.get("target"),
+                        donor_part_number=art.get("donor"),
+                        created_by_department="B",
+                    )
+                )
             return req
 
         make_req("In Progress Req", "B_IN_PROGRESS")
-        make_req("Method Created Req", "B_IN_PROGRESS", artifacts=[{"type": "instructions"}])
-        make_req("Part Number Created Req", "B_IN_PROGRESS", artifacts=[{"type": "part_number", "target": "PN-123"}])
+        make_req(
+            "Method Created Req", "B_IN_PROGRESS", artifacts=[{"type": "instructions"}]
+        )
+        make_req(
+            "Part Number Created Req",
+            "B_IN_PROGRESS",
+            artifacts=[{"type": "part_number", "target": "PN-123"}],
+        )
         make_req("Pending C Review Req", "PENDING_C_REVIEW")
         make_req("Final Review Req", "B_FINAL_REVIEW")
         make_req("Closed Req", "CLOSED")
@@ -118,8 +128,18 @@ def test_dashboard_filters_render(client, b_user, app):
     assert r2.status_code == 200
     assert "In Progress Req" in r2.get_data(as_text=True)
 
-    assert "Method Created Req" in client.get("/dashboard?status=method_created").get_data(as_text=True)
-    assert "Part Number Created Req" in client.get("/dashboard?status=part_number_created").get_data(as_text=True)
-    assert "Pending C Review Req" in client.get("/dashboard?status=under_review_by_department_c").get_data(as_text=True)
-    assert "Final Review Req" in client.get("/dashboard?status=under_final_review").get_data(as_text=True)
-    assert "Closed Req" in client.get("/dashboard?status=request_denied").get_data(as_text=True)
+    assert "Method Created Req" in client.get(
+        "/dashboard?status=method_created"
+    ).get_data(as_text=True)
+    assert "Part Number Created Req" in client.get(
+        "/dashboard?status=part_number_created"
+    ).get_data(as_text=True)
+    assert "Pending C Review Req" in client.get(
+        "/dashboard?status=under_review_by_department_c"
+    ).get_data(as_text=True)
+    assert "Final Review Req" in client.get(
+        "/dashboard?status=under_final_review"
+    ).get_data(as_text=True)
+    assert "Closed Req" in client.get("/dashboard?status=request_denied").get_data(
+        as_text=True
+    )

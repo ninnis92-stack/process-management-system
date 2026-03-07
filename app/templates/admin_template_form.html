@@ -16,6 +16,24 @@
     {{ form.field_count(class="form-control") }}
     <div class="form-text">Create this many empty fields (editable later).</div>
   </div>
+  <hr/>
+  <h5>External Integration (optional)</h5>
+  <div class="mb-3 form-check">
+    {{ form.external_enabled(class="form-check-input") }}
+    <label class="form-check-label">Use external form (e.g. Microsoft Forms)</label>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">External provider</label>
+    {{ form.external_provider(class="form-control") }}
+  </div>
+  <div class="mb-3">
+    <label class="form-label">External form URL</label>
+    {{ form.external_form_url(class="form-control") }}
+  </div>
+  <div class="mb-3">
+    <label class="form-label">External form id</label>
+    {{ form.external_form_id(class="form-control") }}
+  </div>
   <button class="btn btn-primary">Create</button>
 </form>
 {% endblock %}

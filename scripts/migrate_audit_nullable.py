@@ -12,8 +12,8 @@ import shutil
 import sqlite3
 from datetime import datetime
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-DB_PATH = os.getenv('DATABASE_FILE') or os.path.join(ROOT, 'app.db')
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DB_PATH = os.getenv("DATABASE_FILE") or os.path.join(ROOT, "app.db")
 
 if not os.path.exists(DB_PATH):
     print(f"Database file not found: {DB_PATH}")
@@ -31,16 +31,17 @@ try:
     cur.execute("PRAGMA table_info('audit_log')")
     cols = cur.fetchall()
     if not cols:
-        print('No audit_log table present; nothing to do.')
+        print("No audit_log table present; nothing to do.")
         raise SystemExit(0)
     col_info = {c[1]: c for c in cols}
-    if 'request_id' in col_info and col_info['request_id'][3] == 0:
-        print('audit_log.request_id is already nullable; nothing to do.')
+    if "request_id" in col_info and col_info["request_id"][3] == 0:
+        print("audit_log.request_id is already nullable; nothing to do.")
         raise SystemExit(0)
 
-    print('Performing migration: recreate audit_log with nullable request_id...')
+    print("Performing migration: recreate audit_log with nullable request_id...")
 
-    cur.executescript('''
+    cur.executescript(
+        """
     BEGIN;
     CREATE TABLE audit_log_new (
         id INTEGER PRIMARY KEY,
@@ -62,8 +63,9 @@ try:
     DROP TABLE audit_log;
     ALTER TABLE audit_log_new RENAME TO audit_log;
     COMMIT;
-    ''')
-    print('Migration completed successfully.')
+    """
+    )
+    print("Migration completed successfully.")
 except Exception:
     con.rollback()
     raise

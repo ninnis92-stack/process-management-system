@@ -11,7 +11,7 @@ from sqlalchemy import pool
 # access to the values within the .ini file in use.
 from alembic import context
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app import create_app
 from app.extensions import db
@@ -30,7 +30,7 @@ target_metadata = db.metadata
 
 
 def run_migrations_offline():
-    url = app.config.get('SQLALCHEMY_DATABASE_URI') or app.config.get('DATABASE_URL')
+    url = app.config.get("SQLALCHEMY_DATABASE_URI") or app.config.get("DATABASE_URL")
     context.configure(
         url=url,
         target_metadata=target_metadata,

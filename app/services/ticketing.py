@@ -16,10 +16,16 @@ class TicketingClient:
         self.token = cfg.get("TICKETING_TOKEN")
         self.timeout = int(cfg.get("TICKETING_TIMEOUT", 5))
 
-    def create_ticket(self, summary: str, description: str, metadata: Optional[Dict] = None) -> Dict:
+    def create_ticket(
+        self, summary: str, description: str, metadata: Optional[Dict] = None
+    ) -> Dict:
         if not self.enabled or not self.url:
             # Prototype behavior: return a fake ticket id and note
-            return {"ok": None, "ticket_id": f"PROTOTYPE-{int(__import__('time').time())}", "url": None}
+            return {
+                "ok": None,
+                "ticket_id": f"PROTOTYPE-{int(__import__('time').time())}",
+                "url": None,
+            }
 
         # Real implementation should POST to provider API using requests and return structured result.
         try:

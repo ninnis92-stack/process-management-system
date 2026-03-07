@@ -75,7 +75,8 @@ def test_inbound_mail_creates_user_request_for_sso_sender(app, client):
     payload = {
         "from": "sso.user@example.com",
         "to": "requests@example.com",
-        "subject": "title=Email SSO Request;due_at=" + (datetime.utcnow() + timedelta(days=3)).isoformat(),
+        "subject": "title=Email SSO Request;due_at="
+        + (datetime.utcnow() + timedelta(days=3)).isoformat(),
         "body": "SSO request description",
     }
     raw = json.dumps(payload).encode("utf-8")
@@ -192,17 +193,29 @@ def test_out_of_stock_notification_only_mode(monkeypatch, app, client):
         cfg.request_form_email = "requests@example.com"
         cfg.request_form_inventory_out_of_stock_notify_enabled = True
         cfg.request_form_inventory_out_of_stock_notify_mode = "notification"
-        cfg.request_form_inventory_out_of_stock_message = "Inventory issue:\n{out_of_stock_fields}"
+        cfg.request_form_inventory_out_of_stock_message = (
+            "Inventory issue:\n{out_of_stock_fields}"
+        )
         db.session.commit()
 
     def _always_oos(self, value):
         return False
 
-    monkeypatch.setattr("app.services.inventory.InventoryService.validate_part_number", _always_oos)
+    monkeypatch.setattr(
+        "app.services.inventory.InventoryService.validate_part_number", _always_oos
+    )
 
     calls = {"notify": 0, "email": 0}
 
-    def _mock_notify(users, title, body=None, url=None, ntype="generic", request_id=None, allow_email=True):
+    def _mock_notify(
+        users,
+        title,
+        body=None,
+        url=None,
+        ntype="generic",
+        request_id=None,
+        allow_email=True,
+    ):
         calls["notify"] += 1
         assert title == "Inventory out-of-stock notice"
         assert "donor_part_number" in (body or "")
@@ -213,7 +226,9 @@ def test_out_of_stock_notification_only_mode(monkeypatch, app, client):
         return True
 
     monkeypatch.setattr("app.notifcations.notify_users", _mock_notify)
-    monkeypatch.setattr("app.notifcations.send_request_form_inventory_out_of_stock_notice", _mock_email)
+    monkeypatch.setattr(
+        "app.notifcations.send_request_form_inventory_out_of_stock_notice", _mock_email
+    )
 
     payload = {
         "from": "stock.user@example.com",
@@ -248,17 +263,29 @@ def test_out_of_stock_email_only_mode_uses_custom_message(monkeypatch, app, clie
         cfg.request_form_email = "requests@example.com"
         cfg.request_form_inventory_out_of_stock_notify_enabled = True
         cfg.request_form_inventory_out_of_stock_notify_mode = "email"
-        cfg.request_form_inventory_out_of_stock_message = "Custom OOS message:\n{out_of_stock_fields}"
+        cfg.request_form_inventory_out_of_stock_message = (
+            "Custom OOS message:\n{out_of_stock_fields}"
+        )
         db.session.commit()
 
     def _always_oos(self, value):
         return False
 
-    monkeypatch.setattr("app.services.inventory.InventoryService.validate_part_number", _always_oos)
+    monkeypatch.setattr(
+        "app.services.inventory.InventoryService.validate_part_number", _always_oos
+    )
 
     calls = {"notify": 0, "email": 0, "message": None}
 
-    def _mock_notify(users, title, body=None, url=None, ntype="generic", request_id=None, allow_email=True):
+    def _mock_notify(
+        users,
+        title,
+        body=None,
+        url=None,
+        ntype="generic",
+        request_id=None,
+        allow_email=True,
+    ):
         calls["notify"] += 1
         return None
 
@@ -270,7 +297,9 @@ def test_out_of_stock_email_only_mode_uses_custom_message(monkeypatch, app, clie
         return True
 
     monkeypatch.setattr("app.notifcations.notify_users", _mock_notify)
-    monkeypatch.setattr("app.notifcations.send_request_form_inventory_out_of_stock_notice", _mock_email)
+    monkeypatch.setattr(
+        "app.notifcations.send_request_form_inventory_out_of_stock_notice", _mock_email
+    )
 
     payload = {
         "from": "guest.sender@example.com",
@@ -363,10 +392,28 @@ def test_autoresponder_uses_department_template_fields(monkeypatch, app):
         template = FormTemplate(name="Dept A Email Template", description="")
         db.session.add(template)
         db.session.flush()
-        db.session.add(FormField(template_id=template.id, name="part_code", label="Part Code", field_type="text", required=True))
-        db.session.add(FormField(template_id=template.id, name="priority", label="Priority", field_type="select", required=True))
+        db.session.add(
+            FormField(
+                template_id=template.id,
+                name="part_code",
+                label="Part Code",
+                field_type="text",
+                required=True,
+            )
+        )
+        db.session.add(
+            FormField(
+                template_id=template.id,
+                name="priority",
+                label="Priority",
+                field_type="select",
+                required=True,
+            )
+        )
         db.session.flush()
-        db.session.add(DepartmentFormAssignment(template_id=template.id, department_name="A"))
+        db.session.add(
+            DepartmentFormAssignment(template_id=template.id, department_name="A")
+        )
         db.session.commit()
 
     sent = {"subject": None, "body": None}
@@ -385,7 +432,9 @@ def test_autoresponder_uses_department_template_fields(monkeypatch, app):
     assert "priority=" in (sent["body"] or "")
 
 
-def test_inbound_mail_rejects_missing_required_department_field_when_strict(app, client):
+def test_inbound_mail_rejects_missing_required_department_field_when_strict(
+    app, client
+):
     secret = "test-secret"
     app.config["WEBHOOK_SHARED_SECRET"] = secret
 
@@ -399,8 +448,18 @@ def test_inbound_mail_rejects_missing_required_department_field_when_strict(app,
         template = FormTemplate(name="Dept A Validation Template", description="")
         db.session.add(template)
         db.session.flush()
-        db.session.add(FormField(template_id=template.id, name="part_code", label="Part Code", field_type="text", required=True))
-        db.session.add(DepartmentFormAssignment(template_id=template.id, department_name="A"))
+        db.session.add(
+            FormField(
+                template_id=template.id,
+                name="part_code",
+                label="Part Code",
+                field_type="text",
+                required=True,
+            )
+        )
+        db.session.add(
+            DepartmentFormAssignment(template_id=template.id, department_name="A")
+        )
         db.session.commit()
 
     payload = {

@@ -5,6 +5,7 @@ Start with:
 REDIS_URL=redis://redis:6379 flask run or use docker-compose; then:
 python3 scripts/rq_worker.py
 """
+
 import os
 from redis import Redis
 from rq import Worker, Queue, Connection

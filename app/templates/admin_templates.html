@@ -11,6 +11,9 @@
       </div>
       <div>
         <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.edit_template_fields', template_id=t.id) }}">Edit fields</a>
+        {% if t.external_enabled %}
+          <span class="badge text-bg-info ms-2">External: {{ t.external_provider or 'external' }}</span>
+        {% endif %}
       </div>
     </li>
   {% else %}

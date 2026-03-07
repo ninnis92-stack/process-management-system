@@ -24,7 +24,9 @@ class EmailService:
         self.timeout = int(cfg.get("SMTP_TIMEOUT", 10))
         self.test_domains = set(cfg.get("TEST_EMAIL_DOMAINS", [])) or set()
 
-    def send_email(self, recipients: List[str], subject: str, text: str, html: Optional[str] = None) -> dict:
+    def send_email(
+        self, recipients: List[str], subject: str, text: str, html: Optional[str] = None
+    ) -> dict:
         """Send email to recipients.
 
         Returns a dict with keys:
@@ -62,7 +64,9 @@ class EmailService:
 
         if not to_send:
             # Nothing to attempt; return skipped as the reason
-            current_app.logger.info(f"EmailService: skipped sending to test domains: {skipped}")
+            current_app.logger.info(
+                f"EmailService: skipped sending to test domains: {skipped}"
+            )
             result["ok"] = None
             return result
 
@@ -81,11 +85,15 @@ class EmailService:
                 msg["To"] = ", ".join(to_send)
                 s.send_message(msg)
                 s.quit()
-                current_app.logger.info(f"EmailService: sent email to {len(to_send)} recipients (skipped {len(skipped)})")
+                current_app.logger.info(
+                    f"EmailService: sent email to {len(to_send)} recipients (skipped {len(skipped)})"
+                )
                 result["ok"] = True
                 return result
             except Exception as exc:
-                current_app.logger.exception(f"EmailService: failed to send email: {exc}")
+                current_app.logger.exception(
+                    f"EmailService: failed to send email: {exc}"
+                )
                 result["ok"] = False
                 result["error"] = str(exc)
                 return result

@@ -1,11 +1,29 @@
 import smtplib
 from email.message import EmailMessage
-from flask import Blueprint, render_template, redirect, url_for, flash, abort, current_app, request
+from flask import (
+    Blueprint,
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    abort,
+    current_app,
+    request,
+)
 from sqlalchemy import func
 
 from ..extensions import db
 from sqlalchemy.exc import OperationalError
-from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Notification, Workflow
+from ..models import (
+    Artifact,
+    Request as ReqModel,
+    Comment,
+    AuditLog,
+    Submission,
+    User,
+    Notification,
+    Workflow,
+)
 from ..notifcations import notify_users, users_in_department
 from types import SimpleNamespace
 from werkzeug.routing import BuildError
@@ -13,7 +31,16 @@ from .forms import ExternalNewRequestForm, ExternalCommentForm, GuestLookupForm
 
 external_bp = Blueprint("external", __name__, url_prefix="/external")
 
-def _log(req, action_type, note=None, from_status=None, to_status=None, actor_type="guest", actor_label=None):
+
+def _log(
+    req,
+    action_type,
+    note=None,
+    from_status=None,
+    to_status=None,
+    actor_type="guest",
+    actor_label=None,
+):
     entry = AuditLog(
         request_id=req.id,
         actor_type=actor_type,
@@ -25,6 +52,7 @@ def _log(req, action_type, note=None, from_status=None, to_status=None, actor_ty
         note=note,
     )
     db.session.add(entry)
+
 
 # Notification helpers imported from app/notifcations.py
 
@@ -38,7 +66,9 @@ def _send_guest_email(to_email: str, subject: str, body: str) -> None:
     use_tls = current_app.config.get("SMTP_USE_TLS", True)
 
     if not host or not from_email:
-        current_app.logger.warning("Email not sent: SMTP_HOST or MAIL_FROM not configured")
+        current_app.logger.warning(
+            "Email not sent: SMTP_HOST or MAIL_FROM not configured"
+        )
         return
 
     msg = EmailMessage()
@@ -56,6 +86,7 @@ def _send_guest_email(to_email: str, subject: str, body: str) -> None:
             server.send_message(msg)
     except Exception as exc:  # noqa: BLE001
         current_app.logger.error("Failed to send guest email", exc_info=exc)
+
 
 @external_bp.route("/new", methods=["GET", "POST"])
 def external_new():
@@ -80,7 +111,11 @@ def external_new():
                 return render_template("external_new.html", form=form)
 
         # prefer explicit owner_department from form if provided
-        owner_dept = (form.owner_department.data or "B").strip().upper() if getattr(form, 'owner_department', None) else 'B'
+        owner_dept = (
+            (form.owner_department.data or "B").strip().upper()
+            if getattr(form, "owner_department", None)
+            else "B"
+        )
 
         req = ReqModel(
             title=form.title.data.strip(),
@@ -98,7 +133,7 @@ def external_new():
         )
         # Attach selected workflow if present
         try:
-            wf_id = int(getattr(form, 'workflow_id', SimpleNamespace(data=0)).data or 0)
+            wf_id = int(getattr(form, "workflow_id", SimpleNamespace(data=0)).data or 0)
             if wf_id:
                 req.workflow_id = wf_id
         except Exception:
@@ -112,17 +147,25 @@ def external_new():
             # missing on a newly started machine. Session is marked for
             # rollback after a failed flush — rollback first, create tables
             # and retry once so guest submissions succeed on fresh instances.
-            current_app.logger.warning("Flush failed; rolling back, attempting create_all and retry: %s", err)
+            current_app.logger.warning(
+                "Flush failed; rolling back, attempting create_all and retry: %s", err
+            )
             try:
                 db.session.rollback()
             except Exception:
-                current_app.logger.exception("Failed to rollback session after flush error")
+                current_app.logger.exception(
+                    "Failed to rollback session after flush error"
+                )
             try:
                 db.create_all()
-                db.session.add(req)  # Re-add the request instance to the session (rollback detached it)
+                db.session.add(
+                    req
+                )  # Re-add the request instance to the session (rollback detached it)
                 db.session.flush()
             except Exception:
-                current_app.logger.exception("Failed to create tables or flush on retry")
+                current_app.logger.exception(
+                    "Failed to create tables or flush on retry"
+                )
                 raise
 
         dept_users = users_in_department(req.owner_department)
@@ -132,7 +175,9 @@ def external_new():
         try:
             internal_url = url_for("requests.request_detail", request_id=req.id)
         except BuildError:
-            current_app.logger.warning("Could not build internal request_detail URL for Request id=%s", req.id)
+            current_app.logger.warning(
+                "Could not build internal request_detail URL for Request id=%s", req.id
+            )
             internal_url = None
 
         notify_users(
@@ -155,7 +200,9 @@ def external_new():
                 artifact_type="part_number",
                 donor_part_number=donor,
                 target_part_number=target,  # optional
-                no_donor_reason=reason if form.request_type.data == "part_number" else None,
+                no_donor_reason=(
+                    reason if form.request_type.data == "part_number" else None
+                ),
                 instructions_url=None,
                 created_by_user_id=None,
                 created_by_department="A",
@@ -167,8 +214,8 @@ def external_new():
             a2 = Artifact(
                 request_id=req.id,
                 artifact_type="instructions",
-                donor_part_number=donor,     # required by your validation for instructions/both
-                target_part_number=target,   # required for instructions; optional for both if you chose that
+                donor_part_number=donor,  # required by your validation for instructions/both
+                target_part_number=target,  # required for instructions; optional for both if you chose that
                 no_donor_reason=None,
                 instructions_url=None,
                 created_by_user_id=None,
@@ -177,7 +224,13 @@ def external_new():
             )
             db.session.add(a2)
 
-        _log(req, "created", note="Request created by Guest.", to_status=req.status, actor_label=req.guest_email)
+        _log(
+            req,
+            "created",
+            note="Request created by Guest.",
+            to_status=req.status,
+            actor_label=req.guest_email,
+        )
 
         sub = Submission(
             request_id=req.id,
@@ -191,22 +244,39 @@ def external_new():
             created_by_guest_email=req.guest_email,
         )
         db.session.add(sub)
-        _log(req, "submission_created", note="Initial submission packet created (Guest A→B).", actor_label=req.guest_email)
+        _log(
+            req,
+            "submission_created",
+            note="Initial submission packet created (Guest A→B).",
+            actor_label=req.guest_email,
+        )
 
         db.session.commit()
-        
+
         # Email the guest with their request number and tracking link (best-effort)
-        link = url_for("external.external_detail", token=req.guest_access_token, _external=True)
+        link = url_for(
+            "external.external_detail", token=req.guest_access_token, _external=True
+        )
         _send_guest_email(
             req.guest_email,
             subject=f"Your request #{req.id}",
             body=f"Thanks for submitting your request. Your request number is #{req.id}.\n\nTrack it here: {link}\n",
         )
-        flash(f"Request #{req.id} submitted successfully. You can use this page to track updates.", "success")
+        flash(
+            f"Request #{req.id} submitted successfully. You can use this page to track updates.",
+            "success",
+        )
         # Use Post-Redirect-Get so refresh doesn't resubmit the form. Redirect
         # back to the guest submit page with minimal query args so the top
         # banner can render the confirmation and the form stays cleared.
-        return redirect(url_for('external.external_new', created_req_id=req.id, guest_email=req.guest_email, tracking_link=link))
+        return redirect(
+            url_for(
+                "external.external_new",
+                created_req_id=req.id,
+                guest_email=req.guest_email,
+                tracking_link=link,
+            )
+        )
 
     # If redirected after a successful POST, support showing the confirmation
     # banner by accepting query params and creating a small object for the
@@ -214,16 +284,24 @@ def external_new():
     # results in a fresh form.
     created_req = None
     tracking_link = None
-    if request.method == 'GET' and request.args.get('created_req_id'):
+    if request.method == "GET" and request.args.get("created_req_id"):
         try:
-            cid = int(request.args.get('created_req_id'))
+            cid = int(request.args.get("created_req_id"))
         except Exception:
             cid = None
         if cid:
-            created_req = SimpleNamespace(id=cid, guest_email=request.args.get('guest_email'))
-            tracking_link = request.args.get('tracking_link')
+            created_req = SimpleNamespace(
+                id=cid, guest_email=request.args.get("guest_email")
+            )
+            tracking_link = request.args.get("tracking_link")
 
-    return render_template("external_new.html", form=form, created_req=created_req, guest_email=(created_req.guest_email if created_req else None), tracking_link=tracking_link)
+    return render_template(
+        "external_new.html",
+        form=form,
+        created_req=created_req,
+        guest_email=(created_req.guest_email if created_req else None),
+        tracking_link=tracking_link,
+    )
 
 
 @external_bp.route("/dashboard", methods=["GET", "POST"])
@@ -240,20 +318,29 @@ def external_dashboard():
             elif (req.guest_email or "").lower() != email:
                 flash("Email does not match this request.", "warning")
             else:
-                return redirect(url_for("external.external_detail", token=req.guest_access_token))
+                return redirect(
+                    url_for("external.external_detail", token=req.guest_access_token)
+                )
         else:
             # No request id: list all open guest requests for this email
-            results = ReqModel.query.filter(
-                ReqModel.submitter_type == 'guest',
-                func.lower(ReqModel.guest_email) == email,
-                ReqModel.status != 'CLOSED'
-            ).order_by(ReqModel.updated_at.desc()).all()
+            results = (
+                ReqModel.query.filter(
+                    ReqModel.submitter_type == "guest",
+                    func.lower(ReqModel.guest_email) == email,
+                    ReqModel.status != "CLOSED",
+                )
+                .order_by(ReqModel.updated_at.desc())
+                .all()
+            )
             if not results:
                 flash("No open requests found for this email.", "warning")
             else:
-                return render_template('external_dashboard.html', form=form, results=results)
+                return render_template(
+                    "external_dashboard.html", form=form, results=results
+                )
 
     return render_template("external_dashboard.html", form=form)
+
 
 def _get_req_by_token(token: str) -> ReqModel:
     req = ReqModel.query.filter_by(guest_access_token=token).first()
@@ -261,11 +348,16 @@ def _get_req_by_token(token: str) -> ReqModel:
         abort(404)
     return req
 
+
 @external_bp.route("/<token>", methods=["GET", "POST"])
 def external_detail(token: str):
     req = _get_req_by_token(token)
 
-    public_comments = Comment.query.filter_by(request_id=req.id, visibility_scope="public").order_by(Comment.created_at.asc()).all()
+    public_comments = (
+        Comment.query.filter_by(request_id=req.id, visibility_scope="public")
+        .order_by(Comment.created_at.asc())
+        .all()
+    )
     public_submissions = [s for s in req.submissions if s.is_public_to_submitter]
     public_audit = list(req.audit_logs)
 
@@ -279,8 +371,13 @@ def external_detail(token: str):
             body=form.body.data.strip(),
         )
         db.session.add(c)
-        _log(req, "comment_added", note="Guest added a public comment.", actor_label=req.guest_email)
-        
+        _log(
+            req,
+            "comment_added",
+            note="Guest added a public comment.",
+            actor_label=req.guest_email,
+        )
+
         db.session.commit()
         flash("Comment added.", "success")
         return redirect(url_for("external.external_detail", token=token))

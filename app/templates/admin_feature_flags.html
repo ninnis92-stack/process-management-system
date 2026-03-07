@@ -32,6 +32,12 @@
       <div class="form-text">When enabled, users can be allocated admin access from organization-managed SSO claims or APIs. Manual admin assignment in the app still works either way.</div>
     </div>
 
+    <div class="form-check mb-3">
+      {{ form.enable_external_forms(class_='form-check-input') }}
+      {{ form.enable_external_forms.label(class_='form-check-label') }}
+      <div class="form-text">When enabled, admins may mark a Form Template as using an external 3rd-party form; those templates will direct users to the external provider and accept webhook callbacks.</div>
+    </div>
+
     <button class="btn btn-primary">Save</button>
   </form>
 {% endblock %}

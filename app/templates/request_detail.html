@@ -238,6 +238,21 @@
                 {% endfor %}
               </div>
             {% endif %}
+            {% if s.data %}
+              <div class="mt-2">
+                <div class="small text-muted">Submitted form data</div>
+                <table class="table table-sm mt-1">
+                  <tbody>
+                    {% for k, v in (s.data or {}).items() %}
+                      <tr>
+                        <th style="width:30%">{{ k }}</th>
+                        <td style="white-space:pre-wrap">{{ v }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
           </div>
         {% else %}
           <div class="text-muted">No submissions yet.</div>

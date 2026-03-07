@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Unmapped External Submissions</h3>
+<p class="text-muted">Submissions lacking an automated mapping. Map them so the system can extract structured fields.</p>
+<ul class="list-group">
+  {% for s in submissions %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <div>
+        <strong>Submission #{{ s.id }}</strong>
+        <div class="small text-muted">Template: {{ s.template_id or '—' }} · Created: {{ s.created_at }}</div>
+        <div class="mt-1">
+          {% if s.data %}
+            {% for k, v in (s.data or {}).items() %}
+              {% if not k.startswith('_') %}
+                <span class="badge bg-light text-dark me-1">{{ k }}</span>
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.map_submission', submission_id=s.id) }}">Map</a>
+      </div>
+    </li>
+  {% else %}
+    <li class="list-group-item text-muted">No unmapped submissions found.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

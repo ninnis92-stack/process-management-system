@@ -27,12 +27,16 @@ class VerificationService:
         self.session = requests.Session()
         # Don't blindly set Authorization header if no token available; prefer per-request headers
 
-    def _call_api(self, url: str, params: dict, token: Optional[str], timeout: int) -> Dict:
+    def _call_api(
+        self, url: str, params: dict, token: Optional[str], timeout: int
+    ) -> Dict:
         headers = {}
         if token:
             headers["Authorization"] = f"Bearer {token}"
         try:
-            resp = self.session.get(url, params=params, headers=headers, timeout=timeout)
+            resp = self.session.get(
+                url, params=params, headers=headers, timeout=timeout
+            )
             resp.raise_for_status()
             try:
                 return {"ok": True, "details": resp.json()}
@@ -48,7 +52,9 @@ class VerificationService:
             return {"ok": None, "reason": "disabled"}
         # Recommend provider implement GET /validate?part=... returning JSON {valid: true/false,...}
         url = self.part_url.rstrip("/") + "/validate"
-        return self._call_api(url, {"part": part_number}, self.part_token, self.part_timeout)
+        return self._call_api(
+            url, {"part": part_number}, self.part_token, self.part_timeout
+        )
 
     def verify_method(self, method_id: str) -> Dict:
         if not method_id:
@@ -57,9 +63,17 @@ class VerificationService:
             return {"ok": None, "reason": "disabled"}
         # Recommend provider implement GET /validate?method=... returning JSON {valid: true/false,...}
         url = self.method_url.rstrip("/") + "/validate"
-        return self._call_api(url, {"method": method_id}, self.method_token, self.method_timeout)
+        return self._call_api(
+            url, {"method": method_id}, self.method_token, self.method_timeout
+        )
 
-    def verify_lookup(self, provider: str, external_key: Optional[str], value: Any, options: Optional[Dict] = None) -> Dict:
+    def verify_lookup(
+        self,
+        provider: str,
+        external_key: Optional[str],
+        value: Any,
+        options: Optional[Dict] = None,
+    ) -> Dict:
         """Generic provider-aware lookup used by dynamic field verification.
 
         Returns a dict with `ok` and optional `details` / `reason`.

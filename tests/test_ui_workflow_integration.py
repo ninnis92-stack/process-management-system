@@ -21,20 +21,25 @@ def test_request_detail_shows_workflow_limited_transitions(app, client):
         db.session.add(wf)
 
         # Create a Dept B user
-        b = User(email='b_user2@example.com', password_hash=generate_password_hash('secret'), department='B', is_active=True)
+        b = User(
+            email="b_user2@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+        )
         db.session.add(b)
         db.session.commit()
 
         # Create a request in B_IN_PROGRESS owned by Dept B
         r = ReqModel(
-            title='Integration Test',
-            request_type='both',
-            pricebook_status='unknown',
-            description='x',
-            priority='medium',
-            status='B_IN_PROGRESS',
-            owner_department='B',
-            submitter_type='user',
+            title="Integration Test",
+            request_type="both",
+            pricebook_status="unknown",
+            description="x",
+            priority="medium",
+            status="B_IN_PROGRESS",
+            owner_department="B",
+            submitter_type="user",
             due_at=(datetime.utcnow() + timedelta(days=2)),
         )
         r.created_by_user_id = b.id
@@ -43,19 +48,23 @@ def test_request_detail_shows_workflow_limited_transitions(app, client):
         rid = r.id
 
     # login as B and view request_detail
-    rv = client.post('/auth/login', data={'email': 'b_user2@example.com', 'password': 'secret'}, follow_redirects=True)
+    rv = client.post(
+        "/auth/login",
+        data={"email": "b_user2@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
     assert rv.status_code == 200
-    resp = client.get(f'/requests/{rid}')
+    resp = client.get(f"/requests/{rid}")
     assert resp.status_code == 200
-    html = resp.data.decode('utf-8')
+    html = resp.data.decode("utf-8")
 
     # Assert that only the workflow-allowed transitions appear in the select
     assert 'value="B_FINAL_REVIEW"' in html
-    assert 'Final Review' in html
+    assert "Final Review" in html
     assert 'value="WAITING_ON_A_RESPONSE"' in html
     # Label may come from the workflow spec or be replaced by a legacy
     # friendly label; accept either.
-    assert ('Waiting on A' in html) or ('Pending review from Department A' in html)
+    assert ("Waiting on A" in html) or ("Pending review from Department A" in html)
     # A transition not in the workflow should not be present
     assert 'value="SENT_TO_A"' not in html
     assert 'value="C_APPROVED"' not in html

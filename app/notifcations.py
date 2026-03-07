@@ -36,7 +36,9 @@ except Exception:  # pragma: no cover - RQ optional for dev
 try:
     _tasks_mod = importlib.import_module("app.tasks")  # type: ignore[reportMissingImports]
     send_emails_task = getattr(_tasks_mod, "send_emails_task", None)
-except Exception:  # pragma: no cover - tasks module may be unavailable to static checker
+except (
+    Exception
+):  # pragma: no cover - tasks module may be unavailable to static checker
     send_emails_task = None
 
 
@@ -47,8 +49,7 @@ def _get_latest_department_template(department_code: str):
     current admin-configured department form.
     """
     assigned = (
-        DepartmentFormAssignment.query
-        .filter_by(department_name=department_code)
+        DepartmentFormAssignment.query.filter_by(department_name=department_code)
         .order_by(DepartmentFormAssignment.created_at.desc())
         .first()
     )
@@ -65,6 +66,7 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
     recipients_map: dict mapping email -> user_id (or None)
     """
     from flask import current_app as _current
+
     try:
         app = _current._get_current_object()
     except Exception:
@@ -85,7 +87,9 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
             return
         except Exception:
             try:
-                _current.logger.exception("Failed to enqueue email send job; falling back to thread")
+                _current.logger.exception(
+                    "Failed to enqueue email send job; falling back to thread"
+                )
             except Exception:
                 pass
 
@@ -93,7 +97,9 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
     def _send():
         if app is None:
             try:
-                _current.logger.warning("Email send skipped: no app context available for background thread")
+                _current.logger.warning(
+                    "Email send skipped: no app context available for background thread"
+                )
             except Exception:
                 pass
             return
@@ -110,32 +116,38 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
                 for e in skipped:
                     uid = recipients_map.get(e)
                     if uid:
-                        db.session.add(Notification(
-                            user_id=uid,
-                            request_id=request_id,
-                            type="email_skipped",
-                            title="Email skipped (test account)",
-                            body=f"Email to {e} skipped because it is in the test domains.",
-                            url=None,
-                        ))
+                        db.session.add(
+                            Notification(
+                                user_id=uid,
+                                request_id=request_id,
+                                type="email_skipped",
+                                title="Email skipped (test account)",
+                                body=f"Email to {e} skipped because it is in the test domains.",
+                                url=None,
+                            )
+                        )
 
                 if error:
                     for e, uid in recipients_map.items():
                         if uid:
-                            db.session.add(Notification(
-                                user_id=uid,
-                                request_id=request_id,
-                                type="email_failed",
-                                title="Email delivery failed",
-                                body=f"Email delivery to {e} failed: {error}",
-                                url=None,
-                            ))
+                            db.session.add(
+                                Notification(
+                                    user_id=uid,
+                                    request_id=request_id,
+                                    type="email_failed",
+                                    title="Email delivery failed",
+                                    body=f"Email delivery to {e} failed: {error}",
+                                    url=None,
+                                )
+                            )
 
-                if (skipped or error):
+                if skipped or error:
                     try:
                         db.session.commit()
                     except Exception:
-                        _current.logger.exception("Failed to commit email-send notifications")
+                        _current.logger.exception(
+                            "Failed to commit email-send notifications"
+                        )
 
             except Exception:
                 _current.logger.exception("Email sending failed")
@@ -143,7 +155,15 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
     Thread(target=_send, daemon=True).start()
 
 
-def notify_users(users, title, body=None, url=None, ntype="generic", request_id=None, allow_email: bool = True):
+def notify_users(
+    users,
+    title,
+    body=None,
+    url=None,
+    ntype="generic",
+    request_id=None,
+    allow_email: bool = True,
+):
     # Decide whether to persist in-app notifications per-recipient.
     # If the app's EmailService is enabled and an email address exists for
     # a recipient, prefer sending email and skip creating an in-app row for
@@ -197,9 +217,17 @@ def notify_users(users, title, body=None, url=None, ntype="generic", request_id=
             count = Notification.query.filter_by(user_id=u.id).count()
             if count > max_per_user:
                 to_remove = count - max_per_user
-                old = [n.id for n in Notification.query.filter_by(user_id=u.id).order_by(Notification.created_at.asc()).limit(to_remove).all()]
+                old = [
+                    n.id
+                    for n in Notification.query.filter_by(user_id=u.id)
+                    .order_by(Notification.created_at.asc())
+                    .limit(to_remove)
+                    .all()
+                ]
                 if old:
-                    Notification.query.filter(Notification.id.in_(old)).delete(synchronize_session=False)
+                    Notification.query.filter(Notification.id.in_(old)).delete(
+                        synchronize_session=False
+                    )
     except Exception:
         try:
             current_app.logger.exception("Failed to enforce notification cap")
@@ -211,7 +239,9 @@ def notify_users(users, title, body=None, url=None, ntype="generic", request_id=
         subject = title
         text_body = (body or "") + ("\n\n" + url if url else "")
         html_body = None
-        _send_emails_async(recipients_map, subject, text_body, html=html_body, request_id=request_id)
+        _send_emails_async(
+            recipients_map, subject, text_body, html=html_body, request_id=request_id
+        )
 
     # ✅ do NOT commit here; commit happens in the route after all writes
 
@@ -233,24 +263,31 @@ def send_request_form_autoresponder(sender_email: str) -> bool:
     # Prefer department-assigned dynamic form fields when present.
     fields = []
     try:
-        dept = (getattr(cfg, 'request_form_department', 'A') or 'A').strip().upper()
+        dept = (getattr(cfg, "request_form_department", "A") or "A").strip().upper()
         template = _get_latest_department_template(dept)
         if template:
-            template_fields = sorted(list(getattr(template, 'fields', []) or []), key=lambda f: getattr(f, 'created_at', getattr(f, 'id', 0)))
+            template_fields = sorted(
+                list(getattr(template, "fields", []) or []),
+                key=lambda f: getattr(f, "created_at", getattr(f, "id", 0)),
+            )
             for field in template_fields:
-                field_type = (getattr(field, 'field_type', '') or '').strip().lower()
-                if field_type == 'file':
+                field_type = (getattr(field, "field_type", "") or "").strip().lower()
+                if field_type == "file":
                     continue
-                name = (getattr(field, 'name', '') or '').strip()
+                name = (getattr(field, "name", "") or "").strip()
                 if not name:
                     continue
-                options = [str(getattr(o, 'value', '')).strip() for o in (getattr(field, 'options', []) or []) if str(getattr(o, 'value', '')).strip()]
+                options = [
+                    str(getattr(o, "value", "")).strip()
+                    for o in (getattr(field, "options", []) or [])
+                    if str(getattr(o, "value", "")).strip()
+                ]
                 if options:
-                    placeholder = '|'.join(options)
-                elif field_type in ('date', 'datetime') or name in ('due_at', 'due'):
-                    placeholder = 'YYYY-mm-ddTHH:MM'
+                    placeholder = "|".join(options)
+                elif field_type in ("date", "datetime") or name in ("due_at", "due"):
+                    placeholder = "YYYY-mm-ddTHH:MM"
                 else:
-                    placeholder = '<VALUE>'
+                    placeholder = "<VALUE>"
                 fields.append(f"{name}={placeholder}")
     except Exception:
         fields = []
@@ -272,7 +309,11 @@ def send_request_form_autoresponder(sender_email: str) -> bool:
     fields_for_subject = ";".join(fields)
 
     # Use configured first message, falling back to a default helper message
-    if cfg.request_form_first_message and isinstance(cfg.request_form_first_message, str) and cfg.request_form_first_message.strip():
+    if (
+        cfg.request_form_first_message
+        and isinstance(cfg.request_form_first_message, str)
+        and cfg.request_form_first_message.strip()
+    ):
         body = cfg.request_form_first_message
     else:
         body = (
@@ -290,14 +331,16 @@ def send_request_form_autoresponder(sender_email: str) -> bool:
     return True
 
 
-def send_request_form_validation_rejection(sender_email: str, invalid_fields: list[str]) -> bool:
+def send_request_form_validation_rejection(
+    sender_email: str, invalid_fields: list[str]
+) -> bool:
     """Send automated rejection email listing invalid fields for inbound request submissions."""
     if not sender_email or not invalid_fields:
         return False
 
     normalized = []
     for field in invalid_fields:
-        name = (field or '').strip()
+        name = (field or "").strip()
         if name and name not in normalized:
             normalized.append(name)
     if not normalized:
@@ -316,14 +359,16 @@ def send_request_form_validation_rejection(sender_email: str, invalid_fields: li
     return True
 
 
-def send_request_form_inventory_out_of_stock_notice(sender_email: str, out_of_stock_fields: list[str], message: Optional[str] = None) -> bool:
+def send_request_form_inventory_out_of_stock_notice(
+    sender_email: str, out_of_stock_fields: list[str], message: Optional[str] = None
+) -> bool:
     """Notify requester when verified inventory fields resolve as out of stock."""
     if not sender_email or not out_of_stock_fields:
         return False
 
     normalized = []
     for field in out_of_stock_fields:
-        name = (field or '').strip()
+        name = (field or "").strip()
         if name and name not in normalized:
             normalized.append(name)
     if not normalized:

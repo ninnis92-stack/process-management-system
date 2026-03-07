@@ -2,14 +2,27 @@ import os
 import hmac
 import hashlib
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, current_app, abort, jsonify
 
 from app import csrf
 from flask_wtf.csrf import generate_csrf
 from ..extensions import db
-from ..models import SpecialEmailConfig, User, Request as ReqModel, REQUEST_TYPES, PRIORITIES
-from ..models import DepartmentFormAssignment, FormTemplate, EmailRouting
+from ..models import (
+    SpecialEmailConfig,
+    User,
+    Request as ReqModel,
+    REQUEST_TYPES,
+    PRIORITIES,
+)
+from ..models import (
+    DepartmentFormAssignment,
+    FormTemplate,
+    EmailRouting,
+    Submission,
+    Artifact,
+)
 from .. import notifcations as notifications
 from ..services.inventory import InventoryService
 
@@ -23,8 +36,7 @@ def _get_latest_department_template(department_code: str):
     recently assigned in the department form setup UI.
     """
     assigned = (
-        DepartmentFormAssignment.query
-        .filter_by(department_name=department_code)
+        DepartmentFormAssignment.query.filter_by(department_name=department_code)
         .order_by(DepartmentFormAssignment.created_at.desc())
         .first()
     )
@@ -33,7 +45,9 @@ def _get_latest_department_template(department_code: str):
 
 def _get_shared_secret():
     # Prefer app config, then environment variable
-    return current_app.config.get("WEBHOOK_SHARED_SECRET") or os.getenv("WEBHOOK_SHARED_SECRET")
+    return current_app.config.get("WEBHOOK_SHARED_SECRET") or os.getenv(
+        "WEBHOOK_SHARED_SECRET"
+    )
 
 
 def valid_hmac(payload: bytes, signature: str, secret: str) -> bool:
@@ -59,10 +73,14 @@ def incoming_webhook():
     looked up from `WEBHOOK_SHARED_SECRET` in app config or env.
     """
     payload = request.get_data() or b""
-    sig = request.headers.get("X-Webhook-Signature") or request.headers.get("X-Signature")
+    sig = request.headers.get("X-Webhook-Signature") or request.headers.get(
+        "X-Signature"
+    )
     secret = _get_shared_secret()
     if not secret:
-        current_app.logger.warning("Incoming webhook rejected: no shared secret configured")
+        current_app.logger.warning(
+            "Incoming webhook rejected: no shared secret configured"
+        )
         abort(401)
 
     if not valid_hmac(payload, sig, secret):
@@ -78,11 +96,330 @@ def incoming_webhook():
         data = {}
 
     # example: log and return 204
-    current_app.logger.info("Received webhook: %s", {"headers": dict(request.headers), "json_keys": list(data.keys())})
+    current_app.logger.info(
+        "Received webhook: %s",
+        {"headers": dict(request.headers), "json_keys": list(data.keys())},
+    )
     return ("", 204)
 
 
-@integrations_bp.route('/inbound-mail', methods=['POST'])
+@integrations_bp.route("/external-form-callback", methods=["POST"])
+@csrf.exempt
+def external_form_callback():
+    """Accept callbacks from external form providers (e.g. Microsoft Forms).
+
+    Expected JSON payload examples:
+      {
+        "external_form_id": "abcd-1234",             # optional
+        "template_id": 12,                            # optional fallback
+        "form_response": { "title": "...", ... }  # mapping of field keys to values
+      }
+
+    The endpoint verifies the same HMAC-based header as other webhooks
+    and will try to locate a `FormTemplate` by `external_form_id` or
+    by `template_id`. If found and `external_enabled` is True, a new
+    `Request` will be created and a `Submission` row will be stored
+    with the raw data.
+    """
+    payload = request.get_data() or b""
+    sig = request.headers.get("X-Webhook-Signature") or request.headers.get(
+        "X-Signature"
+    )
+    secret = _get_shared_secret()
+    if not secret or not valid_hmac(payload, sig, secret):
+        current_app.logger.warning(
+            "External form callback rejected: invalid/no signature"
+        )
+        abort(401)
+
+    data = request.get_json(silent=True) or {}
+    # Allow provider-specific payloads to be normalized.
+    form_data = data.get("form_response") or data.get("data") or {}
+
+    # If template indicates a provider, allow special parsing
+    def _normalize_provider_payload(provider, raw):
+        if not provider or not isinstance(raw, dict):
+            return raw
+        p = (provider or "").strip().lower()
+        # Microsoft Forms: attempt to map answers into key->value pairs
+        if p in ("microsoft_forms", "microsoft"):
+            # Example Microsoft Forms callback may include `response` -> `answers` list
+            # where each answer has `question` and `answer` or similar keys.
+            try:
+                if "response" in raw and isinstance(raw.get("response"), dict):
+                    resp = raw.get("response")
+                    answers = resp.get("answers") or resp.get("items") or []
+                    out = {}
+                    # Try common shapes
+                    for a in answers:
+                        if isinstance(a, dict):
+                            # prefer explicit name keys
+                            key = a.get("question") or a.get("name") or a.get("id")
+                            val = a.get("answer") or a.get("value") or a.get("text")
+                            if key:
+                                out[str(key)] = val
+                    # Fallback: top-level fields
+                    for k, v in raw.items():
+                        if k not in ("response", "answers", "items") and not out.get(k):
+                            out[k] = v
+                    return out
+            except Exception:
+                current_app.logger.exception("Failed parsing Microsoft Forms payload")
+        return raw
+
+    external_form_id = (data.get("external_form_id") or "").strip() or None
+    template = None
+    try:
+        if external_form_id:
+            template = FormTemplate.query.filter_by(
+                external_form_id=external_form_id
+            ).first()
+        if not template and data.get("template_id"):
+            try:
+                tid = int(data.get("template_id"))
+                template = db.session.get(FormTemplate, tid)
+            except Exception:
+                template = None
+    except Exception:
+        current_app.logger.exception(
+            "Failed locating FormTemplate for external callback"
+        )
+
+    if not template:
+        current_app.logger.warning("External form callback: no matching template")
+        return jsonify({"ok": False, "error": "no_template"}), 400
+
+    if not getattr(template, "external_enabled", False):
+        current_app.logger.warning(
+            "External form callback received for template without external_enabled"
+        )
+        return jsonify({"ok": False, "error": "template_not_external"}), 400
+    # Normalize provider-specific payloads when provider is set on the template
+    provider = getattr(template, "external_provider", None)
+    form_data = _normalize_provider_payload(provider, form_data or {})
+
+    # Map common fields into a Request when possible
+    # Attempt to map incoming form keys to template `FormField`s when possible.
+    def _attempt_field_mapping(template, payload):
+        """Return (mapped_values, mapped_keys) where mapped_values maps
+        field.id -> value and mapped_keys maps field.id -> payload key used.
+        This stores the mapping into the submission `data` under the
+        reserved `_field_map` key when at least one mapping is found.
+        """
+        mapped_values = {}
+        mapped_keys = {}
+        try:
+            if not template or not isinstance(payload, dict):
+                return mapped_values, mapped_keys
+
+            # Build candidate lookup map: normalize payload keys to ease matching
+            def norm(s):
+                return (
+                    (s or "")
+                    .strip()
+                    .lower()
+                    .replace("\n", " ")
+                    .replace("_", " ")
+                    .replace("-", " ")
+                )
+
+            key_map = {}
+            for k, v in payload.items():
+                key_map[norm(str(k))] = (k, v)
+
+            for field in getattr(template, "fields", []) or []:
+                fname = (getattr(field, "name", "") or "").strip()
+                flabel = (getattr(field, "label", "") or "").strip()
+                candidates = [fname, flabel]
+                # allow JSON verification mapping if present
+                try:
+                    verification = getattr(field, "verification", None) or {}
+                    if isinstance(verification, dict) and verification.get(
+                        "external_key"
+                    ):
+                        candidates.append(str(verification.get("external_key")))
+                except Exception:
+                    pass
+
+                found = False
+                for c in candidates:
+                    if not c:
+                        continue
+                    nk = norm(c)
+                    if nk in key_map:
+                        orig_key, val = key_map[nk]
+                        mapped_values[field.id] = val
+                        mapped_keys[field.id] = orig_key
+                        found = True
+                        break
+
+                # Last resort: direct exact key match
+                if not found and fname and fname in payload:
+                    mapped_values[field.id] = payload.get(fname)
+                    mapped_keys[field.id] = fname
+        except Exception:
+            current_app.logger.exception("Field mapping attempt failed")
+
+        return mapped_values, mapped_keys
+
+    # Try mapping before creating request so artifacts can be derived from mapped fields
+    mapped_values, mapped_keys = _attempt_field_mapping(template, form_data or {})
+    if mapped_values:
+        try:
+            fd = dict(form_data or {})
+            fd["_field_map"] = {
+                str(k): {"payload_key": v, "value": mapped_values.get(int(k))}
+                for k, v in mapped_keys.items()
+            }
+            fd["_mapped"] = True
+            form_data = fd
+        except Exception:
+            current_app.logger.exception("Failed annotating mapped form_data")
+
+    title = (
+        form_data.get("title")
+        or form_data.get("summary")
+        or f"External submission {int(time.time())}"
+    )
+    description = form_data.get("description") or form_data.get("details") or ""
+    priority = form_data.get("priority") or "medium"
+    request_type = form_data.get("request_type") or "both"
+    pricebook_status = (
+        form_data.get("pricebook_status") or form_data.get("sales_list") or "unknown"
+    )
+    due_at = None
+    raw_due = (form_data.get("due_at") or form_data.get("due") or "").strip()
+    if raw_due:
+        try:
+            from datetime import datetime
+
+            due_at = datetime.fromisoformat(raw_due.replace("Z", "+00:00"))
+            if getattr(due_at, "tzinfo", None) is not None:
+                due_at = due_at.astimezone(tz=None).replace(tzinfo=None)
+        except Exception:
+            due_at = None
+
+    # determine owner department via DepartmentFormAssignment mapping for this template
+    owner_dept = "B"
+    try:
+        assign = (
+            DepartmentFormAssignment.query.filter_by(template_id=template.id)
+            .order_by(DepartmentFormAssignment.created_at.desc())
+            .first()
+        )
+        if assign and assign.department_name:
+            owner_dept = assign.department_name.strip().upper()
+    except Exception:
+        current_app.logger.exception(
+            "Failed resolving DepartmentFormAssignment for external submission"
+        )
+
+    created_request_id = None
+    try:
+        req = ReqModel(
+            title=title,
+            request_type=(request_type if request_type in REQUEST_TYPES else "both"),
+            pricebook_status=(
+                pricebook_status
+                if pricebook_status in ("in_pricebook", "not_in_pricebook", "unknown")
+                else "unknown"
+            ),
+            description=description,
+            priority=(priority if priority in PRIORITIES else "medium"),
+            status="NEW_FROM_A",
+            owner_department=owner_dept,
+            submitter_type="guest",
+            due_at=(due_at or (datetime.utcnow() + timedelta(days=2))),
+        )
+        db.session.add(req)
+        db.session.flush()
+
+        # Create artifacts from common form fields when present so the
+        # Request view can show structured form-derived artifacts (part numbers
+        # or instructions) immediately on the dashboard.
+        try:
+            donor = (
+                (
+                    form_data.get("donor_part_number") or form_data.get("donor") or ""
+                ).strip()
+                if isinstance(form_data, dict)
+                else None
+            )
+            target = (
+                (
+                    form_data.get("target_part_number") or form_data.get("target") or ""
+                ).strip()
+                if isinstance(form_data, dict)
+                else None
+            )
+            instr_url = (
+                (
+                    form_data.get("instructions_url")
+                    or form_data.get("method_url")
+                    or ""
+                ).strip()
+                if isinstance(form_data, dict)
+                else None
+            )
+            if donor or target:
+                art = Artifact(
+                    request_id=req.id,
+                    artifact_type="part_number",
+                    donor_part_number=(donor or None),
+                    target_part_number=(target or None),
+                    created_by_department=owner_dept or "B",
+                    created_by_guest_email=(
+                        form_data.get("guest_email")
+                        if isinstance(form_data, dict)
+                        else None
+                    ),
+                )
+                db.session.add(art)
+            if instr_url:
+                art2 = Artifact(
+                    request_id=req.id,
+                    artifact_type="instructions",
+                    instructions_url=instr_url,
+                    created_by_department=owner_dept or "B",
+                    created_by_guest_email=(
+                        form_data.get("guest_email")
+                        if isinstance(form_data, dict)
+                        else None
+                    ),
+                )
+                db.session.add(art2)
+        except Exception:
+            current_app.logger.exception(
+                "Failed creating artifacts from external form data"
+            )
+
+        # persist submission record linking to the created request
+        sub = Submission(
+            request_id=req.id,
+            from_department=None,
+            to_department=owner_dept,
+            summary=form_data.get("summary") or None,
+            details=description,
+            template_id=template.id,
+            data=form_data,
+        )
+        db.session.add(sub)
+        db.session.commit()
+        created_request_id = req.id
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception(
+            "Failed creating Request/Submission from external form"
+        )
+
+    current_app.logger.info(
+        "External form callback processed",
+        extra={"template_id": template.id, "created_request_id": created_request_id},
+    )
+    return jsonify({"ok": True, "created_request_id": created_request_id})
+
+
+@integrations_bp.route("/inbound-mail", methods=["POST"])
 @csrf.exempt
 def inbound_mail():
     """Inbound mail webhook for mail providers (prototype).
@@ -101,7 +438,9 @@ def inbound_mail():
     safe to call even when no inventory connector is configured.
     """
     payload = request.get_data() or b""
-    sig = request.headers.get("X-Webhook-Signature") or request.headers.get("X-Signature")
+    sig = request.headers.get("X-Webhook-Signature") or request.headers.get(
+        "X-Signature"
+    )
     secret = _get_shared_secret()
     if not secret or not valid_hmac(payload, sig, secret):
         current_app.logger.warning("Inbound mail rejected: invalid/no signature")
@@ -109,25 +448,25 @@ def inbound_mail():
 
     # Accept JSON or form-encoded payloads
     data = request.get_json(silent=True) or request.form.to_dict() or {}
-    sender = (data.get('from') or data.get('sender') or '').strip()
-    recipient = (data.get('to') or '').strip().lower()
-    subject = (data.get('subject') or '').strip()
-    body = (data.get('body') or data.get('text') or '').strip()
+    sender = (data.get("from") or data.get("sender") or "").strip()
+    recipient = (data.get("to") or "").strip().lower()
+    subject = (data.get("subject") or "").strip()
+    body = (data.get("body") or data.get("text") or "").strip()
 
     if not sender:
-        current_app.logger.warning('Inbound mail missing sender')
-        return (jsonify({'ok': False, 'error': 'missing_sender'}), 400)
+        current_app.logger.warning("Inbound mail missing sender")
+        return (jsonify({"ok": False, "error": "missing_sender"}), 400)
 
     cfg = SpecialEmailConfig.get()
 
     # Optional mailbox routing guard: resolve explicit request_form_email first,
     # then fall back to configured SSO owner email when available.
     target = None
-    if getattr(cfg, 'request_form_email', None):
+    if getattr(cfg, "request_form_email", None):
         target = cfg.request_form_email.strip().lower()
     else:
         try:
-            owner_id = int(getattr(cfg, 'request_form_user_id', 0) or 0)
+            owner_id = int(getattr(cfg, "request_form_user_id", 0) or 0)
         except Exception:
             owner_id = 0
         if owner_id:
@@ -137,7 +476,7 @@ def inbound_mail():
 
     if target:
         if recipient and target not in recipient:
-            return jsonify({'ok': True, 'skipped': 'recipient_mismatch'})
+            return jsonify({"ok": True, "skipped": "recipient_mismatch"})
 
     sent = False
 
@@ -145,20 +484,20 @@ def inbound_mail():
     parsed = {}
     if subject:
         # Expect format: key1=val1;key2=val2;...
-        parts = [p.strip() for p in subject.split(';') if p.strip()]
+        parts = [p.strip() for p in subject.split(";") if p.strip()]
         for p in parts:
-            if '=' in p:
-                k, v = p.split('=', 1)
+            if "=" in p:
+                k, v = p.split("=", 1)
                 parsed[k.strip()] = v.strip()
 
     # Inventory validation for donor/target/price_book_number if present
     inv = InventoryService()
     checks = {}
-    for key in ('donor_part_number', 'target_part_number', 'price_book_number'):
+    for key in ("donor_part_number", "target_part_number", "price_book_number"):
         if parsed.get(key):
             try:
                 ok = None
-                if key in ('donor_part_number', 'target_part_number'):
+                if key in ("donor_part_number", "target_part_number"):
                     ok = inv.validate_part_number(parsed.get(key))
                 else:
                     ok = inv.validate_sales_list_number(parsed.get(key))
@@ -184,44 +523,52 @@ def inbound_mail():
             recognized_sso = bool(user and user.sso_sub)
 
             if recognized_sso:
-                desired_dept = (cfg.request_form_department or 'A').upper().strip()
-                if desired_dept not in ('A', 'B', 'C'):
-                    desired_dept = 'A'
+                desired_dept = (cfg.request_form_department or "A").upper().strip()
+                if desired_dept not in ("A", "B", "C"):
+                    desired_dept = "A"
                 if user.department != desired_dept:
                     user.department = desired_dept
 
-            req_type_raw = (parsed.get('request_type') or '').strip().lower()
-            req_type = req_type_raw or 'both'
+            req_type_raw = (parsed.get("request_type") or "").strip().lower()
+            req_type = req_type_raw or "both"
             if req_type_raw and req_type_raw not in REQUEST_TYPES:
-                invalid_fields.append('request_type')
+                invalid_fields.append("request_type")
             if req_type not in REQUEST_TYPES:
-                req_type = 'both'
+                req_type = "both"
 
-            prio_raw = (parsed.get('priority') or '').strip().lower()
-            prio = prio_raw or 'medium'
+            prio_raw = (parsed.get("priority") or "").strip().lower()
+            prio = prio_raw or "medium"
             if prio_raw and prio_raw not in PRIORITIES:
-                invalid_fields.append('priority')
+                invalid_fields.append("priority")
             if prio not in PRIORITIES:
-                prio = 'medium'
+                prio = "medium"
 
-            sales_list_raw = (parsed.get('sales_list') or parsed.get('pricebook_status') or '').strip().lower()
-            sales_list = sales_list_raw or 'unknown'
-            if sales_list_raw and sales_list_raw not in ('in_pricebook', 'not_in_pricebook', 'unknown'):
-                invalid_fields.append('sales_list')
-            if sales_list not in ('in_pricebook', 'not_in_pricebook', 'unknown'):
-                sales_list = 'unknown'
+            sales_list_raw = (
+                (parsed.get("sales_list") or parsed.get("pricebook_status") or "")
+                .strip()
+                .lower()
+            )
+            sales_list = sales_list_raw or "unknown"
+            if sales_list_raw and sales_list_raw not in (
+                "in_pricebook",
+                "not_in_pricebook",
+                "unknown",
+            ):
+                invalid_fields.append("sales_list")
+            if sales_list not in ("in_pricebook", "not_in_pricebook", "unknown"):
+                sales_list = "unknown"
 
             due_at = None
-            raw_due = (parsed.get('due_at') or '').strip()
+            raw_due = (parsed.get("due_at") or "").strip()
             if raw_due:
                 try:
-                    due_dt = datetime.fromisoformat(raw_due.replace('Z', '+00:00'))
+                    due_dt = datetime.fromisoformat(raw_due.replace("Z", "+00:00"))
                     if due_dt.tzinfo is not None:
                         due_dt = due_dt.astimezone(timezone.utc).replace(tzinfo=None)
                     due_at = due_dt
                 except Exception:
                     due_at = None
-                    invalid_fields.append('due_at')
+                    invalid_fields.append("due_at")
             if due_at is None:
                 due_at = datetime.utcnow() + timedelta(days=2)
 
@@ -230,9 +577,11 @@ def inbound_mail():
                     invalid_fields.append(field_name)
 
             # Verify against admin-edited department form fields when strict mode is enabled.
-            strict_validation = bool(getattr(cfg, 'request_form_field_validation_enabled', False))
-            dept = (getattr(cfg, 'request_form_department', 'A') or 'A').strip().upper()
-            if strict_validation and dept in ('A', 'B', 'C'):
+            strict_validation = bool(
+                getattr(cfg, "request_form_field_validation_enabled", False)
+            )
+            dept = (getattr(cfg, "request_form_department", "A") or "A").strip().upper()
+            if strict_validation and dept in ("A", "B", "C"):
                 try:
                     # Validation contract:
                     # - required fields must be present
@@ -240,51 +589,85 @@ def inbound_mail():
                     # - regex validators must match when configured on the field
                     template = _get_latest_department_template(dept)
                     if template:
-                        template_fields = sorted(list(getattr(template, 'fields', []) or []), key=lambda f: getattr(f, 'created_at', getattr(f, 'id', 0)))
+                        template_fields = sorted(
+                            list(getattr(template, "fields", []) or []),
+                            key=lambda f: getattr(f, "created_at", getattr(f, "id", 0)),
+                        )
                         for field in template_fields:
-                            field_name = (getattr(field, 'name', '') or '').strip()
+                            field_name = (getattr(field, "name", "") or "").strip()
                             if not field_name:
                                 continue
-                            field_type = (getattr(field, 'field_type', '') or '').strip().lower()
-                            if field_type == 'file':
+                            field_type = (
+                                (getattr(field, "field_type", "") or "").strip().lower()
+                            )
+                            if field_type == "file":
                                 continue
 
-                            value = (parsed.get(field_name) or '').strip()
-                            is_required = bool(getattr(field, 'required', False))
+                            value = (parsed.get(field_name) or "").strip()
+                            is_required = bool(getattr(field, "required", False))
                             if is_required and not value:
                                 invalid_fields.append(field_name)
                                 continue
                             if not value:
                                 continue
 
-                            options = [str(getattr(o, 'value', '')).strip() for o in (getattr(field, 'options', []) or []) if str(getattr(o, 'value', '')).strip()]
+                            options = [
+                                str(getattr(o, "value", "")).strip()
+                                for o in (getattr(field, "options", []) or [])
+                                if str(getattr(o, "value", "")).strip()
+                            ]
                             if options and value not in options:
                                 invalid_fields.append(field_name)
                                 continue
 
-                            verification = getattr(field, 'verification', None) or {}
-                            if isinstance(verification, dict) and verification.get('type') == 'regex' and verification.get('pattern'):
-                                pattern = str(verification.get('pattern'))
-                                if not re.match(pattern, value or ''):
+                            verification = getattr(field, "verification", None) or {}
+                            if (
+                                isinstance(verification, dict)
+                                and verification.get("type") == "regex"
+                                and verification.get("pattern")
+                            ):
+                                pattern = str(verification.get("pattern"))
+                                if not re.match(pattern, value or ""):
                                     invalid_fields.append(field_name)
                 except Exception:
-                    current_app.logger.exception('Failed to verify inbound fields against assigned department form template')
+                    current_app.logger.exception(
+                        "Failed to verify inbound fields against assigned department form template"
+                    )
 
             out_of_stock_fields = [
                 field_name
                 for field_name, is_valid in checks.items()
                 if parsed.get(field_name) and is_valid is False
             ]
-            notify_on_out_of_stock = bool(getattr(cfg, 'request_form_inventory_out_of_stock_notify_enabled', False))
+            notify_on_out_of_stock = bool(
+                getattr(
+                    cfg, "request_form_inventory_out_of_stock_notify_enabled", False
+                )
+            )
             if notify_on_out_of_stock and out_of_stock_fields:
-                out_of_stock_notify_mode = (getattr(cfg, 'request_form_inventory_out_of_stock_notify_mode', 'email') or 'email').strip().lower()
-                if out_of_stock_notify_mode not in ('notification', 'email', 'both'):
-                    out_of_stock_notify_mode = 'email'
-                out_of_stock_message = getattr(cfg, 'request_form_inventory_out_of_stock_message', None)
+                out_of_stock_notify_mode = (
+                    (
+                        getattr(
+                            cfg,
+                            "request_form_inventory_out_of_stock_notify_mode",
+                            "email",
+                        )
+                        or "email"
+                    )
+                    .strip()
+                    .lower()
+                )
+                if out_of_stock_notify_mode not in ("notification", "email", "both"):
+                    out_of_stock_notify_mode = "email"
+                out_of_stock_message = getattr(
+                    cfg, "request_form_inventory_out_of_stock_message", None
+                )
                 bullet_list = "\n".join([f"- {f}" for f in out_of_stock_fields])
                 message_text = (
-                    out_of_stock_message.replace('{out_of_stock_fields}', bullet_list)
-                    if out_of_stock_message and isinstance(out_of_stock_message, str) and out_of_stock_message.strip()
+                    out_of_stock_message.replace("{out_of_stock_fields}", bullet_list)
+                    if out_of_stock_message
+                    and isinstance(out_of_stock_message, str)
+                    and out_of_stock_message.strip()
                     else (
                         "Your request-by-email submission includes inventory fields that are currently out of stock.\n\n"
                         "Out-of-stock field(s):\n"
@@ -294,19 +677,22 @@ def inbound_mail():
                 )
                 try:
                     did_notify = False
-                    if out_of_stock_notify_mode in ('notification', 'both') and user is not None:
+                    if (
+                        out_of_stock_notify_mode in ("notification", "both")
+                        and user is not None
+                    ):
                         notifications.notify_users(
                             [user],
-                            title='Inventory out-of-stock notice',
+                            title="Inventory out-of-stock notice",
                             body=message_text,
-                            ntype='inventory_out_of_stock',
+                            ntype="inventory_out_of_stock",
                             request_id=None,
                             allow_email=False,
                         )
                         db.session.commit()
                         did_notify = True
 
-                    if out_of_stock_notify_mode in ('email', 'both'):
+                    if out_of_stock_notify_mode in ("email", "both"):
                         email_sent = notifications.send_request_form_inventory_out_of_stock_notice(
                             sender,
                             out_of_stock_fields,
@@ -318,28 +704,36 @@ def inbound_mail():
                 except Exception:
                     db.session.rollback()
                     out_of_stock_notified = False
-                    current_app.logger.exception('Failed to send inbound out-of-stock notification email')
+                    current_app.logger.exception(
+                        "Failed to send inbound out-of-stock notification email"
+                    )
 
             # Preserve order while removing duplicates
             invalid_fields = list(dict.fromkeys(invalid_fields))
             if strict_validation and invalid_fields:
                 validation_rejected = True
                 try:
-                    notifications.send_request_form_validation_rejection(sender, invalid_fields)
+                    notifications.send_request_form_validation_rejection(
+                        sender, invalid_fields
+                    )
                 except Exception:
-                    current_app.logger.exception('Failed to send inbound validation rejection email')
-                return jsonify({
-                    'ok': True,
-                    'autoresponder_sent': False,
-                    'rejected': True,
-                    'invalid_fields': invalid_fields,
-                    'out_of_stock_notified': bool(out_of_stock_notified),
-                    'out_of_stock_fields': out_of_stock_fields,
-                    'out_of_stock_notify_mode': out_of_stock_notify_mode,
-                    'parsed': parsed,
-                    'checks': checks,
-                    'created_request_id': None,
-                })
+                    current_app.logger.exception(
+                        "Failed to send inbound validation rejection email"
+                    )
+                return jsonify(
+                    {
+                        "ok": True,
+                        "autoresponder_sent": False,
+                        "rejected": True,
+                        "invalid_fields": invalid_fields,
+                        "out_of_stock_notified": bool(out_of_stock_notified),
+                        "out_of_stock_fields": out_of_stock_fields,
+                        "out_of_stock_notify_mode": out_of_stock_notify_mode,
+                        "parsed": parsed,
+                        "checks": checks,
+                        "created_request_id": None,
+                    }
+                )
 
             # Queue autoresponder only when strict validation does not reject the submission.
             try:
@@ -347,42 +741,62 @@ def inbound_mail():
             except Exception:
                 sent = False
 
-            title = (parsed.get('title') or '').strip() or f"Email request from {sender}"
-            description = (parsed.get('description') or '').strip() or body or "Submitted via inbound email."
+            title = (
+                parsed.get("title") or ""
+            ).strip() or f"Email request from {sender}"
+            description = (
+                (parsed.get("description") or "").strip()
+                or body
+                or "Submitted via inbound email."
+            )
 
             # Determine owner department using admin-defined EmailRouting when present.
-            owner_dept = 'B'
+            owner_dept = "B"
             try:
                 mappings = EmailRouting.for_recipient(recipient)
             except Exception:
                 mappings = []
 
             if mappings:
-                mapped_codes = [ (m.department_code or '').upper().strip() for m in mappings if m.department_code ]
+                mapped_codes = [
+                    (m.department_code or "").upper().strip()
+                    for m in mappings
+                    if m.department_code
+                ]
                 # If the sender is a recognized SSO user and their department is
                 # allowed for this recipient, prefer it; otherwise pick the first
                 # mapped department as the owner.
-                if recognized_sso and user and getattr(user, 'department', None) and user.department.upper() in mapped_codes:
+                if (
+                    recognized_sso
+                    and user
+                    and getattr(user, "department", None)
+                    and user.department.upper() in mapped_codes
+                ):
                     owner_dept = user.department.upper()
                 else:
                     owner_dept = mapped_codes[0] if mapped_codes else owner_dept
             else:
                 # Fallback to configured request form department or B
-                owner_dept = (getattr(cfg, 'request_form_department', 'B') or 'B').strip().upper()
+                owner_dept = (
+                    (getattr(cfg, "request_form_department", "B") or "B")
+                    .strip()
+                    .upper()
+                )
 
             req = ReqModel(
                 title=title,
                 request_type=req_type,
                 pricebook_status=sales_list,
-                sales_list_reference=(parsed.get('price_book_number') or '').strip() or None,
+                sales_list_reference=(parsed.get("price_book_number") or "").strip()
+                or None,
                 description=description,
                 priority=prio,
-                status='NEW_FROM_A',
+                status="NEW_FROM_A",
                 owner_department=owner_dept,
-                submitter_type='user' if recognized_sso else 'guest',
+                submitter_type="user" if recognized_sso else "guest",
                 created_by_user_id=(user.id if recognized_sso else None),
                 guest_email=(None if recognized_sso else sender_norm),
-                guest_name=(None if recognized_sso else sender.split('@')[0]),
+                guest_name=(None if recognized_sso else sender.split("@")[0]),
                 due_at=due_at,
             )
             if not recognized_sso:
@@ -393,14 +807,42 @@ def inbound_mail():
             created_request_id = req.id
         except Exception:
             db.session.rollback()
-            current_app.logger.exception('Failed to create request from inbound mail')
+            current_app.logger.exception("Failed to create request from inbound mail")
 
-    current_app.logger.info('Inbound mail processed', extra={'from': sender, 'subject': subject, 'parsed_keys': list(parsed.keys()), 'checks': checks, 'autoresponder_sent': bool(sent), 'validation_rejected': validation_rejected, 'invalid_fields': invalid_fields, 'out_of_stock_notified': bool(out_of_stock_notified), 'out_of_stock_fields': out_of_stock_fields, 'out_of_stock_notify_mode': out_of_stock_notify_mode, 'created_request_id': created_request_id})
+    current_app.logger.info(
+        "Inbound mail processed",
+        extra={
+            "from": sender,
+            "subject": subject,
+            "parsed_keys": list(parsed.keys()),
+            "checks": checks,
+            "autoresponder_sent": bool(sent),
+            "validation_rejected": validation_rejected,
+            "invalid_fields": invalid_fields,
+            "out_of_stock_notified": bool(out_of_stock_notified),
+            "out_of_stock_fields": out_of_stock_fields,
+            "out_of_stock_notify_mode": out_of_stock_notify_mode,
+            "created_request_id": created_request_id,
+        },
+    )
 
-    return jsonify({'ok': True, 'autoresponder_sent': bool(sent), 'rejected': bool(validation_rejected), 'invalid_fields': invalid_fields, 'out_of_stock_notified': bool(out_of_stock_notified), 'out_of_stock_fields': out_of_stock_fields, 'out_of_stock_notify_mode': out_of_stock_notify_mode, 'parsed': parsed, 'checks': checks, 'created_request_id': created_request_id})
+    return jsonify(
+        {
+            "ok": True,
+            "autoresponder_sent": bool(sent),
+            "rejected": bool(validation_rejected),
+            "invalid_fields": invalid_fields,
+            "out_of_stock_notified": bool(out_of_stock_notified),
+            "out_of_stock_fields": out_of_stock_fields,
+            "out_of_stock_notify_mode": out_of_stock_notify_mode,
+            "parsed": parsed,
+            "checks": checks,
+            "created_request_id": created_request_id,
+        }
+    )
 
 
-@integrations_bp.route('/csrf-token', methods=['GET'])
+@integrations_bp.route("/csrf-token", methods=["GET"])
 def csrf_token():
     """Return a fresh CSRF token for API clients.
 
@@ -408,4 +850,4 @@ def csrf_token():
     include the token value in the `X-CSRFToken` header for subsequent POSTs.
     """
     token = generate_csrf()
-    return jsonify({'csrf_token': token})
+    return jsonify({"csrf_token": token})

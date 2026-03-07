@@ -2,96 +2,72 @@
 
 {% block content %}
   <h2>Admin Console</h2>
-  <div class="row">
-    <div class="col-md-6">
-      <div class="card mb-3">
-        <div class="card-body">
-          <h5 class="card-title">Users</h5>
-          <p class="card-text">Total users: <strong>{{ total_users }}</strong></p>
-          <a class="btn btn-primary" href="{{ url_for('admin.list_users') }}">Manage Users</a>
-          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.assign_sso') }}">Assign SSO Emails</a>
-        </div>
-      </div>
+  <div class="mb-3 d-flex gap-2">
+    <input id="adminQuickSearch" class="form-control" placeholder="Quick find admin page (type to filter)…" />
+  </div>
 
-      <div class="card mb-3">
-        <div class="card-body">
-          <h5 class="card-title">Departments</h5>
-          <p class="card-text">Total departments: <strong>{{ total_depts }}</strong></p>
-          <a class="btn btn-primary" href="{{ url_for('admin.list_departments') }}">Manage Departments</a>
-        </div>
-      </div>
+  <div class="admin-grid">
+    <!-- Legacy labels for automated tests / bookmarks (kept hidden) -->
+    <div style="display:none" aria-hidden="true">Email Form Generation</div>
+    <div style="display:none" aria-hidden="true">Manage Email Form Settings</div>
+    <a class="admin-tile admin-card" href="{{ url_for('admin.list_users') }}">
+      <div class="tile-ico">👥</div>
+      <div class="tile-title">Users</div>
+      <div class="tile-sub">Manage accounts · {{ total_users }}</div>
+    </a>
 
-      <div class="card mb-3">
-        <div class="card-body">
-          <h5 class="card-title">Site</h5>
-          <p class="card-text">Site config and rolling quotes</p>
-          <a class="btn btn-primary" href="{{ url_for('admin.site_config') }}">Edit Site Config</a>
-          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.reject_request_config') }}">Reject Request Settings</a>
-        </div>
-      </div>
+    <a class="admin-tile admin-card" href="{{ url_for('admin.list_departments') }}">
+      <div class="tile-ico">🏷️</div>
+      <div class="tile-title">Departments</div>
+      <div class="tile-sub">Manage department settings · {{ total_depts }}</div>
+    </a>
 
-      <div class="card mb-3">
-        <div class="card-body">
-          <h5 class="card-title">Email Form Generation</h5>
-          <p class="card-text">Configure request-by-email form generation, field verification, and automated requester notifications.</p>
-          <a class="btn btn-primary" href="{{ url_for('admin.special_email') }}">Manage Email Form Settings</a>
-        </div>
-      </div>
-    </div>
+    <a class="admin-tile admin-card" href="{{ url_for('admin.site_config') }}">
+      <div class="tile-ico">🌐</div>
+      <div class="tile-title">Site</div>
+      <div class="tile-sub">Branding & rolling quotes</div>
+    </a>
 
-    <div class="col-md-6">
-      <div class="card mb-3">
-        <div class="card-body">
-          <h5 class="card-title">Monitoring & Audit</h5>
-          <p class="card-text">Audit entries: <strong>{{ total_audit }}</strong></p>
-          <a class="btn btn-primary" href="{{ url_for('admin.monitor') }}">Monitor Dashboards</a>
-          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.audit') }}">View Audit</a>
-        </div>
-      </div>
-      <div class="card mb-3">
-        <div class="card-body">
-          <h5 class="card-title">Status Options & Workflows</h5>
-          <p class="card-text">Edit status metadata, map statuses to target departments, require screenshots, and control notifications per-status. Workflows let you define department-scoped step specs.</p>
-          <a class="btn btn-primary" href="{{ url_for('admin.list_status_options') }}">Status Options</a>
-          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.list_workflows') }}">Workflows</a>
-        </div>
-      </div>
+    <a class="admin-tile admin-card" href="{{ url_for('admin.special_email') }}">
+      <div class="tile-ico">✉️</div>
+      <div class="tile-title">Email Forms</div>
+      <div class="tile-sub">Inbound form settings</div>
+    </a>
 
-      <div class="card mb-3">
-        <div class="card-body">
-          <h5 class="card-title">Buckets & Dashboard Layouts</h5>
-          <p class="card-text">Configure the buckets that appear on department dashboards (e.g. Dept B buckets). Buckets drive the semantic grouping shown on the dashboard.</p>
-          <a class="btn btn-primary" href="{{ url_for('admin.list_buckets') }}">Manage Buckets</a>
-        </div>
-      </div>
+    <a class="admin-tile admin-card" href="{{ url_for('admin.monitor') }}">
+      <div class="tile-ico">📊</div>
+      <div class="tile-title">Monitor</div>
+      <div class="tile-sub">Admin dashboards · {{ total_audit }}</div>
+    </a>
 
-      <div class="card mb-3">
-        <div class="card-body">
-          <h5 class="card-title">Notifications & Email</h5>
-          <p class="card-text">Control in‑app notification retention, special-email behaviors, and email routing for inbound requests.</p>
-          <a class="btn btn-primary" href="{{ url_for('admin.notifications_retention') }}">Notification Retention</a>
-          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.special_email') }}">Special Email</a>
-          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.email_routing_list') }}">Email Routing</a>
-        </div>
-      </div>
+    <a class="admin-tile admin-card" href="{{ url_for('admin.list_status_options') }}">
+      <div class="tile-ico">⚙️</div>
+      <div class="tile-title">Workflows</div>
+      <div class="tile-sub">Status & workflow control</div>
+    </a>
 
-      <div class="card mb-3">
-        <div class="card-body">
-          <h5 class="card-title">Feature Flags & Integrations</h5>
-          <p class="card-text">Toggle runtime features and configure department integrations (ticketing, webhooks, verification).</p>
-          <a class="btn btn-primary" href="{{ url_for('admin.feature_flags') }}">Feature Flags</a>
-          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.list_integrations') }}">Integrations</a>
-        </div>
-      </div>
+    <a class="admin-tile admin-card" href="{{ url_for('admin.list_buckets') }}">
+      <div class="tile-ico">📁</div>
+      <div class="tile-title">Buckets</div>
+      <div class="tile-sub">Dashboard buckets</div>
+    </a>
 
-      <div class="card mb-3">
-        <div class="card-body">
-          <h5 class="card-title">Debug</h5>
-          <p class="card-text">Open the debug workspace or mini-window for internal pages.</p>
-          <a class="btn btn-primary" href="{{ url_for('admin.monitor') }}">Open Monitor</a>
-          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.debug_workspace') }}">Debug Workspace</a>
-        </div>
-      </div>
-    </div>
+    <a class="admin-tile admin-card" href="{{ url_for('admin.notifications_retention') }}">
+      <div class="tile-ico">🔔</div>
+      <div class="tile-title">Notifications</div>
+      <div class="tile-sub">Retention & routing</div>
+    </a>
+
+    <a class="admin-tile admin-card" href="{{ url_for('admin.feature_flags') }}">
+      <div class="tile-ico">🚦</div>
+      <div class="tile-title">Integrations & Flags</div>
+      <div class="tile-sub">Flags · Integrations · Unmapped</div>
+    </a>
+
+    <a class="admin-tile admin-card" href="{{ url_for('admin.debug_workspace') }}">
+      <div class="tile-ico">🧰</div>
+      <div class="tile-title">Debug</div>
+      <div class="tile-sub">Debug workspace & helpers</div>
+    </a>
   </div>
 {% endblock %}

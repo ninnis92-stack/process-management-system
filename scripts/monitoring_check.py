@@ -12,34 +12,35 @@ import requests
 import sys
 from urllib.parse import urljoin
 
-APP = os.getenv('APP_URL', 'http://localhost:5001')
-SLACK = os.getenv('SLACK_WEBHOOK')
+APP = os.getenv("APP_URL", "http://localhost:5001")
+SLACK = os.getenv("SLACK_WEBHOOK")
 
 
 def check():
     ok = True
     details = []
     try:
-        r = requests.get(urljoin(APP, '/health'), timeout=5)
+        r = requests.get(urljoin(APP, "/health"), timeout=5)
         if r.status_code != 200:
             ok = False
-            details.append(f'/health returned {r.status_code}')
+            details.append(f"/health returned {r.status_code}")
     except Exception as exc:
         ok = False
-        details.append(f'/health error: {exc}')
+        details.append(f"/health error: {exc}")
 
     try:
-        r = requests.get(urljoin(APP, '/metrics'), timeout=5)
+        r = requests.get(urljoin(APP, "/metrics"), timeout=5)
         if r.status_code != 200:
             ok = False
-            details.append(f'/metrics returned {r.status_code}')
+            details.append(f"/metrics returned {r.status_code}")
     except Exception as exc:
         ok = False
-        details.append(f'/metrics error: {exc}')
+        details.append(f"/metrics error: {exc}")
 
     if not ok and SLACK:
         payload = {
-            'text': f':rotating_light: App monitor detected issues at {APP}:\n' + '\n'.join(details)
+            "text": f":rotating_light: App monitor detected issues at {APP}:\n"
+            + "\n".join(details)
         }
         try:
             requests.post(SLACK, json=payload, timeout=5)
@@ -47,12 +48,12 @@ def check():
             pass
 
     if ok:
-        print('ok')
+        print("ok")
         return 0
     else:
-        print('fail:', '; '.join(details))
+        print("fail:", "; ".join(details))
         return 2
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(check())

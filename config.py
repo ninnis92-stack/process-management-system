@@ -2,6 +2,7 @@ import os
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
+
 class Config:
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     if not SQLALCHEMY_DATABASE_URI:
@@ -30,13 +31,25 @@ class Config:
     SSO_ADMIN_SYNC_ENABLED = os.getenv("SSO_ADMIN_SYNC_ENABLED", "True") == "True"
     SSO_ADMIN_SYNC_STRICT = os.getenv("SSO_ADMIN_SYNC_STRICT", "False") == "True"
     SSO_ADMIN_CLAIM = os.getenv("SSO_ADMIN_CLAIM", "roles")
-    SSO_ADMIN_CLAIM_VALUES = [v.strip().lower() for v in os.getenv("SSO_ADMIN_CLAIM_VALUES", "admin").split(",") if v.strip()]
+    SSO_ADMIN_CLAIM_VALUES = [
+        v.strip().lower()
+        for v in os.getenv("SSO_ADMIN_CLAIM_VALUES", "admin").split(",")
+        if v.strip()
+    ]
     # Optional explicit SSO-admin email allow-list, in addition to ADMIN_EMAILS.
-    SSO_ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("SSO_ADMIN_EMAILS", "").split(",") if e.strip()]
+    SSO_ADMIN_EMAILS = [
+        e.strip().lower()
+        for e in os.getenv("SSO_ADMIN_EMAILS", "").split(",")
+        if e.strip()
+    ]
     # Optional MFA enforcement for SSO-backed admin access.
     SSO_REQUIRE_MFA = os.getenv("SSO_REQUIRE_MFA", "False") == "True"
     SSO_MFA_CLAIM = os.getenv("SSO_MFA_CLAIM", "amr")
-    SSO_MFA_CLAIM_VALUES = [v.strip().lower() for v in os.getenv("SSO_MFA_CLAIM_VALUES", "mfa,otp,2fa,hwk").split(",") if v.strip()]
+    SSO_MFA_CLAIM_VALUES = [
+        v.strip().lower()
+        for v in os.getenv("SSO_MFA_CLAIM_VALUES", "mfa,otp,2fa,hwk").split(",")
+        if v.strip()
+    ]
 
     # Uploads (ensure upload folder is durable in production)
     _default_upload_folder = os.path.join(BASE_DIR, "uploads")
@@ -51,12 +64,16 @@ class Config:
 
     # Part number validation (future integration)
     PART_API_ENABLED = os.getenv("PART_API_ENABLED", "False") == "True"
-    PART_API_URL = os.getenv("PART_API_URL")  # e.g., https://parts.example.com/api/validate
+    PART_API_URL = os.getenv(
+        "PART_API_URL"
+    )  # e.g., https://parts.example.com/api/validate
     PART_API_TOKEN = os.getenv("PART_API_TOKEN")
     PART_API_TIMEOUT = int(os.getenv("PART_API_TIMEOUT", "5"))
 
     # External verification feature flag (safe to keep False until migrations/connectors ready)
-    ENABLE_EXTERNAL_VERIFICATION = os.getenv("ENABLE_EXTERNAL_VERIFICATION", "False") == "True"
+    ENABLE_EXTERNAL_VERIFICATION = (
+        os.getenv("ENABLE_EXTERNAL_VERIFICATION", "False") == "True"
+    )
 
     # Inventory connector (skeleton). When False the InventoryService is a no-op.
     INVENTORY_ENABLED = os.getenv("INVENTORY_ENABLED", "False") == "True"
@@ -85,10 +102,16 @@ class Config:
     TICKETING_TIMEOUT = int(os.getenv("TICKETING_TIMEOUT", "5"))
 
     # Test email handling: comma-separated domains to treat as test accounts (skip real SMTP sends)
-    TEST_EMAIL_DOMAINS = [d.strip().lower() for d in os.getenv("TEST_EMAIL_DOMAINS", "example.com,example.org").split(",") if d.strip()]
+    TEST_EMAIL_DOMAINS = [
+        d.strip().lower()
+        for d in os.getenv("TEST_EMAIL_DOMAINS", "example.com,example.org").split(",")
+        if d.strip()
+    ]
 
     # Admin users allowed to access the internal admin UI (comma-separated emails)
-    ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()]
+    ADMIN_EMAILS = [
+        e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()
+    ]
     # Session cookie hardening recommended for production
     SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "True") == "True"
     SESSION_COOKIE_HTTPONLY = os.getenv("SESSION_COOKIE_HTTPONLY", "True") == "True"
