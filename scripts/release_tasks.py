@@ -135,6 +135,14 @@ def main():
                         with engine.begin() as conn:
                             conn.execute(text("ALTER TABLE feature_flags ADD COLUMN sso_admin_sync_enabled BOOLEAN DEFAULT TRUE"))
                         print('schema_fix=feature_flags.sso_admin_sync_enabled_added')
+                # Ensure user.last_active_dept exists when model expects it
+                if 'user' in insp.get_table_names():
+                    user_cols = {c['name'] for c in insp.get_columns('user')}
+                    if 'last_active_dept' not in user_cols:
+                        with engine.begin() as conn:
+                            # quote user as it's a reserved word in some DBs
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN last_active_dept VARCHAR(2)'))
+                        print('schema_fix=user.last_active_dept_added')
         except Exception as exc:
             print('schema_fix_failed', exc, file=sys.stderr)
 
