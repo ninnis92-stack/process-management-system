@@ -41,6 +41,18 @@
   <strong>Due:</strong> {{ req.due_at.strftime("%b %d, %Y %I:%M %p") if req.due_at else "—" }}
 </div>
 
+{# Expose status option screenshot requirements to client JS as JSON script to avoid JS linter errors #}
+<script id="status-options-data" type="application/json">{{ status_options_map|default({})|tojson }}</script>
+<script>
+  (function(){
+    try {
+      window.STATUS_OPTIONS = JSON.parse(document.getElementById('status-options-data').textContent || '{}');
+    } catch (e) {
+      window.STATUS_OPTIONS = {};
+    }
+  })();
+</script>
+
 <div class="row g-3">
   <div class="col-md-7">
 

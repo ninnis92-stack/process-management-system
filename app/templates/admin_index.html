@@ -48,6 +48,41 @@
           <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.audit') }}">View Audit</a>
         </div>
       </div>
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Status Options & Workflows</h5>
+          <p class="card-text">Edit status metadata, map statuses to target departments, require screenshots, and control notifications per-status. Workflows let you define department-scoped step specs.</p>
+          <a class="btn btn-primary" href="{{ url_for('admin.list_status_options') }}">Status Options</a>
+          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.list_workflows') }}">Workflows</a>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Buckets & Dashboard Layouts</h5>
+          <p class="card-text">Configure the buckets that appear on department dashboards (e.g. Dept B buckets). Buckets drive the semantic grouping shown on the dashboard.</p>
+          <a class="btn btn-primary" href="{{ url_for('admin.monitor') }}">Manage Buckets</a>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Notifications & Email</h5>
+          <p class="card-text">Control in‑app notification retention, special-email behaviors, and email routing for inbound requests.</p>
+          <a class="btn btn-primary" href="{{ url_for('admin.notifications_retention') }}">Notification Retention</a>
+          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.special_email') }}">Special Email</a>
+          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.email_routing_list') }}">Email Routing</a>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Feature Flags & Integrations</h5>
+          <p class="card-text">Toggle runtime features and configure department integrations (ticketing, webhooks, verification).</p>
+          <a class="btn btn-primary" href="{{ url_for('admin.feature_flags') }}">Feature Flags</a>
+          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.list_integrations') }}">Integrations</a>
+        </div>
+      </div>
 
       <div class="card mb-3">
         <div class="card-body">

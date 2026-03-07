@@ -37,12 +37,33 @@ def create_app():
     @app.cli.command("notify-due")
     def notify_due():
         from .notifications.due import send_due_soon_notifications
-        send_due_soon_notifications(current_app, hours=24)
+        # Persist notifications when run as a CLI command during deploy
+        send_due_soon_notifications(current_app, hours=24, commit=True)
 
     @app.cli.command("notify-nudges")
     def notify_nudges():
         from .notifications.due import send_high_priority_nudges
-        send_high_priority_nudges(current_app)
+        # Persist notifications when run as a CLI command during deploy
+        send_high_priority_nudges(current_app, commit=True)
+
+    @app.cli.command("clear-open-requests")
+    @click.confirmation_option(prompt='Are you sure you want to close all open requests?')
+    def clear_open_requests():
+        """Close all non-closed requests by setting their status to CLOSED and clearing assignment."""
+        from .models import Request
+        with app.app_context():
+            try:
+                q = Request.query.filter(Request.status != 'CLOSED')
+                count = q.count()
+                if count == 0:
+                    click.echo('No open requests found.')
+                    return
+                q.update({"status": 'CLOSED', "assigned_to_user_id": None}, synchronize_session=False)
+                db.session.commit()
+                click.echo(f'Closed {count} open requests.')
+            except Exception as e:
+                db.session.rollback()
+                click.echo(f'Failed to clear open requests: {e}')
 
     @app.cli.command("create-user")
     @click.option("--email", required=True, help="User email")

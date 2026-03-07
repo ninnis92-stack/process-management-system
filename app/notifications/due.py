@@ -9,7 +9,7 @@ from .. import notifcations as notifications_module
 def users_in_dept(dept: str):
     return User.query.filter_by(department=dept, is_active=True).all()
 
-def send_due_soon_notifications(app, hours=24):
+def send_due_soon_notifications(app, hours=24, commit: bool = False):
     now = datetime.utcnow()
     soon = now + timedelta(hours=hours)
 
@@ -47,10 +47,11 @@ def send_due_soon_notifications(app, hours=24):
                 dedupe_key=dedupe,
             ))
 
-    db.session.commit()
+    if commit:
+        db.session.commit()
 
 
-def send_high_priority_nudges(app):
+def send_high_priority_nudges(app, commit: bool = False):
     """Send nudges for high-priority open requests according to admin config.
 
     This function will create an in-app `Notification` for the responsible
@@ -144,10 +145,23 @@ def send_high_priority_nudges(app):
                     except Exception:
                         pass
 
-    try:
-        db.session.commit()
-    except Exception:
+    if commit:
         try:
-            app.logger.exception('Failed to commit nudge notifications')
+            db.session.commit()
         except Exception:
-            pass
+            try:
+                app.logger.exception('Failed to commit nudge notifications')
+            except Exception:
+                pass
+    else:
+        # Ensure newly-added Notification objects are flushed to the DB so
+        # subsequent queries in the same test/request context can observe
+        # them without requiring a full commit. Flushing is safe here as it
+        # does not finalize the transaction.
+        try:
+            db.session.flush()
+        except Exception:
+            try:
+                app.logger.exception('Failed to flush nudge notifications')
+            except Exception:
+                pass

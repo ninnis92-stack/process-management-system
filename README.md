@@ -2,6 +2,155 @@
 
 A small prototype app.
 
+## Recent fixes (2026-03-07)
+
+- Notifications dropdown: fixed client-side handling for non-OK responses so the
+  dropdown no longer stays stuck on "Loading…". The client now checks response
+  status before parsing JSON and falls back to a friendly message when the
+  endpoint is unavailable.
+- Server-side: added logging and safe fallbacks in `app/notifications/routes.py`
+  so unexpected errors return safe JSON instead of HTML redirects. Also added a
+  defensive `db.session.rollback()` in `app/auth/routes.py` during login to
+  prevent "current transaction is aborted" errors that caused 500 responses.
+- Tests: local test run passed (31 tests). Smoke scripts executed successfully
+  and were used to validate notification counts and transition flows.
+- Deployment: changes were deployed to Fly — app available at
+  https://process-management-prototype-lingering-bush-6175.fly.dev/
+
+## Feature Flags (quick reference)
+
+- `vibe_enabled`: Enable the Vibe theme picker and per-user theme persistence.
+- `SSO_ENABLED`: Enable OIDC SSO login flow.
+- `SSO_ADMIN_SYNC_ENABLED`: When true, sync admin role from SSO claims where configured.
+- `SSO_ADMIN_SYNC_STRICT`: When true, mirror SSO admin decision exactly on login.
+- `AUTO_CREATE_DB`: When true (development), the app attempts to create tables at boot; in production prefer Alembic migrations.
+- `EMAIL_ENABLED`: When true, send emails instead of creating in-app `Notification` rows.
+- `REQUIRE_SSO_FOR_GUEST`: Require guest submissions to match an SSO-linked user.
+
+## Templates & key files
+
+- Main layout: `app/templates/base.html` (header, notification UI, department chooser modal).
+- Client JS: `app/static/app.js` (notification dropdown, CSRF fetch wrapper, UI helpers).
+- Notifications endpoints: `app/notifications/routes.py` (JSON endpoints for unread count / latest / mark read).
+- Auth handlers: `app/auth/routes.py` (login, SSO, department switching, last_active_dept persistence).
+- Models and migrations: `app/models.py` and `migrations/versions/0023_add_user_department_and_last_active.py`.
+- Smoke & helper scripts: `scripts/automated_role_smoke.py`, `scripts/transition_smoke.py`, `scripts/release_tasks.py`.
+
+## Troubleshooting checklist
+
+If you encounter errors in the UI or server (e.g., notifications stuck on "Loading…" or 500 on login), try these steps:
+
+- Check app health and recent logs:
+
+```bash
+curl -fsS https://process-management-prototype-lingering-bush-6175.fly.dev/health
+fly logs -a process-management-prototype-lingering-bush-6175
+```
+
+- Verify `/notifications/latest` returns JSON when called authenticated (use browser network tab or curl with cookies):
+
+```bash
+# In a browser devtools network trace: inspect the response body for /notifications/latest
+# Or run smoke script which exercises the endpoints:
+source .venv/bin/activate
+PYTHONPATH=$(pwd) python scripts/automated_role_smoke.py
+```
+
+- If the notifications dropdown remains in "Loading…":
+  - Confirm the endpoint returned HTTP 200 and JSON (not an HTML login redirect or 500).
+  - Check browser console for JS errors and that `meta[name="csrf-token"]` is present in `base.html` for authenticated POSTs.
+
+- If login triggers "current transaction is aborted" or 500s:
+  - Ensure database migrations have been applied and the DB is healthy.
+  - Check logs for earlier DB exceptions; a `db.session.rollback()` was added to the login path to reduce this risk.
+
+- Local test issues (segfaults or import errors):
+  - Use the Makefile test runner which sets PYTHONPATH and known invocation:
+
+```bash
+source .venv/bin/activate
+make test
+```
+
+- Redeploy after fixes using the guarded Makefile target (runs tests first):
+
+```bash
+source .venv/bin/activate
+make deploy-safe
+```
+
+If you want, I can add a short Troubleshooting doc under `docs/` with common traces and commands. 
+
+## Urgent Production DB fix (missing `request.workflow_id`)
+
+Symptom: production logs may show errors like "column request.workflow_id does not exist" resulting in 500s on request detail/presence endpoints.
+
+Preferred remediation (safe, automated): re-run the guarded deploy so the release-time maintenance tasks apply (this runs Alembic + idempotent ALTERs via `scripts/release_tasks.py`):
+
+```bash
+source .venv/bin/activate
+make deploy-safe
+# then tail logs to confirm the error disappears
+fly logs -a process-management-prototype-lingering-bush-6175 --no-tail
+```
+
+If deploys keep failing (CI/builder interruptions), apply the minimal, idempotent SQL directly as a fallback. Run this against the production database (replace `DATABASE_URL` with your production connection string or use `flyctl ssh` to run inside the instance):
+
+```sql
+ALTER TABLE request ADD COLUMN IF NOT EXISTS workflow_id INTEGER;
+```
+
+Example using `psql` where `DATABASE_URL` is a Postgres URL:
+
+```bash
+# run from a safe workstation with network access to the DB
+psql "$DATABASE_URL" -c "ALTER TABLE request ADD COLUMN IF NOT EXISTS workflow_id INTEGER;"
+```
+
+Alternative: run the release helper inside a running instance (this will run Alembic and the idempotent safety ALTERs):
+
+```bash
+flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command "python3 scripts/release_tasks.py"
+```
+
+Verify the fix by tailing logs and hitting a request detail URL (or run smoke checks):
+
+```bash
+fly logs -a process-management-prototype-lingering-bush-6175 --no-tail
+curl -fsS https://process-management-prototype-lingering-bush-6175.fly.dev/health
+```
+
+Notes about recent admin UI changes
+
+- Admin creation/edit: a `Role` dropdown was added to the Admin user creation form allowing `User` or `Admin`; this sets `User.is_admin` accordingly.
+- Admins no longer see the notification bell in the navbar (admins do not receive standard in-app notifications).
+- Dashboard: admin users are routed to the admin dashboard; non-admin users continue to use the regular dashboard.
+- A banner button to request self-admin elevation was added and is guarded by the `ALLOW_SELF_ADMIN` config flag. Only enable this flag intentionally in development or supervised demos.
+Verification and quick troubleshooting
+------------------------------------
+
+- Tail remote logs (watch for exceptions from `notifications.latest` or login):
+
+```bash
+fly logs -a process-management-prototype-lingering-bush-6175
+```
+
+- Re-run smoke scripts locally (requires virtualenv activation):
+
+```bash
+source .venv/bin/activate
+PYTHONPATH=$(pwd) python scripts/automated_role_smoke.py
+PYTHONPATH=$(pwd) python scripts/transition_smoke.py
+```
+
+- To redeploy after changes run the Makefile target (tests run before deploy):
+
+```bash
+source .venv/bin/activate
+make deploy-safe
+```
+
+
 Administration: see `docs/ADMIN.md` for notes about the admin-managed Departments and SiteConfig (banner + rolling quotes). Tests covering these features live at `tests/test_admin_site_config.py`.
 
 ## Deployment & seeding (Fly.io)
@@ -203,6 +352,7 @@ Admins can enable a special-email/request toggle that automatically closes a new
 - It uses the field's configured verification provider/API mapping.
 - Empty fields are ignored.
 - Unknown/disabled provider responses fail open and do not auto-reject.
+
 
 Supported provider response signals:
 

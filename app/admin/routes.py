@@ -66,7 +66,7 @@ def create_user():
         dept = form.department.data
         pw = form.password.data or "password123"
         is_active = bool(form.is_active.data)
-        is_admin = bool(form.is_admin.data)
+        is_admin = (getattr(form, 'role', None) and form.role.data == 'admin') or bool(form.is_admin.data)
 
         existing = User.query.filter_by(email=email).first()
         if existing:
@@ -115,7 +115,7 @@ def edit_user(user_id: int):
         if form.password.data:
             u.password_hash = generate_password_hash(form.password.data, method="pbkdf2:sha256")
         u.is_active = bool(form.is_active.data)
-        u.is_admin = bool(form.is_admin.data)
+        u.is_admin = (getattr(form, 'role', None) and form.role.data == 'admin') or bool(form.is_admin.data)
         db.session.commit()
         flash(f"Updated user {u.email}.", "success")
         return redirect(url_for("admin.list_users"))
@@ -294,6 +294,33 @@ def stop_impersonation():
     session.pop('impersonate_started_at', None)
     flash('Stopped acting-as; returned to your normal admin session.', 'success')
     return redirect(url_for('admin.list_users'))
+
+
+@admin_bp.route('/set_self_admin', methods=['POST'])
+@login_required
+def set_self_admin():
+    """Allow a logged-in user to mark their account as admin when enabled via config.
+
+    This action is gated by the `ALLOW_SELF_ADMIN` config flag to avoid accidental
+    elevation in production environments.
+    """
+    if not current_app.config.get('ALLOW_SELF_ADMIN'):
+        flash('Self-admin feature is not enabled on this instance.', 'danger')
+        return redirect(flask_request.referrer or url_for('requests.dashboard'))
+
+    # mark the current user as admin
+    current_user.is_admin = True
+    try:
+        db.session.commit()
+        flash('Your account has been updated to admin.', 'success')
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        flash('Failed to update admin status.', 'danger')
+
+    return redirect(flask_request.referrer or url_for('admin.index'))
 
 
 
@@ -788,6 +815,10 @@ def edit_field_verification(field_id: int):
             form.params_json.data = json.dumps(fv.params, indent=2) if fv.params is not None else ''
         except Exception:
             form.params_json.data = str(fv.params or '')
+        try:
+            form.triggers_auto_reject.data = bool(getattr(fv, 'triggers_auto_reject', False))
+        except Exception:
+            form.triggers_auto_reject.data = False
 
     if form.validate_on_submit():
         import json
@@ -800,7 +831,13 @@ def edit_field_verification(field_id: int):
                 return render_template('admin_field_verification.html', form=form, field=f, fv=fv)
 
         # Replace existing mapping (simple policy: create new row)
-        new = FieldVerification(field_id=f.id, provider=form.provider.data, external_key=(form.external_key.data or None), params=params)
+        new = FieldVerification(
+            field_id=f.id,
+            provider=form.provider.data,
+            external_key=(form.external_key.data or None),
+            params=params,
+            triggers_auto_reject=bool(form.triggers_auto_reject.data),
+        )
         db.session.add(new)
         db.session.commit()
         flash('Field verification mapping saved.', 'success')
@@ -1196,6 +1233,7 @@ def create_status_option():
             notify_enabled=bool(form.notify_enabled.data),
             notify_on_transfer_only=bool(form.notify_on_transfer_only.data),
             email_enabled=bool(getattr(form, 'email_enabled', False).data if getattr(form, 'email_enabled', None) else False),
+            screenshot_required=bool(getattr(form, 'screenshot_required', False).data if getattr(form, 'screenshot_required', None) else False),
         )
         db.session.add(opt)
         db.session.commit()
@@ -1220,6 +1258,7 @@ def edit_status_option(opt_id: int):
         opt.notify_enabled = bool(form.notify_enabled.data)
         opt.notify_on_transfer_only = bool(form.notify_on_transfer_only.data)
         opt.email_enabled = bool(getattr(form, 'email_enabled', False).data if getattr(form, 'email_enabled', None) else False)
+        opt.screenshot_required = bool(getattr(form, 'screenshot_required', False).data if getattr(form, 'screenshot_required', None) else False)
         db.session.commit()
         flash('Status option updated.', 'success')
         return redirect(url_for('admin.list_status_options'))
@@ -1236,6 +1275,23 @@ def delete_status_option(opt_id: int):
     db.session.delete(opt)
     db.session.commit()
     flash('Status option deleted.', 'success')
+    return redirect(url_for('admin.list_status_options'))
+
+
+@admin_bp.route('/status_options/<int:opt_id>/toggle_screenshot', methods=['POST'])
+@login_required
+def toggle_status_screenshot(opt_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+    opt = get_or_404(StatusOption, opt_id)
+    try:
+        opt.screenshot_required = not bool(opt.screenshot_required)
+        db.session.commit()
+        flash('Screenshot requirement updated.', 'success')
+    except Exception:
+        db.session.rollback()
+        flash('Failed to update screenshot requirement.', 'danger')
     return redirect(url_for('admin.list_status_options'))
 
 

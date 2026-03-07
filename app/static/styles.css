@@ -423,3 +423,10 @@ canvas {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* Admin back button tweaks */
+.admin-back-btn { margin-bottom: 0.25rem; }
+
+@media (max-width: 576px) {
+  .admin-back-btn { display: block; width: 100%; }
+}

@@ -4,7 +4,7 @@
 <h2>Status options</h2>
 <p><a href="{{ url_for('admin.create_status_option') }}" class="btn btn-primary">New status option</a></p>
 <table class="table">
-  <thead><tr><th>Code</th><th>Label</th><th>Target dept</th><th>Notify</th><th>Actions</th></tr></thead>
+  <thead><tr><th>Code</th><th>Label</th><th>Target dept</th><th>Notify</th><th>Screenshot</th><th>Actions</th></tr></thead>
   <tbody>
   {% for s in status_options %}
     <tr>
@@ -12,10 +12,14 @@
       <td>{{ s.label }}</td>
       <td>{{ s.target_department or '-' }}</td>
       <td>{{ 'on transfer only' if s.notify_on_transfer_only else ( 'enabled' if s.notify_enabled else 'disabled') }}</td>
+      <td>{{ 'required' if s.screenshot_required else 'no' }}</td>
       <td>
         <a href="{{ url_for('admin.edit_status_option', opt_id=s.id) }}">Edit</a>
         <form method="post" action="{{ url_for('admin.delete_status_option', opt_id=s.id) }}" style="display:inline">
           <button class="btn btn-link" type="submit">Delete</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.toggle_status_screenshot', opt_id=s.id) }}" style="display:inline; margin-left:6px">
+          <button class="btn btn-link">{{ 'Disable' if s.screenshot_required else 'Enable' }} screenshot</button>
         </form>
       </td>
     </tr>

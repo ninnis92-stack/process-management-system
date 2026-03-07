@@ -5,7 +5,7 @@ from sqlalchemy import func
 
 from ..extensions import db
 from sqlalchemy.exc import OperationalError
-from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Notification
+from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Notification, Workflow
 from ..notifcations import notify_users, users_in_department
 from types import SimpleNamespace
 from werkzeug.routing import BuildError
@@ -60,6 +60,11 @@ def _send_guest_email(to_email: str, subject: str, body: str) -> None:
 @external_bp.route("/new", methods=["GET", "POST"])
 def external_new():
     form = ExternalNewRequestForm()
+    # populate dynamic choices
+    form.owner_department.choices = [("A", "A"), ("B", "B"), ("C", "C")]
+    wfs = Workflow.query.filter_by(active=True).order_by(Workflow.name.asc()).all()
+    wf_choices = [(0, "-- none --")] + [(w.id, w.name) for w in wfs]
+    form.workflow_id.choices = wf_choices
     if form.validate_on_submit():
         desc = (form.description.data or "").strip()
         # Normalize guest email early for checks
@@ -74,6 +79,9 @@ def external_new():
                 flash("Guest email must be an SSO-linked account.", "warning")
                 return render_template("external_new.html", form=form)
 
+        # prefer explicit owner_department from form if provided
+        owner_dept = (form.owner_department.data or "B").strip().upper() if getattr(form, 'owner_department', None) else 'B'
+
         req = ReqModel(
             title=form.title.data.strip(),
             request_type=form.request_type.data,
@@ -81,13 +89,20 @@ def external_new():
             priority=form.priority.data,
             requires_c_review=False,
             status="NEW_FROM_A",
-            owner_department="B",
+            owner_department=owner_dept,
             submitter_type="guest",
             guest_email=guest_email,
             guest_name=form.guest_name.data.strip() if form.guest_name.data else None,
             pricebook_status=form.pricebook_status.data,
             due_at=form.due_at.data,
         )
+        # Attach selected workflow if present
+        try:
+            wf_id = int(getattr(form, 'workflow_id', SimpleNamespace(data=0)).data or 0)
+            if wf_id:
+                req.workflow_id = wf_id
+        except Exception:
+            pass
         req.ensure_guest_token()
         db.session.add(req)
         try:

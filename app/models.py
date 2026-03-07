@@ -85,6 +85,7 @@ class Notification(db.Model):
     url = db.Column(db.String(500), nullable=True)   # where to click
     dedupe_key = db.Column(db.String(200), nullable=True, index=True)
     is_read = db.Column(db.Boolean, nullable=False, default=False)
+    read_at = db.Column(db.DateTime, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
@@ -105,6 +106,9 @@ class Request(db.Model):
 
     status = db.Column(db.String(40), nullable=False, default="NEW_FROM_A")
     owner_department = db.Column(db.String(1), nullable=False, default="B")
+    # Optional chosen workflow for this request (guest or user-created)
+    workflow_id = db.Column(db.Integer, db.ForeignKey('workflow.id'), nullable=True)
+    workflow = db.relationship('Workflow', backref='requests')
 
     assigned_to_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     assigned_to_user = db.relationship("User", foreign_keys=[assigned_to_user_id])
@@ -127,6 +131,9 @@ class Request(db.Model):
     comments = db.relationship("Comment", backref="request", lazy=True, cascade="all, delete-orphan")
     audit_logs = db.relationship("AuditLog", backref="request", lazy=True, cascade="all, delete-orphan")
     submissions = db.relationship("Submission", backref="request", lazy=True, cascade="all, delete-orphan")
+    # When True, this request was denied (closed via manual deny or
+    # automatic denial). Used to expose a persistent "Denied" bucket.
+    is_denied = db.Column(db.Boolean, nullable=False, default=False)
 
     def ensure_guest_token(self, days_valid: int = 30):
         if not self.guest_access_token:
@@ -257,6 +264,9 @@ class FieldVerification(db.Model):
     provider = db.Column(db.String(100), nullable=False)  # e.g. 'inventory'
     external_key = db.Column(db.String(200), nullable=True)  # e.g. 'part_number'
     params = db.Column(db.JSON, nullable=True)  # provider-specific params
+    # When True, failures from this verification mapping may trigger an
+    # automatic denial (auto-reject) when global auto-reject is enabled.
+    triggers_auto_reject = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -358,7 +368,7 @@ class RejectRequestConfig(db.Model):
     """Singleton configuration for assignee-driven request rejection."""
     id = db.Column(db.Integer, primary_key=True)
     enabled = db.Column(db.Boolean, nullable=False, default=True)
-    button_label = db.Column(db.String(120), nullable=False, default="Reject Request")
+    button_label = db.Column(db.String(120), nullable=False, default="Deny Request")
     rejection_message = db.Column(db.Text, nullable=True)
     dept_a_enabled = db.Column(db.Boolean, nullable=False, default=False)
     dept_b_enabled = db.Column(db.Boolean, nullable=False, default=True)
@@ -552,6 +562,9 @@ class StatusOption(db.Model):
     notify_on_transfer_only = db.Column(db.Boolean, nullable=False, default=False)
     # If false, status selection will not trigger notifications at all.
     notify_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    # When true, selecting this status requires a screenshot attachment
+    # on transitions that would send work back to Dept B (enforced in routes/ui).
+    screenshot_required = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     # Whether this status should produce email deliveries (when mailer/SSO is active)
     email_enabled = db.Column(db.Boolean, nullable=False, default=False)

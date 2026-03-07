@@ -28,6 +28,19 @@
         </div>
       </div>
 
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Owner Department</label>
+          {{ form.owner_department(class="form-select") }}
+          <div class="form-text">Select which department should own this request.</div>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Workflow (optional)</label>
+          {{ form.workflow_id(class="form-select") }}
+          <div class="form-text">Optional: choose a workflow to apply to this request.</div>
+        </div>
+      </div>
+
       <div class="mb-3">
         <label class="form-label">Title</label>
         {{ form.title(class="form-control") }}

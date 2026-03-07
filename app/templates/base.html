@@ -54,7 +54,11 @@
       <div class="collapse navbar-collapse" id="mainNav">
         <ul class="navbar-nav ms-3 me-auto mb-2 mb-lg-0">
           {% if current_user.is_authenticated %}
-            <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('requests.dashboard') else '' }}" href="{{ url_for('requests.dashboard') }}">Dashboard</a></li>
+            {% if current_user.is_admin %}
+              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin') else '' }}" href="{{ url_for('admin.index') }}">Dashboard</a></li>
+            {% else %}
+              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('requests.dashboard') else '' }}" href="{{ url_for('requests.dashboard') }}">Dashboard</a></li>
+            {% endif %}
             {% if current_user.department == 'A' %}
               <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('requests.request_new') else '' }}" href="{{ url_for('requests.request_new') }}">New Request</a></li>
             {% endif %}
@@ -68,12 +72,17 @@
 
         <div class="d-flex align-items-center nav-actions gap-2">
           {% if current_user.is_authenticated %}
-            <button id="notifBtn" class="btn btn-outline-light btn-sm position-relative notif-btn" type="button" aria-label="Notifications">
+            {% if not current_user.is_admin %}
+              <button id="notifBtn" class="btn btn-outline-light btn-sm position-relative notif-btn" type="button" aria-label="Notifications">
               <span class="notif-ico" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7v3.3l-.9 1.8A1 1 0 0 0 5 16h14a1 1 0 0 0 .9-1.9L19 12.3V9a7 7 0 0 0-7-7Zm0 20a3 3 0 0 0 2.82-2H9.18A3 3 0 0 0 12 22Z"/></svg>
               </span>
               <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
             </button>
+            {% endif %}
+            {% if current_user.is_admin %}
+              <button id="toggleNotifBtn" class="btn btn-outline-light btn-sm ms-2" title="Toggle notifications icon">🔕</button>
+            {% endif %}
             {% if FeatureFlags.get().vibe_enabled %}
               <button id="vibeBtn" class="btn btn-outline-light btn-sm">Vibe · <span id="vibeLabel">—</span></button>
             {% endif %}
@@ -145,7 +154,15 @@
 
   <main id="content" class="main container my-3" role="main" tabindex="-1">
     {% if site_banner_html %}
-      <div class="mb-3">{{ site_banner_html|safe }}</div>
+        <div class="mb-3">
+          {{ site_banner_html|safe }}
+          {% if current_user.is_authenticated and config.get('ALLOW_SELF_ADMIN') %}
+            <form method="post" action="{{ url_for('admin.set_self_admin') }}" class="d-inline ms-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-dark">Make me admin</button>
+            </form>
+          {% endif %}
+        </div>
     {% elif rolling_quotes_enabled and rolling_quotes and rolling_quotes|length > 0 %}
       <div class="alert alert-info mb-3" role="status">{{ rolling_quotes[0] }}</div>
     {% endif %}
@@ -184,6 +201,12 @@
             <button class="btn btn-sm btn-light text-dark" type="button" onclick="copyTextFromString('{{ tracking_link }}', this)" aria-label="Copy tracking link">Copy</button>
           </div>
         </div>
+      </div>
+    {% endif %}
+
+    {% if ep.startswith('admin') and ep != 'admin.index' %}
+      <div class="mb-3">
+        <a class="btn btn-sm btn-outline-secondary admin-back-btn" href="{{ url_for('admin.index') }}">← Back to admin dashboard</a>
       </div>
     {% endif %}
 
@@ -254,6 +277,34 @@
         console.warn('Copy failed', e);
       }
     }
+  </script>
+  <script>
+    (function(){
+      const toggle = document.getElementById('toggleNotifBtn');
+      const notif = document.getElementById('notifBtn');
+      const key = 'admin_notif_visible';
+      function applyPref() {
+        try {
+          const v = localStorage.getItem(key);
+          if (v === 'false') {
+            if (notif) notif.style.display = 'none';
+          } else {
+            if (notif) notif.style.display = '';
+          }
+        } catch (e){}
+      }
+      if (toggle) {
+        toggle.addEventListener('click', function(){
+          try {
+            const curr = localStorage.getItem(key);
+            const next = (curr === 'false') ? 'true' : 'false';
+            localStorage.setItem(key, next);
+          } catch(e){}
+          applyPref();
+        });
+        applyPref();
+      }
+    })();
   </script>
 </body>
 </html>

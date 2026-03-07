@@ -2,6 +2,7 @@
 
 {% block content %}
   <h2>Site Configuration</h2>
+  <a class="btn btn-sm btn-outline-secondary admin-back-btn mb-2" href="{{ url_for('admin.index') }}">← Admin dashboard</a>
   <form method="post" enctype="multipart/form-data">
     {{ form.hidden_tag() }}
 

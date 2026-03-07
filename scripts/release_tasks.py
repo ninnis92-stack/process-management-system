@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app import create_app
 import subprocess
 from sqlalchemy import inspect, text
+import json
 
 
 def main():
@@ -104,6 +105,10 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(text('ALTER TABLE status_option ADD COLUMN email_enabled BOOLEAN DEFAULT FALSE'))
                     print('schema_fix=status_option.email_enabled_added')
+                if 'status_option' in insp.get_table_names() and 'screenshot_required' not in status_cols:
+                    with engine.begin() as conn:
+                        conn.execute(text('ALTER TABLE status_option ADD COLUMN screenshot_required BOOLEAN DEFAULT FALSE'))
+                    print('schema_fix=status_option.screenshot_required_added')
 
                 department_cols = {c['name'] for c in insp.get_columns('department')} if 'department' in insp.get_table_names() else set()
                 if 'department' in insp.get_table_names() and 'order' not in department_cols:
@@ -150,6 +155,37 @@ def main():
                         with engine.begin() as conn:
                             conn.execute(text('ALTER TABLE request ADD COLUMN is_denied BOOLEAN DEFAULT FALSE'))
                         print('schema_fix=request.is_denied_added')
+                    # Ensure workflow_id exists when the model expects it
+                    if 'workflow_id' not in req_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text('ALTER TABLE request ADD COLUMN workflow_id INTEGER'))
+                        print('schema_fix=request.workflow_id_added')
+                # Ensure a default workflow exists so guest forms have sensible choices
+                try:
+                    from app.models import Workflow
+                    from app import db
+                    if 'workflow' in insp.get_table_names():
+                        existing = Workflow.query.filter_by(name='Default A→B→C').first()
+                        if not existing:
+                            spec = {
+                                'steps': ['NEW_FROM_A', 'B_IN_PROGRESS', 'PENDING_C_REVIEW', 'B_FINAL_REVIEW', 'SENT_TO_A', 'CLOSED'],
+                                'transitions': [
+                                    {'from': 'NEW_FROM_A', 'to': 'B_IN_PROGRESS'},
+                                    {'from': 'B_IN_PROGRESS', 'to': 'PENDING_C_REVIEW'},
+                                    {'from': 'PENDING_C_REVIEW', 'to': 'B_FINAL_REVIEW'},
+                                    {'from': 'B_FINAL_REVIEW', 'to': 'SENT_TO_A'},
+                                    {'from': 'SENT_TO_A', 'to': 'CLOSED'},
+                                ]
+                            }
+                            w = Workflow(name='Default A→B→C', description='Default handoff workflow between A→B→C', spec=spec, active=True)
+                            db.session.add(w)
+                            try:
+                                db.session.commit()
+                                print('schema_fix=workflow.default_created')
+                            except Exception:
+                                db.session.rollback()
+                except Exception:
+                    pass
         except Exception as exc:
             print('schema_fix_failed', exc, file=sys.stderr)
 

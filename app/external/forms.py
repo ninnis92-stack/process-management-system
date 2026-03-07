@@ -9,6 +9,9 @@ class ExternalNewRequestForm(FlaskForm):
     guest_email = StringField("Your Email", validators=[DataRequired(), Email()])
     guest_name = StringField("Your Name (optional)", validators=[Optional(), Length(max=120)])
 
+    owner_department = SelectField("Owner Department", choices=[("A", "A"), ("B", "B"), ("C", "C")], validators=[Optional()])
+    workflow_id = SelectField("Workflow (optional)", coerce=int, choices=[], validators=[Optional()])
+
     title = StringField("Title", validators=[DataRequired(), Length(max=200)])
 
     request_type = SelectField(

@@ -157,14 +157,15 @@ def _resolve_verification_rule(field, latest_map):
     else:
         fv = latest_map.get(field.id)
         if fv:
-            v = {
-                'type': 'external_lookup',
-                'params': {
-                    'provider': fv.provider,
-                    'external_key': fv.external_key,
-                    'options': fv.params or {},
+                v = {
+                    'type': 'external_lookup',
+                    'params': {
+                        'provider': fv.provider,
+                        'external_key': fv.external_key,
+                        'options': fv.params or {},
+                    },
+                    'triggers_auto_reject': bool(getattr(fv, 'triggers_auto_reject', False)),
                 }
-            }
         else:
             try:
                 if current_app.config.get('ENABLE_EXTERNAL_VERIFICATION') and field.name in ('donor_part_number', 'target_part_number', 'part_number', 'price_book_number', 'pricebook'):
@@ -211,15 +212,16 @@ def _normalize_lookup_result(raw):
 
 def _run_field_verification(field, rule, submission_data):
     val = submission_data.get(field.name)
+    triggers_flag = bool(rule.get('triggers_auto_reject', False))
     if rule.get('type') == 'regex':
         pat = rule.get('pattern')
         ok = False
         if val is not None and pat:
             ok = bool(re.fullmatch(pat, str(val)))
-        return {'ok': ok, 'type': 'regex', 'value': val}
+        return {'ok': ok, 'type': 'regex', 'value': val, 'triggers_auto_reject': triggers_flag}
 
     if rule.get('type') != 'external_lookup':
-        return {'ok': False, 'reason': 'unknown_rule_type', 'type': rule.get('type')}
+        return {'ok': False, 'reason': 'unknown_rule_type', 'type': rule.get('type'), 'triggers_auto_reject': triggers_flag}
 
     params = rule.get('params') or {}
     provider = params.get('provider')
@@ -227,7 +229,7 @@ def _run_field_verification(field, rule, submission_data):
     options = params.get('options') or {}
 
     if val is None or str(val).strip() == '':
-        return {'ok': None, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'reason': 'empty'}
+        return {'ok': None, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'reason': 'empty', 'triggers_auto_reject': triggers_flag}
 
     if provider == 'inventory':
         try:
@@ -239,19 +241,19 @@ def _run_field_verification(field, rule, submission_data):
                         # compatibility fallback for older/dummy implementations
                         legacy = inv.validate_part_number(str(val).strip()) if hasattr(inv, 'validate_part_number') else None
                         if legacy is None:
-                            return {'ok': None, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'reason': 'unknown'}
-                        return {'ok': bool(legacy), 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val}
-                    return {'ok': qty > 0, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'details': {'stock_count': qty}}
+                            return {'ok': None, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'reason': 'unknown', 'triggers_auto_reject': triggers_flag}
+                        return {'ok': bool(legacy), 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'triggers_auto_reject': triggers_flag}
+                    return {'ok': qty > 0, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'details': {'stock_count': qty}, 'triggers_auto_reject': triggers_flag}
                 legacy = inv.validate_part_number(str(val).strip()) if hasattr(inv, 'validate_part_number') else None
-                return {'ok': None if legacy is None else bool(legacy), 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val}
+                return {'ok': None if legacy is None else bool(legacy), 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'triggers_auto_reject': triggers_flag}
             if ext_key in ('price_book_number', 'pricebook'):
                 res = inv.validate_sales_list_number(str(val).strip())
-                return {'ok': None if res is None else bool(res), 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val}
+                return {'ok': None if res is None else bool(res), 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'triggers_auto_reject': triggers_flag}
             qty = inv.get_stock_count(str(val).strip())
-            return {'ok': None if qty is None else qty > 0, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'details': {'stock_count': qty} if qty is not None else {}}
+            return {'ok': None if qty is None else qty > 0, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'details': {'stock_count': qty} if qty is not None else {}, 'triggers_auto_reject': triggers_flag}
         except Exception as exc:
             current_app.logger.exception('Inventory verification failed')
-            return {'ok': None, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'error': str(exc)}
+            return {'ok': None, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'error': str(exc), 'triggers_auto_reject': triggers_flag}
 
     if (params.get('model') == 'user'):
         from ..models import User
@@ -259,11 +261,11 @@ def _run_field_verification(field, rule, submission_data):
         column = params.get('column')
         if column and val is not None:
             found = bool(db.session.query(User).filter(getattr(User, column) == val).first())
-        return {'ok': found, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val}
+        return {'ok': found, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'triggers_auto_reject': triggers_flag}
 
     raw = VerificationService().verify_lookup(provider, ext_key, val, options)
     ok, meta = _normalize_lookup_result(raw)
-    return {'ok': ok, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, **meta}
+    return {'ok': ok, 'type': 'external_lookup', 'provider': provider, 'external_key': ext_key, 'value': val, 'triggers_auto_reject': triggers_flag, **meta}
 
 def _has_part_number_artifact(req: ReqModel) -> bool:
     return any(a.artifact_type == "part_number" for a in req.artifacts)
@@ -1388,6 +1390,12 @@ def request_detail(request_id: int):
         and req.assigned_to_user_id
         and req.assigned_to_user_id == current_user.id
     )
+    # Prepare status option flags for client-side UI
+    try:
+        from ..models import StatusOption
+        status_options_map = {s.code: bool(s.screenshot_required) for s in StatusOption.query.all()}
+    except Exception:
+        status_options_map = {}
 
     return render_template(
         "request_detail.html",
@@ -1412,6 +1420,7 @@ def request_detail(request_id: int):
         can_reject_request=can_reject_request,
         reject_button_label=reject_button_label,
         reject_message=reject_message,
+        status_options_map=status_options_map,
     )
 
 

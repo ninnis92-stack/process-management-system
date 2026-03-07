@@ -62,4 +62,4 @@ def test_reject_config_defaults_to_dept_b_only(app):
         assert cfg.dept_b_enabled is True
         assert cfg.dept_a_enabled is False
         assert cfg.dept_c_enabled is False
-        assert (cfg.button_label or '').lower() == 'reject request'
+        assert (cfg.button_label or '').lower() == 'deny request'

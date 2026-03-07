@@ -11,6 +11,7 @@ class AdminCreateUserForm(FlaskForm):
     email = EmailField("Email", validators=[DataRequired(), Email(), Length(max=255)])
     name = StringField("Display name", validators=[Optional(), Length(max=255)])
     password = PasswordField("Password", validators=[Optional(), Length(min=6)])
+    role = SelectField("Role", choices=[("user", "User"), ("admin", "Admin")], default="user")
     department = SelectField("Department", choices=[("A", "A"), ("B", "B"), ("C", "C")], validators=[DataRequired()])
     is_active = BooleanField("Active", default=True)
     is_admin = BooleanField("Admin", default=False)
@@ -60,6 +61,7 @@ class StatusOptionForm(FlaskForm):
     notify_enabled = BooleanField("Enable notifications for this status", default=True)
     notify_on_transfer_only = BooleanField("Only notify when request transfers departments", default=False)
     email_enabled = BooleanField("Send email for this status (when mailer/SSO enabled)", default=False)
+    screenshot_required = BooleanField("Require screenshot when this status sends back to Dept B", default=False)
     submit = SubmitField("Save Status")
 
 
@@ -156,6 +158,7 @@ class FieldVerificationForm(FlaskForm):
     provider = SelectField("Provider", choices=[('inventory', 'Inventory Service')], validators=[DataRequired()])
     external_key = StringField("External key", validators=[Optional(), Length(max=200)])
     params_json = TextAreaField("Params (JSON)", validators=[Optional(), Length(max=2000)])
+    triggers_auto_reject = BooleanField("Trigger automatic denial when verification fails", default=False)
     submit = SubmitField("Save Verification")
 
 

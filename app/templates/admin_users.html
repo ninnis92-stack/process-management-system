@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h3 class="mb-3">Admin — Users</h3>
+<a class="btn btn-sm btn-outline-secondary admin-back-btn mb-2" href="{{ url_for('admin.index') }}">← Admin dashboard</a>
   <div class="d-flex gap-2 mb-3">
   <a class="btn btn-primary" href="{{ url_for('admin.create_user') }}">Create / Update User</a>
   <a class="btn btn-outline-secondary" href="{{ url_for('admin.assign_sso') }}">Assign SSO Emails</a>

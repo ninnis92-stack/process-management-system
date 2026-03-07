@@ -756,8 +756,12 @@ document.addEventListener('DOMContentLoaded', function(){
 
       function update(){
         try{
-          // For Dept A: selecting B_IN_PROGRESS indicates sending back to B
-          const requires = String(select.value) === 'B_IN_PROGRESS';
+          // Determine whether the selected status requires a screenshot.
+          const selected = String(select.value);
+          const statusRequires = window.STATUS_OPTIONS && window.STATUS_OPTIONS[selected];
+          // For backward-compat, only enforce when selecting the status that sends back to Dept B (legacy behavior)
+          const sendingBackToB = selected === 'B_IN_PROGRESS';
+          const requires = Boolean(statusRequires && sendingBackToB);
           if(requires && !hasScreenshotAvailable()){
             applyBtn.disabled = true;
             hint.classList.remove('d-none');
