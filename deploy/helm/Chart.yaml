@@ -1,0 +1,6 @@
+apiVersion: v2
+name: process-management-prototype
+description: Helm chart for Process Management Prototype (minimal scaffold)
+type: application
+version: 0.1.0
+appVersion: "latest"

@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "process-management-prototype.fullname" . }}
+  labels:
+    app: {{ include "process-management-prototype.name" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "process-management-prototype.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "process-management-prototype.name" . }}
+    spec:
+      containers:
+        - name: web
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DATABASE_URL
+              value: {{ .Values.databaseUrl | default "" }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
