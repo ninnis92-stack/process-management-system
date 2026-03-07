@@ -196,8 +196,13 @@ def create_app():
             # If the DB/tables aren't ready (e.g., fresh deploy with SQLite),
             # avoid raising an exception during request handling and treat
             # the visitor as anonymous so the app can return a login page
-            # instead of a 500. Specific DB errors (OperationalError) will
-            # be surfaced in the logs by SQLAlchemy where appropriate.
+            # instead of a 500. Rollback the session to clear any aborted
+            # transactions so subsequent requests do not reuse a bad
+            # connection/transaction state.
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
             return None
 
     # Apply impersonation override on each request: if an admin has started an
@@ -261,7 +266,14 @@ def create_app():
                         except Exception:
                             pass
                 except Exception:
-                    # If any DB error occurs while validating, fall back to no-op
+                    # If any DB error occurs while validating, rollback the
+                    # session to avoid leaving the connection in an aborted
+                    # transaction state which would affect subsequent queries.
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
+                    # fall back to no-op
                     pass
         except Exception:
             pass
