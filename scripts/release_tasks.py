@@ -143,6 +143,13 @@ def main():
                             # quote user as it's a reserved word in some DBs
                             conn.execute(text('ALTER TABLE "user" ADD COLUMN last_active_dept VARCHAR(2)'))
                         print('schema_fix=user.last_active_dept_added')
+                # Ensure request.is_denied exists when the model expects it
+                if 'request' in insp.get_table_names():
+                    req_cols = {c['name'] for c in insp.get_columns('request')}
+                    if 'is_denied' not in req_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text('ALTER TABLE request ADD COLUMN is_denied BOOLEAN DEFAULT FALSE'))
+                        print('schema_fix=request.is_denied_added')
         except Exception as exc:
             print('schema_fix_failed', exc, file=sys.stderr)
 
