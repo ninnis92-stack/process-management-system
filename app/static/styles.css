@@ -776,3 +776,75 @@ canvas {
 .dark-mode .card .text-muted {
   color: var(--body-text-muted) !important;
 }
+
+.dark-mode .table a,
+.dark-mode .table .btn-link,
+.dark-mode td .btn-link,
+.dark-mode th .btn-link {
+  color: #9fc3ff !important;
+}
+
+.dark-mode .table a:hover,
+.dark-mode .table .btn-link:hover,
+.dark-mode .table a:focus,
+.dark-mode .table .btn-link:focus {
+  color: #c2d9ff !important;
+}
+
+.dark-mode .btn-link {
+  color: #9fc3ff !important;
+}
+
+.dark-mode .btn-link:hover,
+.dark-mode .btn-link:focus {
+  color: #c2d9ff !important;
+}
+
+.dark-mode .alert {
+  color: var(--body-text) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.22);
+}
+
+.dark-mode .alert a,
+.dark-mode .alert strong,
+.dark-mode .alert-heading {
+  color: inherit !important;
+}
+
+.dark-mode .alert-info {
+  background: rgba(80, 140, 255, 0.14) !important;
+  color: #e5efff !important;
+  border-color: rgba(80, 140, 255, 0.24) !important;
+}
+
+.dark-mode .alert-success {
+  background: rgba(52, 168, 83, 0.14) !important;
+  color: #e5f7ea !important;
+  border-color: rgba(52, 168, 83, 0.24) !important;
+}
+
+.dark-mode .alert-warning {
+  background: rgba(214, 153, 24, 0.16) !important;
+  color: #fff0c7 !important;
+  border-color: rgba(214, 153, 24, 0.28) !important;
+}
+
+.dark-mode .alert-danger,
+.dark-mode .alert-error {
+  background: rgba(220, 76, 100, 0.16) !important;
+  color: #ffe2e7 !important;
+  border-color: rgba(220, 76, 100, 0.3) !important;
+}
+
+.dark-mode .alert-secondary,
+.dark-mode .alert-light {
+  background: rgba(255,255,255,0.06) !important;
+  color: var(--body-text-soft) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+
+.dark-mode .alert .btn-close {
+  filter: invert(1) grayscale(1) brightness(1.7);
+  opacity: 0.9;
+}
