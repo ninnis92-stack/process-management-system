@@ -125,7 +125,7 @@
             {# Account dropdown: compact avatar button that reveals user info + settings. Always shown. #}
             <div class="dropdown ms-2">
               <button class="btn btn-outline-light btn-sm d-flex align-items-center dropdown-toggle" id="accountMenuBtn" data-bs-toggle="dropdown" aria-expanded="false" data-user-name="{{ current_user.name or '' }}" data-user-email="{{ current_user.email or '' }}" data-sso-sub="{{ current_user.sso_sub or '' }}">
-                <span class="avatar avatar-sm me-2">{{ (current_user.email or 'U')[:1]|upper }}</span>
+                <img src="{{ avatar_url_for(current_user, size=34) }}" alt="Account avatar" class="avatar avatar-sm me-2" />
                 <span class="visually-hidden">Account</span>
               </button>
               <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountMenuBtn">
@@ -135,16 +135,22 @@
                 </li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="{{ url_for('auth.settings') }}">Settings</a></li>
+                {% if user_has_multiple_departments(current_user) %}
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#chooseDeptModal">Switch Department</a></li>
+                {% endif %}
+                <li>
+                  <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="dropdown-item">Logout</button>
+                  </form>
+                </li>
               </ul>
             </div>
             <a href="{{ url_for('requests.metrics_ui') }}" class="btn btn-outline-light btn-sm ms-2">Metrics</a>
             {% if current_user.is_acting_as %}
               <span class="badge bg-warning text-dark ms-2">{{ current_user.act_as_label }}</span>
             {% endif %}
-            <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-outline-light btn-sm">Logout</button>
-            </form>
+            {# Logout moved into the account dropdown above. #}
             {% if session.get('impersonate_admin_id') %}
                   <form method="post" action="{{ url_for('admin.stop_impersonation') }}" class="m-0 ms-2">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

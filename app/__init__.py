@@ -732,5 +732,48 @@ def create_app():
                         pass
         except Exception:
             pass
+        except Exception:
+            pass
 
+    # Helper context processor: avatar/url helpers and department helper
+    @app.context_processor
+    def _user_helpers():
+        try:
+            from flask_login import current_user
+            import hashlib
+
+            def _gravatar(email, size=34, default='mp'):
+                if not email:
+                    return f'https://www.gravatar.com/avatar/?d={default}&s={size}'
+                try:
+                    e = email.strip().lower().encode('utf-8')
+                    h = hashlib.md5(e).hexdigest()
+                    return f'https://www.gravatar.com/avatar/{h}?d={default}&s={size}'
+                except Exception:
+                    return f'https://www.gravatar.com/avatar/?d={default}&s={size}'
+
+            def avatar_url_for(user, size=34):
+                # Prefer an SSO-provided picture if present, otherwise gravatar
+                if not user:
+                    return _gravatar(None, size)
+                pic = getattr(user, 'sso_picture', None) or getattr(user, 'picture', None)
+                if pic:
+                    return pic
+                return _gravatar(getattr(user, 'email', None), size)
+
+            def user_has_multiple_departments(user):
+                try:
+                    if not user or not getattr(user, 'id', None):
+                        return False
+                    # Compute unique departments including primary + additional assignments
+                    primary = (getattr(user, 'department', None) or '').strip()
+                    addl = [getattr(ud, 'department', None) for ud in getattr(user, 'departments', []) if getattr(ud, 'department', None)]
+                    uniq = set([d for d in [primary] + addl if d])
+                    return len(uniq) > 1
+                except Exception:
+                    return False
+
+            return dict(avatar_url_for=avatar_url_for, user_has_multiple_departments=user_has_multiple_departments)
+        except Exception:
+            return dict(avatar_url_for=lambda u, size=34: f'https://www.gravatar.com/avatar/?d=mp&s={size}', user_has_multiple_departments=lambda u: False)
     return app
