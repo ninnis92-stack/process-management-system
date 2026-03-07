@@ -175,6 +175,39 @@ def create_app():
                 current_user.act_as_label = f"Acting as Dept {imp_dept}"
             except Exception:
                 pass
+        # Honor a user-selected active department stored in session. This
+        # allows users assigned to multiple departments to switch their
+        # active context without changing their stored primary department.
+        try:
+            active_dept = _session.get('active_dept')
+            if active_dept:
+                # Validate that the current user is allowed to view as this dept
+                try:
+                    from .models import UserDepartment, Department
+                    allowed = False
+                    # Always allow switching to primary department
+                    if getattr(current_user, 'department', None) == active_dept:
+                        allowed = True
+                    # Admins may switch freely
+                    if getattr(current_user, 'is_admin', False):
+                        allowed = True
+                    # Otherwise check explicit assignments
+                    if not allowed:
+                        ud = UserDepartment.query.filter_by(user_id=current_user.id, department=active_dept).first()
+                        if ud:
+                            allowed = True
+                    if allowed:
+                        try:
+                            current_user.department = active_dept
+                            current_user.is_switched_dept = True
+                            current_user.act_as_label = f"Viewing as Dept {active_dept}"
+                        except Exception:
+                            pass
+                except Exception:
+                    # If any DB error occurs while validating, fall back to no-op
+                    pass
+        except Exception:
+            pass
         return
 
     from .auth.routes import auth_bp
@@ -428,10 +461,19 @@ def create_app():
     # edit or replace buckets via the admin UI.
     try:
         if os.getenv("SEED_DEFAULT_BUCKETS", "True").lower() != "false":
-            from .models import StatusBucket, BucketStatus
+            from .models import StatusBucket, BucketStatus, Department
             try:
                 with app.app_context():
-                    # Only seed if Dept B has no buckets configured.
+                    # Ensure default Department rows exist (A/B/C) so code treating
+                    # them as persisted departments behaves consistently.
+                    for code, label, order in (('A', 'Dept A', 0), ('B', 'Dept B', 1), ('C', 'Dept C', 2)):
+                        existing = Department.query.filter_by(code=code).first()
+                        if not existing:
+                            d = Department(code=code, label=label, is_active=True, order=order)
+                            db.session.add(d)
+                    db.session.flush()
+
+                    # Only seed buckets if Dept B has no buckets configured.
                     if StatusBucket.query.filter_by(department_name='B').count() == 0:
                         # New
                         nb = StatusBucket(name='New', department_name='B', order=0, active=True)
@@ -472,10 +514,10 @@ def create_app():
                         arch = StatusBucket(name='Archived', department_name='B', order=5, active=True)
                         db.session.add(arch)
 
-                        db.session.commit()
-                        app.logger.info('Seeded default Dept B buckets')
+                    db.session.commit()
+                    app.logger.info('Seeded default departments and Dept B buckets')
             except Exception:
-                app.logger.exception('Failed to seed default Dept B buckets')
+                app.logger.exception('Failed to seed default Dept B buckets or departments')
     except Exception:
         # Best-effort; avoid failing app startup if env inspection or imports fail.
         pass

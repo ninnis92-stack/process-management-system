@@ -14,6 +14,70 @@ from .sso import oauth
 from .sso import token_has_mfa
 from .sso import sso_user_is_admin
 from sqlalchemy.exc import OperationalError
+from flask import session as _session
+from ..models import UserDepartment, Department
+from flask import render_template
+
+
+def _restore_last_active_dept_for_user(user):
+    """If the user has a persisted `last_active_dept`, and they are allowed
+    to view as that department, set it into the session so the app will
+    present that department on login.
+    """
+    if not user:
+        return
+    try:
+        dept = (getattr(user, 'last_active_dept', None) or '').strip().upper()
+        if not dept:
+            return
+
+        # Validate department exists and user is allowed
+        d = Department.query.filter_by(code=dept, is_active=True).first()
+        if not d:
+            return
+
+        allowed = False
+        if getattr(user, 'department', None) == dept:
+            allowed = True
+        if getattr(user, 'is_admin', False):
+            allowed = True
+        if not allowed:
+            ud = UserDepartment.query.filter_by(user_id=user.id, department=dept).first()
+            if ud:
+                allowed = True
+
+        if allowed:
+            _session['active_dept'] = dept
+    except Exception:
+        # Fail silently; restoring department is a convenience only.
+        return
+
+
+def _get_user_departments(user):
+    """Return a list of department codes the user may act as.
+
+    Primary department is first, followed by any explicit `UserDepartment`
+    assignments (preserving order and uniqueness).
+    """
+    if not user:
+        return []
+    try:
+        depts = []
+        primary = getattr(user, 'department', None)
+        if primary:
+            depts.append(primary)
+        # include explicit assignments
+        for ud in getattr(user, 'departments', []) or []:
+            d = getattr(ud, 'department', None)
+            if d and d not in depts:
+                depts.append(d)
+        # Admins may see all active departments
+        if getattr(user, 'is_admin', False):
+            rows = Department.query.filter_by(is_active=True).order_by(Department.order.asc()).all()
+            depts = [r.code for r in rows]
+        return depts
+    except Exception:
+        return [getattr(user, 'department', None)]
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -107,7 +171,108 @@ def sso_callback():
         session.pop('sso_mfa', None)
 
     login_user(user)
+    try:
+        depts = _get_user_departments(user)
+        if len(depts) > 1:
+            return redirect(url_for('auth.choose_dept'))
+        if getattr(user, 'last_active_dept', None):
+            _restore_last_active_dept_for_user(user)
+        else:
+            _session['active_dept'] = depts[0] if depts else getattr(user, 'department', None)
+    except Exception:
+        pass
     return redirect(url_for("requests.dashboard"))
+
+
+@auth_bp.route('/choose_dept', methods=['GET'])
+@login_required
+def choose_dept():
+    """Render the department selection page when a user has multiple departments."""
+    depts = _get_user_departments(current_user)
+    return render_template('choose_department.html', departments=depts)
+
+
+@auth_bp.route('/departments', methods=['GET'])
+@login_required
+def list_departments():
+    """Return JSON list of departments the current user may switch to.
+
+    Always includes the user's primary department. Admins may see all active
+    departments.
+    """
+    try:
+        if getattr(current_user, 'is_admin', False):
+            rows = Department.query.filter_by(is_active=True).order_by(Department.order.asc()).all()
+            depts = [r.code for r in rows]
+        else:
+            # Primary dept + any UserDepartment rows
+            depts = [getattr(current_user, 'department', None)]
+            extra = [ud.department for ud in getattr(current_user, 'departments', []) if ud.department]
+            for d in extra:
+                if d not in depts:
+                    depts.append(d)
+        return jsonify({'departments': depts})
+    except Exception:
+        return jsonify({'departments': [getattr(current_user, 'department', None)]})
+
+
+@auth_bp.route('/switch_dept', methods=['POST'])
+@login_required
+def switch_department():
+    """Set the user's active department in session if allowed."""
+    data = None
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
+    dept = (data.get('department') or '').strip().upper()
+    if not dept:
+        return ("Missing department", 400)
+
+    # Validate department exists and is active
+    try:
+        d = Department.query.filter_by(code=dept, is_active=True).first()
+        if not d:
+            return ("Unknown department", 404)
+    except Exception:
+        return ("Service unavailable", 503)
+
+    # Allowed if primary, explicitly assigned, or admin
+    allowed = False
+    if getattr(current_user, 'department', None) == dept:
+        allowed = True
+    if getattr(current_user, 'is_admin', False):
+        allowed = True
+    try:
+        if not allowed:
+            ud = UserDepartment.query.filter_by(user_id=current_user.id, department=dept).first()
+            if ud:
+                allowed = True
+    except Exception:
+        pass
+
+    if not allowed:
+        return ("Not allowed to view that department", 403)
+
+    _session['active_dept'] = dept
+    # Persist the user's preference
+    try:
+        if getattr(current_user, 'id', None):
+            u = db.session.get(User, current_user.id)
+            if u:
+                u.last_active_dept = dept
+                db.session.add(u)
+                db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+    # For convenience return JSON for AJAX callers
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'ok': True, 'active_dept': dept})
+    return redirect(url_for('requests.dashboard'))
 
 
 # ---------- Local Login (fallback) ----------
@@ -134,6 +299,24 @@ def login():
                 return redirect(url_for('auth.totp_verify'))
 
         login_user(user)
+        # If the user has multiple departments available, prompt them to choose;
+        # otherwise restore last-active or set primary department into session.
+        try:
+            depts = _get_user_departments(user)
+            if len(depts) > 1:
+                return redirect(url_for('auth.choose_dept'))
+            # single choice - restore last active if present and allowed
+            restored = False
+            if getattr(user, 'last_active_dept', None):
+                try:
+                    _restore_last_active_dept_for_user(user)
+                    restored = True
+                except Exception:
+                    restored = False
+            if not restored:
+                _session['active_dept'] = depts[0] if depts else getattr(user, 'department', None)
+        except Exception:
+            pass
         return redirect(url_for("requests.dashboard"))
 
     return render_template("login.html", form=form)
@@ -143,6 +326,21 @@ def login():
 @auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
+    # Persist the last active department (if any) for this user so it can be
+    # restored on next login.
+    try:
+        active = _session.get('active_dept')
+        if active and getattr(current_user, 'id', None):
+            u = db.session.get(User, current_user.id)
+            if u:
+                u.last_active_dept = active
+                db.session.add(u)
+                db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
     logout_user()
     return redirect(url_for("auth.login"))
 
@@ -219,6 +417,16 @@ def totp_verify():
         session.pop('pre_2fa_userid', None)
         login_user(u)
         session['totp_verified'] = True
+        try:
+            depts = _get_user_departments(u)
+            if len(depts) > 1:
+                return redirect(url_for('auth.choose_dept'))
+            if getattr(u, 'last_active_dept', None):
+                _restore_last_active_dept_for_user(u)
+            else:
+                _session['active_dept'] = depts[0] if depts else getattr(u, 'department', None)
+        except Exception:
+            pass
         return redirect(url_for('requests.dashboard'))
 
     flash('Invalid code.', 'danger')

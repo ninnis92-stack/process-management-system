@@ -107,8 +107,41 @@ def transition_allowed(dept: str, from_status: str, to_status: str) -> bool:
         wf = Workflow.query.filter_by(active=True, department_code=dept).first()
         if not wf:
             wf = Workflow.query.filter_by(active=True, department_code=None).first()
+        # If a workflow spec exists, interpret mode and optional deny list
         if wf and wf.spec:
-            allowed = _allowed_from_spec(wf.spec)
+            spec = wf.spec or {}
+            spec_allowed = _allowed_from_spec(spec)
+            legacy_allowed = ALLOWED_TRANSITIONS.get(dept, set())
+
+            mode = (spec.get('mode') or 'augment').strip().lower()
+            if mode == 'override':
+                allowed = set(spec_allowed)
+            else:
+                # default: augment/union
+                allowed = set(legacy_allowed).union(spec_allowed)
+
+            # Optional `deny` list in spec to explicitly remove transitions
+            deny_raw = spec.get('deny') or spec.get('deny_transitions') or []
+            deny_set = set()
+            if isinstance(deny_raw, dict):
+                # mapping format: {"A": ["B","C"]}
+                for k, vals in deny_raw.items():
+                    if isinstance(vals, (list, tuple)):
+                        for v in vals:
+                            deny_set.add((k, v))
+            elif isinstance(deny_raw, (list, tuple)):
+                for item in deny_raw:
+                    if isinstance(item, dict):
+                        f = item.get('from') or item.get('source')
+                        t = item.get('to') or item.get('target')
+                        if f and t:
+                            deny_set.add((f, t))
+                    elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                        deny_set.add((item[0], item[1]))
+
+            if deny_set:
+                allowed = allowed.difference(deny_set)
+
             return (from_status, to_status) in allowed
     except Exception:
         # On any DB/spec parse error, fall back to legacy map

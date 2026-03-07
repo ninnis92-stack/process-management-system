@@ -9,13 +9,18 @@ from datetime import datetime, timedelta
 notifications_bp = Blueprint("notifications", __name__, url_prefix="/notifications")
 
 @notifications_bp.get("/unread_count")
-@login_required
 def unread_count():
+    # Return a safe default for anonymous users (avoid login redirect HTML)
+    try:
+        if not getattr(current_user, 'is_authenticated', False):
+            return jsonify({"count": 0})
+    except Exception:
+        return jsonify({"count": 0})
+
     count = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
     return jsonify({"count": count})
 
 @notifications_bp.get("/latest")
-@login_required
 def latest():
     # Only return notifications that are unread, or were read today.
     # Notifications marked read before start of today will no longer appear
@@ -33,6 +38,12 @@ def latest():
     per_user_limit = getattr(cfg, 'max_notifications_per_user', 20) or 20
     if per_user_limit > 20:
         per_user_limit = 20
+
+    try:
+        if not getattr(current_user, 'is_authenticated', False):
+            return jsonify([])
+    except Exception:
+        return jsonify([])
 
     items = (
         Notification.query

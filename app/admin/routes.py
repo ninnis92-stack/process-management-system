@@ -139,6 +139,59 @@ def delete_user(user_id: int):
     return redirect(url_for("admin.list_users"))
 
 
+@admin_bp.route('/users/<int:user_id>/departments', methods=['GET', 'POST'])
+@login_required
+def manage_user_departments(user_id: int):
+    if not _is_admin_user():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    u = get_or_404(User, user_id)
+    # Supported department codes (keep in sync with models/choices)
+    choices = ['A', 'B', 'C']
+
+    if flask_request.method == 'POST':
+        selected = flask_request.form.getlist('departments') or []
+        selected = [s.strip().upper() for s in selected if s and s.strip()]
+
+        # Remove existing assignments not in selected
+        existing = {ud.department: ud for ud in getattr(u, 'departments', [])}
+        for dept_code, ud in list(existing.items()):
+            if dept_code not in selected:
+                try:
+                    db.session.delete(ud)
+                except Exception:
+                    db.session.rollback()
+
+        # Add any new assignments
+        for dept in selected:
+            if dept == getattr(u, 'department', None):
+                # primary department should not be duplicated as UserDepartment
+                continue
+            if dept not in existing:
+                try:
+                    new = UserDepartment(user_id=u.id, department=dept)
+                    db.session.add(new)
+                except Exception:
+                    db.session.rollback()
+
+        try:
+            db.session.commit()
+            flash('Updated department assignments.', 'success')
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            flash('Failed to save assignments.', 'danger')
+
+        return redirect(url_for('admin.list_users'))
+
+    # GET: show current assignments
+    assigned = [ud.department for ud in getattr(u, 'departments', [])]
+    return render_template('admin_user_departments.html', user=u, choices=choices, assigned=assigned)
+
+
 
 @admin_bp.route('/users/<int:user_id>/impersonate', methods=['POST'])
 @login_required

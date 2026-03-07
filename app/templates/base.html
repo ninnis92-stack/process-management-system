@@ -29,7 +29,7 @@
     </script>
   {% endif %}
 </head>
-<body class="{% block body_class %}theme-body top-nav-layout{% endblock %} theme-preset-{{ site_theme_preset or 'default' }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}">
+<body class="{% block body_class %}theme-body top-nav-layout{% endblock %} theme-preset-{{ site_theme_preset or 'default' }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}">
   <a href="#content" class="skip-link">Skip to content</a>
 
   {% set ep = request.endpoint or '' %}
@@ -190,10 +190,57 @@
     {% block content %}{% endblock %}
   </main>
 
+  <!-- Department chooser modal (auto-shown for users with multiple departments) -->
+  <div class="modal fade" id="chooseDeptModal" tabindex="-1" aria-labelledby="chooseDeptLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="chooseDeptLabel">Choose Department</h5>
+        </div>
+        <div class="modal-body">
+          <form id="chooseDeptForm" method="post" action="/auth/switch_dept">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+              <label for="chooseDeptSelect" class="form-label">Department</label>
+              <select id="chooseDeptSelect" name="department" class="form-select"></select>
+            </div>
+            <div class="text-end">
+              <button type="submit" class="btn btn-primary">Continue</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- User state provided via data attributes on <body> to avoid JS parser diagnostics in templates -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
   <script>
+    (function(){
+      try{
+        const loggedIn = document.body.getAttribute('data-user-logged-in') === '1';
+        const active = (document.body.getAttribute('data-active-dept') || '').trim();
+        if (!loggedIn || active) return;
+        fetch('/auth/departments').then(r => r.json()).then(j => {
+          const depts = j && j.departments ? j.departments : [];
+          if (depts.length <= 1) return;
+          const sel = document.getElementById('chooseDeptSelect');
+          if (!sel) return;
+          sel.innerHTML = '';
+          depts.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d; opt.textContent = d;
+            sel.appendChild(opt);
+          });
+          const modalEl = document.getElementById('chooseDeptModal');
+          if (!modalEl) return;
+          const modal = new bootstrap.Modal(modalEl);
+          modal.show();
+        }).catch(()=>{});
+      } catch(e){}
+    })();
+
     setTimeout(() => {
       document.querySelectorAll('.alert').forEach(a => a.remove());
     }, 4000);

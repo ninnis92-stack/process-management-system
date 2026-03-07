@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="container" style="max-width:500px;margin-top:40px;">
+    <h3>Select Department</h3>
+    <p>You belong to multiple departments. Choose which department to view for this session.</p>
+    <form method="post" action="{{ url_for('auth.switch_department') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label for="department">Department</label>
+        <select id="department" name="department" class="form-control">
+          {% for d in departments %}
+            <option value="{{ d }}">{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="margin-top:12px;">
+        <button type="submit" class="btn btn-primary">Continue</button>
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-link">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

@@ -63,6 +63,10 @@ class User(db.Model, UserMixin):
     totp_enabled = db.Column(db.Boolean, nullable=False, default=False)
     # Optional per-user vibe/theme preference (index into palettes)
     vibe_index = db.Column(db.Integer, nullable=True, default=0)
+    # Persist the last department the user was viewing when they logged out
+    # or switched contexts. This is used to restore their active department
+    # on subsequent logins when they have multiple department assignments.
+    last_active_dept = db.Column(db.String(2), nullable=True)
 
 class Notification(db.Model):
     """In-app notification with optional deep link and dedupe key."""
@@ -579,6 +583,23 @@ class DepartmentEditor(db.Model):
     can_edit = db.Column(db.Boolean, nullable=False, default=True)
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (db.UniqueConstraint('user_id', 'department', name='uq_user_dept_editor'),)
+
+
+class UserDepartment(db.Model):
+    """Additional department assignments for users.
+
+    This table allows an admin to assign a user to multiple departments
+    without changing their primary `User.department` value. The application
+    will treat the primary `User.department` as the default and include any
+    `UserDepartment` rows when presenting department-switch choices to the
+    user.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref='departments')
+    department = db.Column(db.String(2), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('user_id', 'department', name='uq_user_department'),)
 
 
 class IntegrationConfig(db.Model):

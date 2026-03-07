@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="container" style="max-width:600px;margin-top:24px;">
+    <h3>Manage Departments for {{ user.email }}</h3>
+    <p>Primary department: <strong>{{ user.department }}</strong></p>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label class="form-label">Assigned departments</label>
+        <div>
+          {% for d in choices %}
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="dept_{{ d }}" name="departments" value="{{ d }}" {% if d in assigned %}checked{% endif %} {% if d == user.department %}disabled{% endif %}>
+              <label class="form-check-label" for="dept_{{ d }}">{{ d }} {% if d == user.department %}(primary){% endif %}</label>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="text-end">
+        <a class="btn btn-link" href="{{ url_for('admin.list_users') }}">Back</a>
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+{% endblock %}
