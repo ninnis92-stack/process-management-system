@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, redirect, url_for, request
+from flask import Blueprint, jsonify, redirect, url_for, request, current_app
 from flask_login import login_required, current_user
 from ..extensions import db
 from ..models import Notification
@@ -15,6 +15,7 @@ def unread_count():
         if not getattr(current_user, 'is_authenticated', False):
             return jsonify({"count": 0})
     except Exception:
+        current_app.logger.exception('unread_count: error checking current_user')
         return jsonify({"count": 0})
 
     count = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
@@ -43,24 +44,29 @@ def latest():
         if not getattr(current_user, 'is_authenticated', False):
             return jsonify([])
     except Exception:
+        current_app.logger.exception('latest: error checking current_user')
         return jsonify([])
 
-    items = (
-        Notification.query
-        .filter(Notification.user_id == current_user.id)
-        .filter(or_(Notification.is_read == False, Notification.read_at >= cutoff))
-        .order_by(Notification.created_at.desc())
-        .limit(per_user_limit)
-        .all()
-    )
-    return jsonify([{
-        "id": n.id,
-        "title": n.title,
-        "body": n.body,
-        "url": n.url,
-        "is_read": n.is_read,
-        "created_at": n.created_at.isoformat(),
-    } for n in items])
+    try:
+        items = (
+            Notification.query
+            .filter(Notification.user_id == current_user.id)
+            .filter(or_(Notification.is_read == False, Notification.read_at >= cutoff))
+            .order_by(Notification.created_at.desc())
+            .limit(per_user_limit)
+            .all()
+        )
+        return jsonify([{
+            "id": n.id,
+            "title": n.title,
+            "body": n.body,
+            "url": n.url,
+            "is_read": n.is_read,
+            "created_at": n.created_at.isoformat(),
+        } for n in items])
+    except Exception:
+        current_app.logger.exception('latest: failed to fetch notifications for user %s', getattr(current_user, 'id', None))
+        return jsonify([])
 
 @notifications_bp.post("/<int:notif_id>/read")
 @login_required

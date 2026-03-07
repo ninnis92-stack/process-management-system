@@ -474,7 +474,12 @@
   async function refreshCount() {
     try {
       const r = await fetch("/notifications/unread_count");
-      if (!r.ok) return;
+      if (!r.ok) {
+        badge.style.display = "none";
+        if (momentum) momentum.textContent = "Unable to fetch notifications.";
+        setActive(false);
+        return;
+      }
       const data = await r.json();
       if (data.count > 0) {
         badge.style.display = "inline-block";
@@ -495,7 +500,14 @@
     list.innerHTML = "<div class='text-muted'>Loading…</div>";
     try {
       const r = await fetch("/notifications/latest");
-      if (!r.ok) return;
+      if (!r.ok) {
+        try {
+          const txt = await r.text();
+          console.warn('notifications/latest non-ok response', r.status, txt);
+        } catch (e) { /* ignore */ }
+        list.innerHTML = "<div class='text-muted'>Unable to load notifications right now.</div>";
+        return;
+      }
       const items = await r.json();
       list.innerHTML = items.map(n => `
         <div class="border rounded p-2 mb-2 notif-item ${n.is_read ? "opacity-75" : ""}" data-id="${n.id}" data-url="${n.url || ''}">

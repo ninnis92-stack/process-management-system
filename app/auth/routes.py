@@ -284,7 +284,18 @@ def login():
             user = User.query.filter_by(email=form.email.data.strip().lower()).first()
         except OperationalError as err:
             current_app.logger.exception("Database unavailable during login")
+            try:
+                db.session.rollback()
+            except Exception:
+                current_app.logger.exception('Failed to rollback after OperationalError in login')
             return ("Service temporarily unavailable — database initializing. Please try again shortly.", 503)
+        except Exception as err:
+            current_app.logger.exception('Unexpected DB error during login')
+            try:
+                db.session.rollback()
+            except Exception:
+                current_app.logger.exception('Failed to rollback after unexpected error in login')
+            return ("Service temporarily unavailable — database error. Please try again shortly.", 503)
         if not user or not user.is_active or not check_password_hash(user.password_hash, form.password.data):
             # Add a form-level error so the template can display it near the fields
             form.password.errors.append("Invalid email or password")
