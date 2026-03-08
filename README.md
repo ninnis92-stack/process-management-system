@@ -1,262 +1,184 @@
 # Process Management Prototype
 
-A lightweight Flask application for tracking cross-department requests.
+A lightweight, Flask‑based request tracking application designed for cross‑department workflows.
 
-## Quick start (development/test)
+---
 
-1. Clone the repository and enter the directory:
+## Overview
+
+This prototype supports structured intake forms, multi‑step workflows, and an
+extensible admin interface.  Admins can build custom request templates,
+configure verification integrations that auto‑fill other fields, and declare
+conditional requirements (per field, section, or upload area).  The app runs
+on Postgres and optionally Redis, and is deployed on Fly.io with health checks
+and release‑time schema safety.
+
+Key capabilities:
+
+- **Dynamic request templates** with sections, verification‑prefill, and
+  conditional requirements
+- **Workflow engine** with status transitions, path history and loop protection
+- **Admin console** for users, departments, workflows, site config, integrations,
+  guest forms, feature flags, and more
+- **Field verification** powered by third‑party tracker integrations
+- **Guest submission and lookup** via external blueprints
+- **SSO/OIDC support** with optional admin sync
+- **Theme/vibe system**, dark mode, and per‑user preferences
+
+Everything is covered by a comprehensive test suite and deploys automatically
+using a release script that migrates the database, creates missing columns,
+and seeds baseline accounts.
+
+---
+
+## Getting started (development)
+
+1. **Clone and prepare environment**
    ```bash
    git clone https://github.com/ninnis92-stack/process-management-system.git
    cd process-management-prototype
-   ```
-
-2. Create and activate a virtual environment, then install dependencies:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
+   python -m venv .venv && source .venv/bin/activate
    pip install -r requirements.txt
    ```
 
-3. Configure the application by editing `config.py` or setting environment
-   variables.  At minimum supply a `DATABASE_URL`.
+2. **Configure**
+   Set environment variables or edit `config.py`.  Required:
+   - `DATABASE_URL` (Postgres)
+   - `SECRET_KEY` (Flask session)
+   Optional:
+   - `REDIS_URL` (if using Redis for caching/queues/health)
+   - tracker tokens such as `ERP_VERIFY_TOKEN` for verification integrations
 
-4. Bring the database schema up to date.  For development or testing you can
-   choose one of the following:
+3. **Database setup**
+   Use either:
    ```bash
-   flask db upgrade                     # regular Alembic migration
-   # or — bonus: run the same safety script used in production:
-   python scripts/release_tasks.py      # applies migrations + safe ALTERs
+   flask db upgrade            # run Alembic migrations
+   # or, preferred for dev/production parity:
+   python scripts/release_tasks.py   # migrations + safe ALTERs + seeds
    ```
-   The second command is useful when you pull newer code that adds columns
-   (e.g. the recent `site_config` banner/quote fields) but your database
-   hasn’t been migrated yet.  It will silently add any missing columns and
-   never fail.
+   The release script will also seed demo users and an admin account by
+   default unless `RUN_SEED_ON_RELEASE=0`.
 
-5. Run the server:
+4. **Run the app**
    ```bash
    export FLASK_APP=run.py
    flask run
    ```
+   or use Docker Compose (`docker-compose up web`) to start Postgres/Redis
+   alongside the web service.
 
-6. The full test suite is available via:
+5. **Tests**
    ```bash
-   make test
+   make test          # runs full pytest suite (≈100 tests)
    ```
 
-## Site configuration caution
+---
 
-The `/admin/site_config` page reads from a singleton table.  If the table or
-individual columns are absent (common when running an older database against
-new code) the route will still render and flash a warning rather than raising
-an error.  The codebase includes defensive logic in `SiteConfig.get()` and the
-admin view, and a migration (`0036_add_site_config_banner_quotes_fields.py`)
-and release task to create any missing columns.
+## Database & migrations
 
-## Features
+- Models live in `app/models.py`; business logic is factored into service
+  modules under `app/services/` (e.g. `request_creation.py`,
+  `requirement_rules.py`).
+- Migrations are managed with Alembic; the `scripts/release_tasks.py` helper
+  applies them plus additional `ALTER TABLE` fixes to keep production and
+  development schemas aligned.
+- A second release‑time task creates missing columns safely and can seed the
+  database on every deploy (controlled by `RUN_SEED_ON_RELEASE` env var).
+- Docker Compose includes healthchecks for Postgres and Redis, and `entrypoint.sh`
+  waits for dependencies using `scripts/wait_for_redis_ready.py`.
 
-- Workflows with statuses and transitions
-- Notifications (in-app or via email)
-- Dark mode / per-user themes (“vibes”)
-- SSO/OIDC login with optional admin syncing
-- Admin UI for users, departments, workflows, feature flags, site config, etc.
-- Admin-managed verification fields that can auto-fill linked fields on the same request form
-- Simple external integration layer and webhooks
-- Realtime field verification routing for third-party company trackers via admin-managed verification integration JSON
-- Fly deployment helpers (`make deploy-safe`, `release_tasks.py`)
+---
 
-## Realtime tracker-backed field verification
+## Health & readiness
 
-The app now supports a compatibility layer for third-party realtime data-point trackers that verify request field values before or during request submission.
+Two endpoints exist:
 
-How it works:
+- `/health` – simple liveness check, always returns 200 when the app is
+  running.
+- `/ready` – readiness probe that verifies the Postgres connection; also
+  attempts to initialize Redis if `REDIS_URL` is set (otherwise skip).
 
-- Create or edit an integration at [app/templates/admin_integrations.html](app/templates/admin_integrations.html) using kind `verification`.
-- Define one or more tracker handles under `trackers`.
-- Add `routing.rules` to choose a tracker by field key or field contents.
-- Point a form field verification mapping at provider `verification`.
-- Optional field params such as `tracker_handle` can force a specific tracker for one field.
+Fly.io is configured (`fly.toml`) to use `/ready` for readiness.
 
-Example verification integration JSON:
+Run `curl -i https://<app>/ready` to verify production readiness; you should
+see JSON indicating `database.status:ok` (and Redis if configured).
 
-```json
-{
-   "provider": "generic_verification",
-   "routing": {
-      "default_tracker": "erp",
-      "rules": [
-         {
-            "name": "Serial lookup",
-            "tracker": "serial_hub",
-            "external_keys": ["serial_number"],
-            "starts_with": ["SN-"]
-         },
-         {
-            "name": "Email lookup",
-            "tracker": "people_directory",
-            "external_keys": ["employee_email"],
-            "contains": ["@"]
-         }
-      ]
-   },
-   "trackers": {
-      "erp": {
-         "endpoints": {
-            "base_url": "https://erp.example.com",
-            "validate": "/api/verify"
-         },
-         "auth": {
-            "type": "token",
-            "token_env": "ERP_VERIFY_TOKEN"
-         },
-         "request": {
-            "method": "GET",
-            "payload_location": "query",
-            "query_template": {
-               "value": "{value}",
-               "field": "{external_key}"
-            }
-         },
-         "response": {
-            "ok_path": "ok",
-            "detail_path": "details",
-            "reason_path": "reason"
-         }
-      }
-   }
-}
-```
+Smoke test script (`scripts/smoke_test.sh`) hits the home page, dashboard and
+admin site config for quick sanity checks against any environment.
 
-Supported routing matchers in `routing.rules`:
-
-- `external_keys`
-- `equals` / `equals_any`
-- `contains` / `contains_any`
-- `starts_with` / `starts_with_any`
-- `ends_with` / `ends_with_any`
-- `regex`
-- `min_length` / `max_length`
-- `option_matches` for rule selection from extra params
-
-## Configuration validation and auditing
-
-Before launching in production you can run `flask check-config` to perform
-basic sanity checks on environment variables.  This command uses
-`Config.validate()` and emits human-readable errors when secrets are missing
-or required settings (e.g. SMTP_HOST when EMAIL_ENABLED) are unset.  The
-application also audits any changes made via the admin UI: updates to
-`/admin/site_config` create an `AuditLog` row with `action_type` set to
-`site_config_update`, ensuring that later reviewers can see who changed the
-banner, theme, or quote sets.
-
-## Admin-built smart request forms
-
-Dynamic request templates now support three admin-managed behaviors that work
-together on the main request form:
-
-- **Section grouping** – each template field may be assigned a section name so
-   the request form renders fields in logical groups rather than one flat list.
-- **Verification-driven prefills** – a verified source field can populate linked
-   sibling fields from tracker or verification responses when the template toggle
-   is enabled.
-- **Conditional requirements** – admins can declare that a field, a whole
-   section, or an upload area becomes required when another field is populated,
-   equals a value, is one of several values, verifies successfully, or when a
-   named section becomes populated.
-
-Conditional requirement rules are edited per field in the admin UI and stored
-as JSON. Supported operators are:
-
-- `populated`
-- `empty`
-- `equals`
-- `not_equals`
-- `one_of`
-- `verified`
-- `any_populated` (section rule)
-- `all_populated` (section rule)
-
-This lets admins model common business rules such as “require a supporting
-document upload when request type is instructions” or “require the follow-up
-section when the primary identifier was verified successfully.”
-
-## Admin-built request forms
-
-Dynamic request templates can now behave more like guided product forms instead
-of flat intake screens:
-
-- Each template may enable `verification_prefill_enabled`, allowing verified
-   lookup fields to populate other fields on the same form.
-- Each field verification rule may define `prefill_targets` so tracker/integration
-   responses can map values such as `details.name` or `details.department` into
-   linked request fields.
-- The request UI shows when a field is verification-backed and when it can
-   auto-fill related fields.
-
-Example field verification params:
-
-```json
-{
-   "tracker_handle": "directory",
-   "prefill_enabled": true,
-   "prefill_targets": {
-      "employee_name": "details.name",
-      "employee_email": {
-         "path": "details.email",
-         "overwrite": true
-      }
-   }
-}
-```
-
-The server also applies these prefills during submission, so required linked
-fields can still be populated even if the browser-side enhancement does not run.
-
-## Workflow safety
-
-The request workspace now includes a recent workflow path and recommended next
-actions. The transition endpoint also blocks repeated ping-pong moves between
-the same two statuses inside a short window, which helps reduce unnecessary
-process loops and accidental back-and-forth churn.
-
+---
 
 ## Deployment
 
-Deployments use Fly.  `make deploy-safe` runs tests locally, builds a container,
-and pushes it to Fly.  The container’s release command runs
-`python scripts/release_tasks.py` to automatically fix schema mismatches.
+- `make deploy-safe` builds, tests, and pushes the container to Fly.
+- The image’s `entrypoint.sh` ensures databases are available and optionally
+  seeds on boot (`SEED_ON_BOOT`, default `1`).
+- Fly secrets to set:
+  `SECRET_KEY`, `DATABASE_URL`, `SESSION_COOKIE_SECURE=True`,
+  `PREFERRED_URL_SCHEME=https`, and any tracker auth tokens.
+- Redis is optional; if you set `REDIS_URL` Fly health will check it, otherwise
+  it’s skipped.
 
-Fly polish already included in this repo:
+---
 
-- `fly.toml` points readiness checks at `/health`
-- `Dockerfile` runs the app on port `8080`
-- `scripts/entrypoint.sh` waits for the database before serving traffic
-- release tasks run automatically during deploy
+## Feature notes
 
-### Smoke tests & health endpoints
+### Request templates
 
-A simple shell script (`scripts/smoke_test.sh`) exercises the home page,
-admin site_config page, and dashboard.  Run it against an active URL as part
-of your staging promotion process, e.g.:
+Admin can create templates that:
 
-```bash
-./scripts/smoke_test.sh https://staging.example.com
-```
+- Group fields into named sections
+- Declare verification rules that can auto‑fill other fields
+- Enable a toggle for verification‑prefill per template
+- Define conditional requirement rules with a UI builder or raw JSON
 
-For local verification you can start the server in a background shell and curl
-`/health` and `/ready` directly; both endpoints return `200` and include a
-`X-Request-ID` header for tracing.  These are wired to Fly’s liveness/readiness
-checks already.
+The UI shows badges for verified/required/auto-fill fields and tracks section
+completion.  JavaScript provides live hints when requirements activate.
 
-Suggested Fly secrets / env for production:
+### Verification & prefills
 
-- `SECRET_KEY`
-- `DATABASE_URL`
-- `SESSION_COOKIE_SECURE=True`
-- `PREFERRED_URL_SCHEME=https`
-- any tracker auth env vars referenced by verification integrations, such as `ERP_VERIFY_TOKEN`
+A field’s verification rule may specify `prefill_targets`; when the source
+field verifies (client‑side or server‑side) the system will attempt to populate
+those targets.  This works both in-browser and during submission validation.
+
+### Conditional requirements
+
+Rules can reference other fields or entire sections. Operators include
+`populated`, `equals`, `one_of`, `verified`, `any_populated`, and
+`all_populated`.  Admins edit rules via a guided builder on the field settings
+page; advanced users can edit the underlying JSON.
+
+### Workflow safety
+
+Transition endpoints maintain a short‑term history of status moves and
+prevent bouncing between the same two states repeatedly.  The request detail
+page displays the last few steps and suggests next actions to the user.
+
+---
+
+## Admin & user interface
+
+- **Admin console**: located under `/admin` with subpages for users, departments,
+  workflows, statuses, site configuration, integrations, feature flags, guest
+  form templates, etc.
+- **User settings**: dark mode, theme/vibe selection, quote set, rotating
+  quotes.
+- **Templates & requirements**: rich form editing with grouped fields, hints,
+  and other metadata.
+- Shared UI macros (`app/templates/admin/_macros.html`) keep styles consistent.
+
+Documentation for internal architecture and UI patterns lives in the `docs/`
+folder.
+
+---
 
 ## Changelog
 
-* **2026-03-08** – added site_config banner/quotes columns, defensive admin
-  handling, migration and release_task fixes.
-* Previous entries available in git history.
+All notable changes are tracked in git history; refer to commit messages for
+more detail.  Recent updates include schema fixes, health checks, seeding
+behavior, and the admin‑template/requirement engine.
+
+---
+
+Enjoy building and customizing your request workflows! Feedback and patches
+are welcome via the GitHub repository.
