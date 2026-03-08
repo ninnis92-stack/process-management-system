@@ -257,22 +257,25 @@ def create_app():
             return
 
         imp_admin = None
-        from flask import session as _session
+        from flask import session as _session, current_app as _current_app
 
-        imp_admin = _session.get("impersonate_admin_id")
-        imp_dept = _session.get("impersonate_dept")
-        if (
-            imp_admin
-            and imp_dept
-            and int(imp_admin) == int(getattr(current_user, "id", -1))
-        ):
-            # Override department for permission checks and templates for duration of request.
-            try:
-                current_user.department = imp_dept
-                current_user.is_acting_as = True
-                current_user.act_as_label = f"Acting as Dept {imp_dept}"
-            except Exception:
-                pass
+        # only honor impersonation if the flag is enabled; otherwise the
+        # session keys are ignored.
+        if _current_app.config.get("ALLOW_IMPERSONATION"):
+            imp_admin = _session.get("impersonate_admin_id")
+            imp_dept = _session.get("impersonate_dept")
+            if (
+                imp_admin
+                and imp_dept
+                and int(imp_admin) == int(getattr(current_user, "id", -1))
+            ):
+                # Override department for permission checks and templates for duration of request.
+                try:
+                    current_user.department = imp_dept
+                    current_user.is_acting_as = True
+                    current_user.act_as_label = f"Acting as Dept {imp_dept}"
+                except Exception:
+                    pass
         # Honor a user-selected active department stored in session. This
         # allows users assigned to multiple departments to switch their
         # active context without changing their stored primary department.

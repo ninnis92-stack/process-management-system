@@ -228,6 +228,10 @@ def manage_user_departments(user_id: int):
 @login_required
 
 def impersonate_user(user_id: int):
+    if not current_app.config.get("ALLOW_IMPERSONATION"):
+        flash("Impersonation feature is disabled.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
     if not _is_admin_user():
         flash("Access denied.", "danger")
         return redirect(url_for("requests.dashboard"))
@@ -267,6 +271,10 @@ def impersonate_user(user_id: int):
 @login_required
 
 def impersonate_dept():
+    if not current_app.config.get("ALLOW_IMPERSONATION"):
+        flash("Impersonation feature is disabled.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
     if not _is_admin_user():
         flash("Access denied.", "danger")
         return redirect(url_for("requests.dashboard"))
@@ -299,10 +307,21 @@ def impersonate_dept():
     return redirect(url_for("requests.dashboard"))
 
 
-@admin_bp.route("/impersonate/stop", methods=["POST"])
+@admin_bp.route("/impersonate/stop", methods=["GET","POST"])
 @login_required
 
 def stop_impersonation():
+    # allow GET so users who manually visit the URL (e.g. via bookmark)
+    if not current_app.config.get("ALLOW_IMPERSONATION"):
+        # nothing to stop; treat as harmless redirect
+        flash("Impersonation feature is disabled.", "danger")
+        return redirect(url_for("requests.dashboard"))
+    # are not greeted with Method Not Allowed.  We simply redirect back to the
+    # dashboard with a notice, mirroring the POST behaviour below.
+
+    # handle GET short-circuit: if no impersonation in progress, just
+    # redirect; otherwise proceed to clear the session below. This keeps
+    # behaviour consistent irrespective of verb.
     admin_id = session.get("impersonate_admin_id")
     if not admin_id:
         flash("Not currently impersonating.", "warning")

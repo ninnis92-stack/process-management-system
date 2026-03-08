@@ -68,7 +68,7 @@
             <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.edit_user', user_id=u.id) }}">Edit</a>
             <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.manage_user_departments', user_id=u.id) }}">Departments</a>
             <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.monitor') }}?dept={{ u.department }}">Monitor {{ u.department }}</a>
-            {% if current_user.id != u.id %}
+            {% if current_user.id != u.id and config.get('ALLOW_IMPERSONATION') %}
               <form method="post" action="{{ url_for('admin.impersonate_dept') }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="dept" value="{{ u.department }}" />

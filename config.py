@@ -26,6 +26,12 @@ class Config:
     PLAN_ENFORCEMENT_ENABLED = os.getenv("PLAN_ENFORCEMENT_ENABLED", "True") == "True"
     RQ_ENABLED = os.getenv("RQ_ENABLED", "False") == "True"
 
+    # Debugging convenience: allow an admin to "impersonate" another
+    # department (or specific user) from the UI.  The routes and UI are
+    # present but the feature is off by default; set
+    # `ALLOW_IMPERSONATION=True` in your environment to enable it.
+    ALLOW_IMPERSONATION = os.getenv("ALLOW_IMPERSONATION", "False") == "True"
+
     # SSO / OIDC (all optional; guarded by SSO_ENABLED)
     SSO_ENABLED = os.getenv("SSO_ENABLED", "False") == "True"
     OIDC_CLIENT_ID = os.getenv("OIDC_CLIENT_ID")

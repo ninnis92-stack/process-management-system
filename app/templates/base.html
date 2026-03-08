@@ -155,7 +155,7 @@
               <span class="badge bg-warning text-dark ms-2">{{ current_user.act_as_label }}</span>
             {% endif %}
             {# Logout moved into the account dropdown above. #}
-            {% if session.get('impersonate_admin_id') %}
+            {% if session.get('impersonate_admin_id') and config.get('ALLOW_IMPERSONATION') %}
                   <form method="post" action="{{ url_for('admin.stop_impersonation') }}" class="m-0 ms-2">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button class="btn btn-warning btn-sm">Stop Impersonation</button>
@@ -194,7 +194,7 @@
     </nav>
   {% endif %}
 
-  {% if session.get('impersonate_admin_id') %}
+  {% if session.get('impersonate_admin_id') and config.get('ALLOW_IMPERSONATION') %}
     <div class="impersonation-banner text-dark">
       <div class="container d-flex justify-content-between align-items-center py-2">
         <div>

@@ -207,6 +207,7 @@ Notes about recent admin UI changes
 - Dashboard: admin users are routed to the admin dashboard by default (even if they belong to multiple departments); the regular dashboard is still used for non-admins.  A new "Switch Dept" card on the admin home page lets admins open the department picker when they need to inspect a specific department.
 - **Site/Quotes tiles** now render as `<button>`s with hardwired `onclick` navigation to avoid any stray href rewrite.  The client bundle version for CSS/JS was bumped to `v=20260307e` to force-cache refresh (see recent bug where stale `app.js` caused cards to redirect to static assets).
 - A banner button to request self-admin elevation was added and is guarded by the `ALLOW_SELF_ADMIN` config flag. Only enable this flag intentionally in development or supervised demos.
+- Admin impersonation/"act as dept" functionality exists in the UI but is **disabled by default**.  To turn it on set `ALLOW_IMPERSONATION=True` in the environment so that the buttons/routes become available.  This is mainly a support debug aid and should be left off in strictly locked‑down production instances.
 Verification and quick troubleshooting
 ------------------------------------
 
