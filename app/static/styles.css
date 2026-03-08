@@ -207,6 +207,25 @@
 .dark-mode .notif-dropdown .notif-item strong { color: var(--body-text); }
 .dark-mode .notif-dropdown .notif-item .small, .dark-mode .notif-dropdown .notif-item small { color: rgba(255,255,255,0.72); }
 
+/* Additional dark-mode surface treatments for cards and sections that assume white backgrounds */
+.dark-mode .template-intake-summary,
+.dark-mode .dynamic-field-card,
+.dark-mode .template-section-block,
+.dark-mode .admin-toggle-card,
+.dark-mode .admin-field-group,
+.dark-mode .admin-field-group__summary,
+.dark-mode .admin-field-groups,
+.dark-mode .card-shell,
+.dark-mode .page-shell {
+  background: var(--surface) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.55);
+}
+
+.dark-mode .page-shell {
+  background: var(--page-bg);
+}
+
 /* When the global Vibe feature is disabled, force the entire UI to use
   the login page color theme so pages don't retain a previously-selected
   per-user vibe. This should only affect light mode; dark-mode must keep
@@ -2006,7 +2025,7 @@ canvas {
   background: var(--accent) !important;
   border-color: var(--accent) !important;
   color: var(--nav-bg) !important;
-}}
+}
 
 .dark-mode .btn-outline-primary,
 .dark-mode .btn-outline-secondary,
