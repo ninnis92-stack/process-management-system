@@ -23,6 +23,32 @@ from sqlalchemy import inspect, text
 import json
 
 
+def _ensure_quote_sets_ready():
+    """Normalize and verify quote sets so deploys always have loadable quotes."""
+    from app import db
+    from app.models import SiteConfig
+
+    cfg = SiteConfig.get()
+    normalized_sets = SiteConfig.normalize_quote_sets(getattr(cfg, "rolling_quote_sets", None))
+
+    if normalized_sets != (getattr(cfg, "rolling_quote_sets", None) or {}):
+        cfg._rolling_quote_sets = json.dumps(normalized_sets)
+        print("quote_sets=normalized")
+
+    active = getattr(cfg, "active_quote_set", None) or "default"
+    if active not in normalized_sets:
+        active = "default"
+        cfg.active_quote_set = active
+        print("quote_sets=active_reset_to_default")
+
+    missing = [name for name, quotes in normalized_sets.items() if not quotes]
+    if missing:
+        raise RuntimeError(f"quote sets missing content: {', '.join(sorted(missing))}")
+
+    db.session.commit()
+    print(f"quote_sets=ok total={len(normalized_sets)} active={active} active_count={len(normalized_sets.get(active) or [])}")
+
+
 def _default_workflow_spec():
     steps = [
         {"from_dept": "A", "to_dept": "B", "status": "NEW_FROM_A"},
@@ -721,17 +747,22 @@ def main():
         run_seed_on_release = os.getenv("RUN_SEED_ON_RELEASE", "1") == "1"
         if not run_seed_on_release:
             print("RUN_SEED_ON_RELEASE=0; skipping seed")
-            return
+        else:
+            # Run the idempotent seed script on every release by default so demo,
+            # admin, and baseline records are always present after deployments.
+            try:
+                import seed
 
-        # Run the idempotent seed script on every release by default so demo,
-        # admin, and baseline records are always present after deployments.
+                seed.main()
+                print("seeded")
+            except Exception as exc:
+                print("seed failed", exc, file=sys.stderr)
+
         try:
-            import seed
-
-            seed.main()
-            print("seeded")
+            _ensure_quote_sets_ready()
         except Exception as exc:
-            print("seed failed", exc, file=sys.stderr)
+            print("quote_set_validation_failed", exc, file=sys.stderr)
+            raise
 
 
 if __name__ == "__main__":

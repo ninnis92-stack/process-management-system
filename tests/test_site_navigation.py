@@ -96,6 +96,37 @@ def test_login_page_always_shows_motivational_quotes(client, app):
     assert "Progress, not perfection." in html
 
 
+def test_login_page_hides_quotes_when_external_branding_present(client, app):
+    with app.app_context():
+        cfg = SiteConfig.get()
+        orig_banner = cfg.banner_html
+        orig_logo = cfg.logo_filename
+        orig_theme = cfg.theme_preset
+        orig_quotes = list(cfg.rolling_quotes or [])
+        orig_flag = cfg.rolling_quotes_enabled
+        try:
+            cfg.banner_html = "<div>imported banner</div>"
+            cfg.logo_filename = "brand/logo.png"
+            cfg.theme_preset = "ocean"
+            cfg.rolling_quotes_enabled = True
+            cfg.rolling_quotes = ["Progress, not perfection."]
+            db.session.add(cfg)
+            db.session.commit()
+
+            rv = client.get("/auth/login")
+            assert rv.status_code == 200
+            html = rv.get_data(as_text=True)
+            assert "Progress, not perfection." not in html
+        finally:
+            cfg.banner_html = orig_banner
+            cfg.logo_filename = orig_logo
+            cfg.theme_preset = orig_theme
+            cfg.rolling_quotes = list(orig_quotes)
+            cfg.rolling_quotes_enabled = orig_flag
+            db.session.add(cfg)
+            db.session.commit()
+
+
 def test_local_test_config_uses_non_secure_session_cookie(app):
     assert app.config["SESSION_COOKIE_SECURE"] is False
 

@@ -278,6 +278,9 @@ def sso_callback():
 @login_required
 def choose_dept():
     """Render the department selection page when a user has multiple departments."""
+    if getattr(current_user, "is_admin", False):
+        flash("Admins manage departments from the command center.", "info")
+        return redirect(url_for("admin.index"))
     depts = _get_user_departments(current_user)
     return render_template("choose_department.html", departments=depts)
 

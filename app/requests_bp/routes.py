@@ -45,6 +45,7 @@ from ..models import (
     Notification,
     RejectRequestConfig,
     DepartmentEditor,
+    FeatureFlags,
 )
 from ..models import StatusBucket, BucketStatus
 from .forms import (
@@ -1975,6 +1976,95 @@ def reject_request(request_id: int):
     return redirect(url_for("requests.request_detail", request_id=req.id))
 
 
+def _collect_nudge_targets(req, exclude_user_id=None):
+    assigned_target = None
+    if req.assigned_to_user_id:
+        u = db.session.get(User, req.assigned_to_user_id)
+        if u and getattr(u, "is_active", False):
+            assigned_target = u
+
+    if assigned_target and assigned_target.id != exclude_user_id:
+        recipients = [assigned_target]
+    else:
+        try:
+            recipients = users_in_department(req.owner_department)
+        except Exception:
+            recipients = []
+
+    if exclude_user_id:
+        recipients = [u for u in recipients if getattr(u, "id", None) != exclude_user_id]
+
+    deduped = {
+        getattr(u, "id", None): u
+        for u in recipients
+        if getattr(u, "id", None) is not None
+    }
+    return list(deduped.values())
+
+
+def _dispatch_nudge_notifications(
+    req,
+    targets,
+    *,
+    dedupe_prefix,
+    title,
+    body,
+    email_subject=None,
+    email_body=None,
+    link=None,
+):
+    if not targets:
+        return
+    if link is None:
+        link = url_for("requests.request_detail", request_id=req.id, _external=False)
+    dedupe_key = f"{dedupe_prefix}:req_{req.id}"
+    deduped = {
+        getattr(u, "id", None): u for u in targets if getattr(u, "id", None) is not None
+    }
+    for u in deduped.values():
+        try:
+            db.session.add(
+                Notification(
+                    user_id=u.id,
+                    request_id=req.id,
+                    type="nudge",
+                    title=title,
+                    body=body,
+                    url=link,
+                    dedupe_key=dedupe_key,
+                )
+            )
+            if email_subject and email_body and getattr(u, "email", None):
+                recipients_map = {u.email: u.id}
+                try:
+                    notifications_module._send_emails_async(
+                        recipients_map,
+                        email_subject,
+                        email_body,
+                        html=None,
+                        request_id=req.id,
+                    )
+                except Exception:
+                    try:
+                        current_app.logger.exception(
+                            "Failed to queue nudge email for user %s", u.id
+                        )
+                    except Exception:
+                        pass
+        except Exception:
+            try:
+                current_app.logger.exception("Failed to create nudge notification")
+            except Exception:
+                pass
+    try:
+        db.session.commit()
+    except Exception:
+        try:
+            current_app.logger.exception("Failed to commit nudge notifications")
+        except Exception:
+            pass
+
+
 @requests_bp.route("/requests/<int:request_id>/admin_nudge", methods=["POST"])
 @login_required
 def admin_nudge(request_id: int):
@@ -1991,18 +2081,7 @@ def admin_nudge(request_id: int):
     if not can_view_request(req):
         abort(403)
 
-    # Determine recipients: prefer assigned user, otherwise active users in owner dept
-    targets = []
-    if req.assigned_to_user_id:
-        u = db.session.get(User, req.assigned_to_user_id)
-        if u and getattr(u, "is_active", False):
-            targets.append(u)
-    else:
-        try:
-            targets = users_in_department(req.owner_department)
-        except Exception:
-            targets = []
-
+    targets = _collect_nudge_targets(req)
     if not targets:
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return (
@@ -2013,55 +2092,56 @@ def admin_nudge(request_id: int):
         return redirect(url_for("requests.request_detail", request_id=req.id))
 
     link = url_for("requests.request_detail", request_id=req.id, _external=False)
-
-    for u in {t.id: t for t in targets}.values():
-        try:
-            db.session.add(
-                Notification(
-                    user_id=u.id,
-                    request_id=req.id,
-                    type="nudge",
-                    title=f"Admin reminder: Request #{req.id}",
-                    body=f"Admin triggered reminder for request #{req.id}.",
-                    url=link,
-                    dedupe_key=f"admin_nudge:req_{req.id}",
-                )
-            )
-
-            if getattr(u, "email", None):
-                recipients_map = {u.email: u.id}
-                subject = f"Admin reminder: Request #{req.id} still open"
-                text_body = f"An administrator triggered a reminder for request #{req.id} ({req.title}).\n\n{link}"
-                try:
-                    notifications_module._send_emails_async(
-                        recipients_map, subject, text_body, html=None, request_id=req.id
-                    )
-                except Exception:
-                    try:
-                        current_app.logger.exception(
-                            "Failed to queue admin nudge email"
-                        )
-                    except Exception:
-                        pass
-        except Exception:
-            try:
-                current_app.logger.exception(
-                    "Failed to create admin nudge notification"
-                )
-            except Exception:
-                pass
-
-    try:
-        db.session.commit()
-    except Exception:
-        try:
-            current_app.logger.exception("Failed to commit admin nudge notifications")
-        except Exception:
-            pass
+    _dispatch_nudge_notifications(
+        req,
+        targets,
+        dedupe_prefix="admin_nudge",
+        title=f"Admin reminder: Request #{req.id}",
+        body=f"Admin triggered reminder for request #{req.id}.",
+        email_subject=f"Admin reminder: Request #{req.id} still open",
+        email_body=f"An administrator triggered a reminder for request #{req.id} ({req.title}).\n\n{link}",
+        link=link,
+    )
 
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify({"ok": True, "message": "Admin nudge sent."}), 200
     flash("Admin nudge sent.", "success")
+    return redirect(url_for("requests.request_detail", request_id=req.id))
+
+
+@requests_bp.route("/requests/<int:request_id>/push_nudge", methods=["POST"])
+@login_required
+def push_nudge(request_id: int):
+    flags = FeatureFlags.get()
+    if not getattr(flags, "allow_user_nudges", False):
+        abort(403)
+
+    req = get_or_404(ReqModel, request_id)
+    if not can_view_request(req):
+        abort(403)
+
+    targets = _collect_nudge_targets(req, exclude_user_id=current_user.id)
+    if not targets:
+        flash("No recipients found for reminder.", "warning")
+        return redirect(url_for("requests.request_detail", request_id=req.id))
+
+    link = url_for("requests.request_detail", request_id=req.id, _external=False)
+    actor_label = current_user.name or current_user.email or "A teammate"
+    title = f"Reminder requested: Request #{req.id}"
+    body = f"{actor_label} requested a reminder for request #{req.id}."
+    text_body = f"{actor_label} requested a reminder for request #{req.id} ({req.title}).\n\n{link}"
+    _dispatch_nudge_notifications(
+        req,
+        targets,
+        dedupe_prefix="user_nudge",
+        title=title,
+        body=body,
+        email_subject=title,
+        email_body=text_body,
+        link=link,
+    )
+
+    flash("Reminder sent to the current owner(s).", "success")
     return redirect(url_for("requests.request_detail", request_id=req.id))
 
 

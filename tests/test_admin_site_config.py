@@ -222,6 +222,27 @@ def test_department_quote_permission(app, client):
     assert b"productivity" in rv.data
 
 
+def test_site_config_fills_missing_or_empty_quote_sets(app):
+    with app.app_context():
+        cfg = SiteConfig.get()
+        cfg._rolling_quote_sets = '{"default": [], "engineering": ["Ship it."], "motivational": []}'
+        cfg.active_quote_set = "motivational"
+        db.session.commit()
+
+        refreshed = SiteConfig.get()
+        quote_sets = refreshed.rolling_quote_sets
+
+        assert set(SiteConfig.DEFAULT_QUOTE_SETS).issubset(set(quote_sets))
+        for name, quotes in quote_sets.items():
+            assert isinstance(quotes, list)
+            assert quotes, f"{name} should always have at least one quote"
+
+        assert quote_sets["default"] == SiteConfig.DEFAULT_QUOTE_SETS["default"]
+        assert quote_sets["motivational"] == SiteConfig.DEFAULT_QUOTE_SETS["motivational"]
+        assert quote_sets["engineering"] == ["Ship it."]
+        assert refreshed.rolling_quotes == SiteConfig.DEFAULT_QUOTE_SETS["motivational"]
+
+
 def test_admin_default_quote_and_user_override(app, client):
     # ensure admin default propagates and that user override persists
     with app.app_context():

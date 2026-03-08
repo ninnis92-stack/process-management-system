@@ -586,7 +586,7 @@ def site_config():
                 if raw and raw.strip():
                     parsed = json.loads(raw)
                     if isinstance(parsed, dict):
-                        cfg._rolling_quote_sets = json.dumps(parsed)
+                        cfg._rolling_quote_sets = json.dumps(SiteConfig.normalize_quote_sets(parsed))
                     else:
                         cfg._rolling_quote_sets = None
                 # else: leave existing value alone
@@ -687,6 +687,8 @@ def site_config_preview():
             "default",
             [line.strip() for line in str(raw_quotes).splitlines() if line.strip()],
         )
+
+    parsed = SiteConfig.normalize_quote_sets(parsed)
 
     active_list = parsed.get(active) or parsed.get(str(active)) or []
     if not isinstance(active_list, list):

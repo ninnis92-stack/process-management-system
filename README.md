@@ -77,7 +77,9 @@ and seeds baseline accounts.
    python scripts/release_tasks.py   # migrations + safe ALTERs + seeds
    ```
    The release script will also seed demo users and an admin account by
-   default unless `RUN_SEED_ON_RELEASE=0`.
+  default unless `RUN_SEED_ON_RELEASE=0`. It now also normalizes and validates
+  quote sets so every built-in set has loadable content before a deploy is
+  considered healthy.
 
 6. **Run the app (local deployment)**
    ```bash
@@ -128,6 +130,9 @@ and seeds baseline accounts.
   development schemas aligned.
 - A second release‑time task creates missing columns safely and can seed the
   database on every deploy (controlled by `RUN_SEED_ON_RELEASE` env var).
+- Release-time quote validation auto-fills missing built-in quote sets, resets an
+  invalid active quote set back to `default`, and fails the release if any set
+  would still be empty.
 - Docker Compose includes healthchecks for Postgres and Redis, and `entrypoint.sh`
   waits for dependencies using `scripts/wait_for_redis_ready.py`.
 
@@ -150,6 +155,9 @@ see JSON indicating `database.status:ok` (and Redis if configured).
 Smoke test script (`scripts/smoke_test.sh`) hits the home page, dashboard and
 admin site config for quick sanity checks against any environment.
 
+Use `python scripts/verify_quote_sets.py` to inspect and normalize stored quote
+sets manually; the command exits non-zero if any quote set still lacks content.
+
 ---
 
 ## Deployment
@@ -164,6 +172,12 @@ admin site config for quick sanity checks against any environment.
   it’s skipped.
 
 ### Live deployment checks (March 8, 2026)
+- Added dedicated release-task regression coverage for quote-set normalization and invalid active-set repair; the local suite now passes with `122 passed`.
+- Deployed to `process-management-prototype-lingering-bush-6175` with `flyctl deploy -a process-management-prototype-lingering-bush-6175`.
+- Verified Fly release logs showed `Seeded users:`, `Quote sets:`, `seeded`, and `quote_sets=ok total=11 active=default active_count=5`, confirming `seed.py` ran and quote validation completed during release.
+- Ran deployed smoke checks with `bash scripts/smoke_test.sh https://process-management-prototype-lingering-bush-6175.fly.dev`, `python scripts/smoke_deployed_login.py --url https://process-management-prototype-lingering-bush-6175.fly.dev`, and `python scripts/admin_smoke.py`; seeded user and admin logins both succeeded and the checked admin/metrics routes returned HTTP 200.
+- Cleared remote smoke data with `python scripts/clear_smoke_remote.py`; the cleanup endpoint completed successfully and reported `{"deleted":0}`.
+- Checked both `https://process-management-prototype-lingering-bush-6175.fly.dev/ready` and `https://process-management-prototype-lingering-bush-6175.fly.dev/health`; both returned `{"status":"ok"}`, and `/ready` reported `components.database.status: ok`.
 - Added regression coverage for the hero dashboard CTA so guest and authenticated views keep the correct labels and target URLs; the local suite now passes with `115 passed`.
 - Deployed to `process-management-prototype-lingering-bush-6175` with `flyctl deploy -a process-management-prototype-lingering-bush-6175`.
 - Verified the Fly release command `python scripts/release_tasks.py` completed successfully and that release/boot logs showed `seed.py` running plus the seeded demo/admin accounts being emitted.

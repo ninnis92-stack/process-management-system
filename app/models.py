@@ -924,6 +924,34 @@ class SiteConfig(TenantScopedMixin, db.Model):
         ],
     }
 
+    @classmethod
+    def normalize_quote_sets(cls, quote_sets=None):
+        """Return quote sets with guaranteed quotes for each built-in set."""
+        defaults = {
+            str(name): [str(item).strip() for item in (quotes or []) if str(item).strip()]
+            for name, quotes in cls.DEFAULT_QUOTE_SETS.items()
+        }
+
+        normalized = {}
+        if isinstance(quote_sets, dict):
+            for raw_name, raw_quotes in quote_sets.items():
+                name = str(raw_name or "").strip()
+                if not name or not isinstance(raw_quotes, list):
+                    continue
+                cleaned = [str(item).strip() for item in raw_quotes if str(item).strip()]
+                if cleaned:
+                    normalized[name] = cleaned
+
+        merged = {}
+        for name, quotes in defaults.items():
+            merged[name] = list(normalized.get(name) or quotes)
+
+        for name, quotes in normalized.items():
+            if name not in merged:
+                merged[name] = list(quotes)
+
+        return merged
+
     @property
     def banner_html(self):
         return self.navbar_banner
@@ -948,23 +976,25 @@ class SiteConfig(TenantScopedMixin, db.Model):
             if self._rolling_quote_sets:
                 parsed = json.loads(self._rolling_quote_sets)
                 if isinstance(parsed, dict):
-                    for k, v in parsed.items():
-                        if isinstance(v, list):
-                            sets[str(k)] = [str(x).strip() for x in v if str(x).strip()]
+                    sets = type(self).normalize_quote_sets(parsed)
             # Legacy single list -> populate default set
             if not sets and self._rolling_quotes:
                 try:
                     parsed = json.loads(self._rolling_quotes)
                     if isinstance(parsed, list):
-                        sets["default"] = [str(x).strip() for x in parsed if str(x).strip()]
+                        sets = type(self).normalize_quote_sets({
+                            "default": [str(x).strip() for x in parsed if str(x).strip()]
+                        })
                 except Exception:
-                    sets["default"] = [
-                        line.strip()
-                        for line in str(self._rolling_quotes).splitlines()
-                        if line.strip()
-                    ]
+                    sets = type(self).normalize_quote_sets({
+                        "default": [
+                            line.strip()
+                            for line in str(self._rolling_quotes).splitlines()
+                            if line.strip()
+                        ]
+                    })
             if not sets:
-                sets = type(self).DEFAULT_QUOTE_SETS.copy()
+                sets = type(self).normalize_quote_sets()
 
             active = (self.active_quote_set or "default")
             if active in sets:
@@ -993,10 +1023,7 @@ class SiteConfig(TenantScopedMixin, db.Model):
             if self._rolling_quote_sets:
                 parsed = json.loads(self._rolling_quote_sets)
                 if isinstance(parsed, dict):
-                    out = {}
-                    for k, v in parsed.items():
-                        if isinstance(v, list):
-                            out[str(k)] = [str(x).strip() for x in v if str(x).strip()]
+                    out = type(self).normalize_quote_sets(parsed)
                     if out:
                         return out
         except Exception:
@@ -1006,13 +1033,17 @@ class SiteConfig(TenantScopedMixin, db.Model):
             if self._rolling_quotes:
                 parsed = json.loads(self._rolling_quotes)
                 if isinstance(parsed, list):
-                    return {"default": [str(x).strip() for x in parsed if str(x).strip()]}
+                    return type(self).normalize_quote_sets({
+                        "default": [str(x).strip() for x in parsed if str(x).strip()]
+                    })
         except Exception:
             if self._rolling_quotes:
-                return {"default": [
-                    line.strip() for line in str(self._rolling_quotes).splitlines() if line.strip()
-                ]}
-        return type(self).DEFAULT_QUOTE_SETS.copy()
+                return type(self).normalize_quote_sets({
+                    "default": [
+                        line.strip() for line in str(self._rolling_quotes).splitlines() if line.strip()
+                    ]
+                })
+        return type(self).normalize_quote_sets()
 
     @property
     def parsed_quote_permissions(self):
@@ -1094,6 +1125,19 @@ class SiteConfig(TenantScopedMixin, db.Model):
                 db.session.commit()
             except Exception:
                 db.session.rollback()
+        try:
+            normalized_sets = cls.normalize_quote_sets(getattr(cfg, "rolling_quote_sets", None))
+            current_sets = getattr(cfg, "rolling_quote_sets", None) or {}
+            if normalized_sets != current_sets or not getattr(cfg, "_rolling_quote_sets", None):
+                cfg._rolling_quote_sets = json.dumps(normalized_sets)
+            if not getattr(cfg, "active_quote_set", None) or cfg.active_quote_set not in normalized_sets:
+                cfg.active_quote_set = "default"
+            db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
         return cfg
 
 

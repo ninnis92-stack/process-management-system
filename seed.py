@@ -1,8 +1,9 @@
 from werkzeug.security import generate_password_hash
 from app import create_app
 from app.extensions import db
-from app.models import User
+from app.models import SiteConfig, User
 from sqlalchemy import inspect, text
+import json
 
 
 def main():
@@ -134,6 +135,13 @@ def main():
                 db.session.commit()
             except Exception:
                 db.session.rollback()
+
+        cfg = SiteConfig.get()
+        normalized_sets = SiteConfig.normalize_quote_sets(getattr(cfg, "rolling_quote_sets", None))
+        cfg._rolling_quote_sets = json.dumps(normalized_sets)
+        if not getattr(cfg, "active_quote_set", None) or cfg.active_quote_set not in normalized_sets:
+            cfg.active_quote_set = "default"
+        db.session.commit()
         print("DB =", ...)
         print("Seeded users:")
         print("a@example.com / password123 (Dept A)")
@@ -142,6 +150,9 @@ def main():
         print("Admin account(s):")
         for e in admin_emails:
             print(f"{e} / admin123")
+        print("Quote sets:")
+        for name, quotes in normalized_sets.items():
+            print(f"{name}: {len(quotes)} quote(s)")
 
 
 if __name__ == "__main__":

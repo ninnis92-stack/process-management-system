@@ -521,7 +521,22 @@ def create_app():
             except Exception:
                 pass
 
+            # Authenticated users can still opt into personalized rotating
+            # quotes on signed-in pages even when the public/login banner is
+            # off, provided quotes are available for their selected/default set.
+            try:
+                if (
+                    current_user.is_authenticated
+                    and quote_user
+                    and getattr(quote_user, "quotes_enabled", True)
+                    and rolling_quotes
+                ):
+                    rolling_quotes_enabled = True
+            except Exception:
+                pass
+
             # Respect the global feature flag as well (admin toggle).
+            allow_user_nudges_enabled = False
             try:
                 ff = FeatureFlags.get()
                 # Respect both the admin rolling-quotes flag and the global
@@ -531,6 +546,9 @@ def create_app():
                     rolling_quotes_enabled = False
                 if not getattr(ff, "vibe_enabled", True):
                     rolling_quotes_enabled = False
+                allow_user_nudges_enabled = bool(
+                    getattr(ff, "allow_user_nudges", False)
+                )
             except Exception:
                 try:
                     db.session.rollback()
@@ -573,6 +591,7 @@ def create_app():
                 site_banner_html=banner_html,
                 rolling_quotes_enabled=rolling_quotes_enabled,
                 rolling_quotes=rolling_quotes,
+                allow_user_nudges_enabled=allow_user_nudges_enabled,
                 FeatureFlags=FeatureFlags,
             )
         except Exception:
@@ -585,6 +604,7 @@ def create_app():
                 site_banner_html="",
                 rolling_quotes_enabled=False,
                 rolling_quotes=[],
+                allow_user_nudges_enabled=False,
                 FeatureFlags=None,
             )
 
