@@ -359,6 +359,73 @@ def main():
                             )
                         )
                     print("schema_fix=site_config.theme_preset_added")
+                # newer fields added after 0020 migration; make sure they exist too
+                if (
+                    "site_config" in insp.get_table_names()
+                    and "navbar_banner" not in site_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE site_config ADD COLUMN navbar_banner VARCHAR(500)"
+                            )
+                        )
+                    print("schema_fix=site_config.navbar_banner_added")
+                if (
+                    "site_config" in insp.get_table_names()
+                    and "show_banner" not in site_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE site_config ADD COLUMN show_banner BOOLEAN DEFAULT FALSE"
+                            )
+                        )
+                    print("schema_fix=site_config.show_banner_added")
+                if (
+                    "site_config" in insp.get_table_names()
+                    and "rolling_quotes" not in site_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE site_config ADD COLUMN rolling_quotes TEXT"
+                            )
+                        )
+                    print("schema_fix=site_config.rolling_quotes_added")
+                if (
+                    "site_config" in insp.get_table_names()
+                    and "rolling_quote_sets" not in site_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE site_config ADD COLUMN rolling_quote_sets TEXT"
+                            )
+                        )
+                    print("schema_fix=site_config.rolling_quote_sets_added")
+                if (
+                    "site_config" in insp.get_table_names()
+                    and "active_quote_set" not in site_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE site_config ADD COLUMN active_quote_set VARCHAR(80) DEFAULT 'default'"
+                            )
+                        )
+                    print("schema_fix=site_config.active_quote_set_added")
+                if (
+                    "site_config" in insp.get_table_names()
+                    and "updated_at" not in site_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE site_config ADD COLUMN updated_at TIMESTAMP"
+                            )
+                        )
+                    print("schema_fix=site_config.updated_at_added")
                 # Ensure feature_flags has expected columns added in recent releases.
                 if "feature_flags" in insp.get_table_names():
                     ff_cols = {c["name"] for c in insp.get_columns("feature_flags")}

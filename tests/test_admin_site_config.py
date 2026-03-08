@@ -189,6 +189,50 @@ def test_site_config_missing_table(app, client):
     assert b"brand name" in data
 
 
+def test_site_config_missing_columns(app, client):
+    """If individual columns are missing from `site_config`, the page should
+    warn about schema being out of date and not crash.  This simulates an
+    upgraded codebase running against an older DB.
+    """
+    from sqlalchemy import text
+
+    with app.app_context():
+        # ensure table exists and has at least one row
+        cfg = SiteConfig.get()
+        db.session.commit()
+        # drop each newer column one at a time and check behavior
+        cols_to_drop = [
+            'navbar_banner',
+            'show_banner',
+            'rolling_quotes',
+            'rolling_quote_sets',
+            'active_quote_set',
+            'updated_at',
+        ]
+        for col in cols_to_drop:
+            db.session.execute(text(f"ALTER TABLE site_config DROP COLUMN IF EXISTS {col}"))
+        db.session.commit()
+
+        u = User(
+            email="missing-col@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(u)
+        db.session.commit()
+
+    rv = login_admin(client, email="missing-col@example.com")
+    assert rv.status_code == 200
+
+    rv = client.get("/admin/site_config", follow_redirects=True)
+    assert rv.status_code == 200
+    data = rv.data.lower()
+    assert b"site configuration cannot be loaded" in data or b"schema" in data
+    assert b"brand name" in data
+
+
 def test_site_config_post_handles_commit_exception(app, client, monkeypatch):
     """If the database commit fails during a save, we flash an error but don't 500."""
     with app.app_context():
