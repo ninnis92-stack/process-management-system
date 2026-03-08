@@ -1,6 +1,4 @@
 import os
-import hmac
-import hashlib
 import re
 import time
 from datetime import datetime, timedelta, timezone
@@ -25,6 +23,7 @@ from ..models import (
 )
 from .. import notifcations as notifications
 from ..services.inventory import InventoryService
+from ..security import rate_limit, verify_webhook_request
 
 integrations_bp = Blueprint("integrations_bp", __name__, url_prefix="/integrations")
 
@@ -51,20 +50,18 @@ def _get_shared_secret():
 
 
 def valid_hmac(payload: bytes, signature: str, secret: str) -> bool:
-    if not signature or not secret:
-        return False
-    try:
-        # signature expected as hex string; normalize
-        sig = signature.strip()
-        mac = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256)
-        expected = mac.hexdigest()
-        return hmac.compare_digest(expected, sig)
-    except Exception:
-        return False
+    ok, _reason = verify_webhook_request(
+        payload=payload,
+        signature=signature,
+        secret=secret,
+        timestamp=request.headers.get("X-Webhook-Timestamp"),
+    )
+    return ok
 
 
 @integrations_bp.route("/incoming-webhook", methods=["POST"])
 @csrf.exempt
+@rate_limit("incoming_webhook", config_key="WEBHOOK_RATE_LIMIT", default="60/60")
 def incoming_webhook():
     """Accepts external POSTs from third-party services.
 
@@ -76,6 +73,7 @@ def incoming_webhook():
     sig = request.headers.get("X-Webhook-Signature") or request.headers.get(
         "X-Signature"
     )
+    timestamp = request.headers.get("X-Webhook-Timestamp")
     secret = _get_shared_secret()
     if not secret:
         current_app.logger.warning(
@@ -83,8 +81,14 @@ def incoming_webhook():
         )
         abort(401)
 
-    if not valid_hmac(payload, sig, secret):
-        current_app.logger.warning("Incoming webhook rejected: invalid signature")
+    ok, reason = verify_webhook_request(
+        payload=payload,
+        signature=sig,
+        secret=secret,
+        timestamp=timestamp,
+    )
+    if not ok:
+        current_app.logger.warning("Incoming webhook rejected: %s", reason)
         abort(401)
 
     # At this point the webhook is authenticated. Implement service-specific
@@ -105,6 +109,7 @@ def incoming_webhook():
 
 @integrations_bp.route("/external-form-callback", methods=["POST"])
 @csrf.exempt
+@rate_limit("external_form_callback", config_key="WEBHOOK_RATE_LIMIT", default="60/60")
 def external_form_callback():
     """Accept callbacks from external form providers (e.g. Microsoft Forms).
 
@@ -125,10 +130,18 @@ def external_form_callback():
     sig = request.headers.get("X-Webhook-Signature") or request.headers.get(
         "X-Signature"
     )
+    timestamp = request.headers.get("X-Webhook-Timestamp")
     secret = _get_shared_secret()
-    if not secret or not valid_hmac(payload, sig, secret):
+    ok, reason = verify_webhook_request(
+        payload=payload,
+        signature=sig,
+        secret=secret,
+        timestamp=timestamp,
+    )
+    if not secret or not ok:
         current_app.logger.warning(
-            "External form callback rejected: invalid/no signature"
+            "External form callback rejected: %s",
+            reason or "invalid/no signature",
         )
         abort(401)
 

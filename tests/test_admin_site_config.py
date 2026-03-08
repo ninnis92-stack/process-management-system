@@ -2,6 +2,7 @@ import re
 import pytest
 from app.extensions import db
 from app.models import User, Department, SiteConfig
+from config import Config
 from werkzeug.security import generate_password_hash
 
 
@@ -11,6 +12,22 @@ def login_admin(client, email="admin@example.com", password="secret"):
         data={"email": email, "password": password},
         follow_redirects=True,
     )
+
+
+
+def test_config_validation():
+    """Config.validate should catch missing/invalid settings."""
+    # run the validator against default class, which will have insecure defaults
+    errors = Config.validate()
+    # at least the secret key warning should appear
+    assert any("SECRET_KEY" in e for e in errors)
+    # enabling email without SMTP_HOST should also trigger if we flip flag
+    class Dummy(Config):
+        EMAIL_ENABLED = True
+        SMTP_HOST = ""
+        SMTP_PORT = None
+    errs2 = Dummy.validate()
+    assert any("SMTP_HOST" in e for e in errs2)
 
 
 def test_departments_crud_and_site_config(app, client):
@@ -111,6 +128,18 @@ def test_departments_crud_and_site_config(app, client):
         assert cfg.banner_html is not None
         assert cfg.rolling_quotes_enabled is True
         assert isinstance(cfg.rolling_quotes, list)
+
+        # verify that an audit record was created for the configuration change
+        from app.models import AuditLog
+
+        recent = (
+            AuditLog.query.filter_by(action_type="site_config_update")
+            .order_by(AuditLog.created_at.desc())
+            .first()
+        )
+        assert recent is not None
+        assert recent.actor_type == "user"
+        assert recent.actor_label == "admin@example.com"
 
         # DEFAULT_QUOTE_SETS now ships with two extra themes and a laundry riddles
         # set; each should have the same number of entries as the default list.

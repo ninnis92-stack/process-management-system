@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'admin/_macros.html' import helper_card %}
 {% block content %}
 <section class="page-header">
   <div>
@@ -9,10 +10,17 @@
 </section>
 <form class="page-toolbar surface-panel dashboard-search" method="get" action="{{ url_for('requests.search_requests') }}">
   <div class="input-group">
-    <input type="text" name="q" class="form-control" placeholder="Search by ID or description" value="{{ q }}">
+    <input type="text" name="q" class="form-control" placeholder="Search by request ID, title, description, part, or submission text" value="{{ q }}">
     <button class="btn btn-primary" type="submit">Search</button>
   </div>
 </form>
+
+{% if not q %}
+  <section class="helper-grid mb-3">
+    {{ helper_card('Search by request number', 'Paste a known request ID for the fastest way back into a specific workspace.', '🔎') }}
+    {{ helper_card('Search by business context', 'Descriptions, titles, artifact values, and submission text are all included in the results.', '🧠') }}
+  </section>
+{% endif %}
 
 {% if q and results is not none %}
   <section class="surface-panel section-intro">

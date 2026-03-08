@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'admin/_macros.html' import section_heading, helper_card %}
 {% block content %}
 <section class="page-header">
   <div>
@@ -6,6 +7,12 @@
     <h3 class="page-header__title mb-0">New Request</h3>
     <p class="page-header__lede mb-0">Capture the request details, required part information, and any dynamic fields configured by the admin team.</p>
   </div>
+</section>
+
+<section class="helper-grid mb-3">
+  {{ helper_card('Start with the request goal', 'Use a clear title and description so downstream teams can understand the work without extra follow-up.', '📝') }}
+  {{ helper_card('Part details can be completed in stages', 'Target part numbers may be updated later when the workflow allows it, but donor context helps immediately.', '🧩') }}
+  {{ helper_card('Choose a realistic due date', 'Set enough lead time for reviews and cross-department handoffs, especially when Dept C review may be required.', '⏰') }}
 </section>
 
 <section class="surface-panel">
@@ -24,6 +31,8 @@
           </ul>
         </div>
       {% endif %}
+
+      {{ section_heading('Part and method context', 'Provide the part identifiers first so the request can be routed and verified correctly.', compact=True) }}
 
       <div class="row">
         <div class="col-md-6 mb-3">
@@ -51,9 +60,11 @@
         </div>
       </div>
 
+      {{ section_heading('Request details', 'Capture the business context, urgency, and sales-list state for this work item.', compact=True) }}
+
       <div class="mb-3">
         <label class="form-label">Title</label>
-        {{ form.title(class="form-control") }}
+        {{ form.title(class="form-control", placeholder="Short summary of what needs to be created or updated") }}
       </div>
 
       <div class="row">
@@ -85,12 +96,11 @@
 
       <div class="mb-3">
         <label class="form-label">Description</label>
-        {{ form.description(class="form-control", rows="6") }}
+        {{ form.description(class="form-control", rows="6", placeholder="Explain the request, background, blockers, and anything the next team should know.") }}
       </div>
 
       {% if template_spec %}
-        <hr/>
-        <h5 class="mb-3">Additional Fields</h5>
+        {{ section_heading('Additional fields', 'These fields are configured by the admin team for this workflow.', compact=True) }}
         <div class="row">
           {% for field in template_spec %}
             <div class="col-md-6 mb-3">
@@ -117,7 +127,10 @@
         </div>
       {% endif %}
 
-      <button class="btn btn-primary w-100" type="submit">Submit Request</button>
+      <div class="form-actions-bar">
+        <div class="small text-muted">After submission, the request will appear in your dashboard and can also be tracked from the guest view if needed.</div>
+        <button class="btn btn-primary" type="submit">Submit Request</button>
+      </div>
     </form>
 </section>
 

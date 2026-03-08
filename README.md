@@ -136,6 +136,18 @@ Supported routing matchers in `routing.rules`:
 - `min_length` / `max_length`
 - `option_matches` for rule selection from extra params
 
+## Configuration validation and auditing
+
+Before launching in production you can run `flask check-config` to perform
+basic sanity checks on environment variables.  This command uses
+`Config.validate()` and emits human-readable errors when secrets are missing
+or required settings (e.g. SMTP_HOST when EMAIL_ENABLED) are unset.  The
+application also audits any changes made via the admin UI: updates to
+`/admin/site_config` create an `AuditLog` row with `action_type` set to
+`site_config_update`, ensuring that later reviewers can see who changed the
+banner, theme, or quote sets.
+
+
 ## Deployment
 
 Deployments use Fly.  `make deploy-safe` runs tests locally, builds a container,
@@ -148,6 +160,21 @@ Fly polish already included in this repo:
 - `Dockerfile` runs the app on port `8080`
 - `scripts/entrypoint.sh` waits for the database before serving traffic
 - release tasks run automatically during deploy
+
+### Smoke tests & health endpoints
+
+A simple shell script (`scripts/smoke_test.sh`) exercises the home page,
+admin site_config page, and dashboard.  Run it against an active URL as part
+of your staging promotion process, e.g.:
+
+```bash
+./scripts/smoke_test.sh https://staging.example.com
+```
+
+For local verification you can start the server in a background shell and curl
+`/health` and `/ready` directly; both endpoints return `200` and include a
+`X-Request-ID` header for tracing.  These are wired to Fly’s liveness/readiness
+checks already.
 
 Suggested Fly secrets / env for production:
 

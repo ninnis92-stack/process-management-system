@@ -21,3 +21,27 @@
     <label class="form-check-label">{{ on_label if field.data else off_label }}</label>
   </div>
 {% endmacro %}
+
+{% macro section_heading(title, subtitle=None, badge=None, compact=False) %}
+  <div class="section-heading{% if compact %} section-heading-compact{% endif %}">
+    <div>
+      <h4 class="section-heading__title">{{ title }}</h4>
+      {% if subtitle %}
+        <p class="section-heading__subtitle">{{ subtitle }}</p>
+      {% endif %}
+    </div>
+    {% if badge %}
+      <div class="section-heading__meta">{{ badge }}</div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro helper_card(title, text, icon='💡') %}
+  <div class="helper-card">
+    <div class="helper-card__icon" aria-hidden="true">{{ icon }}</div>
+    <div>
+      <div class="helper-card__title">{{ title }}</div>
+      <div class="helper-card__text">{{ text }}</div>
+    </div>
+  </div>
+{% endmacro %}

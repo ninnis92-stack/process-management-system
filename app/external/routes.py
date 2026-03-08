@@ -30,6 +30,7 @@ from ..notifcations import notify_users, users_in_department
 from types import SimpleNamespace
 from werkzeug.routing import BuildError
 from .forms import ExternalNewRequestForm, ExternalCommentForm, GuestLookupForm
+from ..security import rate_limit
 
 external_bp = Blueprint("external", __name__, url_prefix="/external")
 
@@ -91,6 +92,7 @@ def _send_guest_email(to_email: str, subject: str, body: str) -> None:
 
 
 @external_bp.route("/new", methods=["GET", "POST"])
+@rate_limit("guest_submit", config_key="GUEST_SUBMIT_RATE_LIMIT", default="5/300")
 def external_new():
     form = ExternalNewRequestForm()
     # populate dynamic choices
@@ -334,6 +336,7 @@ def external_new():
 
 
 @external_bp.route("/dashboard", methods=["GET", "POST"])
+@rate_limit("guest_lookup", config_key="GUEST_LOOKUP_RATE_LIMIT", default="10/300")
 def external_dashboard():
     form = GuestLookupForm()
     if form.validate_on_submit():
@@ -379,6 +382,7 @@ def _get_req_by_token(token: str) -> ReqModel:
 
 
 @external_bp.route("/<token>", methods=["GET", "POST"])
+@rate_limit("guest_comment", config_key="GUEST_COMMENT_RATE_LIMIT", default="10/300")
 def external_detail(token: str):
     req = _get_req_by_token(token)
 

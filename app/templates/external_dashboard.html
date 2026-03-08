@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'admin/_macros.html' import helper_card %}
 {% block content %}
 <section class="page-header">
   <div>
@@ -6,6 +7,10 @@
     <h3 class="page-header__title mb-0">Guest Dashboard</h3>
     <p class="page-header__lede mb-0">Use your request number and email address to reopen the public tracking view for an external request.</p>
   </div>
+</section>
+<section class="helper-grid mb-3">
+  {{ helper_card('Use the same email from submission', 'The email must match the one used when the guest request was created.', '📧') }}
+  {{ helper_card('Tracking links still work directly', 'If you saved the original tracking link, opening it is still the quickest path back to the request.', '🔗') }}
 </section>
 <form method="post" class="surface-panel guest-dashboard-form" style="max-width: 480px;">
   {{ form.hidden_tag() }}

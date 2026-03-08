@@ -42,6 +42,7 @@ def app(monkeypatch):
         TESTING=True,
         WTF_CSRF_ENABLED=False,
         SERVER_NAME="localhost",
+        RATE_LIMIT_ENABLED=False,  # disable global rate limits during tests
     )
     # store the path on the app so the teardown block can remove it later
     application._test_sqlite_path = path

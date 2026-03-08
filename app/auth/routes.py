@@ -29,6 +29,7 @@ from sqlalchemy.exc import OperationalError
 from flask import session as _session
 from ..models import UserDepartment, Department
 from ..services.tenant_context import ensure_user_tenant_membership, set_active_tenant
+from ..security import rate_limit
 
 
 def _restore_last_active_dept_for_user(user):
@@ -500,6 +501,7 @@ def switch_department():
 
 # ---------- Local Login (fallback) ----------
 @auth_bp.route("/login", methods=["GET", "POST"])
+@rate_limit("login", config_key="LOGIN_RATE_LIMIT", default="5/300")
 def login():
     form = LoginForm()
     # Clear any pre-filled email when rendering the login page via GET so

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'admin/_macros.html' import section_heading, helper_card %}
 {% block content %}
 <section class="page-header">
   <div>
@@ -6,6 +7,11 @@
     <h3 class="page-header__title mb-0">Guest Submission</h3>
     <p class="page-header__lede mb-0">Submit a request without signing in, route it to the correct department, and receive a tracking link after submission.</p>
   </div>
+</section>
+<section class="helper-grid mb-3">
+  {{ helper_card('Submit without an internal account', 'Guest intake is designed for external collaborators, vendors, or requesters who should not sign in.', '🌐') }}
+  {{ helper_card('Choose the owning department carefully', 'This determines which team sees the request first and how it enters the queue.', '🧭') }}
+  {{ helper_card('A tracking link is shown after submission', 'Save the confirmation link or request number so you can check status later.', '✅') }}
 </section>
 <section class="surface-panel">
     <form method="post">
@@ -22,6 +28,8 @@
                 </ul>
         </div>
       {% endif %}
+      {{ section_heading('Guest details', 'Provide the contact information that should be tied to this request.', compact=True) }}
+
       <div class="row">
         <div class="col-md-6 mb-3">
           <label class="form-label">Email</label>
@@ -32,6 +40,8 @@
           {{ form.guest_name(class="form-control") }}
         </div>
       </div>
+
+      {{ section_heading('Routing and workflow', 'Choose the department and optional workflow before adding the request details.', compact=True) }}
 
       <div class="row">
         <div class="col-12 mb-3">
@@ -59,9 +69,11 @@
         </div>
       </div>
 
+      {{ section_heading('Request details', 'Capture the title, timing, and type of work being requested.', compact=True) }}
+
       <div class="mb-3">
         <label class="form-label">Title</label>
-        {{ form.title(class="form-control") }}
+        {{ form.title(class="form-control", placeholder="Short summary of the work being requested") }}
       </div>
 
       <div class="mb-3">
@@ -101,10 +113,13 @@
 
       <div class="mb-3">
         <label class="form-label">Description (optional)</label>
-        {{ form.description(class="form-control", rows="6") }}
+        {{ form.description(class="form-control", rows="6", placeholder="Add background, expected outcome, and any links or context the team should know.") }}
       </div>
 
-      <button id="submitBtn" class="btn btn-primary" type="submit">Submit Request</button>
+      <div class="form-actions-bar">
+        <div class="small text-muted">After submission, a tracking link will be shown so the request can be viewed again without signing in.</div>
+        <button id="submitBtn" class="btn btn-primary" type="submit">Submit Request</button>
+      </div>
     </form>
 </section>
 <script>

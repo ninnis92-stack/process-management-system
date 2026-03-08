@@ -593,6 +593,22 @@ def site_config():
         try:
             db.session.commit()
             flash("Site configuration saved.", "success")
+            # record audit entry so changes are traceable
+            try:
+                from app.models import AuditLog
+                entry = AuditLog(
+                    actor_type="user",
+                    actor_user_id=current_user.id,
+                    actor_label=current_user.email,
+                    action_type="site_config_update",
+                    note="admin updated site configuration",
+                )
+                db.session.add(entry)
+                db.session.commit()
+            except Exception:
+                current_app.logger.exception(
+                    "failed to audit site config change"
+                )
         except Exception as exc:  # pragma: no cover - defensive
             current_app.logger.exception("failed to save site config")
             try:

@@ -14,6 +14,21 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-fallback")
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "/data/uploads")
     REQUEST_ID_HEADER = os.getenv("REQUEST_ID_HEADER", "X-Request-ID")
+    REQUEST_LOGGING_ENABLED = (
+        os.getenv("REQUEST_LOGGING_ENABLED", "True") == "True"
+    )
+    REQUEST_LOGGING_SKIP_PATHS = [
+        p.strip()
+        for p in os.getenv("REQUEST_LOGGING_SKIP_PATHS", "/static/").split(",")
+        if p.strip()
+    ]
+    SLOW_REQUEST_THRESHOLD_MS = int(os.getenv("SLOW_REQUEST_THRESHOLD_MS", "750"))
+    RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "True") == "True"
+    LOGIN_RATE_LIMIT = os.getenv("LOGIN_RATE_LIMIT", "5/300")
+    GUEST_LOOKUP_RATE_LIMIT = os.getenv("GUEST_LOOKUP_RATE_LIMIT", "10/300")
+    GUEST_SUBMIT_RATE_LIMIT = os.getenv("GUEST_SUBMIT_RATE_LIMIT", "5/300")
+    GUEST_COMMENT_RATE_LIMIT = os.getenv("GUEST_COMMENT_RATE_LIMIT", "10/300")
+    WEBHOOK_RATE_LIMIT = os.getenv("WEBHOOK_RATE_LIMIT", "60/60")
     PREFERRED_URL_SCHEME = os.getenv("PREFERRED_URL_SCHEME", "http")
     PROXY_FIX_ENABLED = os.getenv("PROXY_FIX_ENABLED", "False") == "True"
     PROXY_FIX_X_FOR = int(os.getenv("PROXY_FIX_X_FOR", "1"))
@@ -22,6 +37,21 @@ class Config:
     PROXY_FIX_X_PORT = int(os.getenv("PROXY_FIX_X_PORT", "1"))
     PROXY_FIX_X_PREFIX = int(os.getenv("PROXY_FIX_X_PREFIX", "1"))
     SECURITY_HEADERS_ENABLED = os.getenv("SECURITY_HEADERS_ENABLED", "False") == "True"
+    HEALTHCHECK_REDIS_REQUIRED = (
+        os.getenv("HEALTHCHECK_REDIS_REQUIRED", "False") == "True"
+    )
+    HEALTHCHECK_INCLUDE_DETAILS = (
+        os.getenv("HEALTHCHECK_INCLUDE_DETAILS", "True") == "True"
+    )
+    WEBHOOK_REQUIRE_TIMESTAMP = (
+        os.getenv("WEBHOOK_REQUIRE_TIMESTAMP", "False") == "True"
+    )
+    WEBHOOK_SIGNATURE_TTL_SECONDS = int(
+        os.getenv("WEBHOOK_SIGNATURE_TTL_SECONDS", "300")
+    )
+    WEBHOOK_REPLAY_PROTECTION_ENABLED = (
+        os.getenv("WEBHOOK_REPLAY_PROTECTION_ENABLED", "True") == "True"
+    )
     TENANT_REQUIRED = os.getenv("TENANT_REQUIRED", "True") == "True"
     PLAN_ENFORCEMENT_ENABLED = os.getenv("PLAN_ENFORCEMENT_ENABLED", "True") == "True"
     RQ_ENABLED = os.getenv("RQ_ENABLED", "False") == "True"
@@ -188,3 +218,54 @@ class Config:
 
     # Flask-Caching defaults
     CACHE_DEFAULT_TIMEOUT = int(os.getenv("CACHE_DEFAULT_TIMEOUT", "300"))
+
+    @classmethod
+    def validate(cls, app=None):
+        """Perform sanity checks on configuration values.
+
+        When running in production, the application can call this during
+        startup or via the ``flask check-config`` CLI command to catch
+        missing/invalid environment variables early.  The method returns a
+        list of human-readable error strings; callers may raise or exit based
+        on the result.  ``app`` is optional and is used only for logging.
+        """
+        errors = []
+        # basic secrets
+        if cls.SECRET_KEY == "dev-fallback":
+            errors.append("SECRET_KEY is using the insecure default; set a strong secret in production")
+
+        # SSO/OIDC
+        if cls.SSO_ENABLED:
+            for key in ("OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_DISCOVERY_URL", "OIDC_REDIRECT_URI"):
+                if not getattr(cls, key, None):
+                    errors.append(f"{key} must be set when SSO_ENABLED is True")
+            # optionally warn if SSO_ADMIN_SYNC_* flags are inconsistent
+            if cls.SSO_ADMIN_SYNC_ENABLED and not cls.SSO_ADMIN_CLAIM:
+                errors.append("SSO_ADMIN_CLAIM cannot be empty when SSO_ADMIN_SYNC_ENABLED is True")
+
+        # email
+        if cls.EMAIL_ENABLED:
+            if not cls.SMTP_HOST:
+                errors.append("SMTP_HOST is required when EMAIL_ENABLED is True")
+            if not cls.SMTP_PORT:
+                errors.append("SMTP_PORT is required when EMAIL_ENABLED is True")
+
+        # ticketing
+        if cls.TICKETING_ENABLED:
+            if not cls.TICKETING_URL:
+                errors.append("TICKETING_URL is required when TICKETING_ENABLED is True")
+            if not cls.TICKETING_TOKEN:
+                errors.append("TICKETING_TOKEN is required when TICKETING_ENABLED is True")
+
+        # Redis/DB
+        if cls.RATE_LIMIT_ENABLED and not cls.REDIS_URL:
+            errors.append("RATE_LIMIT_ENABLED is True but REDIS_URL is not configured")
+
+        # general advice
+        if cls.CACHE_DEFAULT_TIMEOUT <= 0:
+            errors.append("CACHE_DEFAULT_TIMEOUT must be positive")
+
+        if app and errors:
+            for e in errors:
+                app.logger.error("Config validation: %s", e)
+        return errors

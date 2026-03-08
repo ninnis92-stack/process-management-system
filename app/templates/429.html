@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header page-header-centered">
+  <div>
+    <div class="page-header__eyebrow">Too many requests</div>
+    <h3 class="page-header__title mb-0">Please wait a moment</h3>
+    <p class="page-header__lede mb-0">This action has temporary protection enabled to reduce abuse and repeated submissions.</p>
+  </div>
+</section>
+
+<section class="surface-panel" style="max-width: 680px; margin: 0 auto;">
+  <div class="helper-card mb-0">
+    <div class="helper-card__icon" aria-hidden="true">⏳</div>
+    <div>
+      <div class="helper-card__title">Try again shortly</div>
+      <div class="helper-card__text">If you were logging in, submitting a guest request, or opening a guest lookup, wait briefly and retry. If the issue continues, contact your administrator.</div>
+    </div>
+  </div>
+</section>
+{% endblock %}

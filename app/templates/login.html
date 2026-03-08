@@ -1,11 +1,46 @@
 {% extends "base.html" %}
 {% block body_class %}top-nav-layout no-vibe{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-5">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h4 class="mb-3">Login</h4>
+<section class="page-header page-header-centered">
+  <div>
+    <div class="page-header__eyebrow">Welcome back</div>
+    <h3 class="page-header__title mb-0">Sign in</h3>
+    <p class="page-header__lede mb-0">Access requests, track progress, and manage handoffs from a single workspace.</p>
+  </div>
+</section>
+<div class="row justify-content-center g-4 align-items-start">
+  <div class="col-lg-4 col-md-5">
+    <section class="surface-panel helper-stack">
+      <div class="section-heading section-heading-compact mb-0">
+        <div>
+          <h4 class="section-heading__title">Before signing in</h4>
+          <p class="section-heading__subtitle">A few quick reminders for smoother access.</p>
+        </div>
+      </div>
+      <div class="helper-card">
+        <div class="helper-card__icon" aria-hidden="true">🔐</div>
+        <div>
+          <div class="helper-card__title">Use the correct account</div>
+          <div class="helper-card__text">Sign in with the email tied to your department access and saved request activity.</div>
+        </div>
+      </div>
+      <div class="helper-card">
+        <div class="helper-card__icon" aria-hidden="true">🧭</div>
+        <div>
+          <div class="helper-card__title">Guest access stays separate</div>
+          <div class="helper-card__text">External request tracking is still available from the Guest Dashboard in the top navigation.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <div class="col-lg-5 col-md-7">
+    <section class="surface-panel form-shell">
+      <div class="section-heading">
+        <div>
+          <h4 class="section-heading__title">Login</h4>
+          <p class="section-heading__subtitle">Use local credentials or SSO when enabled.</p>
+        </div>
+      </div>
         {% if config.SSO_ENABLED %}
           <a class="btn btn-outline-primary w-100 mb-3" href="{{ url_for('auth.sso_login') }}">Sign in with SSO</a>
           <div class="text-muted small mb-2">Having trouble? Use local login below.</div>
@@ -25,8 +60,7 @@
           </div>
           <button class="btn btn-primary w-100">Sign in</button>
         </form>
-      </div>
-    </div>
+      </section>
   </div>
 </div>
 {% endblock %}

@@ -67,6 +67,20 @@ def create_app():
             payload={"kind": "high_priority_nudges"},
         )
 
+    @app.cli.command("check-config")
+    def check_config():
+        """Validate environment-derived configuration values.
+
+        Returns an error code if any checks fail so deploy scripts can halt early.
+        """
+        errors = Config.validate(app)
+        if errors:
+            for e in errors:
+                click.echo(f"ERROR: {e}")
+            # indicate failure -- `flask` will exit nonzero
+            raise click.Abort()
+        click.echo("Configuration OK")
+
     @app.cli.command("clear-open-requests")
     @click.confirmation_option(
         prompt="Are you sure you want to close all open requests?"
@@ -659,6 +673,30 @@ def create_app():
         # If SQLAlchemy isn't available for some reason, skip installing the handler.
         pass
 
+    try:
+        from flask import jsonify, request, render_template
+
+        @app.errorhandler(429)
+        def _handle_rate_limit(_err):
+            wants_json = request.path.startswith("/integrations/") or (
+                request.accept_mimetypes.best == "application/json"
+            )
+            if wants_json:
+                return (
+                    jsonify(
+                        {
+                            "ok": False,
+                            "error": "rate_limited",
+                            "message": "Too many requests. Please try again later.",
+                        }
+                    ),
+                    429,
+                )
+            return (render_template("429.html"), 429)
+
+    except Exception:
+        pass
+
     # Friendly handling for expired/invalid CSRF tokens (common during prototyping).
     try:
         from flask_wtf.csrf import CSRFError
@@ -680,23 +718,74 @@ def create_app():
         # If SQLAlchemy isn't available for some reason, skip installing the handler.
         pass
 
-    # Lightweight health endpoint used by readiness probes. Returns 200 when
-    # the DB responds to a trivial query, otherwise 503.
+    # Runtime health endpoints for liveness/readiness probes.
     from flask import jsonify, g
+
+    def _build_health_payload(*, check_dependencies: bool):
+        payload = {
+            "request_id": getattr(g, "request_id", None),
+            "status": "ok",
+        }
+        include_details = app.config.get("HEALTHCHECK_INCLUDE_DETAILS", True)
+        components = {}
+        failures = []
+
+        if check_dependencies:
+            try:
+                from sqlalchemy import text
+
+                db.session.execute(text("SELECT 1"))
+                components["database"] = {"status": "ok"}
+            except Exception as e:
+                components["database"] = {
+                    "status": "unhealthy",
+                    "error": str(e),
+                }
+                failures.append("database")
+
+            redis_required = bool(app.config.get("HEALTHCHECK_REDIS_REQUIRED"))
+            redis_url = app.config.get("REDIS_URL")
+            try:
+                from .extensions import redis_client as _redis_client
+            except Exception:
+                _redis_client = None
+
+            if redis_required or redis_url:
+                try:
+                    if _redis_client is None:
+                        raise RuntimeError("redis client not initialized")
+                    _redis_client.ping()
+                    components["redis"] = {"status": "ok"}
+                except Exception as e:
+                    components["redis"] = {
+                        "status": "unhealthy" if redis_required else "skipped",
+                        "error": str(e),
+                        "required": redis_required,
+                    }
+                    if redis_required:
+                        failures.append("redis")
+
+        if failures:
+            payload["status"] = "unhealthy"
+            payload["failed_checks"] = failures
+
+        if include_details:
+            payload["components"] = components
+
+        return payload, 503 if failures else 200
 
     @app.route("/health")
     def _health():
-        try:
-            # Simple DB check — if this raises, the DB/tables are likely not ready.
-            from sqlalchemy import text
+        payload, status_code = _build_health_payload(check_dependencies=False)
+        return jsonify(payload), 200 if status_code < 500 else status_code
 
-            db.session.execute(text("SELECT 1"))
-            return (
-                jsonify({"status": "ok", "request_id": getattr(g, "request_id", None)}),
-                200,
-            )
+    @app.route("/ready")
+    def _ready():
+        try:
+            payload, status_code = _build_health_payload(check_dependencies=True)
+            return jsonify(payload), status_code
         except Exception as e:
-            app.logger.warning("Health check failed: %s", e)
+            app.logger.warning("Readiness check failed: %s", e)
             return (
                 jsonify(
                     {

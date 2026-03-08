@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'admin/_macros.html' import section_heading %}
 {% block content %}
 <section class="page-header">
   <div>
@@ -65,15 +66,18 @@
   <div class="col-md-7">
 
     <section class="surface-panel mb-3">
-        <h5>Details</h5>
-        <div><strong>Type:</strong> {{ req.request_type }}</div>
-        <div><strong>Sales list:</strong> {{ req.pricebook_display }}</div>
-        <hr/>
+        {{ section_heading('Details', 'Core request information and narrative context.', badge='Request info', compact=True) }}
+        <div class="key-value-grid mb-3">
+          <div class="key-value-item"><span class="key-value-item__label">Type</span><span class="key-value-item__value">{{ req.request_type }}</span></div>
+          <div class="key-value-item"><span class="key-value-item__label">Sales list</span><span class="key-value-item__value">{{ req.pricebook_display }}</span></div>
+          <div class="key-value-item"><span class="key-value-item__label">Created by</span><span class="key-value-item__value">{{ req.created_by_user.email if req.created_by_user else '—' }}</span></div>
+          <div class="key-value-item"><span class="key-value-item__label">Last updated</span><span class="key-value-item__value">{{ req.updated_at.strftime('%b %d, %Y %I:%M %p') if req.updated_at else '—' }}</span></div>
+        </div>
         <div style="white-space:pre-wrap">{{ req.description }}</div>
     </section>
 
     <section class="surface-panel mb-3">
-        <h5>Artifacts</h5>
+        {{ section_heading('Artifacts', 'Manage part numbers, methods, and supporting links used by this request.', compact=True) }}
         <ul class="list-unstyled mb-3">
           {% for a in req.artifacts %}
             <li class="mb-2">
@@ -222,7 +226,7 @@
     </section>
 
     <section class="surface-panel mb-3">
-        <h5>Handoffs / Submissions</h5>
+      {{ section_heading('Handoffs and submissions', 'Review what was sent between departments and any submitted data or attachments.', compact=True) }}
         {% for s in submissions %}
           <div class="border rounded p-2 mb-2">
             <div class="d-flex justify-content-between">
@@ -267,12 +271,12 @@
   <div class="col-md-5">
 
     <section class="surface-panel mb-3">
-        <h5>Collaboration</h5>
+      {{ section_heading('Collaboration', 'See who else is viewing the workspace right now.', compact=True) }}
         <div id="presenceList" data-request-id="{{ req.id }}" class="small text-muted">Connecting…</div>
     </section>
 
     <section class="surface-panel mb-3" id="assign">
-        <h5 id="assign-heading">Assignment</h5>
+      {{ section_heading('Assignment', 'Set a single owner so comments, edits, and transitions stay coordinated.', compact=True) }}
         {% set assignee = req.assigned_to_user %}
         <div class="mb-2">
           <div class="small text-muted">Current</div>
@@ -292,8 +296,7 @@
 
         {% if current_user.department == "B" %}
       <section class="surface-panel mb-3">
-          <h5>Method / Part (placeholder)</h5>
-          <div class="small text-muted mb-2">Enter the created method ID or part number.</div>
+          {{ section_heading('Verification placeholder', 'Capture the resulting method ID or part number after external work is completed.', compact=True) }}
           {% if (not req.assigned_to_user) or (req.assigned_to_user and req.assigned_to_user.id == current_user.id) %}
           <form method="post" action="{{ url_for('requests.store_verification_placeholder', request_id=req.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -320,7 +323,7 @@
     {# Dept B Controls moved into Transition section as a checkbox. #}
 
     <section class="surface-panel mb-3">
-        <h5>Status Update</h5>
+      {{ section_heading('Status update', 'Apply the next step, attach screenshots, and include any handoff summary when needed.', compact=True) }}
         <div class="small text-muted mb-2">Note: Department A may close a ticket without providing a submission. Dept A may reopen the ticket within 48 hours after closure. Dept B will be notified when a ticket is closed.</div>
         {% if current_user.is_admin %}
           <div class="mb-2">
@@ -403,7 +406,7 @@
     </section>
 
     <section class="surface-panel mb-3">
-        <h5>Comments</h5>
+      {{ section_heading('Comments', 'Add public or department-only notes to keep the request moving.', compact=True) }}
         <div class="small text-muted mb-2">You’ll see public + your department’s internal notes.</div>
 
         <div class="border rounded p-2 mb-3 detail-scroll-panel">
@@ -442,7 +445,7 @@
     </section>
 
     <section class="surface-panel">
-        <h5>Audit Timeline</h5>
+      {{ section_heading('Audit timeline', 'A chronological record of status changes, assignments, and important actions.', compact=True) }}
         <div class="border rounded p-2 detail-scroll-panel">
           {% for a in audit %}
             <div class="mb-2">

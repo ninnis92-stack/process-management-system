@@ -1,4 +1,5 @@
 import os
+import time
 import uuid
 
 from flask import g, request
@@ -24,12 +25,54 @@ def init_runtime_middleware(app):
     def _attach_request_id():
         incoming = (request.headers.get(request_id_header) or "").strip()
         g.request_id = incoming[:120] if incoming else uuid.uuid4().hex
+        g.request_started_at = time.perf_counter()
 
     @app.after_request
     def _set_request_id_header(response):
         request_id = getattr(g, "request_id", None)
         if request_id:
             response.headers.setdefault(request_id_header, request_id)
+
+        if app.config.get("REQUEST_LOGGING_ENABLED", True):
+            skip_prefixes = app.config.get("REQUEST_LOGGING_SKIP_PATHS", ["/static/"])
+            path = request.path or "/"
+            if not any(path.startswith(prefix) for prefix in skip_prefixes):
+                started_at = getattr(g, "request_started_at", None)
+                duration_ms = None
+                if started_at is not None:
+                    duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+                try:
+                    from flask_login import current_user
+
+                    user_id = (
+                        getattr(current_user, "id", None)
+                        if getattr(current_user, "is_authenticated", False)
+                        else None
+                    )
+                except Exception:
+                    user_id = None
+
+                log_level = "warning"
+                if response.status_code < 400:
+                    slow_threshold = int(app.config.get("SLOW_REQUEST_THRESHOLD_MS", 750))
+                    log_level = (
+                        "info"
+                        if duration_ms is None or duration_ms < slow_threshold
+                        else "warning"
+                    )
+
+                getattr(app.logger, log_level)(
+                    "request completed",
+                    extra={
+                        "request_id": request_id,
+                        "method": request.method,
+                        "path": path,
+                        "status_code": response.status_code,
+                        "duration_ms": duration_ms,
+                        "user_id": user_id,
+                        "remote_addr": request.headers.get("X-Forwarded-For", request.remote_addr),
+                    },
+                )
         return response
 
 
