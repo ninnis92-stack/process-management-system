@@ -20,7 +20,7 @@
           </div>
           {{ toggle_checkbox(form.quotes_enabled, 'Rotating quotes enabled', 'Rotating quotes disabled') }}
 
-        {% set external_theme = (active_theme_css or site_theme_preset != 'default') %}
+        {% set external_theme = external_theme_loaded %}
         {% if not external_theme and form.vibe_index %}
           <div class="mb-3">
             <label for="vibe_index" class="form-label">Theme</label>

@@ -19,6 +19,14 @@ from config import Config
 from .extensions import db, login_manager, migrate
 from flask_wtf import CSRFProtect
 from .models import User
+from .utils.user_context import (
+    avatar_url_for,
+    can_view_metrics_for_user,
+    get_user_departments,
+    gravatar_url,
+    is_external_theme_active,
+    user_has_multiple_departments,
+)
 
 # Module-level CSRFProtect instance so other modules can use `from app import csrf`
 csrf = CSRFProtect()
@@ -362,6 +370,8 @@ def create_app():
             brand_name = "FreshProcess"
             site_theme_preset = "default"
             dept_labels = {"A": "Dept A", "B": "Dept B", "C": "Dept C"}
+            external_theme_loaded = False
+            cfg = None
 
             # Theme model is optional in some environments/tests.
             try:
@@ -380,64 +390,6 @@ def create_app():
             except Exception:
                 pass
 
-                # If an AppTheme or SiteConfig supplies a custom logo or theme
-                # preset, treat that as an "imported" external theme and
-                # deactivate the vibe UI by default. We don't persistently
-                # modify the DB flag here; instead expose a light wrapper to
-                # templates so `FeatureFlags.get().vibe_enabled` will reflect the
-                # runtime override while leaving the stored flag untouched.
-                external_theme_loaded = False
-                try:
-                    # AppTheme active with logo or css
-                    from .models import AppTheme
-
-                    t_check = AppTheme.query.filter_by(active=True).first()
-                    if t_check and (
-                        getattr(t_check, "logo_filename", None)
-                        or getattr(t_check, "css", None)
-                    ):
-                        external_theme_loaded = True
-                except Exception:
-                    pass
-                try:
-                    # SiteConfig provides a logo or non-default preset
-                    cfg_check = SiteConfig.get()
-                    if getattr(cfg_check, "logo_filename", None):
-                        external_theme_loaded = True
-                    if (
-                        getattr(cfg_check, "theme_preset", None)
-                        and (cfg_check.theme_preset or "").strip().lower() != "default"
-                    ):
-                        external_theme_loaded = True
-                except Exception:
-                    pass
-
-                class _FeatureFlagsProxy:
-                    def __init__(self, real_cls, force_vibe=None):
-                        self._real = real_cls
-                        self._force = force_vibe
-
-                    def get(self):
-                        f = self._real.get()
-                        if self._force is None:
-                            return f
-
-                        # Return a lightweight view object that overrides
-                        # `vibe_enabled` while delegating other attributes.
-                        class _View:
-                            def __init__(self, orig, forced):
-                                self._orig = orig
-                                self.vibe_enabled = forced
-
-                            def __getattr__(self, name):
-                                return getattr(self._orig, name)
-
-                        return _View(f, self._force)
-
-                feature_flags_obj = _FeatureFlagsProxy(
-                    FeatureFlags, force_vibe=False if external_theme_loaded else None
-                )
-
             # site config (singleton)
             try:
                 quote_user = None
@@ -452,6 +404,7 @@ def create_app():
                 except Exception:
                     quote_user = None
                 cfg = SiteConfig.get()
+                external_theme_loaded = is_external_theme_active(cfg)
                 banner_html = cfg.banner_html or ""
                 try:
                     from .admin.routes import _sanitize_banner_html
@@ -586,6 +539,7 @@ def create_app():
                     else (SiteConfig.DEFAULT_QUOTE_SETS.get('default', [None])[0])
                 ),
                 allow_user_nudges_enabled=allow_user_nudges_enabled,
+                external_theme_loaded=external_theme_loaded,
                 FeatureFlags=FeatureFlags,
             )
         except Exception:
@@ -612,6 +566,7 @@ def create_app():
                 company_url=None,
                 initial_quote=None,
                 allow_user_nudges_enabled=False,
+                external_theme_loaded=False,
                 FeatureFlags=ff,
             )
 
@@ -1032,96 +987,7 @@ def create_app():
     @app.context_processor
     def _user_helpers():
         try:
-            from flask_login import current_user
-            import hashlib
-
-            def _gravatar(email, size=34, default='mp'):
-                if not email:
-                    return f'https://www.gravatar.com/avatar/?d={default}&s={size}'
-                try:
-                    e = email.strip().lower().encode('utf-8')
-                    h = hashlib.md5(e).hexdigest()
-                    return f'https://www.gravatar.com/avatar/{h}?d={default}&s={size}'
-                except Exception:
-                    return f'https://www.gravatar.com/avatar/?d={default}&s={size}'
-
-            def avatar_url_for(user, size=34):
-                # Prefer an SSO-provided picture if present, otherwise gravatar
-                if not user:
-                    return _gravatar(None, size)
-                pic = getattr(user, 'sso_picture', None) or getattr(user, 'picture', None)
-                if pic:
-                    return pic
-                return _gravatar(getattr(user, 'email', None), size)
-
-            def user_has_multiple_departments(user):
-                try:
-                    if not user or not getattr(user, 'id', None):
-                        return False
-                    # Compute unique departments including primary + additional assignments
-                    primary = (getattr(user, 'department', None) or '').strip()
-                    addl = [getattr(ud, 'department', None) for ud in getattr(user, 'departments', []) if getattr(ud, 'department', None)]
-                    uniq = set([d for d in [primary] + addl if d])
-                    return len(uniq) > 1
-                except Exception:
-                    try:
-                        db.session.rollback()
-                    except Exception:
-                        pass
-                    return False
-
-            def can_view_metrics_for_user(user):
-                try:
-                    if not user or not getattr(user, 'id', None):
-                        return False
-                    if getattr(user, 'is_admin', False):
-                        return True
-                    from .models import DepartmentEditor
-
-                    roles = DepartmentEditor.query.filter_by(user_id=user.id).all()
-                    return any(bool(getattr(role, 'can_view_metrics', False)) for role in roles)
-                except Exception:
-                    try:
-                        db.session.rollback()
-                    except Exception:
-                        pass
-                    return False
-
-            def get_user_departments(user):
-                """Return ordered list of department codes the user may act as.
-
-                Mostly duplicates _get_user_departments() from auth.routes; used in
-                templates where the request context may not be available.
-                """
-                if not user or not getattr(user, 'id', None):
-                    return []
-                try:
-                    depts = []
-                    primary = getattr(user, 'department', None)
-                    if primary:
-                        depts.append(primary)
-                    for ud in getattr(user, 'departments', []) or []:
-                        d = getattr(ud, 'department', None)
-                        if d and d not in depts:
-                            depts.append(d)
-                    if getattr(user, 'is_admin', False):
-                        from .models import Department
-
-                        rows = (
-                            Department.query.filter_by(is_active=True)
-                            .order_by(Department.order.asc())
-                            .all()
-                        )
-                        depts = [r.code for r in rows]
-                    return depts
-                except Exception:
-                    try:
-                        db.session.rollback()
-                    except Exception:
-                        pass
-                    return [getattr(user, 'department', None)]
-
             return dict(avatar_url_for=avatar_url_for, user_has_multiple_departments=user_has_multiple_departments, can_view_metrics_for_user=can_view_metrics_for_user, get_user_departments=get_user_departments)
         except Exception:
-            return dict(avatar_url_for=lambda u, size=34: f'https://www.gravatar.com/avatar/?d=mp&s={size}', user_has_multiple_departments=lambda u: False, can_view_metrics_for_user=lambda u: False)
+            return dict(avatar_url_for=lambda u, size=34: gravatar_url(None, size), user_has_multiple_departments=lambda u: False, can_view_metrics_for_user=lambda u: False, get_user_departments=lambda u: [])
     return app

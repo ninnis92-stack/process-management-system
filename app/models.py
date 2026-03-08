@@ -922,9 +922,6 @@ class SiteConfig(TenantScopedMixin, db.Model):
     show_banner = db.Column(db.Boolean, nullable=False, default=False)
     _rolling_quotes = db.Column(
         "rolling_quotes", db.Text, nullable=True
-    )  # JSON list of strings
-    _rolling_quotes = db.Column(
-        "rolling_quotes", db.Text, nullable=True
     )  # JSON list of strings (legacy single unnamed list)
     _rolling_quote_sets = db.Column(
         "rolling_quote_sets", db.Text, nullable=True

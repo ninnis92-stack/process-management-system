@@ -304,6 +304,29 @@ def test_department_list_endpoint(app, client):
     assert len(data.get("departments")) >= 1
 
 
+def test_department_list_endpoint_preserves_multi_department_order(app, client):
+    with app.app_context():
+        user = User(
+            email="dept-order@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+        )
+        db.session.add(user)
+        db.session.commit()
+        db.session.add(UserDepartment(user_id=user.id, department="C"))
+        db.session.add(UserDepartment(user_id=user.id, department="B"))
+        db.session.commit()
+
+    rv = _login(client, "dept-order@example.com")
+    assert rv.status_code == 200
+
+    resp = client.get("/auth/departments")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data == {"departments": ["A", "C", "B"]}
+
+
 def test_hero_dashboard_button_targets_match_view_context(app, client):
     guest_page = client.get("/external/dashboard")
     assert guest_page.status_code == 200

@@ -117,3 +117,46 @@ def test_quote_set_normalization_and_case_insensitive(app, client):
 
     rv = client.get("/dashboard")
     assert b"First, solve the problem." in rv.data
+
+
+def test_external_branding_hides_theme_picker_and_preserves_existing_vibe(app, client):
+    with app.app_context():
+        user = User(
+            email="theme-lock@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=False,
+            vibe_index=4,
+        )
+        db.session.add(user)
+        cfg = SiteConfig.get()
+        original_logo = cfg.logo_filename
+        cfg.logo_filename = "brand/logo.png"
+        db.session.commit()
+
+    try:
+        rv = login(client, email="theme-lock@example.com", password="secret")
+        assert rv.status_code == 200
+
+        settings_page = client.get("/auth/settings")
+        assert settings_page.status_code == 200
+        assert b"<label for=\"vibe_index\" class=\"form-label\">Theme</label>" not in settings_page.data
+
+        rv = client.post(
+            "/auth/settings",
+            data={"vibe_index": "9", "quote_set": "engineering"},
+            follow_redirects=True,
+        )
+        assert rv.status_code == 200
+
+        with app.app_context():
+            refreshed = User.query.filter_by(email="theme-lock@example.com").first()
+            assert refreshed is not None
+            assert refreshed.vibe_index == 4
+            assert refreshed.quote_set == "engineering"
+    finally:
+        with app.app_context():
+            cfg = SiteConfig.get()
+            cfg.logo_filename = original_logo
+            db.session.commit()

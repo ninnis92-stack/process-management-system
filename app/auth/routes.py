@@ -30,6 +30,11 @@ from flask import session as _session
 from ..models import UserDepartment, Department
 from ..services.tenant_context import ensure_user_tenant_membership, set_active_tenant
 from ..security import rate_limit
+from ..utils.user_context import (
+    get_user_departments,
+    is_external_theme_active,
+    user_can_access_department,
+)
 
 
 def _restore_last_active_dept_for_user(user):
@@ -49,17 +54,7 @@ def _restore_last_active_dept_for_user(user):
         if not d:
             return
 
-        allowed = False
-        if getattr(user, "department", None) == dept:
-            allowed = True
-        if getattr(user, "is_admin", False):
-            allowed = True
-        if not allowed:
-            ud = UserDepartment.query.filter_by(
-                user_id=user.id, department=dept
-            ).first()
-            if ud:
-                allowed = True
+        allowed = user_can_access_department(user, dept)
 
         if allowed:
             try:
@@ -89,29 +84,7 @@ def _get_user_departments(user):
     Primary department is first, followed by any explicit `UserDepartment`
     assignments (preserving order and uniqueness).
     """
-    if not user:
-        return []
-    try:
-        depts = []
-        primary = getattr(user, "department", None)
-        if primary:
-            depts.append(primary)
-        # include explicit assignments
-        for ud in getattr(user, "departments", []) or []:
-            d = getattr(ud, "department", None)
-            if d and d not in depts:
-                depts.append(d)
-        # Admins may see all active departments
-        if getattr(user, "is_admin", False):
-            rows = (
-                Department.query.filter_by(is_active=True)
-                .order_by(Department.order.asc())
-                .all()
-            )
-            depts = [r.code for r in rows]
-        return depts
-    except Exception:
-        return [getattr(user, "department", None)]
+    return get_user_departments(user)
 
 
 def _sync_primary_department_from_sso(user, userinfo):
@@ -344,23 +317,7 @@ def settings():
                     u.dark_mode = submitted not in ('', '0', 'false', 'off', 'no')
                 # Determine whether an external/imported theme is active; when
                 # an external theme is present, we do not persist per-user vibe.
-                external_theme_loaded = False
-                try:
-                    from ..models import AppTheme, SiteConfig
-
-                    t_check = AppTheme.query.filter_by(active=True).first()
-                    if t_check and (getattr(t_check, "logo_filename", None) or getattr(t_check, "css", None)):
-                        external_theme_loaded = True
-                except Exception:
-                    pass
-                try:
-                    cfg_check = SiteConfig.get()
-                    if getattr(cfg_check, "logo_filename", None):
-                        external_theme_loaded = True
-                    if getattr(cfg_check, "theme_preset", None) and (cfg_check.theme_preset or "").strip().lower() != "default":
-                        external_theme_loaded = True
-                except Exception:
-                    pass
+                external_theme_loaded = is_external_theme_active()
                 # Only persist the user's vibe choice when external theme is not loaded
                 if not external_theme_loaded and hasattr(form, 'vibe_index'):
                     try:
@@ -407,24 +364,7 @@ def list_departments():
     departments.
     """
     try:
-        if getattr(current_user, "is_admin", False):
-            rows = (
-                Department.query.filter_by(is_active=True)
-                .order_by(Department.order.asc())
-                .all()
-            )
-            depts = [r.code for r in rows]
-        else:
-            # Primary dept + any UserDepartment rows
-            depts = [getattr(current_user, "department", None)]
-            extra = [
-                ud.department
-                for ud in getattr(current_user, "departments", [])
-                if ud.department
-            ]
-            for d in extra:
-                if d not in depts:
-                    depts.append(d)
+        depts = get_user_departments(current_user)
         return jsonify({"departments": depts})
     except Exception:
         return jsonify({"departments": [getattr(current_user, "department", None)]})
@@ -452,20 +392,7 @@ def switch_department():
         return ("Service unavailable", 503)
 
     # Allowed if primary, explicitly assigned, or admin
-    allowed = False
-    if getattr(current_user, "department", None) == dept:
-        allowed = True
-    if getattr(current_user, "is_admin", False):
-        allowed = True
-    try:
-        if not allowed:
-            ud = UserDepartment.query.filter_by(
-                user_id=current_user.id, department=dept
-            ).first()
-            if ud:
-                allowed = True
-    except Exception:
-        pass
+    allowed = user_can_access_department(current_user, dept)
 
     if not allowed:
         return ("Not allowed to view that department", 403)
