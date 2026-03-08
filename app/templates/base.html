@@ -330,10 +330,12 @@
   <script>
     (function(){
       try{
+        // Only apply dark-mode when the server has flagged the user as dark-mode
+        // enabled.  System preferences are intentionally ignored so that the
+        // app behaves consistently regardless of the visitor's OS theme and
+        // so toggling the setting always has a visual effect.
         const isDarkUser = document.body.getAttribute('data-user-dark-mode') === '1';
-        const prefersDark =
-          window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (isDarkUser || prefersDark) document.body.classList.add('dark-mode');
+        if (isDarkUser) document.body.classList.add('dark-mode');
       }catch(e){}
     })();
   </script>
