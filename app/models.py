@@ -858,6 +858,14 @@ class SiteConfig(TenantScopedMixin, db.Model):
             "The more you take, the more you leave behind. What are they? (Footsteps)",
             "What gets wetter the more it dries? (A towel)",
         ],
+        # an engineering-focused set requested for motivation
+        "engineering": [
+            "First, solve the problem. Then, write the code.",
+            "Experience is the name everyone gives to their mistakes.",
+            "If it works, it’s obsolete. If it doesn’t work, it’s creative.",
+            "Optimism is an occupational hazard of programming; feedback is the cure.",
+            "In engineering, absence of evidence is not evidence of absence.",
+        ],
     }
 
     @property
