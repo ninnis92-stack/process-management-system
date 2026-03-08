@@ -32,6 +32,14 @@ deploy-safe:
 
 test:
 	pytest -q
+
+smoke:
+	@echo "Running smoke tests against local server (http://127.0.0.1:5000)"
+	@bash scripts/smoke_test.sh http://127.0.0.1:5000
+
+smoke-clean:
+	@echo "Clearing development database (SQLite)"
+	@rm -f instance/app.db
 PYTHON?=python3
 PIP?=pip
 VENV?=.venv

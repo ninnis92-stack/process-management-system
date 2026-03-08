@@ -99,9 +99,11 @@ and seeds baseline accounts.
    - upload an attachment and watch OCR text appear (requires Tesseract installed locally)
    - visit `/admin` and toggle a feature flag or create a quick guest form
 
-   You may also run the automated suite:
+   Automated helpers are available via Makefile:
    ```bash
-   make test            # or `PYTHONPATH=. pytest` as shown earlier
+   make smoke        # hit home, dashboard, and admin/site_config
+   make smoke-clean  # erase local sqlite DB between runs
+   make test         # run pytest suite (≈100 tests)
    ```
 
 8. **Clearing state**
