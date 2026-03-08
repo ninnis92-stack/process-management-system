@@ -2,6 +2,11 @@
 
 A small prototype app.
 
+## Recent fixes (2026-03-08)
+
+- Dashboard polish: added hover/focus outlines and clearer subtitles for admin cards, plus general UI tweaks after earlier toggle-label work.
+- Prepared README with this new entry. (Updated by automation during development session.)
+
 ## Recent fixes (2026-03-07)
 
 - Admin UX and structure: added admin user email search plus workspace/tenant
@@ -39,6 +44,9 @@ A small prototype app.
   on older DBs; this logic lives in `scripts/release_tasks.py`.
 
 ## Feature Flags (quick reference)
+
+- The admin UI now renders checkboxes with stateful action text ("Enable …" / "Disable …") so that the label always describes what will happen when you click the box.
+
 
 - `vibe_enabled`: Enable the Vibe theme picker and per-user theme persistence.
 - `SSO_ENABLED`: Enable OIDC SSO login flow.
