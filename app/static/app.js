@@ -199,6 +199,49 @@
 
       function updateHint(){
         const val = select.value;
+
+(function initHeroToggleButtons(){
+  function updateButtons(){
+    const endpoint = document.body.dataset.endpoint || '';
+    const isAdminView = endpoint.startsWith('admin');
+    const isDashboardView = endpoint.startsWith('requests.dashboard') || endpoint.startsWith('external.external_dashboard');
+
+    document.querySelectorAll('[data-hero-toggle]').forEach((btn) => {
+      const action = btn.dataset.heroToggle;
+      if(!action) return;
+
+      const openLabel = btn.dataset.stateOpenLabel || btn.textContent.trim();
+      const closeLabel = btn.dataset.stateCloseLabel || openLabel;
+      const openUrl = btn.dataset.stateOpenUrl;
+      const closeUrl = btn.dataset.stateCloseUrl || openUrl;
+
+      let shouldShowClose = false;
+      if(action === 'command-center'){
+        shouldShowClose = isAdminView;
+      } else if(action === 'dashboard'){
+        shouldShowClose = isDashboardView;
+      }
+
+      const label = shouldShowClose ? closeLabel : openLabel;
+      const targetUrl = shouldShowClose ? closeUrl : openUrl;
+
+      if(label){
+        btn.textContent = label;
+        btn.setAttribute('aria-label', label);
+      }
+      if(targetUrl){
+        btn.setAttribute('href', targetUrl);
+      }
+      btn.dataset.heroToggleState = shouldShowClose ? 'close' : 'open';
+    });
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', updateButtons);
+  } else {
+    updateButtons();
+  }
+})();
         if(Array.isArray(handoffTargets) && handoffTargets.indexOf(val) !== -1){
           hintEl.classList.remove('d-none');
         } else {

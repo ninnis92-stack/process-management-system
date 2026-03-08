@@ -51,12 +51,12 @@
       })();
     </script>
   {% endif %}
-</head>
-{% set global_no_vibe = (not FeatureFlags.get().vibe_enabled) %}
-<body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if current_user.is_authenticated and current_user.dark_mode %} dark-mode{% endif %}{% if global_no_vibe %} no-vibe{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if (current_user.is_authenticated and (current_user.dark_mode or False)) else '0' }}">
+ </head>
+ {% set ep = request.endpoint or '' %}
+ {% set global_no_vibe = (not FeatureFlags.get().vibe_enabled) %}
+ <body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if current_user.is_authenticated and current_user.dark_mode %} dark-mode{% endif %}{% if global_no_vibe %} no-vibe{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-endpoint="{{ ep }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if (current_user.is_authenticated and (current_user.dark_mode or False)) else '0' }}">
   <a href="#content" class="skip-link">Skip to content</a>
 
-  {% set ep = request.endpoint or '' %}
   <nav class="navbar theme-nav navbar-expand-lg navbar-dark">
     {% if ep.startswith('admin') %}
       <button class="btn btn-outline-light d-md-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-label="Toggle admin navigation">
@@ -240,26 +240,38 @@
               <section class="hero-callouts" aria-label="Workflow guidance">
                 <div class="hero-callouts__intro">
                   <p class="hero-callouts__tag">Workflow signal</p>
-                  <h3>Stay synced across teams, guests, and the admin desk</h3>
-                  <p class="hero-callouts__lede">
-                    Dashboards now float over a subtle gradient, so you see where work needs attention, which guest form stays open, and what the next action should be.
-                  </p>
-                  <div class="hero-callouts__hint" role="status" aria-live="polite">
-                    Not sure where to start? Follow the storyboards above: admin approvals on the left, guest handoffs on the right.
-                  </div>
+                  {% if current_user.is_admin %}
+                    <h3>Stay synced across teams, guests, and the admin desk</h3>
+                    <p class="hero-callouts__lede">
+                      Dashboards now float over a subtle gradient, so you see where work needs attention, which guest form stays open, and what the next action should be.
+                    </p>
+                    <div class="hero-callouts__hint" role="status" aria-live="polite">
+                      Not sure where to start? Follow the storyboards above: admin approvals on the left, guest handoffs on the right.
+                    </div>
+                  {% else %}
+                    <h3>Stay synced across guests and staff workflows</h3>
+                    <p class="hero-callouts__lede">
+                      Requests now float on a gentle canvas, surfacing what needs attention, which guests are waiting, and what your next action can be.
+                    </p>
+                    <div class="hero-callouts__hint" role="status" aria-live="polite">
+                      Need to escalate a request? Tag the right department or reach out to your admin to keep things moving.
+                    </div>
+                  {% endif %}
                 </div>
-                <div class="hero-callouts__grid">
-                  <article class="hero-callout-card hero-callout-card--admin">
-                    <div class="hero-callout-card__badge">Admin console</div>
-                    <h4 class="hero-callout-card__title">Coordinate cross-department work</h4>
-                    <p class="hero-callout-card__body">Use the expanded metrics canvas, follow next-action chips, and keep every attachment or verification in the same room.</p>
-                    <ul class="hero-callout-card__list">
-                      <li>Monitor dashboards for overdue tiers and approvals.</li>
-                      <li>Review guest forms and assignment queues in one place.</li>
-                      <li>Share metrics or start a workflow directly from this view.</li>
-                    </ul>
-                    <a class="hero-callout-card__link btn btn-sm btn-primary" href="{{ url_for('admin.index') }}">Open admin console</a>
-                  </article>
+                  <div class="hero-callouts__grid">
+                    {% if current_user.is_admin %}
+                      <article class="hero-callout-card hero-callout-card--admin">
+                        <div class="hero-callout-card__badge">Command center</div>
+                        <h4 class="hero-callout-card__title">Coordinate cross-department work</h4>
+                        <p class="hero-callout-card__body">Use the expanded metrics canvas, follow next-action chips, and keep every attachment or verification in the same room.</p>
+                      <ul class="hero-callout-card__list">
+                        <li>Monitor dashboards for overdue tiers and approvals.</li>
+                        <li>Review guest forms and assignment queues in one place.</li>
+                        <li>Share metrics or start a workflow directly from this view.</li>
+                      </ul>
+                        <a class="hero-callout-card__link btn btn-sm btn-primary" data-hero-toggle="command-center" data-state-open-label="Open command center" data-state-close-label="Close command center" data-state-open-url="{{ url_for('admin.index') }}" data-state-close-url="{{ url_for('requests.dashboard') }}" href="{{ url_for('admin.index') }}">Open command center</a>
+                    </article>
+                  {% endif %}
                   <article class="hero-callout-card hero-callout-card--user">
                     <div class="hero-callout-card__badge">Guest & staff experience</div>
                     <h4 class="hero-callout-card__title">Guide every request</h4>
@@ -269,7 +281,7 @@
                       <li>Post attachments, watch OCR text populate, and keep status updates honest.</li>
                       <li>Share tracking links or notifications straight from this canvas.</li>
                     </ul>
-                    <a class="hero-callout-card__link btn btn-sm btn-outline-primary" href="{{ url_for('requests.dashboard') }}">Open staff dashboard</a>
+                    <a class="hero-callout-card__link btn btn-sm btn-outline-primary" data-hero-toggle="dashboard" data-state-open-label="Open staff dashboard" data-state-close-label="Close staff dashboard" data-state-open-url="{{ url_for('requests.dashboard') }}" data-state-close-url="{{ url_for('admin.index') }}" href="{{ url_for('requests.dashboard') }}">Open staff dashboard</a>
                   </article>
                 </div>
               </section>
@@ -278,12 +290,6 @@
           {% if site_banner_html %}
               <div class="mb-3">
                 <div class="alert alert-info mb-0" role="status">{{ site_banner_html|striptags }}</div>
-                {% if current_user.is_authenticated and config.get('ALLOW_SELF_ADMIN') %}
-                  <form method="post" action="{{ url_for('admin.set_self_admin') }}" class="d-inline ms-2">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button class="btn btn-sm btn-outline-dark">Make me admin</button>
-                  </form>
-                {% endif %}
               </div>
           {% elif rolling_quotes_enabled and rolling_quotes and rolling_quotes|length > 0 %}
             <div class="alert alert-info mb-3" role="status">{{ rolling_quotes[0] }}</div>
@@ -527,14 +533,18 @@
   <!-- dynamic toggle labels -->
   <script>
     document.querySelectorAll('.form-check-input[data-toggle-text-on]').forEach(cb=>{
-      var lbl = cb.closest('.form-check') && cb.closest('.form-check').querySelector('.form-check-label');
-  if (lbl == null) return;
-  var on = cb.dataset.toggleTextOn;
-  var off = cb.dataset.toggleTextOff;
-  var upd = ()=> lbl.textContent = cb.checked ? on : off;
-  cb.addEventListener('change', upd);
-  upd();
-});
+      var form = cb.closest('.form-check');
+      var lbl = form && form.querySelector('.form-check-label');
+      if (lbl == null) return;
+      var on = cb.dataset.toggleTextOn;
+      var off = cb.dataset.toggleTextOff;
+      var upd = ()=> {
+        lbl.textContent = cb.checked ? on : off;
+        form.classList.toggle('active', cb.checked);
+      };
+      cb.addEventListener('change', upd);
+      upd();
+    });
   </script>
 </body>
 </html>
