@@ -1,0 +1,3 @@
+/* Frontend bundle stylesheet.
+   Kept intentionally small for now so Stimulus-managed UI enhancements
+   can ship with a stable dist/style.css asset. */

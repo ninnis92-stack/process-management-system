@@ -30,7 +30,7 @@
   <!-- bump version after latest CSS changes to force clients to fetch new stylesheet -->
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260308b') }}">
   <!-- bundled frontend assets (built by Vite/ES modules) -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='dist/style.css', v='20260308c') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css', v='20260308c') }}">
   {% if active_theme_css %}
     <script id="active-theme-css-data" type="application/json">{{ active_theme_css|tojson }}</script>
     <script>

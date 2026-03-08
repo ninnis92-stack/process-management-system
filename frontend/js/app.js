@@ -1,3 +1,4 @@
+import "./style.css";
 import { Application } from "stimulus";
 import OnboardingController from "./controllers/onboarding_controller";
 import FieldFocusController from "./controllers/field_focus_controller";
