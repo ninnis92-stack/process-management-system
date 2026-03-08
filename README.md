@@ -225,6 +225,14 @@ make deploy-safe
 
 Administration: see `docs/ADMIN.md` for notes about the admin-managed Departments and SiteConfig (banner + rolling quotes). Tests covering these features live at `tests/test_admin_site_config.py`.
 
+> **Schema warning:** if the admin UI ever flashes the message
+> "Site configuration cannot be loaded from the database; your schema may be
+> out of date." it means the running database is missing one or more columns
+> added by recent releases.  Running your migration scripts or the
+> `scripts/release_tasks.py` helper on the host will add the needed fields
+> and clear the warning.  This check helps avoid a 500 error when the code is
+> deployed before the schema is updated.
+
 ## Deployment & seeding (Fly.io)
 
 Quick steps to deploy and ensure the demo users and DB are created on Fly:
