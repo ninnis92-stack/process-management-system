@@ -549,6 +549,11 @@
 
     if (darkMode) {
       root.style.setProperty("--nav-bg", mixHex(p.accent, "#202124", 0.18));
+      // tint the nav text slightly with the accent so the interface feels
+      // cohesive when the vibe is active
+      root.style.setProperty("--nav-text", mixHex("#e8eaed", p.accent, 0.15));
+      // body text can get a subtle hint as well
+      root.style.setProperty("--body-text", mixHex("#e8eaed", p.accent, 0.05));
       root.style.setProperty("--surface", mixHex(p.accent, "#1e1e1e", 0.10));
       root.style.setProperty("--border", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.22)`);
       root.style.setProperty("--focus", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.28)`);

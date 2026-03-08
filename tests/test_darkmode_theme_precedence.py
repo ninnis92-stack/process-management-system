@@ -8,3 +8,6 @@ def test_dark_mode_theme_tokens_are_not_overridden_by_light_theme_classes():
     assert "body.theme-preset-forest:not(.dark-mode)" in content
     assert "body.theme-preset-sunset:not(.dark-mode)" in content
     assert "body.theme-preset-midnight:not(.dark-mode)" in content
+    # ensure dark mode uses accent variables for vibe support
+    assert "--accent" in content
+    assert "dark-mode .btn-primary" in content and "var(--accent)" in content

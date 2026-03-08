@@ -8,3 +8,6 @@ def test_dark_mode_vibe_logic_present_in_theme_script():
     assert 'root.style.setProperty("--surface", mixHex(p.accent, "#1e1e1e", 0.10));' in content
     assert 'root.style.setProperty("--nav-bg", mixHex(p.accent, "#202124", 0.18));' in content
     assert '#121212' in content
+    # new variables added for improved vibe support
+    assert 'root.style.setProperty("--nav-text"' in content
+    assert 'root.style.setProperty("--body-text"' in content

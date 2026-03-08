@@ -158,7 +158,11 @@
 
 /* Dark-mode variables and adjustments for improved contrast */
 .dark-mode {
-  /* Modern dark-mode palette inspired by Google Material guidelines */
+  /* Baseline dark palette; when the vibe system is active this
+     will be overridden by the theme script to tint everything based on
+     the current accent color.  If the UI is running under an imported
+     external theme (no-vibe) these values form the "basic" dark mode
+     experience. */
   --nav-bg: #202124;
   --nav-text: #e8eaed;
   --page-bg: #121212;           /* primary canvas color */
@@ -169,14 +173,22 @@
   --border: rgba(255,255,255,0.12);
   --surface: #1e1e1e;          /* cards and panels */
   --focus: rgba(138,180,248,0.3);
+  /* default accent values for dark mode; the JS theme engine will
+     replace these when vibe is turned on. */
+  --accent: #8ab4f8;
+  --accent-2: #8ab4f8;
 }
 
 .dark-mode .card { background: var(--surface) !important; border-color: var(--border) !important; box-shadow: 0 12px 28px rgba(0,0,0,0.45); }
-.dark-mode .theme-nav { background-color: var(--nav-bg) !important; border-color: rgba(255,255,255,0.06) !important; }
+.dark-mode .theme-nav { background-color: var(--nav-bg) !important; border-color: var(--border) !important; }
 .dark-mode .navbar-brand, .dark-mode .navbar-nav .nav-link { color: var(--nav-text) !important; }
-.dark-mode .brand-quote { color: rgba(255,255,255,0.92) !important; }
-.dark-mode a { color: #8eb8ff; }
-.dark-mode .btn-primary { color: #07101a; }
+.dark-mode .brand-quote { color: var(--body-text) !important; }
+.dark-mode a { color: var(--accent-2) !important; }
+.dark-mode .btn-primary {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--nav-bg) !important;
+}
 
 /* When an external/imported theme is active we should not let the
    dark-mode overrides change the navbar/banner/logo visuals. The
@@ -1991,10 +2003,10 @@ canvas {
 }
 
 .dark-mode .btn-primary {
-  background: #8ab4f8 !important;
-  border-color: #8ab4f8 !important;
-  color: #202124 !important;
-}
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--nav-bg) !important;
+}}
 
 .dark-mode .btn-outline-primary,
 .dark-mode .btn-outline-secondary,
