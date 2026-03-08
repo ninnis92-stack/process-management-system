@@ -17,17 +17,17 @@
 
 /* Dark-mode variables and adjustments for improved contrast */
 .dark-mode {
-  /* Accessible dark-mode color tokens (WCAG-aware) */
-  --nav-bg: #0b1720;
-  --nav-text: #ffffff;
-  --page-bg: #0f1720; /* slightly lighter dark background to reduce eye strain */
-  --body-text: #e6edf3;
-  --body-text-soft: #d8e1eb;
-  --body-text-muted: #c2ccd8;
-  --muted: #c2ccd8;
-  --border: rgba(255,255,255,0.08);
-  --surface: #0b1318; /* card/surface slightly lighter than page bg */
-  --focus: rgba(142,167,255,0.18);
+  /* Modern dark-mode palette inspired by Google Material guidelines */
+  --nav-bg: #202124;
+  --nav-text: #e8eaed;
+  --page-bg: #121212;           /* primary canvas color */
+  --body-text: #e8eaed;
+  --body-text-soft: #c6c6c6;
+  --body-text-muted: #8a8a8a;
+  --muted: #8a8a8a;
+  --border: rgba(255,255,255,0.12);
+  --surface: #1e1e1e;          /* cards and panels */
+  --focus: rgba(138,180,248,0.3);
 }
 
 .dark-mode .card { background: var(--surface) !important; border-color: var(--border) !important; box-shadow: 0 12px 28px rgba(0,0,0,0.45); }
@@ -540,7 +540,7 @@ button.admin-tile {
 .dark-mode .metric-chip,
 .dark-mode .metric-card,
 .dark-mode .empty-state {
-  background: rgba(11, 19, 24, 0.92);
+  background: var(--surface) !important;
   border-color: var(--border);
   color: var(--body-text);
 }
@@ -1324,7 +1324,11 @@ canvas {
 }
 
 .dark-mode .alert .btn-close {
-  filter: invert(1) grayscale(1) brightness(1.4);
+  /* avoid using CSS filters to invert the close icon; filters can produce
+     unintended “inversion” effects when inherited or when browser behavior
+     changes.  Bootstrap’s SVG close icon respects `currentColor`, so we
+     simply adjust the color instead. */
+  color: var(--body-text) !important;
   opacity: 0.9;
 }
 
@@ -1475,7 +1479,8 @@ canvas {
 }
 
 .dark-mode .alert .btn-close {
-  filter: invert(1) grayscale(1) brightness(1.7);
+  /* same rule repeated later; keep colors consistent without filters */
+  color: var(--body-text) !important;
   opacity: 0.9;
 }
 
