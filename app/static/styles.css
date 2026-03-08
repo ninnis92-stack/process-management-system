@@ -55,10 +55,10 @@
 .dark-mode .notif-dropdown .notif-item .small, .dark-mode .notif-dropdown .notif-item small { color: rgba(255,255,255,0.72); }
 
 /* When the global Vibe feature is disabled, force the entire UI to use
-   the login page color theme so pages don't retain a previously-selected
-   per-user vibe. This is applied by adding `no-vibe` to <body> in
-   `base.html` when FeatureFlags.vibe_enabled is false. */
-body.no-vibe {
+  the login page color theme so pages don't retain a previously-selected
+  per-user vibe. This should only affect light mode; dark-mode must keep
+  its own palette tokens. */
+body.no-vibe:not(.dark-mode) {
   --nav-bg: #0b1726;
   --nav-text: #eef2f7;
   --accent: #79c0ff;
@@ -71,7 +71,7 @@ body.no-vibe {
   --focus: rgba(11,97,238,0.14);
 }
 
-.theme-preset-ocean {
+body.theme-preset-ocean:not(.dark-mode) {
   --nav-bg: #082032;
   --accent: #3ec1d3;
   --accent-2: #7ad7f0;
@@ -80,7 +80,7 @@ body.no-vibe {
              #f1fbff;
 }
 
-.theme-preset-forest {
+body.theme-preset-forest:not(.dark-mode) {
   --nav-bg: #1f3b2d;
   --accent: #7bc96f;
   --accent-2: #b6d7a8;
@@ -89,7 +89,7 @@ body.no-vibe {
              #f4fbf5;
 }
 
-.theme-preset-sunset {
+body.theme-preset-sunset:not(.dark-mode) {
   --nav-bg: #3b1f2b;
   --accent: #ff8a5b;
   --accent-2: #ffb26b;
@@ -98,7 +98,7 @@ body.no-vibe {
              #fff8f3;
 }
 
-.theme-preset-midnight {
+body.theme-preset-midnight:not(.dark-mode) {
   --nav-bg: #0a0f1f;
   --accent: #8ea7ff;
   --accent-2: #7a5cff;
