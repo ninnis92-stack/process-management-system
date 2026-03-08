@@ -233,7 +233,10 @@ page displays the last few steps and suggests next actions to the user.
 - Admin users no longer see the department‑selection prompt on every page
   refresh.  The modal only appears when they intentionally choose “Switch
   Dept” (this makes the command center experience smoother on phones and other
-  devices where the previous automatic picker was distracting).
+  devices where the previous automatic picker was distracting).  The navbar
+  picker now uses the same POST `/auth/switch_dept` endpoint as the regular
+  multi‑department control, ensuring the chosen department is stored in the
+  session and persists across views.
 - Non‑admin users who belong to multiple departments now see a permanent
   dropdown picker in the top‑nav bar.  It functions exactly like the admin
   selector but updates the session via a simple POST to `/auth/switch_dept`.
@@ -241,6 +244,10 @@ page displays the last few steps and suggests next actions to the user.
   modal is suppressed (the UI still includes the page but it only opens if the
   user deliberately navigates there).  This avoids annoying popups on mobile
   while keeping department switching quick and obvious.
+- Rolling quotes are seeded and normalized on every deployment; the release
+  command logs `quote_sets=ok` and authenticated pages include a
+  `#rolling-quotes-data` script tag when quotes are enabled.  Smoke tests and
+  unit tests verify the banner text appears.
 - **User settings**: dark mode (tints with the chosen vibe), theme/vibe selection, quote set, rotating
   quotes.
 - **Templates & requirements**: rich form editing with grouped fields, hints,
