@@ -105,9 +105,9 @@ def test_admin_navigation_links_resolve(app, client):
 
     rv = _login(client, "nav-admin@example.com")
     assert rv.status_code == 200
-    # login should land on the admin console rather than the department picker
+    # login should land on the command center rather than the department picker
     body = rv.get_data(as_text=True)
-    assert "Admin Console" in body
+    assert "Command center" in body
 
     page = client.get("/admin/")
     assert page.status_code == 200
@@ -137,3 +137,27 @@ def test_admin_navigation_links_resolve(app, client):
         assert resp.status_code in (200, 302), route
         location = resp.headers.get("Location", "")
         assert not location.endswith("/static/app.js"), route
+
+
+def test_hero_dashboard_button_targets_match_view_context(app, client):
+    guest_page = client.get("/external/dashboard")
+    assert guest_page.status_code == 200
+    guest_html = guest_page.get_data(as_text=True)
+    assert 'data-hero-toggle="dashboard"' in guest_html
+    assert 'data-state-open-label="Open guest dashboard"' in guest_html
+    assert 'data-state-close-label="Close guest dashboard"' in guest_html
+    assert 'data-state-open-url="/external/dashboard"' in guest_html
+    assert 'data-state-close-url="/external/new"' in guest_html
+
+    _create_user(app, email="hero-staff@example.com", department="B")
+    login_response = _login(client, "hero-staff@example.com")
+    assert login_response.status_code == 200
+
+    staff_page = client.get("/dashboard")
+    assert staff_page.status_code == 200
+    staff_html = staff_page.get_data(as_text=True)
+    assert 'data-hero-toggle="dashboard"' in staff_html
+    assert 'data-state-open-label="Open staff dashboard"' in staff_html
+    assert 'data-state-close-label="Close staff dashboard"' in staff_html
+    assert 'data-state-open-url="/dashboard"' in staff_html
+    assert 'data-state-close-url="/admin/"' in staff_html

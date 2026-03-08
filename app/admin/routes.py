@@ -186,6 +186,20 @@ def delete_guest_form(gf_id: int):
     return redirect(url_for("admin.list_guest_forms"))
 
 
+@admin_bp.route("/toggle_notifications", methods=["POST"])
+@login_required
+
+def toggle_notifications():
+    """Flip the global notifications flag and return to dashboard."""
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+    flags = FeatureFlags.get()
+    flags.enable_notifications = not bool(flags.enable_notifications)
+    db.session.commit()
+    flash(f"Notifications {'enabled' if flags.enable_notifications else 'disabled'}.", "success")
+    return redirect(url_for("admin.index"))
+
 @admin_bp.route("/")
 @login_required
 def index():
@@ -200,6 +214,8 @@ def index():
     total_jobs = JobRecord.query.count()
     total_events = IntegrationEvent.query.count()
     total_tenants = Tenant.query.count()
+    # expose feature flags so dashboard tiles may reflect their state
+    flags = FeatureFlags.get()
     return render_template(
         "admin_index.html",
         total_users=total_users,
@@ -210,6 +226,7 @@ def index():
         total_tenants=total_tenants,
         current_tenant_name=getattr(tenant, "name", "Default Workspace"),
         current_tenant_role=tenant_role_for_user(current_user),
+        flags=flags,
     )
 
 

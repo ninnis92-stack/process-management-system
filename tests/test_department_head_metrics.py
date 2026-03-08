@@ -214,8 +214,8 @@ def test_admin_can_export_site_metrics(app, client):
         db.session.commit()
     rv = login_user(client, "admin@example.com")
     assert rv.status_code == 200
-    # admin should land on admin console instead of department picker
-    assert b"Admin Console" in rv.data
+    # admin should land on the command center instead of the department picker
+    assert b"Command center" in rv.data
     # first visit the HTML metrics page and ensure the full-site button exists
     rv = client.get("/metrics/ui")
     assert rv.status_code == 200
@@ -267,7 +267,7 @@ def test_admin_can_view_metrics_from_settings_and_overview(app, client):
         db.session.commit()
 
     rv = login_user(client, "metrics-settings-admin@example.com")
-    assert b"Admin Console" in rv.data
+    assert b"Command center" in rv.data
     assert rv.status_code == 200
 
     rv = client.get("/admin/metrics_config")
@@ -502,7 +502,7 @@ def test_admin_can_toggle_department_head_metrics_role(app, client):
         head_id = head.id
 
     rv = login_user(client, "metrics-admin@example.com")
-    assert b"Admin Console" in rv.data
+    assert b"Command center" in rv.data
     assert rv.status_code == 200
 
     rv = client.post(
@@ -576,7 +576,7 @@ def test_admin_metrics_groups_departments_into_buckets(app, client):
         db.session.commit()
 
     rv = login_user(client, "bucket-admin@example.com")
-    assert b"Admin Console" in rv.data
+    assert b"Command center" in rv.data
     assert rv.status_code == 200
 
     rv = client.get("/metrics/ui")

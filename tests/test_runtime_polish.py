@@ -207,5 +207,6 @@ def test_admin_console_uses_unified_shell_classes(app, client):
 
     response = client.get("/admin/")
     assert response.status_code == 200
-    assert b"page-header" in response.data
+    # new layout uses hero banner instead of page-header
+    assert b"admin-hero" in response.data
     assert b"surface-panel" in response.data

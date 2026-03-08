@@ -164,11 +164,13 @@ admin site config for quick sanity checks against any environment.
   it’s skipped.
 
 ### Live deployment checks (March 8, 2026)
-- Deployed to process-management-prototype-lingering-bush-6175 via `fly deploy --remote-only`; the release command `python scripts/release_tasks.py` completed successfully, running Alembic migrations, `db.create_all()`, and `seed.py` so the Fly Postgres database is up and seeded.
-- Ran `bash scripts/smoke_test.sh https://process-management-prototype-lingering-bush-6175.fly.dev` (home, `/admin/site_config`, `/dashboard`) and confirmed the basic endpoints returned HTTP 200/redirects.
-- Cleaned local state afterward with `make smoke-clean`, which deletes `instance/app.db` so future dev runs start from a fresh SQLite file.
-- Checked readiness with `curl -fsS https://process-management-prototype-lingering-bush-6175.fly.dev/ready`; the response reported `database.status:ok`, showing the Fly health and Postgres connectivity are passing.
-- During the release command the `user.show_hints` migration previously logged a Postgres `DATATYPE_MISMATCH` because it defaulted to `1`; the migration now uses `server_default=sa.text('TRUE')` so future deployments will complete the ALTER without error.
+- Added regression coverage for the hero dashboard CTA so guest and authenticated views keep the correct labels and target URLs; the local suite now passes with `115 passed`.
+- Deployed to `process-management-prototype-lingering-bush-6175` with `flyctl deploy -a process-management-prototype-lingering-bush-6175`.
+- Verified the Fly release command `python scripts/release_tasks.py` completed successfully and that release/boot logs showed `seed.py` running plus the seeded demo/admin accounts being emitted.
+- Added a release-task schema safety net for legacy `form_template` installs, and confirmed Fly applied `schema_fix=form_template.external_enabled_added`, `schema_fix=form_template.external_provider_added`, `schema_fix=form_template.external_form_url_added`, and `schema_fix=form_template.external_form_id_added` during deploy.
+- Ran deployed smoke checks with `bash scripts/smoke_test.sh https://process-management-prototype-lingering-bush-6175.fly.dev`, `python scripts/smoke_deployed_login.py --url https://process-management-prototype-lingering-bush-6175.fly.dev`, and `python scripts/admin_smoke.py`; after the schema fix the admin assignments page returned HTTP 200.
+- Cleared remote smoke data with `python scripts/clear_smoke_remote.py`; the cleanup endpoint completed successfully and reported `{"deleted":0}`.
+- Checked both `https://process-management-prototype-lingering-bush-6175.fly.dev/ready` and `https://process-management-prototype-lingering-bush-6175.fly.dev/health`; both returned `{"status":"ok"}`, and `/ready` reported `components.database.status: ok`.
 
 ---
 

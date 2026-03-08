@@ -454,6 +454,50 @@ def main():
                             )
                         )
                     print("schema_fix=form_template.verification_prefill_enabled_added")
+                if (
+                    "form_template" in insp.get_table_names()
+                    and "external_enabled" not in form_template_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE form_template ADD COLUMN external_enabled BOOLEAN DEFAULT FALSE"
+                            )
+                        )
+                    print("schema_fix=form_template.external_enabled_added")
+                if (
+                    "form_template" in insp.get_table_names()
+                    and "external_provider" not in form_template_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE form_template ADD COLUMN external_provider VARCHAR(100)"
+                            )
+                        )
+                    print("schema_fix=form_template.external_provider_added")
+                if (
+                    "form_template" in insp.get_table_names()
+                    and "external_form_url" not in form_template_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE form_template ADD COLUMN external_form_url VARCHAR(1000)"
+                            )
+                        )
+                    print("schema_fix=form_template.external_form_url_added")
+                if (
+                    "form_template" in insp.get_table_names()
+                    and "external_form_id" not in form_template_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE form_template ADD COLUMN external_form_id VARCHAR(255)"
+                            )
+                        )
+                    print("schema_fix=form_template.external_form_id_added")
 
                 form_field_cols = (
                     {c["name"] for c in insp.get_columns("form_field")}

@@ -281,7 +281,7 @@
                       <li>Post attachments, watch OCR text populate, and keep status updates honest.</li>
                       <li>Share tracking links or notifications straight from this canvas.</li>
                     </ul>
-                    <a class="hero-callout-card__link btn btn-sm btn-outline-primary" data-hero-toggle="dashboard" data-state-open-label="Open staff dashboard" data-state-close-label="Close staff dashboard" data-state-open-url="{{ url_for('requests.dashboard') }}" data-state-close-url="{{ url_for('admin.index') }}" href="{{ url_for('requests.dashboard') }}">Open staff dashboard</a>
+                    <a class="hero-callout-card__link btn btn-sm btn-outline-primary" data-hero-toggle="dashboard" data-state-open-label="{{ 'Open staff dashboard' if current_user.is_authenticated else 'Open guest dashboard' }}" data-state-close-label="{{ 'Close staff dashboard' if current_user.is_authenticated else 'Close guest dashboard' }}" data-state-open-url="{{ url_for('requests.dashboard') if current_user.is_authenticated else url_for('external.external_dashboard') }}" data-state-close-url="{{ url_for('admin.index') if current_user.is_authenticated else url_for('external.external_new') }}" href="{{ url_for('requests.dashboard') if current_user.is_authenticated else url_for('external.external_dashboard') }}">{{ 'Open staff dashboard' if current_user.is_authenticated else 'Open guest dashboard' }}</a>
                   </article>
                 </div>
               </section>

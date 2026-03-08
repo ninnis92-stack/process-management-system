@@ -47,11 +47,10 @@ def test_departments_crud_and_site_config(app, client):
     rv = login_admin(client)
     assert rv.status_code == 200
 
-    # admin index exposes email form generation controls
+    # admin index shows the email forms tile (legacy labels removed)
     rv = client.get("/admin/")
     assert rv.status_code == 200
-    assert b"Email Form Generation" in rv.data
-    assert b"Manage Email Form Settings" in rv.data
+    assert b"Email Forms" in rv.data
 
     # departments list (empty)
     rv = client.get("/admin/departments")

@@ -199,6 +199,19 @@
 
       function updateHint(){
         const val = select.value;
+        if(Array.isArray(handoffTargets) && handoffTargets.indexOf(val) !== -1){
+          hintEl.classList.remove('d-none');
+        } else {
+          hintEl.classList.add('d-none');
+        }
+      }
+
+      select.addEventListener('change', updateHint);
+      // initial
+      updateHint();
+    }catch(e){ console.warn('initHandoffHint error', e); }
+  });
+})();
 
 (function initHeroToggleButtons(){
   function updateButtons(){
@@ -241,19 +254,6 @@
   } else {
     updateButtons();
   }
-})();
-        if(Array.isArray(handoffTargets) && handoffTargets.indexOf(val) !== -1){
-          hintEl.classList.remove('d-none');
-        } else {
-          hintEl.classList.add('d-none');
-        }
-      }
-
-      select.addEventListener('change', updateHint);
-      // initial
-      updateHint();
-    }catch(e){ console.warn('initHandoffHint error', e); }
-  });
 })();
 
 (function initDeptMiniWindow(){

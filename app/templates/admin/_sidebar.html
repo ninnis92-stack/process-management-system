@@ -1,11 +1,5 @@
-<div class="offcanvas offcanvas-start" tabindex="-1" id="adminSidebar" aria-labelledby="adminSidebarLabel">
-  <div class="offcanvas-header">
-    <h5 class="offcanvas-title" id="adminSidebarLabel">Admin</h5>
-    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-  </div>
-  <div class="offcanvas-body p-0">
-    <nav class="admin-sidebar">
-      <ul class="nav flex-column">
+{%- macro admin_sidebar_items() -%}
+  <ul class="nav flex-column admin-sidebar-list">
     <li class="nav-item"><span class="nav-heading">Configuration</span></li>
     <li class="nav-item"><a class="nav-link {% if request.endpoint=='admin.list_users' %}active{% endif %}" href="{{ url_for('admin.list_users') }}">Users</a></li>
     <li class="nav-item"><a class="nav-link {% if request.endpoint=='admin.list_departments' %}active{% endif %}" href="{{ url_for('admin.list_departments') }}">Departments</a></li>
@@ -25,7 +19,30 @@
     <li class="nav-item"><a class="nav-link {% if request.endpoint=='admin.feature_flags' %}active{% endif %}" href="{{ url_for('admin.feature_flags') }}">Integrations & Flags</a></li>
     <li class="nav-item"><a class="nav-link {% if request.endpoint=='admin.migration_status' %}active{% endif %}" href="{{ url_for('admin.migration_status') }}">Migrations</a></li>
     <li class="nav-item"><a class="nav-link {% if request.endpoint=='admin.debug_workspace' %}active{% endif %}" href="{{ url_for('admin.debug_workspace') }}">Debug</a></li>
-      </ul>
+  </ul>
+{%- endmacro %}
+
+<div class="offcanvas offcanvas-start" tabindex="-1" id="adminSidebar" aria-labelledby="adminSidebarLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="adminSidebarLabel">Admin</h5>
+    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body p-0">
+    <nav class="admin-sidebar">
+      {{ admin_sidebar_items() }}
     </nav>
   </div>
 </div>
+
+<aside class="admin-sidebar-panel d-none d-md-flex flex-column">
+  <div class="admin-sidebar-panel__body">
+    <div class="admin-sidebar-panel__header">
+      <p class="admin-sidebar-panel__eyebrow">Command center</p>
+      <h5 class="admin-sidebar-panel__title">Command center</h5>
+      <p class="admin-sidebar-panel__lede">Keep configuration, workflow, and monitoring links anchored so the navbar button feels like a shortcut rather than the only entry.</p>
+    </div>
+    <nav class="admin-sidebar admin-sidebar-panel__nav">
+      {{ admin_sidebar_items() }}
+    </nav>
+  </div>
+</aside>

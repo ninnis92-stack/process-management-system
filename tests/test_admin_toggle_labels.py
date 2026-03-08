@@ -78,3 +78,27 @@ def test_reject_request_config_label_describes_state(client, app):
     assert 'Enable reject request' in html
     # the checkbox should also expose the on/off texts as attributes
     assert 'data-toggle-text-on="Disable reject request"' in html
+def test_dashboard_notification_toggle(client, app):
+    """Verify dashboard toggle tile label updates with flag state and posts correctly."""
+    make_admin(app)
+    with app.app_context():
+        flags = FeatureFlags.get()
+        flags.enable_notifications = False
+        db.session.commit()
+
+    rv = login_admin(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/admin/")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+    assert "Notifications off" in html
+
+    rv = client.post("/admin/toggle_notifications", follow_redirects=True)
+    assert rv.status_code == 200
+    with app.app_context():
+        assert FeatureFlags.get().enable_notifications is True
+    html = rv.get_data(as_text=True)
+    assert "Notifications on" in html
+    # active class should be applied when flag is enabled
+    assert 'admin-toggle-card active' in html

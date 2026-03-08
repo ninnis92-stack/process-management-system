@@ -379,6 +379,9 @@ def stop_impersonation():
 @login_required
 
 def set_self_admin():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
     if not current_app.config.get("ALLOW_SELF_ADMIN"):
         flash("Self-admin feature is not enabled on this instance.", "danger")
         return redirect(flask_request.referrer or url_for("requests.dashboard"))

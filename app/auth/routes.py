@@ -250,7 +250,7 @@ def sso_callback():
         session.pop("sso_mfa", None)
 
     login_user(user)
-    # admins always land on the admin console by default; this happens before
+    # admins always land on the command center by default; this happens before
     # any department-selection logic so that they never get kicked back to the
     # /auth/choose_dept page.  We still respect a `next` URL if present so that
     # automated flows continue to work.
@@ -572,7 +572,7 @@ def login():
             tenant = ensure_user_tenant_membership(user)
             if tenant:
                 set_active_tenant(tenant)
-            # redirect admins immediately to the admin console; skip department flow
+            # redirect admins immediately to the command center; skip department flow
             if getattr(user, "is_admin", False):
                 next_url = request.args.get('next') or request.form.get('next')
                 if next_url and next_url.startswith('/') and not next_url.startswith('//'):
