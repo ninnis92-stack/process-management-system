@@ -226,6 +226,35 @@
   background: var(--page-bg);
 }
 
+.dark-mode .hero-callouts {
+  background: linear-gradient(135deg, rgba(255,255,255,0.02), transparent 60%), var(--page-bg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.45);
+}
+
+.dark-mode .hero-callouts__intro h3,
+.dark-mode .hero-callouts__intro p,
+.dark-mode .hero-callouts__hint {
+  color: var(--body-text);
+}
+
+.dark-mode .hero-callout-card {
+  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.45);
+}
+
+.dark-mode .hero-callout-card__badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--body-text);
+}
+
+.dark-mode .hero-callout-card__title,
+.dark-mode .hero-callout-card__body,
+.dark-mode .hero-callout-card__list li {
+  color: var(--body-text);
+}
+
 /* When the global Vibe feature is disabled, force the entire UI to use
   the login page color theme so pages don't retain a previously-selected
   per-user vibe. This should only affect light mode; dark-mode must keep
