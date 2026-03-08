@@ -15,7 +15,14 @@ from ..models import (
     FieldVerification,
     Submission as FormSubmission,
 )
-from .field_verification import resolve_field_verification_rule, run_field_verification
+from .field_verification import (
+    apply_prefill_values_to_submission,
+    collect_prefill_target_names,
+    extract_prefill_values,
+    get_verification_prefill_config,
+    resolve_field_verification_rule,
+    run_field_verification,
+)
 
 
 def load_latest_field_verification_map(template_fields) -> dict[int, object]:
@@ -40,7 +47,12 @@ def load_latest_field_verification_map(template_fields) -> dict[int, object]:
     return latest_map
 
 
-def build_template_spec(template_fields, latest_map: dict[int, object] | None = None):
+def build_template_spec(
+    template_fields,
+    latest_map: dict[int, object] | None = None,
+    *,
+    verification_prefill_enabled: bool = False,
+):
     latest_map = latest_map or {}
     spec = []
     for field in template_fields:
@@ -53,9 +65,33 @@ def build_template_spec(template_fields, latest_map: dict[int, object] | None = 
         ]
         verification_rule = resolve_field_verification_rule(field, latest_map)
         field_hint = getattr(field, "hint", None)
+        verification_meta = None
         if not field_hint and isinstance(verification_rule, dict):
             rule_params = verification_rule.get("params") or {}
             field_hint = rule_params.get("bulk_input_hint") or None
+        if isinstance(verification_rule, dict):
+            verification_meta = {
+                "enabled": True,
+                "provider": verification_rule.get("provider")
+                or verification_rule.get("type"),
+                "external_key": verification_rule.get("external_key")
+                or verification_rule.get("key"),
+                "prefill_enabled": False,
+                "prefill_targets": [],
+                "prefill_trigger": None,
+            }
+            if verification_prefill_enabled:
+                prefill_cfg = get_verification_prefill_config(verification_rule)
+                if prefill_cfg:
+                    verification_meta.update(
+                        {
+                            "prefill_enabled": True,
+                            "prefill_targets": list(
+                                (prefill_cfg.get("targets") or {}).keys()
+                            ),
+                            "prefill_trigger": prefill_cfg.get("trigger") or "blur",
+                        }
+                    )
         spec.append(
             {
                 "id": field.id,
@@ -65,12 +101,14 @@ def build_template_spec(template_fields, latest_map: dict[int, object] | None = 
                 "required": bool(getattr(field, "required", False)),
                 "hint": field_hint,
                 "options": options,
+                "verification": verification_meta,
             }
         )
     return spec
 
 
-def collect_template_submission_data(template_fields):
+def collect_template_submission_data(template_fields, skip_required_fields=None):
+    skip_required_fields = set(skip_required_fields or [])
     submission_data = {}
     missing_field = None
     for field in template_fields:
@@ -79,7 +117,7 @@ def collect_template_submission_data(template_fields):
         else:
             value = request.form.get(field.name)
 
-        if field.required and (
+        if field.required and field.name not in skip_required_fields and (
             value is None
             or (not getattr(value, "filename", None) and str(value).strip() == "")
         ):
@@ -92,6 +130,32 @@ def collect_template_submission_data(template_fields):
             submission_data[field.name] = value
 
     return submission_data, missing_field
+
+
+def validate_required_template_submission(template_fields, submission_data: dict):
+    for field in template_fields:
+        value = submission_data.get(field.name)
+        if field.required and (
+            value is None
+            or (not getattr(value, "filename", None) and str(value).strip() == "")
+        ):
+            return getattr(field, "label", field.name)
+    return None
+
+
+def get_template_prefill_target_names(
+    template_fields, latest_map: dict[int, object] | None = None, *, enabled: bool = False
+) -> set[str]:
+    if not enabled:
+        return set()
+    latest_map = latest_map or {}
+    target_names: set[str] = set()
+    for field in template_fields:
+        rule = resolve_field_verification_rule(field, latest_map)
+        if not rule:
+            continue
+        target_names.update(collect_prefill_target_names(rule))
+    return target_names
 
 
 def apply_submission_data_to_request(req, submission_data: dict):
@@ -184,9 +248,13 @@ def save_template_file_attachments(form_submission, template_fields, current_use
         db.session.commit()
 
 
-def run_template_field_verifications(template_fields, submission_data: dict):
+def run_template_field_verifications(
+    template_fields,
+    submission_data: dict,
+    latest_map: dict[int, object] | None = None,
+):
     verification_results = {}
-    latest_map = load_latest_field_verification_map(template_fields)
+    latest_map = latest_map or load_latest_field_verification_map(template_fields)
 
     for field in template_fields:
         rule = resolve_field_verification_rule(field, latest_map)
@@ -202,3 +270,30 @@ def run_template_field_verifications(template_fields, submission_data: dict):
             verification_results[field.name] = {"ok": False, "error": str(exc)}
 
     return verification_results
+
+
+def apply_template_verification_prefills(
+    template_fields,
+    submission_data: dict,
+    verification_results: dict,
+    latest_map: dict[int, object] | None = None,
+    *,
+    enabled: bool = False,
+):
+    if not enabled:
+        return {}
+
+    latest_map = latest_map or {}
+    applied_by_source = {}
+    for field in template_fields:
+        rule = resolve_field_verification_rule(field, latest_map)
+        if not rule:
+            continue
+        result = verification_results.get(field.name)
+        prefills = extract_prefill_values(rule, result)
+        if not prefills:
+            continue
+        applied = apply_prefill_values_to_submission(submission_data, prefills)
+        if applied:
+            applied_by_source[field.name] = applied
+    return applied_by_source

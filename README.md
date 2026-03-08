@@ -59,6 +59,7 @@ and release task to create any missing columns.
 - Dark mode / per-user themes (“vibes”)
 - SSO/OIDC login with optional admin syncing
 - Admin UI for users, departments, workflows, feature flags, site config, etc.
+- Admin-managed verification fields that can auto-fill linked fields on the same request form
 - Simple external integration layer and webhooks
 - Realtime field verification routing for third-party company trackers via admin-managed verification integration JSON
 - Fly deployment helpers (`make deploy-safe`, `release_tasks.py`)
@@ -146,6 +147,45 @@ application also audits any changes made via the admin UI: updates to
 `/admin/site_config` create an `AuditLog` row with `action_type` set to
 `site_config_update`, ensuring that later reviewers can see who changed the
 banner, theme, or quote sets.
+
+## Admin-built request forms
+
+Dynamic request templates can now behave more like guided product forms instead
+of flat intake screens:
+
+- Each template may enable `verification_prefill_enabled`, allowing verified
+   lookup fields to populate other fields on the same form.
+- Each field verification rule may define `prefill_targets` so tracker/integration
+   responses can map values such as `details.name` or `details.department` into
+   linked request fields.
+- The request UI shows when a field is verification-backed and when it can
+   auto-fill related fields.
+
+Example field verification params:
+
+```json
+{
+   "tracker_handle": "directory",
+   "prefill_enabled": true,
+   "prefill_targets": {
+      "employee_name": "details.name",
+      "employee_email": {
+         "path": "details.email",
+         "overwrite": true
+      }
+   }
+}
+```
+
+The server also applies these prefills during submission, so required linked
+fields can still be populated even if the browser-side enhancement does not run.
+
+## Workflow safety
+
+The request workspace now includes a recent workflow path and recommended next
+actions. The transition endpoint also blocks repeated ping-pong moves between
+the same two statuses inside a short window, which helps reduce unnecessary
+process loops and accidental back-and-forth churn.
 
 
 ## Deployment

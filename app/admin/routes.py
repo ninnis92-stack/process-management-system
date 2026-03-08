@@ -938,6 +938,10 @@ def create_template():
         t = FormTemplate(
             name=form.name.data.strip(),
             description=(form.description.data or "").strip() or None,
+            verification_prefill_enabled=bool(
+                getattr(form, "verification_prefill_enabled", None)
+                and form.verification_prefill_enabled.data
+            ),
             external_enabled=bool(
                 getattr(form, "external_enabled", None) and form.external_enabled.data
             ),
@@ -1004,6 +1008,9 @@ def edit_template_fields(template_id: int):
         # save external integration settings if present
         try:
             # checkbox present means 'on' or '1'
+            t.verification_prefill_enabled = bool(
+                flask_request.form.get("verification_prefill_enabled")
+            )
             ext_enabled = flask_request.form.get("external_enabled")
             t.external_enabled = bool(ext_enabled)
             t.external_provider = (
@@ -1074,6 +1081,16 @@ def edit_field_verification(field_id: int):
         form.bulk_input_hint.data = (
             params.get("bulk_input_hint") or params.get("entry_hint") or ""
         )
+        form.prefill_enabled.data = bool(params.get("prefill_enabled", False))
+        try:
+            form.prefill_targets_json.data = json.dumps(
+                params.get("prefill_targets") or {}, indent=2
+            )
+        except Exception:
+            form.prefill_targets_json.data = ""
+        form.prefill_overwrite_existing.data = bool(
+            params.get("prefill_overwrite_existing", False)
+        )
 
     if form.validate_on_submit():
         import json
@@ -1099,6 +1116,32 @@ def edit_field_verification(field_id: int):
             value_separator=form.value_separator.data,
             bulk_input_hint=form.bulk_input_hint.data,
         )
+
+        if form.prefill_enabled.data:
+            raw_prefill_targets = (form.prefill_targets_json.data or "").strip()
+            prefill_targets = {}
+            if raw_prefill_targets:
+                try:
+                    prefill_targets = json.loads(raw_prefill_targets)
+                except Exception:
+                    flash("Invalid JSON in prefill targets field.", "danger")
+                    return render_template(
+                        "admin_field_verification.html", form=form, field=f, fv=fv
+                    )
+                if not isinstance(prefill_targets, dict):
+                    flash("Prefill targets JSON must be a JSON object.", "danger")
+                    return render_template(
+                        "admin_field_verification.html", form=form, field=f, fv=fv
+                    )
+            params["prefill_enabled"] = True
+            params["prefill_targets"] = prefill_targets
+            params["prefill_overwrite_existing"] = bool(
+                form.prefill_overwrite_existing.data
+            )
+        else:
+            params.pop("prefill_enabled", None)
+            params.pop("prefill_targets", None)
+            params.pop("prefill_overwrite_existing", None)
 
         # Replace existing mapping (simple policy: create new row)
         new = FieldVerification(

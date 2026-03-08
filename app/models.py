@@ -477,6 +477,11 @@ class FormTemplate(TenantScopedMixin, db.Model):
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # When enabled, verification-backed fields on this template may populate
+    # other fields in the same request form based on admin-configured mapping.
+    verification_prefill_enabled = db.Column(
+        db.Boolean, nullable=False, default=False
+    )
     # Optional external form integration (eg. Microsoft Forms) — disabled by default
     external_enabled = db.Column(db.Boolean, nullable=False, default=False)
     # Provider identifier (informational), e.g. 'microsoft_forms'

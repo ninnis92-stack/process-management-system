@@ -69,16 +69,25 @@ from ..models import (
 from ..notifcations import notify_users, users_in_department
 from .. import notifcations as notifications_module
 from ..services.request_creation import (
+    apply_template_verification_prefills,
     apply_submission_data_to_request,
     build_initial_artifact,
     build_template_spec,
     collect_template_submission_data,
     create_form_submission,
+    get_template_prefill_target_names,
     load_latest_field_verification_map,
     run_template_field_verifications,
     save_template_file_attachments,
+    validate_required_template_submission,
 )
 from ..services.ticketing import TicketingClient
+from ..services.field_verification import (
+    extract_prefill_values,
+    get_verification_prefill_config,
+    resolve_field_verification_rule,
+    run_field_verification,
+)
 from ..services.verification import VerificationService
 from ..services.integrations import emit_webhook_event, serialize_request
 from ..services.process_metrics import (
@@ -335,6 +344,66 @@ def _closed_within_hours(req: ReqModel, hours: int = 48) -> bool:
     if not entry:
         return False
     return (datetime.utcnow() - entry.created_at) <= timedelta(hours=hours)
+
+
+def _recent_status_change_entries(req_id: int, hours: int = 24, limit: int = 12):
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    try:
+        return (
+            AuditLog.query.filter_by(request_id=req_id, action_type="status_change")
+            .filter(AuditLog.created_at >= cutoff)
+            .order_by(AuditLog.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+    except Exception:
+        return []
+
+
+def _detect_recent_transition_loop(
+    req_id: int, from_status: str, to_status: str, *, hours: int = 24
+):
+    """Return a warning string when a request is bouncing between two statuses.
+
+    The guard blocks a third move in the same reciprocal pair within the
+    recent window, which prevents accidental ping-pong between teams without
+    blocking a single legitimate correction or reopen.
+    """
+    if not req_id or not from_status or not to_status or from_status == to_status:
+        return None
+
+    recent = _recent_status_change_entries(req_id, hours=hours)
+    if len(recent) < 2:
+        return None
+
+    pair = {from_status, to_status}
+    pair_hits = [
+        entry
+        for entry in recent
+        if {entry.from_status, entry.to_status} == pair
+        and entry.from_status
+        and entry.to_status
+    ]
+    if len(pair_hits) < 2:
+        return None
+
+    latest = recent[0]
+    if latest.from_status == to_status and latest.to_status == from_status:
+        return (
+            f"This request has already bounced between {from_status} and {to_status} multiple times in the last {hours} hours. "
+            "Update the summary/details first or choose a different next step to avoid a process loop."
+        )
+    return None
+
+
+def _build_recent_status_path(audit_entries, current_status: str):
+    path = []
+    for entry in audit_entries or []:
+        if entry.to_status and (not path or path[-1] != entry.to_status):
+            path.append(entry.to_status)
+    if not path or path[-1] != current_status:
+        path.append(current_status)
+    return path[-6:]
 
 
 # Notification helpers are provided by app/notifcations.py (imported above)
@@ -1417,6 +1486,7 @@ def request_new():
         .first()
     )
     template = None
+    latest_map = {}
     if assigned:
         template = db.session.get(FormTemplate, assigned.template_id)
     # Debug prints are intentionally lightweight and temporary to help
@@ -1432,7 +1502,13 @@ def request_new():
     template_spec = None
     if template and template_fields:
         latest_map = load_latest_field_verification_map(template_fields)
-        template_spec = build_template_spec(template_fields, latest_map)
+        template_spec = build_template_spec(
+            template_fields,
+            latest_map,
+            verification_prefill_enabled=bool(
+                getattr(template, "verification_prefill_enabled", False)
+            ),
+        )
 
         # If the template is configured to use an external form, redirect or show a link.
         if template and getattr(template, "external_enabled", False):
@@ -1481,12 +1557,61 @@ def request_new():
         reject_button_label = ""
         reject_message = ""
         status_options_map = {}
+        verification_results = {}
+        applied_prefills = {}
         # Provide a sensible default due date for dynamic submissions (48 hours from now)
         default_due = (
             form.due_at.data
             if getattr(form, "due_at", None) and form.due_at.data
             else (datetime.utcnow() + timedelta(days=2))
         )
+
+        submission_data = {}
+        if template is not None:
+            prefill_target_names = get_template_prefill_target_names(
+                template_fields,
+                latest_map,
+                enabled=bool(getattr(template, "verification_prefill_enabled", False)),
+            )
+            submission_data, missing_field = collect_template_submission_data(
+                template_fields,
+                skip_required_fields=prefill_target_names,
+            )
+            if missing_field:
+                flash(f"Field {missing_field} is required.", "danger")
+                return render_template(
+                    "request_new.html",
+                    form=form,
+                    template=template,
+                    template_fields=template_fields,
+                    template_spec=template_spec,
+                )
+
+            verification_results = run_template_field_verifications(
+                template_fields, submission_data, latest_map
+            )
+            applied_prefills = apply_template_verification_prefills(
+                template_fields,
+                submission_data,
+                verification_results,
+                latest_map,
+                enabled=bool(getattr(template, "verification_prefill_enabled", False)),
+            )
+            missing_field = validate_required_template_submission(
+                template_fields, submission_data
+            )
+            if missing_field:
+                flash(
+                    f"Field {missing_field} is still required after verification and auto-fill.",
+                    "danger",
+                )
+                return render_template(
+                    "request_new.html",
+                    form=form,
+                    template=template,
+                    template_fields=template_fields,
+                    template_spec=template_spec,
+                )
 
         # Provide a temporary default title and request_type so flush won't violate NOT NULL constraints.
         req = ReqModel(
@@ -1506,23 +1631,7 @@ def request_new():
 
         db.session.add(req)
         db.session.flush()  # req.id available
-        # If dynamic template provided, gather submitted values
-        submission_data = {}
         if template is not None:
-            submission_data, missing_field = collect_template_submission_data(
-                template_fields
-            )
-            if missing_field:
-                flash(f"Field {missing_field} is required.", "danger")
-                db.session.rollback()
-                return render_template(
-                    "request_new.html",
-                    form=form,
-                    template=template,
-                    template_fields=template_fields,
-                    template_spec=template_spec,
-                )
-
             # Map common fields into Request model where possible
             apply_submission_data_to_request(req, submission_data)
             # If the dynamic form provided a due date, try to parse and apply it
@@ -1605,18 +1714,13 @@ def request_new():
             # Handle file-type fields (attachments)
             save_template_file_attachments(fs, template_fields, current_user.id)
 
-            # Execute verification rules for fields that have them. Prefer inline
-            # `FormField.verification`; otherwise consult DB mappings. Fetch the
-            # latest `FieldVerification` rows for all template fields in a single
-            # query to avoid subtle visibility/session issues in request contexts.
-            verification_results = run_template_field_verifications(
-                template_fields, submission_data
-            )
-
-            if verification_results:
+            if verification_results or applied_prefills:
                 # attach results into Submission.data for later inspection
-                fs.data = dict(fs.data)
-                fs.data["_verifications"] = verification_results
+                fs.data = dict(fs.data or {})
+                if verification_results:
+                    fs.data["_verifications"] = verification_results
+                if applied_prefills:
+                    fs.data["_auto_prefills"] = applied_prefills
                 db.session.add(fs)
                 db.session.commit()
 
@@ -1716,6 +1820,63 @@ def request_new():
         template=template,
         template_fields=template_fields,
         template_spec=template_spec,
+    )
+
+
+@requests_bp.route("/requests/template-prefill", methods=["POST"])
+@login_required
+def template_field_prefill():
+    assigned = (
+        DepartmentFormAssignment.query.filter_by(department_name="A")
+        .order_by(DepartmentFormAssignment.created_at.desc())
+        .first()
+    )
+    if not assigned:
+        return jsonify({"ok": False, "error": "template_not_assigned"}), 404
+
+    template = db.session.get(FormTemplate, assigned.template_id)
+    if not template or not getattr(template, "verification_prefill_enabled", False):
+        return jsonify({"ok": False, "error": "prefill_disabled"}), 400
+
+    payload = request.get_json(silent=True) or {}
+    field_name = str(payload.get("field_name") or "").strip()
+    values = payload.get("values") if isinstance(payload.get("values"), dict) else {}
+    if not field_name:
+        return jsonify({"ok": False, "error": "missing_field_name"}), 400
+
+    template_fields = sorted(
+        list(template.fields),
+        key=lambda f: getattr(f, "created_at", getattr(f, "id", 0)),
+    )
+    latest_map = load_latest_field_verification_map(template_fields)
+    source_field = next((field for field in template_fields if field.name == field_name), None)
+    if not source_field:
+        return jsonify({"ok": False, "error": "field_not_found"}), 404
+
+    rule = resolve_field_verification_rule(source_field, latest_map)
+    prefill_cfg = get_verification_prefill_config(rule)
+    if not rule or not prefill_cfg:
+        return jsonify({"ok": False, "error": "prefill_not_configured"}), 400
+
+    if field_name not in values and payload.get("value") is not None:
+        values[field_name] = payload.get("value")
+
+    result = run_field_verification(source_field, rule, values)
+    prefills = extract_prefill_values(rule, result)
+    applied_prefills = {}
+    for target_name, meta in prefills.items():
+        if meta.get("overwrite") or values.get(target_name) in (None, ""):
+            applied_prefills[target_name] = meta
+
+    return jsonify(
+        {
+            "ok": True,
+            "result": result,
+            "prefills": {
+                key: value.get("value") for key, value in applied_prefills.items()
+            },
+            "meta": applied_prefills,
+        }
     )
 
 
@@ -1963,6 +2124,10 @@ def request_detail(request_id: int):
         .order_by(AuditLog.created_at.asc())
         .all()
     )
+    recent_status_path = _build_recent_status_path(
+        [a for a in audit if a.action_type == "status_change"], req.status
+    )
+    suggested_next_actions = list(possible or [])[:4]
 
     # Avoid lazy-loading `req.artifacts` on potentially detached instances;
     # query artifacts directly by request id so the session is used explicitly.
@@ -2047,6 +2212,8 @@ def request_detail(request_id: int):
         handoff_targets=[
             t for t, _ in possible if handoff_for_transition(req.status, t)
         ],
+        recent_status_path=recent_status_path,
+        suggested_next_actions=suggested_next_actions,
         image_attachments=image_attachments,
         can_reject_request=can_reject_request,
         reject_button_label=reject_button_label,
@@ -3018,6 +3185,11 @@ def do_transition(request_id: int):
 
         if not is_transition_valid_for_request(req, dept, req.status, to_status):
             flash("That transition isn't allowed from the current status.", "danger")
+            return redirect(url_for("requests.request_detail", request_id=req.id))
+
+        loop_warning = _detect_recent_transition_loop(req.id, req.status, to_status)
+        if loop_warning:
+            flash(loop_warning, "warning")
             return redirect(url_for("requests.request_detail", request_id=req.id))
 
         from_status = req.status

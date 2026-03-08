@@ -30,6 +30,22 @@
       <div class="form-text">Shown to users on the request form so admins can customize instructions for this field.</div>
     </div>
   </div>
+  <div class="alert alert-light border mb-3">
+    <div class="form-check mb-2">
+      {{ form.prefill_enabled(class="form-check-input") }}
+      <label class="form-check-label" for="{{ form.prefill_enabled.id }}">{{ form.prefill_enabled.label.text }}</label>
+    </div>
+    <div class="small text-muted mb-3">Use this when a successful lookup returns additional data that should populate other fields in the same request form.</div>
+    <div class="mb-3">
+      <label class="form-label">{{ form.prefill_targets_json.label.text }}</label>
+      {{ form.prefill_targets_json(class="form-control", rows=6, placeholder='{"employee_name": "details.name", "employee_department": {"path": "details.department", "overwrite": true}}') }}
+      <div class="form-text">Map target field keys to response paths. Paths can start with <code>details.</code> or <code>result.</code>. If no prefix is provided, the app looks in the result first and then the details payload.</div>
+    </div>
+    <div class="form-check">
+      {{ form.prefill_overwrite_existing(class="form-check-input") }}
+      <label class="form-check-label" for="{{ form.prefill_overwrite_existing.id }}">{{ form.prefill_overwrite_existing.label.text }}</label>
+    </div>
+  </div>
   <div class="mb-3">
     <label class="form-label">Params (JSON)</label>
     {{ form.params_json(class="form-control", rows=6) }}

@@ -309,6 +309,142 @@
   });
 })();
 
+(function initTemplateVerificationPrefill(){
+  document.addEventListener('DOMContentLoaded', function(){
+    const form = document.querySelector('form[data-template-prefill-endpoint]');
+    if(!form) return;
+
+    const endpoint = form.dataset.templatePrefillEndpoint;
+    if(!endpoint) return;
+
+    const specEl = document.getElementById('template-spec-data');
+    if(!specEl || !specEl.textContent) return;
+
+    let fields = [];
+    try {
+      fields = JSON.parse(specEl.textContent || '[]');
+    } catch (e) {
+      console.warn('Could not parse template spec for prefill', e);
+      return;
+    }
+    if(!Array.isArray(fields) || !fields.length) return;
+
+    const setStatus = (fieldName, message, tone) => {
+      const slot = form.querySelector(`[data-field-status-for="${fieldName}"]`);
+      if(!slot) return;
+      slot.textContent = message || '';
+      slot.classList.remove('is-success', 'is-warning', 'is-loading');
+      if(tone === 'success') slot.classList.add('is-success');
+      if(tone === 'warning') slot.classList.add('is-warning');
+      if(tone === 'loading') slot.classList.add('is-loading');
+    };
+
+    const collectValues = () => {
+      const formData = new FormData(form);
+      const values = {};
+      formData.forEach((value, key) => {
+        if(typeof value === 'string') values[key] = value;
+      });
+      return values;
+    };
+
+    const applyPrefills = (meta, prefills) => {
+      Object.entries(prefills || {}).forEach(([targetField, value]) => {
+        const input = form.querySelector(`[name="${targetField}"]`);
+        if(!input) return;
+        const targetMeta = (meta || {})[targetField] || {};
+        if(input.value && !targetMeta.overwrite) return;
+        input.value = value == null ? '' : String(value);
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    };
+
+    const wireField = (field) => {
+      const verification = field && field.verification;
+      if(!verification || !verification.prefill_enabled) return;
+
+      const input = form.querySelector(`[name="${field.name}"]`);
+      if(!input) return;
+
+      const eventName = verification.prefill_trigger === 'change' || input.tagName === 'SELECT'
+        ? 'change'
+        : 'blur';
+
+      let inFlight = false;
+      input.addEventListener(eventName, async () => {
+        const value = (input.value || '').trim();
+        if(!value || inFlight) {
+          if(!value) setStatus(field.name, '', null);
+          return;
+        }
+
+        inFlight = true;
+        setStatus(field.name, 'Verifying and checking linked fields…', 'loading');
+
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              field_name: field.name,
+              value,
+              values: collectValues()
+            })
+          });
+
+          let payload = {};
+          try {
+            payload = await response.json();
+          } catch (e) {
+            payload = {};
+          }
+
+          if(!response.ok || payload.ok === false) {
+            setStatus(field.name, 'Linked auto-fill is unavailable for this field right now.', 'warning');
+            return;
+          }
+
+          const result = payload.result || {};
+          const prefills = payload.prefills || {};
+          const appliedCount = Object.keys(prefills).length;
+
+          if(result.ok === true && appliedCount > 0) {
+            applyPrefills(payload.meta, prefills);
+            setStatus(
+              field.name,
+              `Verified successfully and updated ${appliedCount} linked field${appliedCount === 1 ? '' : 's'}.`,
+              'success'
+            );
+            return;
+          }
+
+          if(result.ok === true) {
+            setStatus(field.name, 'Verified successfully. No linked fields needed updates.', 'success');
+            return;
+          }
+
+          if(result.ok === false) {
+            setStatus(field.name, 'Verification did not return a valid match, so linked fields were not updated.', 'warning');
+            return;
+          }
+
+          setStatus(field.name, '', null);
+        } catch (e) {
+          console.warn('Template verification prefill failed', e);
+          setStatus(field.name, 'Linked auto-fill could not complete.', 'warning');
+        } finally {
+          inFlight = false;
+        }
+      });
+    };
+
+    fields.forEach(wireField);
+  });
+})();
+
 // Attach CSRF token from meta to fetch POST/PUT/DELETE requests automatically
 (function attachCsrfToFetch(){
   const meta = document.querySelector('meta[name="csrf-token"]');

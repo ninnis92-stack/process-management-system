@@ -16,7 +16,7 @@
 </section>
 
 <section class="surface-panel">
-    <form method="post" {% if template_spec %}enctype="multipart/form-data"{% endif %}>
+  <form method="post" {% if template_spec %}enctype="multipart/form-data"{% endif %}{% if template and template.verification_prefill_enabled %} data-template-prefill-endpoint="{{ url_for('requests.template_field_prefill') }}"{% endif %}>
       {{ form.hidden_tag() }}
 
       {% if form.errors %}
@@ -100,31 +100,56 @@
       </div>
 
       {% if template_spec %}
-        {{ section_heading('Additional fields', 'These fields are configured by the admin team for this workflow.', compact=True) }}
+        <section class="template-intake-summary mb-3">
+          <div>
+            <div class="eyebrow-label">Admin-built request form</div>
+            <h4 class="mb-1">{{ template.name }}</h4>
+            <p class="text-muted mb-0">{{ template.description or 'This request form was configured by an admin. Labels, validation, verification, and linked auto-fill behavior all come from the template setup.' }}</p>
+          </div>
+          <div class="template-intake-summary__meta">
+            <span class="badge text-bg-light">{{ template_spec|length }} configured field{% if template_spec|length != 1 %}s{% endif %}</span>
+            {% if template.verification_prefill_enabled %}
+              <span class="badge text-bg-primary">Verification auto-fill enabled</span>
+            {% endif %}
+          </div>
+        </section>
+        {{ section_heading('Additional fields', 'These fields are configured by the admin team for this workflow. Verification-backed fields can validate values and, when enabled, fill in related fields automatically.', compact=True) }}
         <div class="row">
           {% for field in template_spec %}
             <div class="col-md-6 mb-3">
+              <div class="dynamic-field-card" data-template-field="{{ field.name }}">
               <label class="form-label">{{ field.label }}{% if field.required %} *{% endif %}</label>
+              <div class="dynamic-field-card__badges mb-2">
+                {% if field.required %}<span class="badge rounded-pill text-bg-light">Required</span>{% endif %}
+                {% if field.verification and field.verification.enabled %}<span class="badge rounded-pill text-bg-light">Verified</span>{% endif %}
+                {% if field.verification and field.verification.prefill_enabled %}<span class="badge rounded-pill text-bg-primary">Auto-fills {{ field.verification.prefill_targets|length }} linked field{% if field.verification.prefill_targets|length != 1 %}s{% endif %}</span>{% endif %}
+              </div>
               {% if field.field_type == 'textarea' %}
-                <textarea class="form-control" name="{{ field.name }}" rows="4">{{ request.form.get(field.name, '') }}</textarea>
+                <textarea class="form-control js-template-field" id="dynamic-field-{{ field.name }}" name="{{ field.name }}" rows="4">{{ request.form.get(field.name, '') }}</textarea>
               {% elif field.field_type == 'select' %}
-                <select class="form-select" name="{{ field.name }}">
+                <select class="form-select js-template-field" id="dynamic-field-{{ field.name }}" name="{{ field.name }}">
                   <option value="">-- Select --</option>
                   {% for opt in field.options %}
                     <option value="{{ opt.value }}" {% if request.form.get(field.name) == opt.value %}selected{% endif %}>{{ opt.label }}</option>
                   {% endfor %}
                 </select>
               {% elif field.field_type == 'file' %}
-                <input class="form-control" type="file" name="{{ field.name }}">
+                <input class="form-control" type="file" id="dynamic-field-{{ field.name }}" name="{{ field.name }}">
               {% else %}
-                <input class="form-control" type="text" name="{{ field.name }}" value="{{ request.form.get(field.name, '') }}">
+                <input class="form-control js-template-field" type="text" id="dynamic-field-{{ field.name }}" name="{{ field.name }}" value="{{ request.form.get(field.name, '') }}">
               {% endif %}
               {% if field.hint %}
                 <div class="form-text">{{ field.hint }}</div>
               {% endif %}
+              {% if field.verification and field.verification.prefill_enabled and field.verification.prefill_targets %}
+                <div class="form-text mt-1">When this value verifies successfully, the form can populate: {{ field.verification.prefill_targets|join(', ') }}.</div>
+              {% endif %}
+              <div class="dynamic-field-status" data-field-status-for="{{ field.name }}" aria-live="polite"></div>
+              </div>
             </div>
           {% endfor %}
         </div>
+        <script id="template-spec-data" type="application/json">{{ template_spec|tojson }}</script>
       {% endif %}
 
       <div class="form-actions-bar">

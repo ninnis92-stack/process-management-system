@@ -329,3 +329,237 @@ def test_field_verification_routes_to_tracker_handle_by_content(app, client, mon
         assert result2.get("details", {}).get("source") == "erp"
         assert calls[-1]["url"] == "https://erp.example.com/verify"
         assert calls[-1]["kwargs"]["params"]["value"] == "EMP-7"
+
+
+def test_template_prefill_endpoint_returns_linked_values(app, client, monkeypatch):
+    u = User(
+        email="prefill@example.com",
+        name="Prefill",
+        department="A",
+        is_active=True,
+        password_hash=generate_password_hash("password"),
+    )
+    db.session.add(u)
+    db.session.commit()
+
+    rv = client.post(
+        "/auth/login",
+        data={"email": "prefill@example.com", "password": "password"},
+        follow_redirects=True,
+    )
+    assert rv.status_code in (200, 302)
+
+    t = FormTemplate(
+        name="Prefill Template",
+        description="Lookup-driven prefill",
+        verification_prefill_enabled=True,
+    )
+    db.session.add(t)
+    db.session.commit()
+
+    source = FormField(
+        template_id=t.id,
+        name="employee_id",
+        label="Employee ID",
+        field_type="text",
+        required=True,
+    )
+    target = FormField(
+        template_id=t.id,
+        name="employee_name",
+        label="Employee Name",
+        field_type="text",
+        required=True,
+    )
+    db.session.add(source)
+    db.session.add(target)
+    db.session.commit()
+
+    db.session.add(DepartmentFormAssignment(template_id=t.id, department_name="A"))
+    db.session.add(
+        FieldVerification(
+            field_id=source.id,
+            provider="verification",
+            external_key="employee_id",
+            params={
+                "prefill_enabled": True,
+                "prefill_targets": {"employee_name": "details.name"},
+            },
+        )
+    )
+    db.session.add(
+        IntegrationConfig(
+            department="A",
+            kind="verification",
+            enabled=True,
+            config="""
+            {
+              "provider": "generic_verification",
+              "routing": {"default_tracker": "directory"},
+              "trackers": {
+                "directory": {
+                  "endpoints": {"base_url": "https://directory.example.com", "validate": "/lookup"},
+                  "request": {
+                    "method": "GET",
+                    "payload_location": "query",
+                    "query_template": {"employee_id": "{value}"}
+                  },
+                  "response": {
+                    "ok_path": "ok",
+                    "detail_path": "details"
+                  }
+                }
+              }
+            }
+            """,
+        )
+    )
+    db.session.commit()
+
+    def fake_request(self, method, url, **kwargs):
+        return DummyHTTPResponse({"ok": True, "details": {"name": "Ada Lovelace"}})
+
+    monkeypatch.setattr("requests.sessions.Session.request", fake_request)
+
+    rv = client.post(
+        "/requests/template-prefill",
+        json={"field_name": "employee_id", "values": {"employee_id": "EMP-1"}},
+    )
+    assert rv.status_code == 200
+    payload = rv.get_json()
+    assert payload["result"]["ok"] is True
+    assert payload["prefills"]["employee_name"] == "Ada Lovelace"
+
+
+def test_dynamic_submission_applies_verified_prefills_before_required_check(app, client, monkeypatch):
+    u = User(
+        email="prefill-submit@example.com",
+        name="Prefill Submit",
+        department="A",
+        is_active=True,
+        password_hash=generate_password_hash("password"),
+    )
+    db.session.add(u)
+    db.session.commit()
+
+    rv = client.post(
+        "/auth/login",
+        data={"email": "prefill-submit@example.com", "password": "password"},
+        follow_redirects=True,
+    )
+    assert rv.status_code in (200, 302)
+
+    t = FormTemplate(
+        name="Verified Prefill Submit",
+        description="Required targets can be filled from verification",
+        verification_prefill_enabled=True,
+    )
+    db.session.add(t)
+    db.session.commit()
+
+    source = FormField(
+        template_id=t.id,
+        name="employee_id",
+        label="Employee ID",
+        field_type="text",
+        required=True,
+    )
+    target_name = FormField(
+        template_id=t.id,
+        name="employee_name",
+        label="Employee Name",
+        field_type="text",
+        required=True,
+    )
+    target_email = FormField(
+        template_id=t.id,
+        name="employee_email",
+        label="Employee Email",
+        field_type="text",
+        required=False,
+    )
+    db.session.add_all([source, target_name, target_email])
+    db.session.commit()
+
+    db.session.add(DepartmentFormAssignment(template_id=t.id, department_name="A"))
+    db.session.add(
+        FieldVerification(
+            field_id=source.id,
+            provider="verification",
+            external_key="employee_id",
+            params={
+                "prefill_enabled": True,
+                "prefill_targets": {
+                    "employee_name": "details.name",
+                    "employee_email": "details.email"
+                },
+            },
+        )
+    )
+    db.session.add(
+        IntegrationConfig(
+            department="A",
+            kind="verification",
+            enabled=True,
+            config="""
+            {
+              "provider": "generic_verification",
+              "routing": {"default_tracker": "directory"},
+              "trackers": {
+                "directory": {
+                  "endpoints": {"base_url": "https://directory.example.com", "validate": "/lookup"},
+                  "request": {
+                    "method": "GET",
+                    "payload_location": "query",
+                    "query_template": {"employee_id": "{value}"}
+                  },
+                  "response": {
+                    "ok_path": "ok",
+                    "detail_path": "details"
+                  }
+                }
+              }
+            }
+            """,
+        )
+    )
+    db.session.commit()
+
+    def fake_request(self, method, url, **kwargs):
+        return DummyHTTPResponse(
+            {
+                "ok": True,
+                "details": {
+                    "name": "Grace Hopper",
+                    "email": "grace@example.com",
+                },
+            }
+        )
+
+    monkeypatch.setattr("requests.sessions.Session.request", fake_request)
+
+    rv = client.get("/requests/new")
+    assert rv.status_code == 200
+    assert b"Verification auto-fill enabled" in rv.data
+    assert b"employee_name" in rv.data
+
+    rv = client.post(
+        "/requests/new",
+        data={"employee_id": "EMP-9", "due_at": "2030-01-01"},
+        follow_redirects=True,
+    )
+    assert rv.status_code in (200, 302)
+
+    sub = Submission.query.order_by(Submission.created_at.desc()).first()
+    assert sub is not None
+    assert sub.data.get("employee_id") == "EMP-9"
+    assert sub.data.get("employee_name") == "Grace Hopper"
+    assert sub.data.get("employee_email") == "grace@example.com"
+    assert sub.data.get("_verifications", {}).get("employee_id", {}).get("ok") is True
+    assert (
+        sub.data.get("_auto_prefills", {})
+        .get("employee_id", {})
+        .get("employee_name", {})
+        .get("value")
+        == "Grace Hopper"
+    )

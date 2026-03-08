@@ -1,3 +1,92 @@
+.template-intake-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(243,246,255,0.95));
+}
+
+.template-intake-summary__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.eyebrow-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+}
+
+.dynamic-field-card {
+  height: 100%;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+}
+
+.dynamic-field-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.dynamic-field-status {
+  min-height: 1.25rem;
+  margin-top: 0.45rem;
+  font-size: 0.84rem;
+  color: #64748b;
+}
+
+.dynamic-field-status.is-loading {
+  color: #2563eb;
+}
+
+.dynamic-field-status.is-success {
+  color: #15803d;
+}
+
+.dynamic-field-status.is-warning {
+  color: #b45309;
+}
+
+.admin-template-settings {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-toggle-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 0.9rem;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+@media (max-width: 768px) {
+  .template-intake-summary,
+  .admin-template-settings {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .template-intake-summary__meta {
+    justify-content: flex-start;
+  }
+}
 :root {
   --nav-bg: #0b1726;
   --max-page-width: 1200px;
@@ -641,6 +730,62 @@ button.admin-tile {
   border-left: 4px solid rgba(59, 130, 246, 0.35);
 }
 
+.workflow-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.workflow-path {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.workflow-path__step {
+  padding: 0.75rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(248, 250, 252, 0.92);
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.workflow-path__step.is-current {
+  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+}
+
+.workflow-path__label {
+  display: block;
+}
+
+.next-action-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.next-action-card {
+  padding: 0.9rem 1rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+}
+
+.next-action-card__title {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.next-action-card__meta {
+  margin-top: 0.2rem;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
 .request-summary-card {
   overflow: hidden;
 }
@@ -669,6 +814,12 @@ button.admin-tile {
 
 .table-shell .table {
   margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .workflow-overview {
+    grid-template-columns: 1fr;
+  }
 }
 
 .table-shell thead th {

@@ -330,6 +330,9 @@ class FormTemplateAdminForm(FlaskForm):
         "Description", validators=[Optional(), Length(max=1000)]
     )
     field_count = IntegerField("Number of fields", default=3)
+    verification_prefill_enabled = BooleanField(
+        "Allow verified fields to auto-fill linked fields", default=False
+    )
     external_enabled = BooleanField(
         "Use external form (e.g. Microsoft Forms)", default=False
     )
@@ -398,6 +401,15 @@ class FieldVerificationForm(FlaskForm):
     )
     bulk_input_hint = StringField(
         "User entry hint", validators=[Optional(), Length(max=300)]
+    )
+    prefill_enabled = BooleanField(
+        "Auto-fill linked fields after successful verification", default=False
+    )
+    prefill_targets_json = TextAreaField(
+        "Prefill targets (JSON)", validators=[Optional(), Length(max=3000)]
+    )
+    prefill_overwrite_existing = BooleanField(
+        "Allow verified values to overwrite existing target values", default=False
     )
     params_json = TextAreaField(
         "Params (JSON)", validators=[Optional(), Length(max=2000)]

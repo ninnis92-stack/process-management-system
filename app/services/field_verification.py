@@ -60,6 +60,128 @@ def apply_bulk_verification_params(
     return merged
 
 
+def _prefill_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def collect_prefill_target_names(rule) -> set[str]:
+    config = get_verification_prefill_config(rule)
+    if not config:
+        return set()
+    return set(config.get("targets", {}).keys())
+
+
+def get_verification_prefill_config(rule) -> Dict[str, Any] | None:
+    if not isinstance(rule, dict):
+        return None
+
+    params = rule.get("params") or {}
+    if not _prefill_bool(params.get("prefill_enabled")):
+        return None
+
+    raw_targets = params.get("prefill_targets") or params.get("linked_fields") or {}
+    if not isinstance(raw_targets, dict) or not raw_targets:
+        return None
+
+    default_overwrite = _prefill_bool(params.get("prefill_overwrite_existing"))
+    trigger = (params.get("prefill_trigger") or "blur").strip().lower() or "blur"
+    targets: Dict[str, Dict[str, Any]] = {}
+
+    for field_name, target_spec in raw_targets.items():
+        if not isinstance(field_name, str) or not field_name.strip():
+            continue
+        if isinstance(target_spec, str):
+            path = target_spec.strip()
+            overwrite = default_overwrite
+        elif isinstance(target_spec, dict):
+            path = str(target_spec.get("path") or target_spec.get("source") or "").strip()
+            overwrite = _prefill_bool(target_spec.get("overwrite", default_overwrite))
+        else:
+            continue
+        if not path:
+            continue
+        targets[field_name.strip()] = {
+            "path": path,
+            "overwrite": overwrite,
+        }
+
+    if not targets:
+        return None
+
+    return {
+        "enabled": True,
+        "trigger": trigger,
+        "overwrite_existing": default_overwrite,
+        "targets": targets,
+    }
+
+
+def _get_prefill_path_value(result: Dict[str, Any], path: str):
+    parts = [segment for segment in str(path or "").split(".") if segment]
+    if not parts:
+        return None
+
+    if parts[0] == "result":
+        current = result
+        parts = parts[1:]
+    elif parts[0] == "details":
+        current = result.get("details") if isinstance(result, dict) else None
+        parts = parts[1:]
+    else:
+        current = result
+
+    if not parts:
+        return current
+
+    for idx, part in enumerate(parts):
+        if isinstance(current, dict) and part in current:
+            current = current.get(part)
+            continue
+        if (
+            idx == 0
+            and isinstance(result, dict)
+            and isinstance(result.get("details"), dict)
+            and part in (result.get("details") or {})
+        ):
+            current = result.get("details", {}).get(part)
+            continue
+        return None
+    return current
+
+
+def extract_prefill_values(rule, result: Dict[str, Any] | None) -> Dict[str, Dict[str, Any]]:
+    config = get_verification_prefill_config(rule)
+    if not config or not isinstance(result, dict) or result.get("ok") is not True:
+        return {}
+
+    prefills: Dict[str, Dict[str, Any]] = {}
+    for field_name, target_spec in (config.get("targets") or {}).items():
+        value = _get_prefill_path_value(result, target_spec.get("path"))
+        if value is None or isinstance(value, (dict, list, tuple, set)):
+            continue
+        prefills[field_name] = {
+            "value": value,
+            "path": target_spec.get("path"),
+            "overwrite": bool(target_spec.get("overwrite", False)),
+        }
+    return prefills
+
+
+def apply_prefill_values_to_submission(
+    submission_data: Dict[str, Any], prefills: Dict[str, Dict[str, Any]]
+) -> Dict[str, Dict[str, Any]]:
+    applied: Dict[str, Dict[str, Any]] = {}
+    for field_name, payload in (prefills or {}).items():
+        existing = submission_data.get(field_name)
+        if existing not in (None, "") and not payload.get("overwrite"):
+            continue
+        submission_data[field_name] = payload.get("value")
+        applied[field_name] = payload
+    return applied
+
+
 def run_single_field_verification(field: FormField, rule, value):
     provider = (rule.get("provider") or rule.get("type") or "").strip().lower()
     external_key = (
@@ -78,12 +200,14 @@ def run_single_field_verification(field: FormField, rule, value):
                 "external_key": external_key,
                 "type": "regex",
                 "reason": "missing_pattern",
+                "value": value,
             }
         return {
             "ok": bool(re.match(pattern, str(value))),
             "provider": "regex",
             "external_key": external_key,
             "type": "regex",
+            "value": value,
         }
 
     if provider in ("inventory", "external_lookup"):
@@ -99,6 +223,7 @@ def run_single_field_verification(field: FormField, rule, value):
             "external_key": external_key,
             "type": "external_lookup",
             "triggers_auto_reject": bool(rule.get("triggers_auto_reject")),
+            "value": value,
         }
 
     verifier = VerificationService()
@@ -109,6 +234,7 @@ def run_single_field_verification(field: FormField, rule, value):
     if provider in ("verification", "tracker", "realtime_tracker", "third_party_tracker") or str(provider).startswith("tracker:"):
         result.setdefault("type", "tracker_lookup")
     result.setdefault("triggers_auto_reject", bool(rule.get("triggers_auto_reject")))
+    result.setdefault("value", value)
     return result
 
 

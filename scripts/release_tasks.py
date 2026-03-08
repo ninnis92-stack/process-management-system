@@ -426,6 +426,23 @@ def main():
                             )
                         )
                     print("schema_fix=site_config.updated_at_added")
+
+                form_template_cols = (
+                    {c["name"] for c in insp.get_columns("form_template")}
+                    if "form_template" in insp.get_table_names()
+                    else set()
+                )
+                if (
+                    "form_template" in insp.get_table_names()
+                    and "verification_prefill_enabled" not in form_template_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE form_template ADD COLUMN verification_prefill_enabled BOOLEAN DEFAULT FALSE"
+                            )
+                        )
+                    print("schema_fix=form_template.verification_prefill_enabled_added")
                 # Ensure feature_flags has expected columns added in recent releases.
                 if "feature_flags" in insp.get_table_names():
                     ff_cols = {c["name"] for c in insp.get_columns("feature_flags")}

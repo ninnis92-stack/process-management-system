@@ -15,6 +15,34 @@
   </div>
 {% endif %}
 
+<section class="workflow-overview mb-3">
+  <div class="workflow-overview__path surface-panel">
+    {{ section_heading('Workflow path', 'See the recent route this request took so handoffs and loops are easier to spot.', compact=True) }}
+    <div class="workflow-path">
+      {% for step in recent_status_path %}
+        <div class="workflow-path__step {% if step == req.status %}is-current{% endif %}">
+          <span class="workflow-path__label">{{ step.replace('_', ' ').title() }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="workflow-overview__actions surface-panel">
+    {{ section_heading('Recommended next actions', 'These are the currently allowed moves for your department from this status.', compact=True) }}
+    {% if suggested_next_actions %}
+      <div class="next-action-list">
+        {% for code, label in suggested_next_actions %}
+          <div class="next-action-card">
+            <div class="next-action-card__title">{{ label }}</div>
+            <div class="next-action-card__meta">{{ code.replace('_', ' ').title() }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-muted small">No direct actions are available from this status for your department.</div>
+    {% endif %}
+  </div>
+</section>
+
 <section class="surface-panel surface-panel-muted mb-3">
 <div class="meta-badge-row mb-3">
   {% set icon = {
