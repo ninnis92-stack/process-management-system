@@ -435,6 +435,14 @@ def create_app():
                     pass
                 rolling_quotes_enabled = bool(cfg.rolling_quotes_enabled)
                 rolling_quotes = cfg.rolling_quotes or []
+                # allow per-user override of the active set
+                try:
+                    if current_user.is_authenticated and getattr(current_user, 'quote_set', None):
+                        user_set = current_user.quote_set
+                        if user_set and cfg and cfg.rolling_quote_sets and user_set in cfg.rolling_quote_sets:
+                            rolling_quotes = cfg.rolling_quote_sets.get(user_set, [])
+                except Exception:
+                    pass
                 if getattr(cfg, "logo_filename", None):
                     try:
                         logo = url_for("static", filename=cfg.logo_filename)

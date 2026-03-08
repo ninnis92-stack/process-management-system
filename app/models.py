@@ -207,6 +207,9 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     vibe_index = db.Column(db.Integer, nullable=True, default=0)
     # User preference: enable dark mode in the UI
     dark_mode = db.Column(db.Boolean, nullable=False, default=False)
+    # user preference: quote set for rolling quotes (matches keys of
+    # SiteConfig.DEFAULT_QUOTE_SETS).
+    quote_set = db.Column(db.String(80), nullable=True)
     # Persist the last department the user was viewing when they logged out
     # or switched contexts. This is used to restore their active department
     # on subsequent logins when they have multiple department assignments.

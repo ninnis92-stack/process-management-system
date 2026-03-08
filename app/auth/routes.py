@@ -315,6 +315,16 @@ def settings():
         (24, "Aurora · Aurora")
     ]
     form.vibe_index.choices = palettes
+    # populate quote-set choices from site config defaults
+    try:
+        from ..models import SiteConfig
+
+        cfg = SiteConfig.get()
+        sets = list(cfg.rolling_quote_sets.keys()) if cfg and cfg.rolling_quote_sets else list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
+    except Exception:
+        sets = list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
+    # simple label = key
+    form.quote_set.choices = [(s, s.capitalize()) for s in sets]
     if form.validate_on_submit():
         try:
             u = db.session.get(User, current_user.id)
@@ -343,6 +353,12 @@ def settings():
                 if not external_theme_loaded and hasattr(form, 'vibe_index'):
                     try:
                         u.vibe_index = int(form.vibe_index.data)
+                    except Exception:
+                        pass
+                # persist the user's quote set preference (may be None/empty)
+                if hasattr(form, 'quote_set'):
+                    try:
+                        u.quote_set = form.quote_set.data or None
                     except Exception:
                         pass
                 db.session.add(u)

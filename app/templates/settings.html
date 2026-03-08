@@ -28,6 +28,19 @@
           </div>
         {% endif %}
 
+        {% if form.quote_set %}
+          <div class="mb-3">
+            <label for="quote_set" class="form-label">Rolling Quote Set</label>
+            <select class="form-select" id="quote_set" name="quote_set">
+              <option value="">(use site default)</option>
+              {% for val, label in form.quote_set.choices %}
+                <option value="{{ val }}" {% if (current_user.quote_set is not none and current_user.quote_set == val) or (form.quote_set.data is not none and form.quote_set.data == val) %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Select which set of rolling quotes you'd like to see; leave blank to follow the site default.</div>
+          </div>
+        {% endif %}
+
         <button class="btn btn-primary" type="submit" id="darkModeSubmitBtn">{{ 'Disable dark mode' if dark_mode_enabled else 'Enable dark mode' }}</button>
       </form>
     </div>
