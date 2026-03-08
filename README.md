@@ -217,6 +217,15 @@ Verification and quick troubleshooting
 fly logs -a process-management-prototype-lingering-bush-6175
 ```
 
+
+### Recent deployment notes
+
+- 2026‑03‑07: pushed new flag `ALLOW_IMPERSONATION` which disables the admin
+  "act as" buttons by default; UI/handlers skip impersonation when off.  Full
+  test suite (79 tests) passed locally.  Deployed to Fly and ran remote smoke
+  check (health /, login pages) – all returned 200.  Cleaned smoke rows via
+  `/admin/debug/cleanup` and re‑verified `/health` is 200.
+
 - Re-run smoke scripts locally (requires virtualenv activation):
 
 ```bash
