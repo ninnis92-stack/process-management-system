@@ -387,19 +387,50 @@
     return `rgb(${dr}, ${dg}, ${db})`;
   }
 
+  function mixHex(hexA, hexB, weightA) {
+    const a = hexToRgb(hexA);
+    const b = hexToRgb(hexB);
+    const wa = Math.max(0, Math.min(1, weightA));
+    const wb = 1 - wa;
+    return `rgb(${Math.round(a.r * wa + b.r * wb)}, ${Math.round(a.g * wa + b.g * wb)}, ${Math.round(a.b * wa + b.b * wb)})`;
+  }
+
+  function isDarkModeEnabled() {
+    return document.body.classList.contains('dark-mode');
+  }
+
   function applyTheme(idx) {
     const p = palettes[idx] || palettes[0];
     const root = document.documentElement;
-    root.style.setProperty("--accent", p.accent);
-    root.style.setProperty("--accent-2", p.accent2 || p.accent);
-    // gentle nav background derived from the accent (muted for pastel palettes)
-    root.style.setProperty("--nav-bg", darkenHex(p.accent, 0.56));
     const rgb = hexToRgb(p.accent);
-    root.style.setProperty("--focus", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.16)`);
+    const darkMode = isDarkModeEnabled();
+
+    root.style.setProperty("--accent", p.accent);
     root.style.setProperty(
-      "--page-bg",
-      `radial-gradient(circle at 20% 20%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.10), transparent 30%), radial-gradient(circle at 80% 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.06), transparent 28%), #fbfcfe`
+      "--accent-2",
+      darkMode ? mixHex(p.accent, "#ffffff", 0.35) : (p.accent2 || p.accent)
     );
+
+    if (darkMode) {
+      root.style.setProperty("--nav-bg", mixHex(p.accent, "#202124", 0.18));
+      root.style.setProperty("--surface", mixHex(p.accent, "#1e1e1e", 0.10));
+      root.style.setProperty("--border", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.22)`);
+      root.style.setProperty("--focus", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.28)`);
+      root.style.setProperty(
+        "--page-bg",
+        `radial-gradient(circle at 20% 20%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18), transparent 30%), radial-gradient(circle at 80% 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12), transparent 28%), #121212`
+      );
+    } else {
+      root.style.setProperty("--nav-bg", darkenHex(p.accent, 0.56));
+      root.style.setProperty("--surface", "#ffffff");
+      root.style.setProperty("--border", "#e6e9ee");
+      root.style.setProperty("--focus", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.16)`);
+      root.style.setProperty(
+        "--page-bg",
+        `radial-gradient(circle at 20% 20%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.10), transparent 30%), radial-gradient(circle at 80% 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.06), transparent 28%), #fbfcfe`
+      );
+    }
+
     // Update any visible vibe labels (global and department-facing)
     const vibeLabels = document.querySelectorAll('.vibeLabel, #vibeLabel');
     vibeLabels.forEach(el => { try { el.textContent = (p.theme || p.name); } catch(e){} });

@@ -57,3 +57,25 @@ def test_dark_mode_not_added_by_default(client, app):
     m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
     assert m, "no body tag?"
     assert b"dark-mode" not in m.group(1)
+
+
+def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):
+    make_user(app, dark_mode=True)
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/auth/settings")
+    assert rv.status_code == 200
+    assert b'id="darkModeLabel">Disable dark mode<' in rv.data
+    assert b'id="darkModeSubmitBtn">Disable dark mode<' in rv.data
+
+
+def test_settings_page_shows_enable_text_when_dark_mode_disabled(client, app):
+    make_user(app, dark_mode=False)
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/auth/settings")
+    assert rv.status_code == 200
+    assert b'id="darkModeLabel">Enable dark mode<' in rv.data
+    assert b'id="darkModeSubmitBtn">Enable dark mode<' in rv.data
