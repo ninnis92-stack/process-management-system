@@ -8,7 +8,7 @@ from wtforms import (
     TextAreaField,
 )
 from wtforms.fields import EmailField
-from wtforms.validators import DataRequired, Email, Optional, Length
+from wtforms.validators import DataRequired, Email, Optional, Length, URL
 from wtforms.validators import AnyOf
 from wtforms import ValidationError
 from wtforms import IntegerField
@@ -62,6 +62,9 @@ class SiteConfigForm(FlaskForm):
     clear_logo = BooleanField("Remove current logo", default=False)
     navbar_banner = StringField(
         "Navbar banner text", validators=[Optional(), Length(max=500)]
+    )
+    company_url = StringField(
+        "Company URL", validators=[Optional(), Length(max=255), URL(message="Must be a valid URL")] 
     )
     show_banner = BooleanField("Show banner", default=False)
     rolling_quotes = TextAreaField(
@@ -170,6 +173,10 @@ class StatusOptionForm(FlaskForm):
     )
     screenshot_required = BooleanField(
         "Require screenshot when this status sends back to Dept B", default=False
+    )
+    approval_stages_text = TextAreaField(
+        "Approval stages",
+        validators=[Optional(), Length(max=4000)],
     )
     submit = SubmitField("Save Status")
 

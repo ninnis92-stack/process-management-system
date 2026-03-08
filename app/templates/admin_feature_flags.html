@@ -6,25 +6,25 @@
   <form method="post" class="admin-feature-flags">
     {{ form.hidden_tag() }}
 
-    {{ toggle_checkbox(form.enable_notifications, 'Disable notifications', 'Enable notifications') }}
+    {{ toggle_checkbox(form.enable_notifications, 'Notifications enabled', 'Notifications disabled') }}
 
-    {{ toggle_checkbox(form.enable_nudges, 'Disable nudges', 'Enable nudges') }}
+    {{ toggle_checkbox(form.enable_nudges, 'Automated nudges enabled', 'Automated nudges disabled') }}
 
-    {{ toggle_checkbox(form.allow_user_nudges, 'Disable user nudges', 'Enable user nudges') }}
+    {{ toggle_checkbox(form.allow_user_nudges, 'User nudges enabled', 'User nudges disabled') }}
       <div class="form-text">When enabled, users may push nudges to other users (not recommended).</div>
 
-    {{ toggle_checkbox(form.vibe_enabled, 'Disable Vibe button UI', 'Enable Vibe button UI') }}
+    {{ toggle_checkbox(form.vibe_enabled, 'Vibe button UI enabled', 'Vibe button UI disabled') }}
 
-    {{ toggle_checkbox(form.rolling_quotes_enabled, 'Disable rolling quotes', 'Enable rolling quotes') }}
+    {{ toggle_checkbox(form.rolling_quotes_enabled, 'Rolling quotes enabled', 'Rolling quotes disabled') }}
       <div class="form-text">When disabled, rolling quotes will not be shown anywhere in the UI.</div>
 
-    {{ toggle_checkbox(form.sso_admin_sync_enabled, 'Disable SSO admin sync', 'Enable SSO admin sync') }}
+    {{ toggle_checkbox(form.sso_admin_sync_enabled, 'SSO admin sync enabled', 'SSO admin sync disabled') }}
       <div class="form-text">When enabled, users can be allocated admin access from organization-managed SSO claims or APIs. Manual admin assignment in the app still works either way.</div>
 
-    {{ toggle_checkbox(form.sso_department_sync_enabled, 'Disable SSO department sync', 'Enable SSO department sync') }}
+    {{ toggle_checkbox(form.sso_department_sync_enabled, 'SSO department sync enabled', 'SSO department sync disabled') }}
       <div class="form-text">When enabled, SSO-linked users whose primary department is not marked as admin-managed will have it reassigned from the configured SSO department claim on login.</div>
 
-    {{ toggle_checkbox(form.enable_external_forms, 'Disable external forms', 'Enable external forms') }}
+    {{ toggle_checkbox(form.enable_external_forms, 'External forms enabled', 'External forms disabled') }}
       <div class="form-text">When enabled, admins may mark a Form Template as using an external 3rd-party form; those templates will direct users to the external provider and accept webhook callbacks.</div>
 
     <button class="btn btn-primary">Save</button>

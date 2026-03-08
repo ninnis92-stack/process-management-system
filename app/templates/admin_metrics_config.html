@@ -16,7 +16,7 @@
         <div class="card-body">
           {{ form.hidden_tag() }}
 
-          {{ toggle_checkbox(form.enabled, 'Disable metrics tracking', 'Enable metrics tracking') }}
+          {{ toggle_checkbox(form.enabled, 'Metrics tracking enabled', 'Metrics tracking disabled') }}
 
           <div class="form-check mb-3">
             {{ form.track_request_created(class_='form-check-input') }}

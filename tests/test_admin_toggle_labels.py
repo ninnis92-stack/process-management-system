@@ -32,10 +32,10 @@ def make_admin(app):
 
 
 def test_feature_flags_render_correct_action_labels(client, app):
-    """Labels on the feature‑flags page should describe the *action*.
+    """Labels on the feature‑flags page should describe the current state.
 
-    The macros we added generate either "Enable …" or "Disable …" based on
-    the current stored value.
+    Checked switches now read as enabled and unchecked switches read as
+    disabled so the UI matches what an admin is actually seeing.
     """
 
     make_admin(app)
@@ -53,14 +53,10 @@ def test_feature_flags_render_correct_action_labels(client, app):
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
 
-    # notification toggle should show "Disable" when enabled
-    # ensure the macro added data attributes so JS could update the label
-    assert 'data-toggle-text-on="Disable notifications"' in html
-    assert 'Disable notifications' in html
-    # nudge toggle should show "Enable" when disabled
-    assert 'Enable nudges' in html
-    # vibe toggle text derived from label above
-    assert 'Disable Vibe button UI' in html
+    assert 'data-toggle-text-checked="Notifications enabled"' in html
+    assert 'Notifications enabled' in html
+    assert 'Automated nudges disabled' in html
+    assert 'Vibe button UI enabled' in html
 
     # simulate saving new values and verify the returned page reflects them
     rv2 = client.post(
@@ -79,7 +75,33 @@ def test_feature_flags_render_correct_action_labels(client, app):
     )
     assert rv2.status_code == 200
     html2 = rv2.get_data(as_text=True)
-    assert 'Disable nudges' in html2  # label updated after save
+    assert 'Automated nudges enabled' in html2
+
+
+def test_feature_flags_post_unchecked_boxes_disable_flags(client, app):
+    make_admin(app)
+    with app.app_context():
+        flags = FeatureFlags.get()
+        flags.enable_notifications = True
+        flags.enable_nudges = True
+        flags.allow_user_nudges = True
+        db.session.commit()
+
+    rv = login_admin(client)
+    assert rv.status_code == 200
+
+    rv = client.post(
+        "/admin/feature_flags",
+        data={},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+
+    with app.app_context():
+        flags = FeatureFlags.get()
+        assert flags.enable_notifications is False
+        assert flags.enable_nudges is False
+        assert flags.allow_user_nudges is False
 
 
 def test_reject_request_config_label_describes_state(client, app):
@@ -94,9 +116,9 @@ def test_reject_request_config_label_describes_state(client, app):
     rv = client.get("/admin/reject_request_config")
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
-    assert 'Enable reject request' in html
+    assert 'Reject request disabled' in html
     # the checkbox should also expose the on/off texts as attributes
-    assert 'data-toggle-text-on="Disable reject request"' in html
+    assert 'data-toggle-text-checked="Reject request enabled"' in html
 def test_dashboard_notification_toggle(client, app):
     """Verify dashboard toggle tile label updates with flag state and posts correctly."""
     make_admin(app)

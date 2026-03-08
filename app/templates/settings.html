@@ -16,9 +16,9 @@
 
           <div class="form-check mb-3">
             {{ form.dark_mode(class_='form-check-input') }}
-            <label class="form-check-label" for="dark_mode" id="darkModeLabel">{{ 'Disable dark mode' if dark_mode_enabled else 'Enable dark mode' }}</label>
+            <label class="form-check-label" for="dark_mode" id="darkModeLabel">{{ 'Dark mode enabled' if dark_mode_enabled else 'Dark mode disabled' }}</label>
           </div>
-          {{ toggle_checkbox(form.quotes_enabled, 'Hide rotating quotes', 'Show rotating quotes') }}
+          {{ toggle_checkbox(form.quotes_enabled, 'Rotating quotes enabled', 'Rotating quotes disabled') }}
 
         {% set external_theme = (active_theme_css or site_theme_preset != 'default') %}
         {% if not external_theme and form.vibe_index %}
@@ -45,7 +45,7 @@
           </div>
         {% endif %}
 
-        <button class="btn btn-primary" type="submit" id="darkModeSubmitBtn">{{ 'Disable dark mode' if dark_mode_enabled else 'Enable dark mode' }}</button>
+        <button class="btn btn-primary" type="submit" id="darkModeSubmitBtn">Save settings</button>
       </form>
     </div>
   </div>
@@ -58,9 +58,8 @@
       if (!checkbox || !label || !submitBtn) return;
 
       const syncDarkModeText = () => {
-        const actionText = checkbox.checked ? 'Disable dark mode' : 'Enable dark mode';
-        label.textContent = actionText;
-        submitBtn.textContent = actionText;
+        label.textContent = checkbox.checked ? 'Dark mode enabled' : 'Dark mode disabled';
+        submitBtn.textContent = 'Save settings';
       };
 
       checkbox.addEventListener('change', syncDarkModeText);

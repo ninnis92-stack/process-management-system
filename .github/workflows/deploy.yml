@@ -7,6 +7,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      APP_URL: https://process-management-prototype-lingering-bush-6175.fly.dev
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -19,7 +21,7 @@ jobs:
           pip install -r requirements.txt
       - name: Run tests
         run: |
-          pytest -q
+          PYTHONPATH=. pytest -q
       - name: Install flyctl
         run: |
           curl -L https://fly.io/install.sh | sh
@@ -28,3 +30,20 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           ~/.fly/bin/flyctl deploy -a process-management-prototype-lingering-bush-6175
+      - name: Run post-deploy smoke checks
+        env:
+          SMOKE_ADMIN_EMAIL: ${{ secrets.PRODUCTION_ADMIN_EMAIL || 'admin@example.com' }}
+          SMOKE_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_ADMIN_PASSWORD || 'admin123' }}
+          WEBHOOK_SHARED_SECRET: ${{ secrets.WEBHOOK_SHARED_SECRET }}
+        run: |
+          PYTHONPATH=. bash scripts/smoke_test.sh "$APP_URL"
+          PYTHONPATH=. python scripts/smoke_deployed_login.py --url "$APP_URL"
+          PYTHONPATH=. python scripts/admin_smoke.py --url "$APP_URL"
+          PYTHONPATH=. python scripts/webhook_smoke.py --url "$APP_URL" --secret "$WEBHOOK_SHARED_SECRET"
+      - name: Clear smoke data
+        if: always()
+        env:
+          SMOKE_ADMIN_EMAIL: ${{ secrets.PRODUCTION_ADMIN_EMAIL || 'admin@example.com' }}
+          SMOKE_ADMIN_PASSWORD: ${{ secrets.PRODUCTION_ADMIN_PASSWORD || 'admin123' }}
+        run: |
+          PYTHONPATH=. python scripts/clear_smoke_remote.py --url "$APP_URL"

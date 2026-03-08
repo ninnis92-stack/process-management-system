@@ -1,18 +1,17 @@
-# See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
+# Manual fallback deploy so `deploy.yml` remains the primary automated path.
 
-name: Fly Deploy
+name: Fly Deploy Manual
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+
 jobs:
   deploy:
     name: Deploy app
     runs-on: ubuntu-latest
-    concurrency: deploy-group    # optional: ensure only one action runs at a time
+    concurrency: deploy-group
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --remote-only
+      - run: flyctl deploy --remote-only -a process-management-prototype-lingering-bush-6175
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

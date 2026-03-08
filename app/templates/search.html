@@ -8,25 +8,142 @@
     <p class="page-header__lede mb-0">Find requests by ID, title, description, artifact data, or submission content.</p>
   </div>
 </section>
+<section class="surface-panel search-hero mb-3">
+  <div>
+    <div class="search-hero__eyebrow">Fast retrieval</div>
+    <h5 class="mb-1">Search, pin, and work complex queues without memorizing status names.</h5>
+    <p class="text-muted mb-0">Saved views, approval filters, SLA states, and bulk priority updates are all grouped here so the app feels like a finished operations tool instead of a loose collection of screens.</p>
+  </div>
+  <div class="search-hero__chips">
+    <span class="search-hero__chip">Saved queues</span>
+    <span class="search-hero__chip">Approval routing</span>
+    <span class="search-hero__chip">SLA focus</span>
+  </div>
+</section>
 <form class="page-toolbar surface-panel dashboard-search" method="get" action="{{ url_for('requests.search_requests') }}">
-  <div class="input-group">
-    <input type="text" name="q" class="form-control" placeholder="Search by request ID, title, description, part, or submission text" value="{{ q }}">
-    <button class="btn btn-primary" type="submit">Search</button>
+  <div class="row g-2 align-items-end">
+    <div class="col-lg-4">
+      <label class="form-label">Keywords</label>
+      <input type="text" name="q" class="form-control" placeholder="Search by request ID, title, description, part, or submission text" value="{{ q }}">
+    </div>
+    <div class="col-md-3 col-lg-2">
+      <label class="form-label">Status</label>
+      <select class="form-select" name="status">
+        <option value="" {% if not status_filter %}selected{% endif %}>All statuses</option>
+        {% for status in ['NEW_FROM_A','UNDER_REVIEW','B_IN_PROGRESS','WAITING_ON_A_RESPONSE','PENDING_C_REVIEW','EXEC_APPROVAL','C_NEEDS_CHANGES','C_APPROVED','B_FINAL_REVIEW','SENT_TO_A','CLOSED'] %}
+          <option value="{{ status }}" {% if status_filter == status %}selected{% endif %}>{{ status }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3 col-lg-2">
+      <label class="form-label">Priority</label>
+      <select class="form-select" name="priority">
+        <option value="" {% if not priority_filter %}selected{% endif %}>All priorities</option>
+        {% for priority in ['low', 'medium', 'high'] %}
+          <option value="{{ priority }}" {% if priority_filter == priority %}selected{% endif %}>{{ priority.title() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3 col-lg-2">
+      <label class="form-label">SLA</label>
+      <select class="form-select" name="sla">
+        <option value="" {% if not sla_filter %}selected{% endif %}>All</option>
+        <option value="breached" {% if sla_filter == 'breached' %}selected{% endif %}>Breached</option>
+        <option value="at_risk" {% if sla_filter == 'at_risk' %}selected{% endif %}>At risk</option>
+        <option value="on_track" {% if sla_filter == 'on_track' %}selected{% endif %}>On track</option>
+      </select>
+    </div>
+    <div class="col-md-3 col-lg-1">
+      <div class="form-check mt-4 pt-2">
+        <input class="form-check-input" type="checkbox" id="approvalOnly" name="approval_only" value="1" {% if approval_only %}checked{% endif %}>
+        <label class="form-check-label" for="approvalOnly">Approvals</label>
+      </div>
+    </div>
+    <div class="col-lg-1 d-grid">
+      <button class="btn btn-primary" type="submit">Search</button>
+    </div>
   </div>
 </form>
 
-{% if not q %}
-  <section class="helper-grid mb-3">
-    {{ helper_card('Search by request number', 'Paste a known request ID for the fastest way back into a specific workspace.', '🔎') }}
-    {{ helper_card('Search by business context', 'Descriptions, titles, artifact values, and submission text are all included in the results.', '🧠') }}
+{% if saved_views %}
+  <section class="surface-panel mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+      <div>
+        <h5 class="mb-0">Saved views</h5>
+        <small class="text-muted">Pin your most-used queues as reusable dashboard shortcuts.</small>
+      </div>
+    </div>
+    <div class="saved-view-grid">
+      {% for view in saved_views %}
+        <div class="saved-view-card border rounded px-3 py-3">
+          <div class="fw-semibold">
+            <a class="text-reset" href="{{ url_for('requests.open_saved_search_view', view_id=view.id) }}">{{ view.name }}</a>
+            {% if view.is_default %}<span class="badge bg-primary ms-1">Default</span>{% endif %}
+          </div>
+          <div class="small text-muted">{{ view.last_used_at.strftime('%Y-%m-%d %H:%M') if view.last_used_at else 'Saved for later' }}</div>
+          <div class="d-flex gap-2 mt-2">
+            <form method="post" action="{{ url_for('requests.set_default_saved_search_view', view_id=view.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-secondary" type="submit">Make default</button>
+            </form>
+            <form method="post" action="{{ url_for('requests.delete_saved_search_view', view_id=view.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
   </section>
 {% endif %}
 
-{% if q and results is not none %}
-  <section class="surface-panel section-intro">
-    <div class="mb-0 text-muted">Showing {{ results|length }} result{{ '' if results|length == 1 else 's' }} for "{{ q }}"</div>
+{% if not (q or status_filter or priority_filter or sla_filter or approval_only) %}
+  <section class="helper-grid mb-3">
+    {{ helper_card('Search by request number', 'Paste a known request ID for the fastest way back into a specific workspace.', '🔎') }}
+    {{ helper_card('Search by business context', 'Descriptions, titles, artifact values, and submission text are all included in the results.', '🧠') }}
+    {{ helper_card('Filter by SLA or approvals', 'Use the SLA and approvals filters to work breach queues, exec approvals, and Department C reviews without memorizing status names.', '⏱️') }}
   </section>
-  <div class="list-group surface-panel list-surface">
+{% endif %}
+
+{% if (q or status_filter or priority_filter or sla_filter or approval_only) and results is not none %}
+  <section class="surface-panel section-intro">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div class="mb-0 text-muted">Showing {{ results|length }} result{{ '' if results|length == 1 else 's' }}{% if q %} for "{{ q }}"{% endif %}</div>
+      <div class="search-filter-summary">
+        {% if status_filter %}<span class="search-filter-summary__chip">Status · {{ status_filter }}</span>{% endif %}
+        {% if priority_filter %}<span class="search-filter-summary__chip">Priority · {{ priority_filter.title() }}</span>{% endif %}
+        {% if sla_filter %}<span class="search-filter-summary__chip">SLA · {{ sla_filter.replace('_', ' ').title() }}</span>{% endif %}
+        {% if approval_only %}<span class="search-filter-summary__chip">Approval queues</span>{% endif %}
+      </div>
+    </div>
+  </section>
+  {% if current_user.is_admin and results %}
+    <section class="surface-panel mb-3">
+      <form method="post" action="{{ url_for('requests.bulk_update_requests') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="q" value="{{ q }}">
+        <input type="hidden" name="status" value="{{ status_filter }}">
+        <input type="hidden" name="priority_filter" value="{{ priority_filter }}">
+        <input type="hidden" name="sla" value="{{ sla_filter }}">
+        {% if approval_only %}<input type="hidden" name="approval_only" value="1">{% endif %}
+        <div class="d-flex flex-wrap align-items-end gap-2">
+          <div>
+            <label class="form-label">Bulk priority update</label>
+            <select class="form-select" name="priority">
+              <option value="">Choose priority</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <button class="btn btn-outline-primary" type="submit">Apply to selected</button>
+          <div class="small text-muted">Admins can batch retag priority from search results without opening each request.</div>
+        </div>
+            <div class="list-group list-surface mt-3">
+  {% endif %}
+          {% if not current_user.is_admin or not results %}
+          <div class="list-group surface-panel list-surface">
+          {% endif %}
     {% for r in results %}
       {% set cls = {
         'NEW_FROM_A': 'status-new',
@@ -46,22 +163,62 @@
         'SENT_TO_A': '📨',
         'CLOSED': '✅'
       }.get(r.status, '•') %}
-      <div class="list-group-item list-group-item-action">
+      <div class="list-group-item list-group-item-action search-result-card">
         <div class="d-flex justify-content-between">
-          <strong>#{{ r.id }} · <a class="text-reset" href="{{ url_for('requests.request_detail', request_id=r.id) }}">{{ r.title }}</a></strong>
-          <span class="badge status-pill {{ cls }}">{{ icon }} {{ r.status }}</span>
+          <div class="d-flex align-items-center gap-2">
+            {% if current_user.is_admin %}
+              <input class="form-check-input" type="checkbox" name="request_ids" value="{{ r.id }}" aria-label="Select request {{ r.id }}">
+            {% endif %}
+            <strong>#{{ r.id }} · <a class="text-reset" href="{{ url_for('requests.request_detail', request_id=r.id) }}">{{ r.title }}</a></strong>
+          </div>
+          <div class="d-flex flex-wrap gap-1 justify-content-end">
+            <span class="badge status-pill {{ cls }}">{{ icon }} {{ r.status }}</span>
+            {% if r.sla_state == 'breached' %}
+              <span class="badge bg-danger">SLA breached</span>
+            {% elif r.sla_state == 'at_risk' %}
+              <span class="badge bg-warning text-dark">SLA at risk</span>
+            {% elif r.sla_state == 'on_track' %}
+              <span class="badge bg-success">SLA on track</span>
+            {% endif %}
+            {% if r.status in ['PENDING_C_REVIEW', 'EXEC_APPROVAL'] %}
+              <span class="badge bg-secondary">Approval queue</span>
+            {% endif %}
+          </div>
         </div>
         <small class="text-muted">
           {{ r.pricebook_display }} · {{ r.priority }}
           · Due: {{ r.due_at.strftime('%b %d, %Y %I:%M %p') if r.due_at else '—' }}
           · Updated: {{ r.updated_at.strftime('%b %d, %Y %I:%M %p') if r.updated_at else '—' }}
         </small>
+        <div class="small text-muted mt-2">Open the request workspace to update signoffs, comments, artifacts, or handoff summaries.</div>
       </div>
     {% else %}
       <div class="list-group-item text-muted">No results.</div>
     {% endfor %}
   </div>
-{% elif not q %}
+  {% if current_user.is_admin and results %}
+        </div>
+      </form>
+    </section>
+  {% endif %}
+  <section class="surface-panel mb-3">
+    <form method="post" action="{{ url_for('requests.save_search_view') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="status" value="{{ status_filter }}">
+      <input type="hidden" name="priority" value="{{ priority_filter }}">
+      <input type="hidden" name="sla" value="{{ sla_filter }}">
+      {% if approval_only %}<input type="hidden" name="approval_only" value="1">{% endif %}
+      <div class="d-flex flex-wrap align-items-end gap-2">
+        <div>
+          <label class="form-label">Save this view</label>
+          <input class="form-control" type="text" name="name" placeholder="e.g. My breached approvals">
+        </div>
+        <button class="btn btn-outline-primary" type="submit">Save view</button>
+      </div>
+    </form>
+  </section>
+{% elif not (q or status_filter or priority_filter or sla_filter or approval_only) %}
   <div class="empty-state">Enter a request ID or keywords to search.</div>
 {% else %}
   <div class="empty-state">No results.</div>

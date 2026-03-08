@@ -1,5 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
+{% set totals = namespace(items=(requests|length if requests is defined and requests is not none else 0)) %}
+{% if buckets is defined and buckets %}
+  {% set totals.items = 0 %}
+  {% for bucket_items in buckets.values() %}
+    {% set totals.items = totals.items + (bucket_items|length) %}
+  {% endfor %}
+{% endif %}
 <section class="page-header">
   <div>
     <div class="page-header__eyebrow">Work management</div>
@@ -13,6 +20,46 @@
   {% endif %}
 </section>
 
+<section class="surface-panel dashboard-launchpad mb-3">
+  <div class="dashboard-launchpad__intro">
+    <div>
+      <div class="dashboard-launchpad__eyebrow">Operations cockpit</div>
+      <h4 class="mb-1">
+        {% if mode == 'A' %}
+          Keep incoming requests moving with fewer clicks
+        {% elif mode == 'B' %}
+          Work handoffs, approvals, and escalations from one queue
+        {% else %}
+          Review approvals with a clear signoff path
+        {% endif %}
+      </h4>
+      <p class="text-muted mb-0">
+        {% if mode == 'A' %}
+          Create requests, monitor returns from Department B, and reopen recent closures without losing context.
+        {% elif mode == 'B' %}
+          See backlog volume, saved queue shortcuts, and approval pressure before opening the next request.
+        {% else %}
+          Focus on the next review, the items waiting on other approvers, and the requests ready to hand back.
+        {% endif %}
+      </p>
+    </div>
+    <div class="dashboard-launchpad__stats">
+      <div class="dashboard-stat-card">
+        <span class="dashboard-stat-card__label">Visible work</span>
+        <strong class="dashboard-stat-card__value">{{ totals.items }}</strong>
+      </div>
+      <div class="dashboard-stat-card">
+        <span class="dashboard-stat-card__label">Saved views</span>
+        <strong class="dashboard-stat-card__value">{{ saved_views|length if saved_views else 0 }}</strong>
+      </div>
+      <div class="dashboard-stat-card">
+        <span class="dashboard-stat-card__label">Approval cards</span>
+        <strong class="dashboard-stat-card__value">{{ approval_cards|length if approval_cards else 0 }}</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
 <form class="page-toolbar surface-panel dashboard-search" method="get" action="{{ url_for('requests.search_requests') }}">
   <input id="searchInput" name="q" class="form-control me-2" type="search" placeholder="Search by request # or description" aria-label="Search" value="{{ request.args.get('q','') }}">
   <button class="btn btn-outline-secondary" type="submit">Search</button>
@@ -20,6 +67,55 @@
     <a href="{{ url_for('requests.dashboard') }}" class="btn btn-link ms-2">Clear</a>
   {% endif %}
 </form>
+
+{% if saved_views %}
+  <section class="surface-panel mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h5 class="mb-0">Personal dashboard shortcuts</h5>
+        <small class="text-muted">Jump into your saved queues, escalations, and approval views.</small>
+      </div>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('requests.search_requests') }}">Manage saved views</a>
+    </div>
+    <div class="dashboard-chip-list mt-3">
+      {% for view in saved_views %}
+        <a class="dashboard-chip {% if view.is_default %}is-primary{% endif %}" href="{{ url_for('requests.open_saved_search_view', view_id=view.id) }}">
+          <span class="dashboard-chip__title">{{ view.name }}</span>
+          <span class="dashboard-chip__meta">{{ 'Default shortcut' if view.is_default else 'Saved queue' }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+{% if approval_cards %}
+  <section class="mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+      <div>
+        <h5 class="mb-0">Approval queue snapshot</h5>
+        <small class="text-muted">Use these cards to jump straight into signoff work and approval follow-up.</small>
+      </div>
+    </div>
+    <div class="row g-3">
+      {% for card in approval_cards %}
+        <div class="col-md-4">
+          <a class="card h-100 text-reset card-link-wrap request-summary-card approval-card" href="{{ card.href }}">
+            <div class="card-body">
+              <div class="small text-muted">Approval queue</div>
+              <div class="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <div class="fw-semibold">{{ card.title }}</div>
+                  <div class="small text-muted mt-1">{{ card.description }}</div>
+                </div>
+                <span class="approval-card__count">{{ card.count }}</span>
+              </div>
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
 
 {% if bucket_list %}
   <div class="page-toolbar surface-panel bucket-toolbar">
@@ -46,6 +142,7 @@
         <h5 class="mb-0">Dept A — Your requests</h5>
         <small class="text-muted">Submit, approve, or reopen finished work.</small>
       </div>
+      <span class="dashboard-section-badge">{{ requests|length if requests else 0 }} active</span>
     </div>
 
     <div class="row g-3">
@@ -77,6 +174,7 @@
         <h5 class="mb-0">Dept B — Work queue</h5>
         <small class="text-muted">Filter by status or browse buckets.</small>
       </div>
+      <span class="dashboard-section-badge">{{ totals.items }} visible</span>
     </div>
 
     {% if not bucket_list %}
@@ -91,7 +189,7 @@
       {% set visible_items = items|selectattr('status', 'ne', 'CLOSED')|list %}
     {% endif %}
     {% if visible_items|length %}
-      <div class="card mb-3" id="bucket-{{ label|replace(' ', '-')|lower() }}">
+      <div class="card mb-3 dashboard-bucket-card" id="bucket-{{ label|replace(' ', '-')|lower() }}">
         <div class="card-header d-flex justify-content-between align-items-center">
           <strong>{{ label }}</strong>
           <span class="badge status-pill text-bg-light text-dark">{{ visible_items|length }} item{{ '' if visible_items|length == 1 else 's' }}</span>
@@ -137,6 +235,7 @@
         <h5 class="mb-0">Dept C — Pending review</h5>
         <small class="text-muted">Review handoffs awaiting your approval or change request.</small>
       </div>
+      <span class="dashboard-section-badge">{{ requests|length if requests else 0 }} in queue</span>
     </div>
   </section>
 

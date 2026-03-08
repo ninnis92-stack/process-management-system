@@ -9,31 +9,67 @@
     </div>
   </section>
 
+  <section class="helper-grid mb-3">
+    <div class="helper-card">
+      <div class="helper-card__icon" aria-hidden="true">🛰️</div>
+      <div><div class="helper-card__title">Pending events</div><div class="helper-card__text">{{ summary.pending }}</div></div>
+    </div>
+    <div class="helper-card">
+      <div class="helper-card__icon" aria-hidden="true">⚠️</div>
+      <div><div class="helper-card__title">Failed events</div><div class="helper-card__text">{{ summary.failed }}</div></div>
+    </div>
+    <div class="helper-card">
+      <div class="helper-card__icon" aria-hidden="true">✅</div>
+      <div><div class="helper-card__title">Delivered events</div><div class="helper-card__text">{{ summary.delivered }}</div></div>
+    </div>
+    <div class="helper-card">
+      <div class="helper-card__icon" aria-hidden="true">🛠️</div>
+      <div><div class="helper-card__title">Jobs needing attention</div><div class="helper-card__text">{{ summary.jobs_failed }} failed · {{ summary.jobs_running }} active</div></div>
+    </div>
+  </section>
+
   <section class="surface-panel table-shell">
     <div class="table-responsive">
       <table class="table align-middle mb-0">
         <thead>
           <tr>
             <th>Event</th>
+            <th>Provider</th>
+            <th>Correlation</th>
             <th>Destination</th>
             <th>Status</th>
             <th>Created</th>
+            <th>Next retry</th>
             <th>Delivered</th>
             <th>Error</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
           {% for event in events %}
             <tr>
               <td>{{ event.event_name }}</td>
+              <td>{{ event.provider_key or '—' }}</td>
+              <td><span class="small text-muted">{{ event.correlation_id or '—' }}</span></td>
               <td>{{ event.destination_kind }}</td>
               <td>{{ event.status }}</td>
               <td>{{ event.created_at.strftime('%Y-%m-%d %H:%M') if event.created_at else '—' }}</td>
+              <td>{{ event.next_retry_at.strftime('%Y-%m-%d %H:%M') if event.next_retry_at else '—' }}</td>
               <td>{{ event.delivered_at.strftime('%Y-%m-%d %H:%M') if event.delivered_at else '—' }}</td>
               <td class="small text-muted">{{ event.last_error or '—' }}</td>
+              <td>
+                {% if event.status == 'failed' %}
+                  <form method="post" action="{{ url_for('admin.retry_integration_event', event_id=event.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-primary" type="submit">Retry</button>
+                  </form>
+                {% else %}
+                  <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
             </tr>
           {% else %}
-            <tr><td colspan="6" class="text-muted">No integration events recorded yet.</td></tr>
+            <tr><td colspan="10" class="text-muted">No integration events recorded yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>

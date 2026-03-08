@@ -191,6 +191,6 @@ def test_user_settings_surface_expected_controls(app, client):
     for expected in (
         "Theme",
         "Rolling Quote Set",
-        "Show rotating quotes",
+        "Rotating quotes enabled",
     ):
         assert expected in html

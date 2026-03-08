@@ -15,6 +15,24 @@
   </div>
 {% endif %}
 
+<section class="request-workspace-summary mb-3">
+  <div class="workspace-summary-card surface-panel">
+    <span class="workspace-summary-card__label">Current status</span>
+    <strong class="workspace-summary-card__value">{{ 'Requires executive approval' if req.status == 'EXEC_APPROVAL' else req.status.replace('_', ' ').title() }}</strong>
+    <span class="workspace-summary-card__meta">Owner · Dept {{ req.owner_department }}</span>
+  </div>
+  <div class="workspace-summary-card surface-panel">
+    <span class="workspace-summary-card__label">Assignment</span>
+    <strong class="workspace-summary-card__value">{{ assigned_user.name or assigned_user.email if assigned_user else 'Unassigned' }}</strong>
+    <span class="workspace-summary-card__meta">Single owner keeps edits and handoffs coordinated</span>
+  </div>
+  <div class="workspace-summary-card surface-panel">
+    <span class="workspace-summary-card__label">Approval stages</span>
+    <strong class="workspace-summary-card__value">{{ approval_state.current_rows|length if approval_state.current_rows else 0 }}</strong>
+    <span class="workspace-summary-card__meta">{{ 'Configured signoffs active' if approval_state.has_configured_stages else 'No staged signoffs on this status' }}</span>
+  </div>
+</section>
+
 <section class="workflow-overview mb-3">
   <div class="workflow-overview__path surface-panel">
     {{ section_heading('Workflow path', 'See the recent route this request took so handoffs and loops are easier to spot.', compact=True) }}
@@ -350,9 +368,105 @@
 
     {# Dept B Controls moved into Transition section as a checkbox. #}
 
+    {% if approval_state.has_configured_stages or approval_state.history_rows %}
+    <section class="surface-panel mb-3 approval-panel">
+      {{ section_heading('Approval progress', 'Track the active signoff path, see who can approve next, and review prior signoff cycles.', compact=True) }}
+      {% if approval_state.current_rows %}
+        {% if approval_state.ready %}
+          <div class="alert alert-success py-2">All configured approval stages are complete. This request is ready for its next workflow step.</div>
+        {% elif approval_state.blocked %}
+          <div class="alert alert-warning py-2">A reviewer requested changes during this approval cycle. Update the request, then re-enter this status to start a fresh signoff cycle.</div>
+        {% else %}
+          <div class="small text-muted mb-3">Approvals are completed in order. Only the next eligible role and department can sign off the current stage.</div>
+        {% endif %}
+
+        <div class="d-flex flex-column gap-2 approval-stage-list">
+          {% for stage in approval_state.current_rows %}
+            <div class="approval-stage-card border rounded p-3">
+              <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                <div>
+                  <div class="fw-semibold approval-stage-card__title">{{ stage.stage_order }}. {{ stage.stage_name }}</div>
+                  <div class="small text-muted">
+                    {% if stage.required_department %}Dept {{ stage.required_department }}{% else %}Any department{% endif %}
+                    ·
+                    {% if stage.required_role %}{{ stage.required_role.replace('_', ' ').title() }}+{% else %}Any role{% endif %}
+                  </div>
+                </div>
+                <span class="badge approval-stage-card__badge {% if stage.state == 'approved' %}text-bg-success{% elif stage.state == 'changes_requested' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">
+                  {{ stage.state.replace('_', ' ').title() }}
+                </span>
+              </div>
+              {% if stage.decided_at %}
+                <div class="small text-muted mt-1">{{ stage.decided_by_user.email if stage.decided_by_user else 'System' }} · {{ stage.decided_at }}</div>
+              {% endif %}
+              {% if stage.decision_note %}
+                <div class="small mt-2" style="white-space:pre-wrap">{{ stage.decision_note }}</div>
+              {% endif %}
+              {% if stage.id in approval_state.actionable_ids %}
+                <form method="post" action="{{ url_for('requests.record_approval_decision', request_id=req.id, approval_id=stage.id) }}" class="mt-3">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div class="mb-2">
+                    <label class="form-label">Signoff note (optional)</label>
+                    <textarea name="note" class="form-control" rows="2" placeholder="Decision context, conditions, or follow-up details"></textarea>
+                  </div>
+                  <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-success" type="submit" name="decision" value="approve">Approve stage</button>
+                    <button class="btn btn-outline-warning" type="submit" name="decision" value="changes_requested">Request changes</button>
+                  </div>
+                </form>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% elif approval_state.has_configured_stages %}
+        <div class="text-muted small">This status is configured for approvals, but there is no active signoff cycle yet.</div>
+      {% endif %}
+
+      {% if approval_state.history_rows %}
+        <div class="mt-3 pt-3 border-top">
+          <div class="fw-semibold mb-2">Multi-step signoff history</div>
+          <div class="d-flex flex-column gap-2">
+            {% for stage in approval_state.history_rows %}
+              <div class="border rounded p-3 bg-light approval-history-card">
+                <div class="d-flex justify-content-between gap-2 flex-wrap">
+                  <div>
+                    <div class="fw-semibold">Cycle {{ stage.cycle_index }} · {{ stage.stage_order }}. {{ stage.stage_name }}</div>
+                    <div class="small text-muted">
+                      {{ stage.required_department and ('Dept ' ~ stage.required_department) or 'Any department' }}
+                      ·
+                      {{ stage.required_role and (stage.required_role.replace('_', ' ').title() ~ '+') or 'Any role' }}
+                    </div>
+                  </div>
+                  <span class="badge {% if stage.state == 'approved' %}text-bg-success{% else %}text-bg-warning{% endif %}">{{ stage.state.replace('_', ' ').title() }}</span>
+                </div>
+                <div class="small text-muted mt-1">{{ stage.decided_by_user.email if stage.decided_by_user else 'System' }} · {{ stage.decided_at or stage.created_at }}</div>
+                {% if stage.decision_note %}
+                  <div class="small mt-1" style="white-space:pre-wrap">{{ stage.decision_note }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </section>
+    {% endif %}
+
     <section class="surface-panel mb-3">
       {{ section_heading('Status update', 'Apply the next step, attach screenshots, and include any handoff summary when needed.', compact=True) }}
-        <div class="small text-muted mb-2">Note: Department A may close a ticket without providing a submission. Dept A may reopen the ticket within 48 hours after closure. Dept B will be notified when a ticket is closed.</div>
+        <div class="status-update-guidance mb-3">
+          <div class="status-update-guidance__item">
+            <strong>Handoffs</strong>
+            <span>Cross-department moves require a short summary so the next team can act without reopening chat or notes.</span>
+          </div>
+          <div class="status-update-guidance__item">
+            <strong>Attachments</strong>
+            <span>Paste or drag screenshots directly into the workspace when proof or context is required.</span>
+          </div>
+          <div class="status-update-guidance__item">
+            <strong>Closures</strong>
+            <span>Department A can close without a submission packet and can reopen within 48 hours if follow-up is needed.</span>
+          </div>
+        </div>
         {% if current_user.is_admin %}
           <div class="mb-2">
             <button id="adminNudgeBtn" type="button" class="btn btn-sm btn-outline-secondary" data-nudge-url="{{ url_for('requests.admin_nudge', request_id=req.id) }}">Start 30s Nudge</button>
@@ -394,9 +508,9 @@
         {% endif %}
         {% if transition_form.to_status.choices %}
           {% if (not req.assigned_to_user) or (req.assigned_to_user and req.assigned_to_user.id == current_user.id) %}
-          <form method="post" action="{{ url_for('requests.do_transition', request_id=req.id) }}" enctype="multipart/form-data">
+          <form method="post" action="{{ url_for('requests.do_transition', request_id=req.id) }}" enctype="multipart/form-data" class="status-update-form">
             {{ transition_form.hidden_tag() }}
-            <div class="mb-2 d-flex align-items-center">
+            <div class="status-update-form__hero mb-3 d-flex align-items-center">
               <div style="flex:1">
                 <label class="form-label">Next Status</label>
                 {{ transition_form.to_status(class="form-select", id="toStatusSelect") }}
@@ -406,16 +520,18 @@
               </div>
             </div>
 
-            <div class="mb-2">
-              <label id="submissionSummaryLabel" class="form-label">Summary</label>
-              {{ transition_form.submission_summary(class="form-control", placeholder="Short summary") }}
-            </div>
-            <div class="mb-2">
-              <label id="submissionDetailsLabel" class="form-label">Details</label>
-              {{ transition_form.submission_details(class="form-control", rows="4", placeholder="What was locked in, what to review, assumptions...") }}
+            <div class="row g-3">
+              <div class="col-12">
+                <label id="submissionSummaryLabel" class="form-label">Summary</label>
+                {{ transition_form.submission_summary(class="form-control", placeholder="Short summary") }}
+              </div>
+              <div class="col-12">
+                <label id="submissionDetailsLabel" class="form-label">Details</label>
+                {{ transition_form.submission_details(class="form-control", rows="4", placeholder="What was locked in, what to review, assumptions...") }}
+              </div>
             </div>
 
-            <div class="mb-2">
+            <div class="mb-2 mt-3">
               <label class="form-label">Attachments (images)</label>
               {{ transition_form.files(class="form-control", multiple=True, id="fileInput") }}
               <div id="pasteZone" class="paste-zone mt-2">
@@ -473,6 +589,7 @@
           <div class="mb-2">
             <label class="form-label">Comment</label>
             {{ comment_form.body(class="form-control", rows="3") }}
+            <div class="form-text">Mention teammates with @email to send them a direct notification when they already have access to this request.</div>
           </div>
           <button class="btn btn-outline-primary w-100">Add Comment</button>
         </form>

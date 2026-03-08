@@ -4,8 +4,14 @@
 {% block content %}
 {{ page_header('Status options', url_for('admin.create_status_option'), 'New status option', 'Workflow control', 'Keep status codes, notifications, and downstream routing aligned across every workflow.') }}
 <section class="surface-panel surface-panel-muted">
-  <div class="page-toolbar">
-    <a href="{{ url_for('admin.list_workflows') }}" class="btn btn-secondary">View workflows</a>
+  <div class="admin-status-toolbar">
+    <div>
+      <div class="fw-semibold">Approval-ready status catalog</div>
+      <div class="small text-muted">Use this catalog to keep notifications, email behavior, screenshots, and staged approvals aligned before integrations go live.</div>
+    </div>
+    <div class="page-toolbar">
+      <a href="{{ url_for('admin.list_workflows') }}" class="btn btn-secondary">View workflows</a>
+    </div>
   </div>
 </section>
 <section class="surface-panel table-shell">
@@ -19,6 +25,7 @@
       <col class="col-scope" />
       <col class="col-email" />
       <col class="col-screenshot" />
+      <col class="col-screenshot" />
       <col class="col-actions" />
     </colgroup>
     <thead>
@@ -30,6 +37,7 @@
         <th class="text-center">Notify Scope</th>
         <th class="text-center">Email</th>
         <th class="text-center">Screenshot</th>
+        <th>Approval stages</th>
         <th class="text-center">Actions</th>
       </tr>
     </thead>
@@ -47,6 +55,14 @@
       <td class="text-center"><span class="admin-status-pill is-neutral">{{ 'Originator only' if (s.notify_to_originator_only|default(false)) else 'Department' }}</span></td>
       <td class="text-center"><span class="admin-status-pill {{ 'is-success' if (s.email_enabled|default(false)) else 'is-neutral' }}">{{ 'Email on' if (s.email_enabled|default(false)) else 'Email off' }}</span></td>
       <td class="text-center"><span class="admin-status-pill {{ 'is-warning' if (s.screenshot_required|default(false)) else 'is-neutral' }}">{{ 'Required' if (s.screenshot_required|default(false)) else 'Optional' }}</span></td>
+      <td>
+        {% if s.approval_stages %}
+          <div class="small fw-semibold">{{ s.approval_stages|length }} stage{{ '' if s.approval_stages|length == 1 else 's' }}</div>
+          <div class="small text-muted">{{ s.approval_stage_summary }}</div>
+        {% else %}
+          <span class="text-muted small">No stages configured</span>
+        {% endif %}
+      </td>
       <td class="text-center actions-cell">
         <div class="admin-actions-group justify-content-center">
           <a href="{{ url_for('admin.edit_status_option', opt_id=s.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>

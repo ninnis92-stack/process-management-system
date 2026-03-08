@@ -64,7 +64,9 @@
       </button>
     {% endif %}
     <div class="container-fluid">
-      <a class="navbar-brand d-flex align-items-center brand-stack" href="{{ url_for('requests.dashboard') }}">
+      {% set brand_href = company_url if company_url else url_for('requests.dashboard') %}
+      <a class="navbar-brand d-flex align-items-center brand-stack" href="{{ brand_href }}"
+         {% if company_url and (company_url.startswith('http://') or company_url.startswith('https://')) %}target="_blank" rel="noopener noreferrer"{% endif %}>
         {% if theme_logo_url %}
           <img src="{{ theme_logo_url }}" alt="{{ site_brand_name or 'FreshProcess' }} logo" class="brand-logo-img" style="height:40px; margin-right:10px;" />
         {% else %}
@@ -548,14 +550,14 @@
   </script>
   <!-- dynamic toggle labels -->
   <script>
-    document.querySelectorAll('.form-check-input[data-toggle-text-on]').forEach(cb=>{
+    document.querySelectorAll('.form-check-input[data-toggle-text-checked]').forEach(cb=>{
       var form = cb.closest('.form-check');
       var lbl = form && form.querySelector('.form-check-label');
       if (lbl == null) return;
-      var on = cb.dataset.toggleTextOn;
-      var off = cb.dataset.toggleTextOff;
+      var checkedLabel = cb.dataset.toggleTextChecked;
+      var uncheckedLabel = cb.dataset.toggleTextUnchecked;
       var upd = ()=> {
-        lbl.textContent = cb.checked ? on : off;
+        lbl.textContent = cb.checked ? checkedLabel : uncheckedLabel;
         form.classList.toggle('active', cb.checked);
       };
       cb.addEventListener('change', upd);
@@ -591,7 +593,7 @@
       function save(){
         try{
           const all = JSON.parse(sessionStorage.getItem(storageKey)||'{}');
-          const list = Array.from(document.querySelectorAll('.form-check-input[data-toggle-text-on]')).map(cb=>({name:cb.name,checked:cb.checked}));
+          const list = Array.from(document.querySelectorAll('.form-check-input[data-toggle-text-checked]')).map(cb=>({name:cb.name,checked:cb.checked}));
           all[path] = list;
           sessionStorage.setItem(storageKey, JSON.stringify(all));
         }catch(e){}

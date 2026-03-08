@@ -155,8 +155,15 @@ see JSON indicating `database.status:ok` (and Redis if configured).
 Smoke test script (`scripts/smoke_test.sh`) hits the home page, dashboard and
 admin site config for quick sanity checks against any environment.
 
+Webhook smoke script (`scripts/webhook_smoke.py`) verifies that production
+webhooks reject unsigned traffic and, when a shared secret is supplied,
+accept a correctly signed payload for `/integrations/incoming-webhook`.
+
 Use `python scripts/verify_quote_sets.py` to inspect and normalize stored quote
 sets manually; the command exits non-zero if any quote set still lacks content.
+
+Prometheus scrape templates live under [ops/prometheus/fly-scrape.yml](ops/prometheus/fly-scrape.yml)
+and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORING.md).
 
 ---
 
@@ -165,13 +172,37 @@ sets manually; the command exits non-zero if any quote set still lacks content.
 - `make deploy-safe` builds, tests, and pushes the container to Fly.
 - The image’s `entrypoint.sh` ensures databases are available and optionally
   seeds on boot (`SEED_ON_BOOT`, default `1`).
+- GitHub Actions now includes a scheduled production monitoring workflow that
+  runs health checks, seeded-user login, admin smoke, signed webhook smoke,
+  and cleanup against Fly.
 - Fly secrets to set:
   `SECRET_KEY`, `DATABASE_URL`, `SESSION_COOKIE_SECURE=True`,
   `PREFERRED_URL_SCHEME=https`, and any tracker auth tokens.
+- Optional but recommended monitoring/alerting secrets:
+  `SENTRY_DSN`, `SENTRY_ENVIRONMENT=production`, `WEBHOOK_SHARED_SECRET`,
+  `PAGERDUTY_ROUTING_KEY`, `PRODUCTION_BASE_URL`, `PRODUCTION_ADMIN_EMAIL`,
+  and `PRODUCTION_ADMIN_PASSWORD`.
 - Redis is optional; if you set `REDIS_URL` Fly health will check it, otherwise
   it’s skipped.
 
 ### Live deployment checks (March 8, 2026)
+- Added production monitoring assets: `sentry-sdk` support in dependencies,
+  a Prometheus scrape template, a scheduled GitHub Actions monitor, a PagerDuty
+  notifier, and a signed webhook smoke script for production-only webhook paths.
+- Added production-path regression coverage for SSO fallback/no-email behavior,
+  webhook replay rejection, inbound-mail signature rejection, and health probes;
+  the local suite now passes with `149 passed` after this hardening pass.
+- Deployed to `process-management-prototype-lingering-bush-6175` with `flyctl deploy -a process-management-prototype-lingering-bush-6175`.
+- Verified Fly release logs again showed `seeded`, `Seeded users:`, `Quote sets:`,
+  and `quote_sets=ok total=11 active=default active_count=5`, confirming `seed.py`
+  ran and the Fly database converged during release.
+- Ran deployed smoke checks with `bash scripts/smoke_test.sh`,
+  `python scripts/smoke_deployed_login.py`, `python scripts/admin_smoke.py`,
+  and `python scripts/clear_smoke_remote.py`; health, seeded login, admin pages,
+  metrics, and cleanup all completed successfully.
+- Checked `https://process-management-prototype-lingering-bush-6175.fly.dev/health`
+  and `https://process-management-prototype-lingering-bush-6175.fly.dev/ready`;
+  both returned `{"status":"ok"}`, and readiness reported the database healthy.
 - Added dedicated release-task regression coverage for quote-set normalization and invalid active-set repair; the local suite now passes with `122 passed`.
 - Deployed to `process-management-prototype-lingering-bush-6175` with `flyctl deploy -a process-management-prototype-lingering-bush-6175`.
 - Verified Fly release logs showed `Seeded users:`, `Quote sets:`, `seeded`, and `quote_sets=ok total=11 active=default active_count=5`, confirming `seed.py` ran and quote validation completed during release.

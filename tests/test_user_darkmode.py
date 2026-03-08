@@ -66,8 +66,8 @@ def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):
 
     rv = client.get("/auth/settings")
     assert rv.status_code == 200
-    assert b'id="darkModeLabel">Disable dark mode<' in rv.data
-    assert b'id="darkModeSubmitBtn">Disable dark mode<' in rv.data
+    assert b'id="darkModeLabel">Dark mode enabled<' in rv.data
+    assert b'id="darkModeSubmitBtn">Save settings<' in rv.data
 
 
 def test_settings_page_shows_enable_text_when_dark_mode_disabled(client, app):
@@ -77,5 +77,50 @@ def test_settings_page_shows_enable_text_when_dark_mode_disabled(client, app):
 
     rv = client.get("/auth/settings")
     assert rv.status_code == 200
-    assert b'id="darkModeLabel">Enable dark mode<' in rv.data
-    assert b'id="darkModeSubmitBtn">Enable dark mode<' in rv.data
+    assert b'id="darkModeLabel">Dark mode disabled<' in rv.data
+    assert b'id="darkModeSubmitBtn">Save settings<' in rv.data
+
+
+def test_settings_post_unchecked_dark_mode_disables_preference(client, app):
+    make_user(app, dark_mode=True)
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.post(
+        "/auth/settings",
+        data={
+            "dark_mode_present": "1",
+            "quotes_enabled_present": "1",
+            "quotes_enabled": "y",
+        },
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+
+    with app.app_context():
+        user = User.query.filter_by(email="admin@example.com").first()
+        assert user is not None
+        assert user.dark_mode is False
+
+
+def test_settings_post_checked_dark_mode_enables_preference(client, app):
+    make_user(app, dark_mode=False)
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.post(
+        "/auth/settings",
+        data={
+            "dark_mode_present": "1",
+            "dark_mode": "y",
+            "quotes_enabled_present": "1",
+            "quotes_enabled": "y",
+        },
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+
+    with app.app_context():
+        user = User.query.filter_by(email="admin@example.com").first()
+        assert user is not None
+        assert user.dark_mode is True

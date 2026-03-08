@@ -15,10 +15,10 @@
   </section>
 {% endmacro %}
 
-{% macro toggle_checkbox(field, on_label, off_label) %}
+{% macro toggle_checkbox(field, checked_label, unchecked_label) %}
   <div class="form-check mb-3">
-    {{ field(class_='form-check-input', **{'data-toggle-text-on': on_label, 'data-toggle-text-off': off_label}) }}
-    <label class="form-check-label">{{ on_label if field.data else off_label }}</label>
+    {{ field(class_='form-check-input', **{'data-toggle-text-checked': checked_label, 'data-toggle-text-unchecked': unchecked_label}) }}
+    <label class="form-check-label">{{ checked_label if field.data else unchecked_label }}</label>
   </div>
 {% endmacro %}
 

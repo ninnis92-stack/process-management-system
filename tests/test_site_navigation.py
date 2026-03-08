@@ -270,6 +270,21 @@ def test_initial_quote_on_dashboard(app, client):
     assert "Sort today" in html
 
 
+def test_brand_link_respects_company_url(app, client):
+    # when site config has a company_url, the navbar-brand href should use it
+    with app.app_context():
+        cfg = SiteConfig.get()
+        cfg.company_url = "https://example.com"
+        db.session.add(cfg)
+        db.session.commit()
+    _create_user(app, email="brand-user@example.com", department="A")
+    _login(client, "brand-user@example.com")
+    resp = client.get("/dashboard")
+    html = resp.get_data(as_text=True)
+    assert 'href="https://example.com"' in html
+    assert 'target="_blank"' in html
+
+
 def test_department_list_endpoint(app, client):
     # verify the JSON helper returns correct department lists for users
     _create_user(app, email="dept-json@example.com", department="A")

@@ -47,3 +47,31 @@ def test_release_task_keeps_custom_quote_sets_with_content(app):
         assert refreshed.active_quote_set == "custom"
         assert refreshed.rolling_quote_sets["custom"] == ["Own the day."]
         assert refreshed.rolling_quote_sets["default"] == ["Custom default."]
+
+def test_release_task_adds_company_url_column(app):
+    # simulate legacy schema missing the company_url column and run main()
+    module = _load_release_tasks_module()
+    from sqlalchemy import inspect, text
+    from app import db
+
+    with app.app_context():
+        engine = db.engine
+        insp = inspect(engine)
+        cols = {c['name'] for c in insp.get_columns('site_config')}
+        if 'company_url' in cols:
+            with engine.begin() as conn:
+                # sqlite doesn't support drop column easily; instead recreate table
+                conn.execute(text('ALTER TABLE site_config RENAME TO site_config_old'))
+                # recreate minimal schema without company_url
+                conn.execute(text('CREATE TABLE site_config (id INTEGER PRIMARY KEY)'))
+                conn.execute(text('INSERT INTO site_config(id) SELECT id FROM site_config_old'))
+                conn.execute(text('DROP TABLE site_config_old'))
+        # ensure it's gone
+        insp2 = inspect(engine)
+        assert 'company_url' not in {c['name'] for c in insp2.get_columns('site_config')}
+
+        # run main which should trigger schema safety net
+        module.main()
+
+        insp3 = inspect(engine)
+        assert 'company_url' in {c['name'] for c in insp3.get_columns('site_config')}

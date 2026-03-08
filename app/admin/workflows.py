@@ -131,6 +131,38 @@ def _workflow_scope_label(wf):
     return "All departments"
 
 
+def _parse_approval_stage_lines(raw_text):
+    stages = []
+    for line in (raw_text or "").splitlines():
+        trimmed = line.strip()
+        if not trimmed:
+            continue
+        parts = [part.strip() for part in trimmed.split("|")]
+        name = parts[0] if parts else ""
+        role = (parts[1] if len(parts) > 1 else "").lower() or None
+        department = (parts[2] if len(parts) > 2 else "").upper() or None
+        if department and department not in {"A", "B", "C"}:
+            department = None
+        if not name:
+            continue
+        stages.append({"name": name, "role": role, "department": department})
+    return stages
+
+
+def _format_approval_stage_lines(opt):
+    lines = []
+    for stage in getattr(opt, "approval_stages", []) or []:
+        parts = [stage.get("name") or "Stage"]
+        if stage.get("role"):
+            parts.append(stage.get("role"))
+        if stage.get("department"):
+            if len(parts) == 1:
+                parts.append("")
+            parts.append(stage.get("department"))
+        lines.append(" | ".join(parts))
+    return "\n".join(lines)
+
+
 # --- workflow CRUD -----------------------------------------------------------
 
 @admin_bp.route("/workflows")
@@ -462,6 +494,11 @@ def create_status_option():
     form = StatusOptionForm()
     if form.validate_on_submit():
         code = form.code.data.strip()
+        approval_stages = _parse_approval_stage_lines(
+            getattr(form, "approval_stages_text", None).data
+            if getattr(form, "approval_stages_text", None)
+            else ""
+        )
         opt = StatusOption(
             code=code,
             label=form.label.data.strip(),
@@ -484,6 +521,7 @@ def create_status_option():
                 else False
             ),
         )
+        opt.approval_stages = approval_stages
         db.session.add(opt)
         db.session.commit()
         flash("Status option created.", "success")
@@ -502,6 +540,8 @@ def edit_status_option(opt_id: int):
 
     opt = get_or_404(StatusOption, opt_id)
     form = StatusOptionForm(obj=opt)
+    if flask_request.method == "GET" and getattr(form, "approval_stages_text", None):
+        form.approval_stages_text.data = _format_approval_stage_lines(opt)
     if form.validate_on_submit():
         opt.code = form.code.data.strip()
         opt.label = form.label.data.strip()
@@ -522,6 +562,11 @@ def edit_status_option(opt_id: int):
             getattr(form, "screenshot_required", False).data
             if getattr(form, "screenshot_required", None)
             else False
+        )
+        opt.approval_stages = _parse_approval_stage_lines(
+            getattr(form, "approval_stages_text", None).data
+            if getattr(form, "approval_stages_text", None)
+            else ""
         )
         db.session.commit()
         flash("Status option updated.", "success")

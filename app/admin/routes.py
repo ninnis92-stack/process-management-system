@@ -63,6 +63,20 @@ from .utils import _is_admin_user
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
+
+def _submitted_checkbox_enabled(field_name: str) -> bool:
+    """Return the posted boolean state for a checkbox-like field.
+
+    Admin toggle forms post the whole settings surface at once. When a box is
+    unchecked the browser omits the field entirely, so relying on WTForms field
+    defaults can accidentally flip omitted values back to their default `True`.
+    Reading directly from the submitted form keeps checkbox behavior intuitive:
+    present means enabled, absent means disabled.
+    """
+
+    raw = (flask_request.form.get(field_name) or "").strip().lower()
+    return raw not in ("", "0", "false", "off", "no")
+
 # Load auxiliary handlers to keep this file from growing even more.
 # Load auxiliary handlers to keep this file from growing even more.
 # ``tenants`` and ``users`` must be imported after ``admin_bp`` is defined so the
@@ -355,7 +369,32 @@ def integration_events():
         return redirect(url_for("requests.dashboard"))
 
     events = IntegrationEvent.query.order_by(IntegrationEvent.created_at.desc()).limit(200).all()
-    return render_template("admin_integration_events.html", events=events)
+    summary = {
+        "pending": IntegrationEvent.query.filter_by(status="pending").count(),
+        "failed": IntegrationEvent.query.filter_by(status="failed").count(),
+        "delivered": IntegrationEvent.query.filter_by(status="delivered").count(),
+        "jobs_failed": JobRecord.query.filter_by(status="failed").count(),
+        "jobs_running": JobRecord.query.filter(JobRecord.status.in_(["queued", "running"])).count(),
+    }
+    return render_template("admin_integration_events.html", events=events, summary=summary)
+
+
+@admin_bp.route("/integration_events/<int:event_id>/retry", methods=["POST"])
+@login_required
+def retry_integration_event(event_id: int):
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    event = get_or_404(IntegrationEvent, event_id)
+    event.status = "pending"
+    event.last_error = None
+    event.delivered_at = None
+    event.next_retry_at = datetime.utcnow()
+    db.session.add(event)
+    db.session.commit()
+    flash(f"Integration event {event.id} queued for retry.", "success")
+    return redirect(url_for("admin.integration_events"))
 
 
 @admin_bp.route("/debug_workspace")
@@ -478,6 +517,7 @@ def site_config():
 
     if flask_request.method == "GET" and cfg:
         form.brand_name.data = getattr(cfg, "brand_name", None)
+        form.company_url.data = getattr(cfg, "company_url", None)
         form.theme_preset.data = getattr(cfg, "theme_preset", "default") or "default"
         form.navbar_banner.data = getattr(cfg, "banner_html", None) or getattr(
             cfg, "navbar_banner", None
@@ -496,6 +536,10 @@ def site_config():
         except Exception:
             form.rolling_quote_sets.data = None
         # load permissions JSON if available
+        try:
+            cfg.company_url = form.company_url.data or None
+        except Exception:
+            pass
         try:
             perms = getattr(cfg, "quote_permissions", None)
             if perms:
@@ -1656,22 +1700,25 @@ def feature_flags():
         )
 
     if form.validate_on_submit():
-        flags.enable_notifications = bool(form.enable_notifications.data)
-        flags.enable_nudges = bool(form.enable_nudges.data)
-        flags.allow_user_nudges = bool(form.allow_user_nudges.data)
-        flags.vibe_enabled = bool(form.vibe_enabled.data)
-        flags.sso_admin_sync_enabled = bool(form.sso_admin_sync_enabled.data)
-        flags.sso_department_sync_enabled = bool(
-            getattr(form, "sso_department_sync_enabled", None)
-            and form.sso_department_sync_enabled.data
+        flags.enable_notifications = _submitted_checkbox_enabled(
+            "enable_notifications"
         )
-        flags.enable_external_forms = bool(
-            getattr(form, "enable_external_forms", None)
-            and form.enable_external_forms.data
+        flags.enable_nudges = _submitted_checkbox_enabled("enable_nudges")
+        flags.allow_user_nudges = _submitted_checkbox_enabled(
+            "allow_user_nudges"
         )
-        flags.rolling_quotes_enabled = bool(
-            getattr(form, "rolling_quotes_enabled", None)
-            and form.rolling_quotes_enabled.data
+        flags.vibe_enabled = _submitted_checkbox_enabled("vibe_enabled")
+        flags.sso_admin_sync_enabled = _submitted_checkbox_enabled(
+            "sso_admin_sync_enabled"
+        )
+        flags.sso_department_sync_enabled = _submitted_checkbox_enabled(
+            "sso_department_sync_enabled"
+        )
+        flags.enable_external_forms = _submitted_checkbox_enabled(
+            "enable_external_forms"
+        )
+        flags.rolling_quotes_enabled = _submitted_checkbox_enabled(
+            "rolling_quotes_enabled"
         )
         db.session.commit()
         flash("Feature flags updated.", "success")
@@ -1796,10 +1843,14 @@ def metrics_config():
         )
 
     if form.validate_on_submit():
-        cfg.enabled = bool(form.enabled.data)
-        cfg.track_request_created = bool(form.track_request_created.data)
-        cfg.track_assignments = bool(form.track_assignments.data)
-        cfg.track_status_changes = bool(form.track_status_changes.data)
+        cfg.enabled = _submitted_checkbox_enabled("enabled")
+        cfg.track_request_created = _submitted_checkbox_enabled(
+            "track_request_created"
+        )
+        cfg.track_assignments = _submitted_checkbox_enabled("track_assignments")
+        cfg.track_status_changes = _submitted_checkbox_enabled(
+            "track_status_changes"
+        )
         cfg.lookback_days = max(int(form.lookback_days.data or 30), 1)
         cfg.user_metrics_limit = max(int(form.user_metrics_limit.data or 15), 1)
         cfg.target_completion_hours = max(
@@ -1927,12 +1978,12 @@ def reject_request_config():
         form.dept_c_enabled.data = bool(getattr(cfg, "dept_c_enabled", False))
 
     if form.validate_on_submit():
-        cfg.enabled = bool(form.enabled.data)
+        cfg.enabled = _submitted_checkbox_enabled("enabled")
         cfg.button_label = (form.button_label.data or "Reject Request").strip()[:120]
         cfg.rejection_message = (form.rejection_message.data or "").strip() or None
-        cfg.dept_a_enabled = bool(form.dept_a_enabled.data)
-        cfg.dept_b_enabled = bool(form.dept_b_enabled.data)
-        cfg.dept_c_enabled = bool(form.dept_c_enabled.data)
+        cfg.dept_a_enabled = _submitted_checkbox_enabled("dept_a_enabled")
+        cfg.dept_b_enabled = _submitted_checkbox_enabled("dept_b_enabled")
+        cfg.dept_c_enabled = _submitted_checkbox_enabled("dept_c_enabled")
         db.session.commit()
         flash("Reject request configuration updated.", "success")
         return redirect(url_for("admin.reject_request_config"))

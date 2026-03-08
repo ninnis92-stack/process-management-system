@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
 """Login as seeded admin and POST to /admin/debug/cleanup to clear smoke rows."""
+import argparse
+import os
 import re
-import sys
 import requests
 from urllib.parse import urljoin
-
-BASE = "https://process-management-prototype-lingering-bush-6175.fly.dev"
-ADMIN_EMAIL = "admin@example.com"
-ADMIN_PW = "admin123"
-
-session = requests.Session()
-
 
 def get_csrf(session, url):
     r = session.get(url, timeout=10)
@@ -20,14 +14,22 @@ def get_csrf(session, url):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--url", default=os.getenv("SMOKE_BASE_URL") or "https://process-management-prototype-lingering-bush-6175.fly.dev")
+    parser.add_argument("--email", default=os.getenv("SMOKE_ADMIN_EMAIL") or "admin@example.com")
+    parser.add_argument("--password", default=os.getenv("SMOKE_ADMIN_PASSWORD") or "admin123")
+    args = parser.parse_args()
+    session = requests.Session()
+    base = args.url.rstrip("/")
+
     try:
-        csrf = get_csrf(session, urljoin(BASE, "/auth/login"))
+        csrf = get_csrf(session, urljoin(base, "/auth/login"))
         if not csrf:
             print("No CSRF token found; abort")
             return 2
         r = session.post(
-            urljoin(BASE, "/auth/login"),
-            data={"email": ADMIN_EMAIL, "password": ADMIN_PW, "csrf_token": csrf},
+            urljoin(base, "/auth/login"),
+            data={"email": args.email, "password": args.password, "csrf_token": csrf},
             allow_redirects=True,
             timeout=10,
         )
@@ -40,11 +42,11 @@ def main():
             return 3
 
         # fetch admin page to get csrf token for subsequent POST
-        admin_csrf = get_csrf(session, urljoin(BASE, "/admin"))
+        admin_csrf = get_csrf(session, urljoin(base, "/admin"))
         payload = {"csrf_token": admin_csrf} if admin_csrf else {}
         # POST cleanup
         r2 = session.post(
-            urljoin(BASE, "/admin/debug/cleanup?confirm=true"), data=payload, timeout=10
+            urljoin(base, "/admin/debug/cleanup?confirm=true"), data=payload, timeout=10
         )
         print("/admin/debug/cleanup ->", r2.status_code)
         print("URL:", r2.url)

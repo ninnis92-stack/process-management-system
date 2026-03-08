@@ -6,7 +6,7 @@
   <form method="post">
     {{ form.hidden_tag() }}
 
-    {{ toggle_checkbox(form.enabled, 'Disable reject request', 'Enable reject request') }}
+    {{ toggle_checkbox(form.enabled, 'Reject request enabled', 'Reject request disabled') }}
 
     <div class="mb-3">
       {{ form.button_label.label(class_='form-label') }}

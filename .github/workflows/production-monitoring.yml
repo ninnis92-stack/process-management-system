@@ -1,0 +1,47 @@
+name: Production Monitoring
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: ${{ secrets.PRODUCTION_BASE_URL || 'https://process-management-prototype-lingering-bush-6175.fly.dev' }}
+      ADMIN_EMAIL: ${{ secrets.PRODUCTION_ADMIN_EMAIL || 'admin@example.com' }}
+      ADMIN_PASSWORD: ${{ secrets.PRODUCTION_ADMIN_PASSWORD || 'admin123' }}
+      WEBHOOK_SHARED_SECRET: ${{ secrets.WEBHOOK_SHARED_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run public health checks
+        run: |
+          bash scripts/smoke_test.sh "$APP_URL"
+      - name: Run seeded user login smoke
+        run: |
+          python scripts/smoke_deployed_login.py --url "$APP_URL"
+      - name: Run admin smoke
+        run: |
+          SMOKE_ADMIN_EMAIL="$ADMIN_EMAIL" SMOKE_ADMIN_PASSWORD="$ADMIN_PASSWORD" python scripts/admin_smoke.py --url "$APP_URL"
+      - name: Run webhook smoke
+        run: |
+          python scripts/webhook_smoke.py --url "$APP_URL" --secret "$WEBHOOK_SHARED_SECRET"
+      - name: Clear smoke data
+        if: always()
+        run: |
+          SMOKE_ADMIN_EMAIL="$ADMIN_EMAIL" SMOKE_ADMIN_PASSWORD="$ADMIN_PASSWORD" python scripts/clear_smoke_remote.py --url "$APP_URL"
+      - name: Trigger PagerDuty on failure
+        if: failure()
+        env:
+          PAGERDUTY_ROUTING_KEY: ${{ secrets.PAGERDUTY_ROUTING_KEY }}
+        run: |
+          python scripts/notify_pagerduty.py --summary "Process Management Prototype production monitoring failure" --details '{"app_url":"'"$APP_URL"'","workflow":"production-monitoring"}'

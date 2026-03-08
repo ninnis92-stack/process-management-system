@@ -9,6 +9,7 @@ Prometheus metrics (via `app/metrics.py`) when available.
 
 import json
 import os
+import re
 import uuid
 import time
 from datetime import datetime, timedelta
@@ -46,6 +47,9 @@ from ..models import (
     RejectRequestConfig,
     DepartmentEditor,
     FeatureFlags,
+    SavedSearchView,
+    RequestApproval,
+    StatusOption,
 )
 from ..models import StatusBucket, BucketStatus
 from .forms import (
@@ -71,6 +75,7 @@ from ..services.process_metrics import (
     build_process_metrics_summary,
     record_process_metric_event,
 )
+from ..services.tenant_context import tenant_role_for_user
 from .permissions import (
     allowed_comment_scopes_for_user,
     can_view_request,
@@ -160,6 +165,100 @@ _presence: Dict[int, Dict[int, Dict[str, object]]] = {}
 
 def _users_in_dept(dept: str):
     return users_in_department(dept)
+
+
+MENTION_RE = re.compile(r"(?<!\w)@([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})")
+APPROVAL_STATUSES = {"PENDING_C_REVIEW", "EXEC_APPROVAL"}
+
+
+def _approval_status_codes() -> tuple:
+    codes = set(APPROVAL_STATUSES)
+    try:
+        codes.update(
+            code
+            for code, raw_json in db.session.query(
+                StatusOption.code, StatusOption.approval_stages_json
+            ).all()
+            if raw_json
+        )
+    except Exception:
+        pass
+    return tuple(sorted(codes))
+
+
+def _sla_state_for_request(req: ReqModel, now: Optional[datetime] = None) -> Optional[str]:
+    now = now or datetime.utcnow()
+    due_at = getattr(req, "due_at", None)
+    if not due_at or getattr(req, "status", None) == "CLOSED":
+        return None
+    if due_at < now:
+        return "breached"
+
+    hours_left = (due_at - now).total_seconds() / 3600.0
+    priority = (getattr(req, "priority", "medium") or "medium").strip().lower()
+    threshold_hours = {
+        "high": 24,
+        "medium": 48,
+        "low": 72,
+    }.get(priority, 48)
+    if hours_left <= threshold_hours:
+        return "at_risk"
+    return "on_track"
+
+
+def _mentioned_recipients_for_comment(req: ReqModel, body: str) -> list[User]:
+    emails = {
+        match.group(1).strip().lower() for match in MENTION_RE.finditer(body or "")
+    }
+    if not emails:
+        return []
+
+    allowed_user_ids = {
+        getattr(u, "id", None) for u in _users_in_dept(getattr(req, "owner_department", None))
+    }
+    if getattr(req, "created_by_user_id", None):
+        allowed_user_ids.add(req.created_by_user_id)
+    if getattr(req, "assigned_to_user_id", None):
+        allowed_user_ids.add(req.assigned_to_user_id)
+
+    mentioned = []
+    for email in emails:
+        user = User.query.filter(func.lower(User.email) == email).first()
+        if not user or not getattr(user, "is_active", True):
+            continue
+        if user.id == getattr(current_user, "id", None):
+            continue
+        if getattr(user, "is_admin", False) or user.id in allowed_user_ids:
+            mentioned.append(user)
+
+    unique = {}
+    for user in mentioned:
+        unique[user.id] = user
+    return list(unique.values())
+
+
+def _saved_views_for_current_user(limit: int = 8) -> list[SavedSearchView]:
+    if not getattr(current_user, "is_authenticated", False):
+        return []
+    return (
+        SavedSearchView.query.filter_by(user_id=current_user.id)
+        .order_by(SavedSearchView.is_default.desc(), SavedSearchView.updated_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def _normalized_saved_view_params(source) -> dict[str, str]:
+    raw = {
+        "q": (source.get("q") or "").strip(),
+        "status": (source.get("status") or "").strip().upper(),
+        "priority": (source.get("priority") or source.get("priority_filter") or "").strip().lower(),
+        "sla": (source.get("sla") or "").strip().lower(),
+        "approval_only": "1"
+        if (source.get("approval_only") or "").strip().lower() in {"1", "true", "yes", "on"}
+        else "",
+    }
+    return {k: v for k, v in raw.items() if v}
 
 
 def _request_list_query(q):
@@ -380,6 +479,205 @@ def _build_recent_status_path(audit_entries, current_status: str):
     return path[-6:]
 
 
+ROLE_PRIORITY = {
+    "viewer": 0,
+    "member": 1,
+    "analyst": 2,
+    "tenant_admin": 3,
+    "platform_admin": 4,
+}
+
+APPROVAL_TRANSITIONS_REQUIRING_COMPLETION = {
+    ("PENDING_C_REVIEW", "C_APPROVED"),
+    ("EXEC_APPROVAL", "SENT_TO_A"),
+}
+
+
+def _role_satisfies_requirement(actual_role: Optional[str], required_role: Optional[str]) -> bool:
+    if not required_role:
+        return True
+    return ROLE_PRIORITY.get(actual_role or "", -1) >= ROLE_PRIORITY.get(
+        required_role, ROLE_PRIORITY.get("platform_admin", 4) + 1
+    )
+
+
+def _approval_stage_definitions_for_status(status_code: Optional[str]) -> list:
+    if not status_code:
+        return []
+    try:
+        opt = StatusOption.query.filter_by(code=status_code).first()
+        return list(getattr(opt, "approval_stages", []) or []) if opt else []
+    except Exception:
+        return []
+
+
+def _current_approval_rows(request_id: int, status_code: Optional[str]):
+    if not request_id or not status_code:
+        return []
+    try:
+        rows = (
+            RequestApproval.query.filter_by(request_id=request_id, status_code=status_code)
+            .order_by(RequestApproval.cycle_index.desc(), RequestApproval.stage_order.asc())
+            .all()
+        )
+    except Exception:
+        return []
+    if not rows:
+        return []
+    latest_cycle = rows[0].cycle_index
+    return [row for row in rows if row.cycle_index == latest_cycle]
+
+
+def _approval_history_rows(request_id: int, status_code: Optional[str]):
+    if not request_id or not status_code:
+        return []
+    current_rows = _current_approval_rows(request_id, status_code)
+    current_cycle = current_rows[0].cycle_index if current_rows else None
+    try:
+        query = RequestApproval.query.filter_by(request_id=request_id, status_code=status_code)
+        if current_cycle is not None:
+            query = query.filter(RequestApproval.cycle_index < current_cycle)
+        return query.order_by(
+            RequestApproval.cycle_index.desc(),
+            RequestApproval.stage_order.asc(),
+            RequestApproval.created_at.desc(),
+        ).all()
+    except Exception:
+        return []
+
+
+def _user_can_signoff_approval(approval: RequestApproval, user, cycle_rows=None) -> bool:
+    if not approval or not user or approval.state != "pending":
+        return False
+    if approval.required_department:
+        user_department = (getattr(user, "department", "") or "").upper()
+        if user_department != (approval.required_department or "").upper():
+            return False
+    if not _role_satisfies_requirement(
+        tenant_role_for_user(user), approval.required_role
+    ):
+        return False
+    rows = cycle_rows if cycle_rows is not None else _current_approval_rows(approval.request_id, approval.status_code)
+    for row in rows or []:
+        if row.cycle_index != approval.cycle_index:
+            continue
+        if row.stage_order >= approval.stage_order:
+            break
+        if row.state != "approved":
+            return False
+    return True
+
+
+def _approval_cycle_state(request_id: int, status_code: Optional[str], user=None) -> dict:
+    current_rows = _current_approval_rows(request_id, status_code)
+    ready = bool(current_rows) and all(row.state == "approved" for row in current_rows)
+    blocked = any(row.state == "changes_requested" for row in current_rows)
+    actionable = [
+        row for row in current_rows if _user_can_signoff_approval(row, user, current_rows)
+    ] if user else []
+    return {
+        "current_rows": current_rows,
+        "history_rows": _approval_history_rows(request_id, status_code),
+        "ready": ready,
+        "blocked": blocked,
+        "actionable_rows": actionable,
+        "actionable_ids": [row.id for row in actionable],
+        "has_configured_stages": bool(_approval_stage_definitions_for_status(status_code)),
+    }
+
+
+def _create_approval_cycle_for_status(req: ReqModel, status_code: Optional[str]):
+    stages = _approval_stage_definitions_for_status(status_code)
+    if not stages:
+        return []
+    try:
+        latest_cycle = (
+            db.session.query(func.max(RequestApproval.cycle_index))
+            .filter_by(request_id=req.id, status_code=status_code)
+            .scalar()
+            or 0
+        )
+    except Exception:
+        latest_cycle = 0
+    cycle_index = latest_cycle + 1
+    created = []
+    for idx, stage in enumerate(stages, start=1):
+        created.append(
+            RequestApproval(
+                tenant_id=getattr(req, "tenant_id", None),
+                request_id=req.id,
+                status_code=status_code,
+                cycle_index=cycle_index,
+                stage_order=idx,
+                stage_name=stage.get("name") or f"Stage {idx}",
+                required_role=stage.get("role") or None,
+                required_department=stage.get("department") or None,
+                state="pending",
+            )
+        )
+    db.session.add_all(created)
+    _log(
+        req,
+        "approval_decision",
+        note=f"Approval cycle {cycle_index} started for {status_code} with {len(created)} stage(s).",
+        from_status=status_code,
+        to_status=status_code,
+    )
+    return created
+
+
+def _approval_transition_requires_completion(from_status: str, to_status: str) -> bool:
+    return (from_status, to_status) in APPROVAL_TRANSITIONS_REQUIRING_COMPLETION
+
+
+def _approval_dashboard_cards(user, scoped_requests) -> list:
+    cards = []
+    requests_list = list(scoped_requests or [])
+    if not user or not requests_list:
+        return cards
+
+    needs_my_signoff = 0
+    awaiting_others = 0
+    ready_for_next_step = 0
+
+    for req in requests_list:
+        snapshot = _approval_cycle_state(req.id, req.status, user=user)
+        if not snapshot["current_rows"]:
+            continue
+        if snapshot["ready"]:
+            ready_for_next_step += 1
+        elif snapshot["actionable_rows"]:
+            needs_my_signoff += 1
+        else:
+            awaiting_others += 1
+
+    cards.append(
+        {
+            "title": "Needs my signoff",
+            "count": needs_my_signoff,
+            "description": "Requests where you can approve the next stage right now.",
+            "href": url_for("requests.search_requests", approval_only="1"),
+        }
+    )
+    cards.append(
+        {
+            "title": "Awaiting others",
+            "count": awaiting_others,
+            "description": "Approval work still waiting on another role or department.",
+            "href": url_for("requests.search_requests", approval_only="1"),
+        }
+    )
+    cards.append(
+        {
+            "title": "Ready for next step",
+            "count": ready_for_next_step,
+            "description": "All configured signoffs are complete and the request can move forward.",
+            "href": url_for("requests.search_requests", approval_only="1"),
+        }
+    )
+    return cards
+
+
 # Notification helpers are provided by app/notifcations.py (imported above)
 
 
@@ -456,6 +754,7 @@ def dashboard():
             dept = as_dept
 
     artifact_form = ArtifactForm()
+    saved_views = _saved_views_for_current_user()
 
     # expose an assignment picker for dept heads in the bucket UI
     can_bulk_assign = _user_is_dept_head(current_user, dept)
@@ -558,6 +857,8 @@ def dashboard():
                 status_counts=status_counts,
                 now=datetime.utcnow(),
                 artifact_form=artifact_form,
+                saved_views=saved_views,
+                approval_cards=[],
             )
 
         # no bucket filter; show all
@@ -571,6 +872,8 @@ def dashboard():
             status_counts=status_counts,
             now=datetime.utcnow(),
             artifact_form=artifact_form,
+            saved_views=saved_views,
+            approval_cards=[],
         )
 
     if dept == "B":
@@ -617,6 +920,8 @@ def dashboard():
                 status_counts=status_counts,
                 now=datetime.utcnow(),
                 artifact_form=artifact_form,
+                saved_views=saved_views,
+                approval_cards=_approval_dashboard_cards(current_user, items),
             )
 
         # legacy status filter semantics if no bucket selected
@@ -951,6 +1256,11 @@ def dashboard():
             artifact_form=artifact_form,
             assignment_form=assignment_form,
             can_bulk_assign=can_bulk_assign,
+            saved_views=saved_views,
+            approval_cards=_approval_dashboard_cards(
+                current_user,
+                [req for bucket_items in buckets.values() for req in bucket_items],
+            ),
         )
 
     if dept == "C":
@@ -979,6 +1289,8 @@ def dashboard():
                 artifact_form=artifact_form,
                 assignment_form=assignment_form,
                 can_bulk_assign=can_bulk_assign,
+                saved_views=saved_views,
+                approval_cards=_approval_dashboard_cards(current_user, items),
             )
 
         pending = (
@@ -997,6 +1309,8 @@ def dashboard():
             artifact_form=artifact_form,
             assignment_form=assignment_form,
             can_bulk_assign=can_bulk_assign,
+            saved_views=saved_views,
+            approval_cards=_approval_dashboard_cards(current_user, pending),
         )
 
     abort(403)
@@ -1182,6 +1496,15 @@ def assign_bucket():
 @cached_view(timeout=30, prefix="search")
 def search_requests():
     q = (request.args.get("q") or "").strip()
+    status_filter = (request.args.get("status") or "").strip().upper()
+    priority_filter = (request.args.get("priority") or "").strip().lower()
+    sla_filter = (request.args.get("sla") or "").strip().lower()
+    approval_only = (request.args.get("approval_only") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     dept = current_user.department
     base = ReqModel.query
     if dept == "A":
@@ -1203,33 +1526,9 @@ def search_requests():
         )
 
     results = []
-    if q:
+    has_filters = bool(q or status_filter or priority_filter or sla_filter or approval_only)
+    if has_filters:
         # Numeric queries should match request id exactly, but also look for text in other fields
-        filters = [
-            ReqModel.title.ilike(f"%{q}%"),
-            ReqModel.description.ilike(f"%{q}%"),
-        ]
-
-        # Search artifacts (part numbers / instructions URL)
-        filters.extend(
-            [
-                Artifact.donor_part_number.ilike(f"%{q}%"),
-                Artifact.target_part_number.ilike(f"%{q}%"),
-                Artifact.instructions_url.ilike(f"%{q}%"),
-            ]
-        )
-
-        # Search submission text (public-to-submitter only) and other request fields
-        filters.extend(
-            [
-                Submission.summary.ilike(f"%{q}%"),
-                Submission.details.ilike(f"%{q}%"),
-                ReqModel.request_type.ilike(f"%{q}%"),
-                ReqModel.pricebook_status.ilike(f"%{q}%"),
-                ReqModel.sales_list_reference.ilike(f"%{q}%"),
-            ]
-        )
-
         qry = base.outerjoin(Artifact, Artifact.request_id == ReqModel.id)
         qry = qry.outerjoin(
             Submission,
@@ -1239,17 +1538,177 @@ def search_requests():
             ),
         )
 
-        if q.isdigit():
-            # include exact id matches as well
-            id_filter = ReqModel.id == int(q)
-            qry = qry.filter(or_(id_filter, *filters))
-        else:
-            qry = qry.filter(or_(*filters))
+        if q:
+            filters = [
+                ReqModel.title.ilike(f"%{q}%"),
+                ReqModel.description.ilike(f"%{q}%"),
+                Artifact.donor_part_number.ilike(f"%{q}%"),
+                Artifact.target_part_number.ilike(f"%{q}%"),
+                Artifact.instructions_url.ilike(f"%{q}%"),
+                Submission.summary.ilike(f"%{q}%"),
+                Submission.details.ilike(f"%{q}%"),
+                ReqModel.request_type.ilike(f"%{q}%"),
+                ReqModel.pricebook_status.ilike(f"%{q}%"),
+                ReqModel.sales_list_reference.ilike(f"%{q}%"),
+            ]
+            if q.isdigit():
+                id_filter = ReqModel.id == int(q)
+                qry = qry.filter(or_(id_filter, *filters))
+            else:
+                qry = qry.filter(or_(*filters))
+
+        if status_filter:
+            qry = qry.filter(ReqModel.status == status_filter)
+        if priority_filter:
+            qry = qry.filter(ReqModel.priority == priority_filter)
+        if approval_only:
+            approval_statuses = _approval_status_codes()
+            qry = qry.filter(
+                or_(
+                    ReqModel.status.in_(approval_statuses),
+                    ReqModel.id.in_(
+                        db.session.query(RequestApproval.request_id).distinct()
+                    ),
+                )
+            )
 
         results = qry.order_by(ReqModel.updated_at.desc()).all()
 
+        now = datetime.utcnow()
+        annotated = []
+        for req in results:
+            req.sla_state = _sla_state_for_request(req, now)
+            if sla_filter and req.sla_state != sla_filter:
+                continue
+            annotated.append(req)
+        results = annotated
+
     # If query is blank, return an empty result set instead of causing an error
-    return render_template("search.html", results=results, q=q)
+    return render_template(
+        "search.html",
+        results=results,
+        q=q,
+        status_filter=status_filter,
+        priority_filter=priority_filter,
+        sla_filter=sla_filter,
+        approval_only=approval_only,
+        saved_views=_saved_views_for_current_user(),
+    )
+
+
+@requests_bp.route("/search/saved", methods=["POST"])
+@login_required
+def save_search_view():
+    name = (request.form.get("name") or "").strip()
+    params = _normalized_saved_view_params(request.form)
+
+    if not name:
+        flash("Provide a name for the saved view.", "warning")
+        return redirect(url_for("requests.search_requests", **params))
+    if not params:
+        flash("Choose at least one filter before saving a view.", "warning")
+        return redirect(url_for("requests.search_requests"))
+
+    saved = SavedSearchView.query.filter_by(user_id=current_user.id, name=name).first()
+    if not saved:
+        saved = SavedSearchView(
+            user_id=current_user.id,
+            tenant_id=getattr(current_user, "tenant_id", None),
+            name=name,
+            endpoint="requests.search_requests",
+        )
+        db.session.add(saved)
+    saved.params = params
+    saved.last_used_at = datetime.utcnow()
+    db.session.commit()
+
+    flash(f"Saved view '{name}' updated.", "success")
+    return redirect(url_for("requests.search_requests", **params))
+
+
+@requests_bp.route("/search/saved/<int:view_id>")
+@login_required
+def open_saved_search_view(view_id: int):
+    saved = get_or_404(SavedSearchView, view_id)
+    if saved.user_id != current_user.id:
+        abort(403)
+    saved.last_used_at = datetime.utcnow()
+    db.session.add(saved)
+    db.session.commit()
+    return redirect(url_for("requests.search_requests", **saved.params))
+
+
+@requests_bp.route("/search/saved/<int:view_id>/delete", methods=["POST"])
+@login_required
+def delete_saved_search_view(view_id: int):
+    saved = get_or_404(SavedSearchView, view_id)
+    if saved.user_id != current_user.id:
+        abort(403)
+    db.session.delete(saved)
+    db.session.commit()
+    flash("Saved view removed.", "success")
+    return redirect(url_for("requests.search_requests"))
+
+
+@requests_bp.route("/search/saved/<int:view_id>/default", methods=["POST"])
+@login_required
+def set_default_saved_search_view(view_id: int):
+    saved = get_or_404(SavedSearchView, view_id)
+    if saved.user_id != current_user.id:
+        abort(403)
+    SavedSearchView.query.filter_by(user_id=current_user.id).update(
+        {SavedSearchView.is_default: False}, synchronize_session=False
+    )
+    saved.is_default = True
+    saved.last_used_at = datetime.utcnow()
+    db.session.add(saved)
+    db.session.commit()
+    flash(f"'{saved.name}' is now your default dashboard shortcut.", "success")
+    return redirect(url_for("requests.search_requests", **saved.params))
+
+
+@requests_bp.route("/requests/bulk_update", methods=["POST"])
+@login_required
+def bulk_update_requests():
+    if not getattr(current_user, "is_admin", False):
+        abort(403)
+
+    raw_ids = request.form.getlist("request_ids")
+    request_ids = [int(value) for value in raw_ids if str(value).isdigit()]
+    new_priority = (request.form.get("priority") or "").strip().lower()
+
+    redirect_kwargs = {
+        "q": request.form.get("q", ""),
+        "status": request.form.get("status", ""),
+        "priority": request.form.get("priority_filter", ""),
+        "sla": request.form.get("sla", ""),
+    }
+    if request.form.get("approval_only"):
+        redirect_kwargs["approval_only"] = "1"
+
+    if not request_ids:
+        flash("Select at least one request for a bulk update.", "warning")
+        return redirect(url_for("requests.search_requests", **redirect_kwargs))
+
+    if new_priority not in {"low", "medium", "high"}:
+        flash("Choose a valid priority before running the bulk update.", "warning")
+        return redirect(url_for("requests.search_requests", **redirect_kwargs))
+
+    requests_to_update = ReqModel.query.filter(ReqModel.id.in_(request_ids)).all()
+    updated = 0
+    for req in requests_to_update:
+        if not can_view_request(req):
+            continue
+        if req.priority == new_priority:
+            continue
+        old_priority = req.priority
+        req.priority = new_priority
+        _log(req, "bulk_priority_update", note=f"Priority changed from {old_priority} to {new_priority} via search.")
+        updated += 1
+
+    db.session.commit()
+    flash(f"Updated priority on {updated} request{'s' if updated != 1 else ''}.", "success")
+    return redirect(url_for("requests.search_requests", **redirect_kwargs))
 
 
 @requests_bp.route("/metrics/ui")
@@ -1696,6 +2155,7 @@ def request_detail(request_id: int):
         [a for a in audit if a.action_type == "status_change"], req.status
     )
     suggested_next_actions = list(possible or [])[:4]
+    approval_state = _approval_cycle_state(req.id, req.status, user=current_user)
 
     # Avoid lazy-loading `req.artifacts` on potentially detached instances;
     # query artifacts directly by request id so the session is used explicitly.
@@ -1782,12 +2242,58 @@ def request_detail(request_id: int):
         ],
         recent_status_path=recent_status_path,
         suggested_next_actions=suggested_next_actions,
+        approval_state=approval_state,
         image_attachments=image_attachments,
         can_reject_request=can_reject_request,
         reject_button_label=reject_button_label,
         reject_message=reject_message,
         status_options_map=status_options_map,
     )
+
+
+@requests_bp.route("/requests/<int:request_id>/approvals/<int:approval_id>/decision", methods=["POST"])
+@login_required
+def record_approval_decision(request_id: int, approval_id: int):
+    req = get_or_404(ReqModel, request_id)
+    if not can_view_request(req):
+        abort(403)
+
+    approval = get_or_404(RequestApproval, approval_id)
+    if approval.request_id != req.id:
+        abort(404)
+    if req.status != approval.status_code:
+        flash("This approval stage is no longer active for the current request status.", "warning")
+        return redirect(url_for("requests.request_detail", request_id=request_id))
+
+    cycle_rows = _current_approval_rows(req.id, approval.status_code)
+    if not _user_can_signoff_approval(approval, current_user, cycle_rows):
+        abort(403)
+
+    decision = (request.form.get("decision") or "approve").strip().lower()
+    if decision not in {"approve", "changes_requested"}:
+        decision = "approve"
+    note = (request.form.get("note") or "").strip() or None
+
+    approval.state = "approved" if decision == "approve" else "changes_requested"
+    approval.decision_note = note
+    approval.decided_by_user_id = current_user.id
+    approval.decided_at = datetime.utcnow()
+
+    outcome_label = "approved" if decision == "approve" else "requested changes for"
+    _log(
+        req,
+        "approval_decision",
+        note=f"{current_user.email} {outcome_label} stage {approval.stage_order}: {approval.stage_name}",
+        from_status=req.status,
+        to_status=req.status,
+    )
+    db.session.commit()
+
+    flash(
+        "Approval recorded." if decision == "approve" else "Change request recorded.",
+        "success",
+    )
+    return redirect(url_for("requests.request_detail", request_id=request_id))
 
 
 @requests_bp.route("/requests/<int:request_id>/assign_self", methods=["POST"])
@@ -2445,6 +2951,18 @@ def add_comment(request_id: int):
         request_id=req.id,
     )
 
+    mentioned_users = _mentioned_recipients_for_comment(req, c.body)
+    if mentioned_users:
+        notify_users(
+            mentioned_users,
+            title=f"You were mentioned on Request #{req.id}",
+            body=(c.body[:160] + "…") if len(c.body) > 160 else c.body,
+            url=url_for("requests.request_detail", request_id=req.id),
+            ntype="mention",
+            request_id=req.id,
+            allow_email=False,
+        )
+
     _log(req, "comment_added", note=f"Comment added ({c.visibility_scope}).")
     db.session.commit()
 
@@ -2767,6 +3285,7 @@ def do_transition(request_id: int):
                 "C_APPROVED",
                 "C_NEEDS_CHANGES",
                 "B_FINAL_REVIEW",
+                "EXEC_APPROVAL",
                 "SENT_TO_A",
                 "CLOSED",
             ):
@@ -2840,6 +3359,18 @@ def do_transition(request_id: int):
             return redirect(url_for("requests.request_detail", request_id=req.id))
 
         from_status = req.status
+
+        approval_state = _approval_cycle_state(req.id, from_status, user=current_user)
+        if (
+            _approval_transition_requires_completion(from_status, to_status)
+            and approval_state["has_configured_stages"]
+            and not approval_state["ready"]
+        ):
+            flash(
+                "Complete every configured approval stage before moving this request forward.",
+                "warning",
+            )
+            return redirect(url_for("requests.request_detail", request_id=req.id))
 
         # Determine whether we should create a submission record. Create one when
         # this is a handoff (cross-department transfer) OR when the actor provided
@@ -2977,6 +3508,8 @@ def do_transition(request_id: int):
 
         req.status = to_status
         req.owner_department = owner_for_status(to_status)
+        if from_status != to_status:
+            _create_approval_cycle_for_status(req, to_status)
         _log(
             req,
             "status_change",

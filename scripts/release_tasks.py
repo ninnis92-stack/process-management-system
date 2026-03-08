@@ -421,6 +421,17 @@ def main():
                     print("schema_fix=site_config.show_banner_added")
                 if (
                     "site_config" in insp.get_table_names()
+                    and "company_url" not in site_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE site_config ADD COLUMN company_url VARCHAR(255)"
+                            )
+                        )
+                    print("schema_fix=site_config.company_url_added")
+                if (
+                    "site_config" in insp.get_table_names()
                     and "rolling_quotes" not in site_cols
                 ):
                     with engine.begin() as conn:
@@ -607,6 +618,30 @@ def main():
                                 )
                             )
                         print("schema_fix=request.is_denied_added")
+
+                if "integration_event" in insp.get_table_names():
+                    event_cols = {c["name"] for c in insp.get_columns("integration_event")}
+                    if "provider_key" not in event_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE integration_event ADD COLUMN provider_key VARCHAR(80)"))
+                        print("schema_fix=integration_event.provider_key_added")
+                    if "correlation_id" not in event_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE integration_event ADD COLUMN correlation_id VARCHAR(120)"))
+                        print("schema_fix=integration_event.correlation_id_added")
+                    if "retry_count" not in event_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE integration_event ADD COLUMN retry_count INTEGER DEFAULT 0"))
+                        print("schema_fix=integration_event.retry_count_added")
+                    if "last_attempt_at" not in event_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE integration_event ADD COLUMN last_attempt_at TIMESTAMP"))
+                        print("schema_fix=integration_event.last_attempt_at_added")
+                    if "next_retry_at" not in event_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE integration_event ADD COLUMN next_retry_at TIMESTAMP"))
+                        print("schema_fix=integration_event.next_retry_at_added")
+
                     # Ensure workflow_id exists when the model expects it
                     if "workflow_id" not in req_cols:
                         with engine.begin() as conn:
@@ -657,6 +692,14 @@ def main():
                                 )
                             )
                         print("schema_fix=status_option.sales_list_number_required_added")
+                    if "approval_stages_json" not in status_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE status_option ADD COLUMN approval_stages_json TEXT"
+                                )
+                            )
+                        print("schema_fix=status_option.approval_stages_json_added")
                 # Ensure a default workflow exists so guest forms have sensible choices
                 try:
                     from app.models import Workflow

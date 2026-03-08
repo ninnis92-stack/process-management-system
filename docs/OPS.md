@@ -132,6 +132,11 @@ Replace `FLY_APP` with your target app (e.g., `process-management-prototype-stag
 flyctl deploy -a <FLY_APP>
 ```
 
+# Webhook smoke (unsigned rejection + optional signed acceptance)
+```
+python scripts/webhook_smoke.py --url https://<FLY_APP>.fly.dev --secret "$WEBHOOK_SHARED_SECRET"
+```
+
 # Create staging app (Fly)
 ```
 flyctl apps create process-management-prototype-staging --org <your-org>
@@ -142,6 +147,7 @@ flyctl secrets set DATABASE_URL=postgres://... FLY_ENV=staging
 # Post-deploy smoke flow
 1. Run `curl -fsS https://$FLY_APP.fly.dev/health` → expect `{"status":"ok"}`
 2. Run `curl -I https://$FLY_APP.fly.dev/` → expect `200` or `302` depending on auth
+3. Run `python scripts/webhook_smoke.py --url https://$FLY_APP.fly.dev --secret "$WEBHOOK_SHARED_SECRET"` to validate signed webhook handling.
 3. Create smoke-record (inside instance):
 
 ```
@@ -164,6 +170,9 @@ Security checklist (pre-prod)
 
 Monitoring & backups
 - Add Prometheus scraping for `/metrics` and set up a retention/alerting policy
+- Use the sample scrape config in `ops/prometheus/fly-scrape.yml` for production Prometheus targets
+- Configure `SENTRY_DSN` and `SENTRY_ENVIRONMENT=production` so runtime exceptions flow to Sentry
+- Add `PAGERDUTY_ROUTING_KEY` to GitHub secrets so the scheduled production monitoring workflow can escalate failed smoke checks
 - Back up database snapshots daily and test restore
 
 Backup script

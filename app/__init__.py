@@ -589,6 +589,7 @@ def create_app():
                 site_theme_preset=site_theme_preset,
                 department_labels=dept_labels,
                 site_banner_html=banner_html,
+                company_url=getattr(cfg, 'company_url', None),
                 rolling_quotes_enabled=rolling_quotes_enabled,
                 rolling_quotes=rolling_quotes,
                 # choose an initial quote to render server-side; fallback to the
@@ -604,6 +605,17 @@ def create_app():
                 FeatureFlags=FeatureFlags,
             )
         except Exception:
+            # if any part of the helper blows up (e.g. missing schema), still
+            # return a minimal set of values that won't break templates.  we
+            # try to provide a basic FeatureFlags object because the navbar
+            # code accesses `FeatureFlags.get().vibe_enabled`.
+            ff = None
+            try:
+                ff = FeatureFlags.get()
+            except Exception:
+                class _Dummy:
+                    vibe_enabled = False
+                ff = _Dummy()
             return dict(
                 active_theme_css="",
                 theme_logo_url=current_app.config.get("LOGO_URL"),
@@ -613,8 +625,10 @@ def create_app():
                 site_banner_html="",
                 rolling_quotes_enabled=False,
                 rolling_quotes=[],
+                company_url=None,
+                initial_quote=None,
                 allow_user_nudges_enabled=False,
-                FeatureFlags=None,
+                FeatureFlags=ff,
             )
 
     # Track the last successfully rendered GET URL in the session so that

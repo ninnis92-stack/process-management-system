@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
 """Smoke test: log in as seeded admin and check admin pages on deployed app."""
+import argparse
+import os
 import re
-import sys
 import requests
 from urllib.parse import urljoin
-
-BASE = "https://process-management-prototype-lingering-bush-6175.fly.dev"
-ADMIN_EMAIL = "admin@example.com"
-ADMIN_PW = "admin123"
-
-session = requests.Session()
-
 
 def get_csrf(session, url):
     r = session.get(url, timeout=10)
@@ -20,15 +14,23 @@ def get_csrf(session, url):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--url", default=os.getenv("SMOKE_BASE_URL") or "https://process-management-prototype-lingering-bush-6175.fly.dev")
+    parser.add_argument("--email", default=os.getenv("SMOKE_ADMIN_EMAIL") or "admin@example.com")
+    parser.add_argument("--password", default=os.getenv("SMOKE_ADMIN_PASSWORD") or "admin123")
+    args = parser.parse_args()
+    session = requests.Session()
+    base = args.url.rstrip("/")
+
     try:
-        csrf = get_csrf(session, urljoin(BASE, "/auth/login"))
+        csrf = get_csrf(session, urljoin(base, "/auth/login"))
         print("GET /auth/login -> csrf", bool(csrf))
         if not csrf:
             print("No CSRF token found; abort")
             return 2
         r = session.post(
-            urljoin(BASE, "/auth/login"),
-            data={"email": ADMIN_EMAIL, "password": ADMIN_PW, "csrf_token": csrf},
+            urljoin(base, "/auth/login"),
+            data={"email": args.email, "password": args.password, "csrf_token": csrf},
             allow_redirects=True,
             timeout=10,
         )
@@ -44,7 +46,7 @@ def main():
         ]
         for p in paths:
             try:
-                rr = session.get(urljoin(BASE, p), timeout=10)
+                rr = session.get(urljoin(base, p), timeout=10)
                 print(
                     f"GET {p} ->",
                     rr.status_code,
@@ -57,7 +59,7 @@ def main():
                 print("Error requesting", p, e)
         # test metrics json if available
         try:
-            rj = session.get(urljoin(BASE, "/metrics/json"), timeout=10)
+            rj = session.get(urljoin(base, "/metrics/json"), timeout=10)
             if rj.status_code == 200:
                 print("metrics/json keys:", list(rj.json().keys())[:10])
         except Exception:

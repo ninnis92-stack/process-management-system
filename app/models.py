@@ -45,6 +45,7 @@ ACTION_TYPES = (
     "assignment_changed",
     "submission_created",
     "c_review_toggled",
+    "approval_decision",
 )
 
 
@@ -169,10 +170,15 @@ class IntegrationEvent(TenantScopedMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     event_name = db.Column(db.String(120), nullable=False, index=True)
     destination_kind = db.Column(db.String(60), nullable=False, default="outbox")
+    provider_key = db.Column(db.String(80), nullable=True, index=True)
+    correlation_id = db.Column(db.String(120), nullable=True, index=True)
     status = db.Column(db.String(30), nullable=False, default="pending", index=True)
     payload_json = db.Column(db.JSON, nullable=True)
     metadata_json = db.Column(db.JSON, nullable=True)
     last_error = db.Column(db.Text, nullable=True)
+    retry_count = db.Column(db.Integer, nullable=False, default=0)
+    last_attempt_at = db.Column(db.DateTime, nullable=True)
+    next_retry_at = db.Column(db.DateTime, nullable=True, index=True)
     delivered_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
 
@@ -216,6 +222,38 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     # or switched contexts. This is used to restore their active department
     # on subsequent logins when they have multiple department assignments.
     last_active_dept = db.Column(db.String(2), nullable=True)
+
+
+class SavedSearchView(TenantScopedMixin, db.Model):
+    """User-saved search filters that double as lightweight personal dashboard shortcuts."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    user = db.relationship("User", backref="saved_search_views")
+    name = db.Column(db.String(120), nullable=False)
+    endpoint = db.Column(db.String(120), nullable=False, default="requests.search_requests")
+    query_json = db.Column(db.Text, nullable=True)
+    is_default = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_used_at = db.Column(db.DateTime, nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "name", name="uq_saved_search_view_user_name"),
+    )
+
+    @property
+    def params(self) -> dict:
+        try:
+            parsed = json.loads(self.query_json or "{}")
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+
+    @params.setter
+    def params(self, value):
+        cleaned = value if isinstance(value, dict) else {}
+        self.query_json = json.dumps(cleaned)
 
 
 class Notification(TenantScopedMixin, db.Model):
@@ -375,6 +413,9 @@ class Request(TenantScopedMixin, db.Model):
     )
     submissions = db.relationship(
         "Submission", backref="request", lazy=True, cascade="all, delete-orphan"
+    )
+    approval_steps = db.relationship(
+        "RequestApproval", backref="request", lazy=True, cascade="all, delete-orphan"
     )
     # When True, this request was denied (closed via manual deny or
     # automatic denial). Used to expose a persistent "Denied" bucket.
@@ -816,6 +857,29 @@ class AuditLog(TenantScopedMixin, db.Model):
     event_ts = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
+class RequestApproval(TenantScopedMixin, db.Model):
+    """A single approval-stage record created when a request enters an approval status."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False, index=True)
+    status_code = db.Column(db.String(80), nullable=False, index=True)
+    cycle_index = db.Column(db.Integer, nullable=False, default=1)
+    stage_order = db.Column(db.Integer, nullable=False, default=0)
+    stage_name = db.Column(db.String(200), nullable=False)
+    required_role = db.Column(db.String(40), nullable=True)
+    required_department = db.Column(db.String(10), nullable=True)
+    state = db.Column(db.String(30), nullable=False, default="pending", index=True)
+    decided_by_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
+    decided_by_user = db.relationship("User", foreign_keys=[decided_by_user_id])
+    decision_note = db.Column(db.Text, nullable=True)
+    decided_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    @property
+    def is_complete(self) -> bool:
+        return self.state in {"approved", "changes_requested"}
+
+
 class SiteConfig(TenantScopedMixin, db.Model):
     """Singleton site configuration for banner and rolling quotes."""
 
@@ -823,6 +887,10 @@ class SiteConfig(TenantScopedMixin, db.Model):
     brand_name = db.Column(db.String(120), nullable=True)
     logo_filename = db.Column(db.String(255), nullable=True)
     theme_preset = db.Column(db.String(40), nullable=False, default="default")
+    # optional external link used by branding; when set we surface an absolute
+    # href on the navbar logo that points off-site.  Stored as a full URL so we
+    # can open it in a new tab without forcing users through our own routing.
+    company_url = db.Column(db.String(255), nullable=True)
     navbar_banner = db.Column(db.String(500), nullable=True)
     show_banner = db.Column(db.Boolean, nullable=False, default=False)
     _rolling_quotes = db.Column(
@@ -1195,6 +1263,66 @@ class StatusOption(TenantScopedMixin, db.Model):
     # the originator (the user who created the request) rather than the
     # entire owner department. Admin toggle exposed in the UI.
     notify_to_originator_only = db.Column(db.Boolean, nullable=False, default=False)
+    # JSON list of approval stages for this status. Each stage is stored as:
+    # {"name": str, "role": str|None, "department": str|None}
+    approval_stages_json = db.Column(db.Text, nullable=True)
+
+    @staticmethod
+    def normalize_approval_stages(value) -> list:
+        if not value:
+            return []
+
+        raw_items = value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                raw_items = parsed if isinstance(parsed, list) else []
+            except Exception:
+                raw_items = []
+
+        if not isinstance(raw_items, list):
+            return []
+
+        normalized = []
+        for idx, item in enumerate(raw_items):
+            if isinstance(item, str):
+                name = item.strip()
+                role = None
+                department = None
+            elif isinstance(item, dict):
+                name = str(item.get("name") or item.get("label") or item.get("title") or "").strip()
+                role = str(item.get("role") or "").strip().lower() or None
+                department = str(item.get("department") or item.get("dept") or "").strip().upper() or None
+            else:
+                continue
+
+            if not name:
+                name = f"Stage {idx + 1}"
+            if department and department not in {"A", "B", "C"}:
+                department = None
+            normalized.append(
+                {
+                    "name": name,
+                    "role": role,
+                    "department": department,
+                }
+            )
+        return normalized
+
+    @property
+    def approval_stages(self) -> list:
+        return self.normalize_approval_stages(self.approval_stages_json)
+
+    @approval_stages.setter
+    def approval_stages(self, value):
+        self.approval_stages_json = json.dumps(self.normalize_approval_stages(value))
+
+    @property
+    def approval_stage_summary(self) -> str:
+        stages = self.approval_stages
+        if not stages:
+            return "No stages"
+        return ", ".join(stage.get("name") or f"Stage {idx + 1}" for idx, stage in enumerate(stages))
 
 
 class Workflow(TenantScopedMixin, db.Model):
