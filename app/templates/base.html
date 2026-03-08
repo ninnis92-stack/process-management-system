@@ -558,8 +558,17 @@
           if(saved && Array.isArray(saved)){
             saved.forEach(s=>{
               const cb = document.querySelector(`.form-check-input[name="${s.name}"]`);
-              if(cb) cb.checked = s.checked;
+              if(cb){
+                cb.checked = s.checked;
+                // update label/form class as if the user toggled it
+                cb.dispatchEvent(new Event('change'));
+              }
             });
+          // once we've restored values from storage, drop the entry so
+          // future visits will reflect whatever the server sends instead of
+          // possibly stale client state.
+          delete all[path];
+          sessionStorage.setItem(storageKey, JSON.stringify(all));
           }
         }catch(e){}
       }

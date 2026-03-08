@@ -62,6 +62,25 @@ def test_feature_flags_render_correct_action_labels(client, app):
     # vibe toggle text derived from label above
     assert 'Disable Vibe button UI' in html
 
+    # simulate saving new values and verify the returned page reflects them
+    rv2 = client.post(
+        "/admin/feature_flags",
+        data={
+            "enable_notifications": "y",
+            "enable_nudges": "y",
+            "allow_user_nudges": "",
+            "vibe_enabled": "y",
+            "sso_admin_sync_enabled": "y",
+            "sso_department_sync_enabled": "",
+            "enable_external_forms": "",
+            "rolling_quotes_enabled": "y",
+        },
+        follow_redirects=True,
+    )
+    assert rv2.status_code == 200
+    html2 = rv2.get_data(as_text=True)
+    assert 'Disable nudges' in html2  # label updated after save
+
 
 def test_reject_request_config_label_describes_state(client, app):
     make_admin(app)
