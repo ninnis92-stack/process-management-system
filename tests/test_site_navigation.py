@@ -65,24 +65,22 @@ def test_public_navigation_links_resolve(client):
         assert not location.endswith("/static/app.js"), route
 
 
-def test_login_page_always_shows_motivational_quotes(client, app):
-    # The login page should follow the rolling quotes toggle: when the
-    # flag is disabled no quote renders, but enabling it restores the
-    # built-in motivational set so unauthenticated visitors still see a
-    # friendly message without needing a user account.
+def test_login_page_no_longer_shows_rolling_quote_banner(client, app):
+    # The login page (and any page) should not render a rolling-quote banner
+    # under the navbar.  Quotes are now injected only inside the nav element.
     with app.app_context():
         cfg = SiteConfig.get()
         cfg.rolling_quotes_enabled = False
-        cfg.rolling_quotes = []
-        cfg.banner_html = '<div>banner</div>'
+        cfg.rolling_quotes = ["Progress, not perfection."]
+        cfg.banner_html = ''
         db.session.add(cfg)
         db.session.commit()
 
     rv = client.get("/auth/login")
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
-
     assert "Progress, not perfection." not in html
+    assert "Banner text" not in html
 
     with app.app_context():
         cfg = SiteConfig.get()
@@ -93,10 +91,13 @@ def test_login_page_always_shows_motivational_quotes(client, app):
     rv = client.get("/auth/login")
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
-    assert "Progress, not perfection." in html
+    assert "Progress, not perfection." not in html.split('<script')[0]
+    assert "Banner text" not in html.split('<script')[0]
 
 
 def test_login_page_hides_quotes_when_external_branding_present(client, app):
+    # With the rolling-quote banner removed, external branding no longer
+    # affects quote visibility. The page should never render the quote text.
     with app.app_context():
         cfg = SiteConfig.get()
         orig_banner = cfg.banner_html
@@ -258,16 +259,19 @@ def test_navbar_department_dropdown_for_multi_dept_user(app, client):
 
 
 def test_initial_quote_on_dashboard(app, client):
-    # the motivation slot should be populated with a real quote (at least the
-    # first built-in line) rather than the generic placeholder. this ensures the
-    # server-side fallback is wired up properly.
+    # the motivation slot should be populated with one of the rolling quotes
+    # rather than the generic placeholder. this verifies the server-side
+    # randomization is working and the placeholder isn't leaking through.
     _create_user(app, email="quote-user@example.com", department="A")
     _login(client, "quote-user@example.com")
     resp = client.get("/dashboard")
     html = resp.get_data(as_text=True)
     assert "Loading inspiration" not in html
-    # check for a known fragment from the default set
-    assert "Sort today" in html
+    with app.app_context():
+        cfg = SiteConfig.get()
+        quotes = cfg.rolling_quotes or SiteConfig.DEFAULT_QUOTE_SETS.get("default", [])
+    # at least one of the configured quotes should appear somewhere in the html
+    assert any(q and q in html for q in quotes), "no rolling quote rendered in dashboard"
 
 
 def test_brand_link_respects_company_url(app, client):

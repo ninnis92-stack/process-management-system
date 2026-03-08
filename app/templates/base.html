@@ -300,13 +300,6 @@
               </section>
             {% endif %}
 
-          {% if site_banner_html %}
-              <div class="mb-3">
-                <div class="alert alert-info mb-0" role="status">{{ site_banner_html|striptags }}</div>
-              </div>
-          {% elif rolling_quotes_enabled and rolling_quotes and rolling_quotes|length > 0 %}
-            <div class="alert alert-info mb-3" role="status">{{ rolling_quotes[0] }}</div>
-          {% endif %}
 
           {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}

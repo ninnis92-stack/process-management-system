@@ -103,7 +103,8 @@ needed.
    - create a new request via the dashboard and confirm you can view/track it
    - upload an attachment and watch OCR text appear (requires Tesseract installed locally)
    - visit `/admin` and toggle a feature flag or create a quick guest form
-
+   - note that the site banner feature has been removed; quotes now live only in
+     the navbar and randomize daily rather than showing as a separate alert
    Automated helpers are available via Makefile:
    ```bash
    make smoke        # hit home, dashboard, and admin/site_config
@@ -276,6 +277,11 @@ Supported submitter access policies:
 - `unaffiliated_only` — blocks known affiliated/SSO-linked organization members
   so the form can be reserved for unaffiliated submitters
 
+**Notes on rolling quotes:** the quotes shown in the navbar are now randomized
+once per day using a deterministic seed; the server picks the initial quote using
+the same algorithm so the page loads with the correct text.  The separate
+rolling-quote banner that used to appear under the navbar has been removed
+entirely.
 Additional notes:
 
 - Approved organization domains are stored as a newline- or comma-separated list
