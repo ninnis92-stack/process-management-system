@@ -12,6 +12,7 @@ import os
 import click
 from dotenv import load_dotenv
 from flask import Flask, current_app
+from flask_login import current_user
 from werkzeug.security import generate_password_hash
 
 from config import Config
