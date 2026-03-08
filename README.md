@@ -171,6 +171,7 @@ admin site config for quick sanity checks against any environment.
 - Ran deployed smoke checks with `bash scripts/smoke_test.sh https://process-management-prototype-lingering-bush-6175.fly.dev`, `python scripts/smoke_deployed_login.py --url https://process-management-prototype-lingering-bush-6175.fly.dev`, and `python scripts/admin_smoke.py`; after the schema fix the admin assignments page returned HTTP 200.
 - Cleared remote smoke data with `python scripts/clear_smoke_remote.py`; the cleanup endpoint completed successfully and reported `{"deleted":0}`.
 - Checked both `https://process-management-prototype-lingering-bush-6175.fly.dev/ready` and `https://process-management-prototype-lingering-bush-6175.fly.dev/health`; both returned `{"status":"ok"}`, and `/ready` reported `components.database.status: ok`.
+- The login page now uses the `motivational` quote set when rolling quotes are enabled; admins can toggle the flag on or off via `/admin/feature_flags` and the control is independent of any per-user preferences.
 - Added client‑side persistence for toggle checkboxes (feature flags and similar forms), ensuring their on/off state survives page refreshes after saving.
 
 ---
