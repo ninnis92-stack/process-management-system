@@ -31,7 +31,7 @@ Key capabilities:
 - **Dynamic request templates** with sections, verification‑prefill, and
   conditional requirements
 - **Workflow engine** with status transitions, path history and loop protection
-- **Admin console** for users, departments, workflows, site config, integrations,
+- **Command center** for users, departments, workflows, site config, integrations,
   guest forms, feature flags, and more
 - **Field verification** powered by third‑party tracker integrations
 - **Guest submission and lookup** via external blueprints
@@ -200,7 +200,7 @@ page displays the last few steps and suggests next actions to the user.
 
 ## Admin & user interface
 
-- **Admin console**: located under `/admin` with subpages for users, departments,
+- **Command center**: located under `/admin` with subpages for users, departments,
   workflows, statuses, site configuration, integrations, feature flags, guest
   form templates, etc.
 - **User settings**: dark mode (tints with the chosen vibe), theme/vibe selection, quote set, rotating
