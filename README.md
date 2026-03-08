@@ -182,7 +182,10 @@ replaces any department restriction. Admin users are exempt from these rules and
 always see every configured quote set. When creating or editing a user the
 admin form now includes controls for the initial `quote_set` and `quotes_enabled`
 flag so assignments do not need to be POSTed manually.
-
+> **Tip:** during the recent diagnostics cycle the code temporarily logged
+> quote-context information at every `requests.dashboard` render to debug a
+> regression; that logging has been removed from the default branch but the
+> note remains here for historical context.
 Prometheus scrape templates live under [ops/prometheus/fly-scrape.yml](ops/prometheus/fly-scrape.yml)
 and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORING.md).
 
@@ -203,6 +206,14 @@ and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORIN
   `SENTRY_DSN`, `SENTRY_ENVIRONMENT=production`, `WEBHOOK_SHARED_SECRET`,
   `PAGERDUTY_ROUTING_KEY`, `PRODUCTION_BASE_URL`, `PRODUCTION_ADMIN_EMAIL`,
   and `PRODUCTION_ADMIN_PASSWORD`.
+
+> **Feature flag defaults:** flags are stored in the database and may initially
+> contain `NULL` values.  The application now treats `None` as a sensible
+> default (e.g. `rolling_quotes_enabled` defaults to `True`) instead of
+> disabling the feature.  This avoids an empty row accidentally turning off key
+> functionality during an upgrade; missing values are normalized during every
+> release task run.
+
 - Redis is optional; if you set `REDIS_URL` Fly health will check it, otherwise
   it’s skipped.
 
