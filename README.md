@@ -48,6 +48,40 @@ A small prototype app.
 - Models and migrations: `app/models.py` and `migrations/versions/0023_add_user_department_and_last_active.py`.
 - Smoke & helper scripts: `scripts/automated_role_smoke.py`, `scripts/transition_smoke.py`, `scripts/release_tasks.py`.
 
+## External integrations
+
+The app now includes a lightweight integration layer so other software can pull
+data from it and subscribe to events without modifying core workflow code.
+
+Key pieces:
+
+- `app/services/integrations.py`
+  - `fetch_external_data(provider_name, config, query)` for provider adapters.
+  - `emit_webhook_event(event_name, payload)` for outbound events.
+  - `serialize_request(req)` for stable request payloads.
+- `api/index.py`
+  - `GET /api/requests` — export request data with optional `department`, `status`, `limit`.
+  - `GET /api/requests/<id>` — export one request.
+  - `POST /api/integrations/fetch` — call a provider adapter (`echo` included as a starter).
+  - `GET/POST /api/integrations/webhook-subscriptions` — manage outbound webhook subscribers.
+- `app/models.py`
+  - `WebhookSubscription` stores webhook URLs, event filters, and optional signing secrets.
+
+Current outbound event:
+
+- `request.status_changed`
+
+This event is emitted whenever a request transition is committed. Consumers will
+receive a JSON payload containing the serialized request and the `from_status`
+/ `to_status` values.
+
+To add a new external software connector:
+
+1. Create a provider class in `app/services/integrations.py` implementing `fetch()`.
+2. Register it in the `PROVIDERS` map.
+3. Optionally emit more events from workflow points using `emit_webhook_event()`.
+4. Use the API endpoints to let external systems read request data or register webhooks.
+
 ## Migrations & Staging Smoke Tests
 
 If you encounter errors referencing missing DB columns (for example a missing
@@ -161,7 +195,8 @@ Notes about recent admin UI changes
 
 - Admin creation/edit: a `Role` dropdown was added to the Admin user creation form allowing `User` or `Admin`; this sets `User.is_admin` accordingly.
 - Admins no longer see the notification bell in the navbar (admins do not receive standard in-app notifications).
-- Dashboard: admin users are routed to the admin dashboard; non-admin users continue to use the regular dashboard.
+- Dashboard: admin users are routed to the admin dashboard by default (even if they belong to multiple departments); the regular dashboard is still used for non-admins.  A new "Switch Dept" card on the admin home page lets admins open the department picker when they need to inspect a specific department.
+- **Site/Quotes tiles** now render as `<button>`s with hardwired `onclick` navigation to avoid any stray href rewrite.  The client bundle version for CSS/JS was bumped to `v=20260307e` to force-cache refresh (see recent bug where stale `app.js` caused cards to redirect to static assets).
 - A banner button to request self-admin elevation was added and is guarded by the `ALLOW_SELF_ADMIN` config flag. Only enable this flag intentionally in development or supervised demos.
 Verification and quick troubleshooting
 ------------------------------------
@@ -248,7 +283,7 @@ flask db upgrade
 
 ## Scheduling & Nudges
 
-- Automated nudges for high-priority requests: enable from the Admin -> Special Emails page (`High-priority nudges`). Set the reminder interval in hours (default 24).
+- Automated nudges for high-priority requests: enable from the Admin -> Special Emails page (`High-priority nudges`). Set the reminder interval using the dropdown (30 minutes, 1 hour, 2 hours, 4 hours, 8 hours, 12 hours, 24 hours); fractions like 0.5 imply minutes.
 - A small cron example is provided at `scripts/cron_examples.sh` showing how to run the nudge sender hourly and refresh Prometheus gauges periodically. Adjust paths and virtualenv activation to match your environment or use your platform's scheduler.
 - Run nudges manually for testing:
 
@@ -431,7 +466,11 @@ Supported provider response signals:
 
 - The app exposes Prometheus-format metrics at `/metrics` (text exposition). A small DB-backed
   human-friendly view is available at `/metrics/ui` and a machine-friendly JSON endpoint at
-  `/metrics/json` (supports `?range=daily|weekly|monthly|yearly`).
+  `/metrics/json` (supports `?range=daily|weekly|monthly|yearly|all`).
+  Site admins or department heads can toggle between full-site metrics and a single department
+  using the buttons on the UI; `dept` query parameter restricts to a specific department.
+  You can also filter the user-efficiency section by passing one or more `user` parameters
+  (IDs or emails) and export the resulting snapshot as CSV for easy comparison.
 - `app/metrics.py` contains counters and a gauge used by the application. The dependency on
   `prometheus_client` is optional for local/dev runs — if the package is not installed the app
   uses a safe noop fallback so the server can start. To enable full Prometheus support, install:
@@ -587,7 +626,7 @@ This script will create temporary test users and print counts of in‑app `Notif
 
 ## Nudges
 - Nudges are automated reminders for high-priority requests that are still open for the assigned user.
-- Admin can enable/disable nudges and control the timer interval in the admin special-email settings.
+- Admin can enable/disable nudges and control the timer interval in the admin special-email settings; the interface now offers 30‑minute and 1‑hour presets and stores the interval as a floating-point value for fine‑grained control.
 - A default minimum delay of 4 hours after request creation is enforced before nudges begin; admin can only extend that delay.
 - User-driven nudge pushing is disabled by default; nudges are intended to be timer-driven by admin configuration.
 
@@ -790,6 +829,8 @@ PY
 
 Recent admin fixes
 - Dark mode admin tables and muted helper text were tightened so pages like Departments and Workflows keep the same dark background while avoiding washed-out copy.
+- Admin dashboard now separates **Workflows** and **Status Options** tiles; workflows have their own page and status options are managed independently.
+- Visiting the status options page will automatically create entries derived from any existing workflows when the table is empty, ensuring the admin sees meaningful rows without manual "implement" steps.
 - The workflow list now surfaces inferred cross-department scope labels like `A / B / C` when a workflow spans multiple departments instead of showing only `Global`.
 
 Dev-only smoke-test scripts
