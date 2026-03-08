@@ -303,6 +303,15 @@ page displays the last few steps and suggests next actions to the user.
   script fails, the server now injects the first quote directly into the HTML
   and the JavaScript falls back to a built-in list when a configured set is
   empty.  Smoke tests and unit tests verify the banner text appears.
+- Administrators can restrict available quote sets by department or by
+  individual user via the site configuration page.  When both a department and
+  user rule exist the user-specific list wins; admins themselves bypass these
+  restrictions and always have access to every defined set for testing and
+  configuration purposes.  The quote-selection dropdown in user settings and
+  admin forms only shows the allowed names.
+- Stored per-user preferences are normalized to lowercase/trimmed values on
+  save and during seed/release tasks, protecting against case mismatches or
+  legacy entries that could otherwise disappear after an upgrade.
 - **User settings**: dark mode (tints with the chosen vibe), theme/vibe selection, quote set, rotating
   quotes.
 - **Templates & requirements**: rich form editing with grouped fields, hints,

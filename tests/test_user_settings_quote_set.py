@@ -72,3 +72,48 @@ def test_user_can_select_quote_set(app, client):
     assert rv.status_code == 200
     rv = client.get("/dashboard")
     assert b"rolling-quotes-data" not in rv.data
+
+
+def test_quote_set_normalization_and_case_insensitive(app, client):
+    """Ensure user preference is normalized and matched regardless of case.
+
+    This covers the situation where a user record might contain an
+    uppercase or otherwise mis‑cased value from a previous release or manual
+    edit; the dashboard should still pick the intended set instead of falling
+    back to the global/active set (e.g. "laundry riddles").
+    """
+    with app.app_context():
+        # create a user whose quote_set is mixed/caps
+        u = User(
+            email="case@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=False,
+        )
+        # assign uppercase value to exercise normalization validator
+        u.quote_set = "ENGINEERING"
+        db.session.add(u)
+        db.session.commit()
+        # confirm stored value was normalized
+        u2 = User.query.filter_by(email="case@example.com").first()
+        assert u2.quote_set == "engineering"
+
+    # login and expect engineering quote on dashboard even though value was
+    # originally all-caps
+    rv = login(client, email="case@example.com", password="secret")
+    assert rv.status_code == 200
+    rv = client.get("/dashboard")
+    assert rv.status_code == 200
+    assert b"First, solve the problem." in rv.data
+
+    # additionally simulate a stray value that doesn't match case in the
+    # DB (e.g. someone manually inserted "Engineering"), and verify the
+    # lookup logic ignores case when choosing quotes.
+    with app.app_context():
+        u3 = User.query.filter_by(email="case@example.com").first()
+        u3.quote_set = "Engineering"
+        db.session.commit()
+
+    rv = client.get("/dashboard")
+    assert b"First, solve the problem." in rv.data

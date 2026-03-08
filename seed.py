@@ -141,6 +141,17 @@ def main():
         cfg._rolling_quote_sets = json.dumps(normalized_sets)
         if not getattr(cfg, "active_quote_set", None) or cfg.active_quote_set not in normalized_sets:
             cfg.active_quote_set = "default"
+        # normalize any existing user preferences just in case there are stray
+        # upper‑case or whitespace‑padded values from earlier releases or manual
+        # edits; the model's validator will also keep future writes consistent.
+        try:
+            from sqlalchemy import func
+
+            db.session.query(User).filter(User.quote_set.isnot(None)).update(
+                {User.quote_set: func.lower(User.quote_set)}, synchronize_session=False
+            )
+        except Exception:
+            pass
         db.session.commit()
         print("DB =", ...)
         print("Seeded users:")
