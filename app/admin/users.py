@@ -84,11 +84,13 @@ def create_user():
         is_admin = (getattr(form, "role", None) and form.role.data == "admin") or bool(
             form.is_admin.data
         )
+        department_override = bool(getattr(form, "department_override", None) and form.department_override.data)
 
         existing = User.query.filter_by(email=email).first()
         if existing:
             existing.name = name or existing.name
             existing.department = dept
+            existing.department_override = department_override
             if form.password.data:
                 existing.password_hash = generate_password_hash(
                     pw, method="pbkdf2:sha256"
@@ -104,6 +106,7 @@ def create_user():
             email=email,
             name=name,
             department=dept,
+            department_override=department_override,
             password_hash=generate_password_hash(pw, method="pbkdf2:sha256"),
             is_active=is_active,
             is_admin=is_admin,
@@ -133,6 +136,9 @@ def edit_user(user_id: int):
         u.email = form.email.data.strip().lower()
         u.name = form.name.data.strip() if form.name.data else None
         u.department = form.department.data
+        u.department_override = bool(
+            getattr(form, "department_override", None) and form.department_override.data
+        )
         if form.password.data:
             u.password_hash = generate_password_hash(
                 form.password.data, method="pbkdf2:sha256"

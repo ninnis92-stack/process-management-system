@@ -27,6 +27,9 @@ class AdminCreateUserForm(FlaskForm):
         choices=[("A", "A"), ("B", "B"), ("C", "C")],
         validators=[DataRequired()],
     )
+    department_override = BooleanField(
+        "Admin-managed primary department", default=False
+    )
     is_active = BooleanField("Active", default=True)
     is_admin = BooleanField("Admin", default=False)
     submit = SubmitField("Create / Update User")
@@ -372,6 +375,10 @@ class FeatureFlagsForm(FlaskForm):
     vibe_enabled = BooleanField("Show Vibe button UI", default=True)
     sso_admin_sync_enabled = BooleanField(
         "Allow SSO to allocate admin access from organization claims/APIs", default=True
+    )
+    sso_department_sync_enabled = BooleanField(
+        "Allow SSO to update primary departments from organization claims/APIs",
+        default=False,
     )
     enable_external_forms = BooleanField(
         "Enable external form integrations (3rd-party forms)", default=False

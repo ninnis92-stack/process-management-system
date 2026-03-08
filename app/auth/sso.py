@@ -106,3 +106,29 @@ def sso_user_is_admin(userinfo: dict, config: dict, email: str = "") -> bool:
 
     actual = set(_normalize_claim_values(_get_nested_claim(userinfo, claim_path)))
     return bool(actual & expected)
+
+
+def sso_user_department(userinfo: dict, config: dict) -> Optional[str]:
+    """Resolve a primary department from SSO claims.
+
+    Returns `A`, `B`, or `C` when the configured claim or mapping yields a
+    recognized department.
+    """
+    claim_path = config.get("SSO_DEPARTMENT_CLAIM")
+    if not claim_path:
+        return None
+
+    mapping = {
+        str(key).strip().lower(): str(value).strip().upper()
+        for key, value in (config.get("SSO_DEPARTMENT_MAP") or {}).items()
+        if str(key).strip() and str(value).strip()
+    }
+
+    for raw in _normalize_claim_values(_get_nested_claim(userinfo, claim_path)):
+        direct = raw.strip().upper()
+        if direct in {"A", "B", "C"}:
+            return direct
+        mapped = mapping.get(raw.strip().lower())
+        if mapped in {"A", "B", "C"}:
+            return mapped
+    return None

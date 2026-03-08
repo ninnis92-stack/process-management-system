@@ -24,6 +24,7 @@ from ..extensions import db
 from .sso import oauth
 from .sso import token_has_mfa
 from .sso import sso_user_is_admin
+from .sso import sso_user_department
 from sqlalchemy.exc import OperationalError
 from flask import session as _session
 from ..models import UserDepartment, Department
@@ -112,6 +113,36 @@ def _get_user_departments(user):
         return [getattr(user, "department", None)]
 
 
+def _sync_primary_department_from_sso(user, userinfo):
+    if not user:
+        return
+    try:
+        flags = None
+        try:
+            flags = FeatureFlags.get()
+        except Exception:
+            flags = None
+
+        sync_enabled = bool(
+            getattr(
+                flags,
+                "sso_department_sync_enabled",
+                current_app.config.get("SSO_DEPARTMENT_SYNC_ENABLED", False),
+            )
+        )
+        if not sync_enabled or getattr(user, "department_override", False):
+            return
+
+        resolved_department = sso_user_department(userinfo, current_app.config)
+        if resolved_department and getattr(user, "department", None) != resolved_department:
+            user.department = resolved_department
+    except Exception:
+        current_app.logger.exception(
+            "Failed to sync SSO primary department for %s",
+            getattr(user, "email", getattr(user, "id", "unknown")),
+        )
+
+
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 
@@ -198,6 +229,8 @@ def sso_callback():
                 user.is_admin = False
     except Exception:
         current_app.logger.exception("Failed to sync SSO admin role for %s", email)
+
+    _sync_primary_department_from_sso(user, userinfo)
 
     db.session.commit()
 

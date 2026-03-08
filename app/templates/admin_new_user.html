@@ -23,6 +23,12 @@
   <div class="mb-3">
     <label class="form-label">Department</label>
     {{ form.department(class="form-select") }}
+    <div class="form-text">Admins can reassign the primary department here, or let SSO refresh it on login when department sync is enabled.</div>
+  </div>
+  <div class="form-check mb-3">
+    {{ form.department_override(class="form-check-input") }}
+    <label class="form-check-label ms-2">{{ form.department_override.label.text }}</label>
+    <div class="form-text">Turn this on when admins should keep reassigning the primary department manually. Leave it off when the configured SSO department claim should drive updates instead.</div>
   </div>
   <div class="form-check mb-3">
     {{ form.is_active(class="form-check-input") }}

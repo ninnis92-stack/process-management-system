@@ -1473,6 +1473,13 @@ def feature_flags():
         form.sso_admin_sync_enabled.data = bool(
             getattr(flags, "sso_admin_sync_enabled", True)
         )
+        form.sso_department_sync_enabled.data = bool(
+            getattr(
+                flags,
+                "sso_department_sync_enabled",
+                current_app.config.get("SSO_DEPARTMENT_SYNC_ENABLED", False),
+            )
+        )
         form.enable_external_forms.data = bool(
             getattr(flags, "enable_external_forms", False)
         )
@@ -1486,6 +1493,10 @@ def feature_flags():
         flags.allow_user_nudges = bool(form.allow_user_nudges.data)
         flags.vibe_enabled = bool(form.vibe_enabled.data)
         flags.sso_admin_sync_enabled = bool(form.sso_admin_sync_enabled.data)
+        flags.sso_department_sync_enabled = bool(
+            getattr(form, "sso_department_sync_enabled", None)
+            and form.sso_department_sync_enabled.data
+        )
         flags.enable_external_forms = bool(
             getattr(form, "enable_external_forms", None)
             and form.enable_external_forms.data

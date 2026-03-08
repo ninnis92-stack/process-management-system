@@ -39,6 +39,12 @@
     </div>
 
     <div class="form-check mb-3">
+      {{ form.sso_department_sync_enabled(class_='form-check-input') }}
+      {{ form.sso_department_sync_enabled.label(class_='form-check-label') }}
+      <div class="form-text">When enabled, SSO-linked users whose primary department is not marked as admin-managed will have it reassigned from the configured SSO department claim on login.</div>
+    </div>
+
+    <div class="form-check mb-3">
       {{ form.enable_external_forms(class_='form-check-input') }}
       {{ form.enable_external_forms.label(class_='form-check-label') }}
       <div class="form-text">When enabled, admins may mark a Form Template as using an external 3rd-party form; those templates will direct users to the external provider and accept webhook callbacks.</div>

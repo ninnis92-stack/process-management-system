@@ -55,6 +55,24 @@ class Config:
         for e in os.getenv("SSO_ADMIN_EMAILS", "").split(",")
         if e.strip()
     ]
+    # Optional primary-department sync from SSO claims.
+    # Example:
+    #   SSO_DEPARTMENT_SYNC_ENABLED=True
+    #   SSO_DEPARTMENT_CLAIM=department
+    #   SSO_DEPARTMENT_MAP=sales:A,ops:B,quality:C
+    SSO_DEPARTMENT_SYNC_ENABLED = (
+        os.getenv("SSO_DEPARTMENT_SYNC_ENABLED", "False") == "True"
+    )
+    SSO_DEPARTMENT_CLAIM = os.getenv("SSO_DEPARTMENT_CLAIM", "department")
+    SSO_DEPARTMENT_MAP = {
+        key.strip().lower(): value.strip().upper()
+        for key, value in (
+            pair.split(":", 1)
+            for pair in os.getenv("SSO_DEPARTMENT_MAP", "").split(",")
+            if ":" in pair
+        )
+        if key.strip() and value.strip()
+    }
     # Optional MFA enforcement for SSO-backed admin access.
     SSO_REQUIRE_MFA = os.getenv("SSO_REQUIRE_MFA", "False") == "True"
     SSO_MFA_CLAIM = os.getenv("SSO_MFA_CLAIM", "amr")

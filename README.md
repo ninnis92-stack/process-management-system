@@ -455,6 +455,10 @@ Deployment note (automated):
   `/auth/login` 200, seeded login 200, `/dashboard` 200), and remote cleanup
   completed via `scripts/clear_smoke_remote.py` (`deleted 0`).
 
+- 2026-03-08 UTC: local full suite passed (`77 passed in 13.71s`), deployed to
+  Fly successfully, remote smoke checks passed (all endpoints 200), and smoke
+  cleanup was executed (`deleted 0`).
+
 - 2026-03-08 UTC: local full suite passed (`71 passed in 13.26s`), deployed to
   Fly successfully, remote smoke checks passed (`/health` 200, `/auth/login`
   200, seeded login and `/dashboard` fetch succeeded), and remote `SMOKE_`

@@ -1,4 +1,4 @@
-from app.auth.sso import sso_user_is_admin, token_has_mfa
+from app.auth.sso import sso_user_is_admin, token_has_mfa, sso_user_department
 
 
 def test_sso_admin_sync_from_group_claim():
@@ -56,6 +56,33 @@ def test_sso_admin_sync_false_when_no_match():
         "ADMIN_EMAILS": [],
     }
     assert sso_user_is_admin(userinfo, config) is False
+
+
+def test_sso_department_sync_from_direct_claim():
+    userinfo = {"email": "user@example.com", "department": "b"}
+    config = {
+        "SSO_DEPARTMENT_CLAIM": "department",
+        "SSO_DEPARTMENT_MAP": {},
+    }
+    assert sso_user_department(userinfo, config) == "B"
+
+
+def test_sso_department_sync_from_mapped_claim():
+    userinfo = {"email": "user@example.com", "profile": {"team": "quality"}}
+    config = {
+        "SSO_DEPARTMENT_CLAIM": "profile.team",
+        "SSO_DEPARTMENT_MAP": {"quality": "C"},
+    }
+    assert sso_user_department(userinfo, config) == "C"
+
+
+def test_sso_department_sync_returns_none_for_unmapped_claim():
+    userinfo = {"email": "user@example.com", "profile": {"team": "finance"}}
+    config = {
+        "SSO_DEPARTMENT_CLAIM": "profile.team",
+        "SSO_DEPARTMENT_MAP": {"sales": "A"},
+    }
+    assert sso_user_department(userinfo, config) is None
 
 
 def test_token_has_mfa_from_default_amr_claim():

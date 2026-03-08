@@ -196,6 +196,7 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     name = db.Column(db.String(255), nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     department = db.Column(db.String(1), nullable=False, default="A")  # A/B/C
+    department_override = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
@@ -647,6 +648,7 @@ class FeatureFlags(TenantScopedMixin, db.Model):
     allow_user_nudges = db.Column(db.Boolean, nullable=False, default=False)
     vibe_enabled = db.Column(db.Boolean, nullable=False, default=True)
     sso_admin_sync_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    sso_department_sync_enabled = db.Column(db.Boolean, nullable=False, default=False)
     # Allow admins to enable external form integrations (3rd-party forms -> webhook)
     enable_external_forms = db.Column(db.Boolean, nullable=False, default=False)
     # Allow admins to enable/disable rolling quotes shown in the UI
