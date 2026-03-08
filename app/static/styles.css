@@ -227,9 +227,12 @@
 }
 
 .dark-mode .hero-callouts {
-  background: linear-gradient(135deg, rgba(255,255,255,0.02), transparent 60%), var(--page-bg);
+  background:
+    radial-gradient(circle at 10% 20%, rgba(var(--accent-rgb, 138, 180, 248), 0.12), transparent 45%),
+    radial-gradient(circle at 85% 0%, rgba(var(--accent-rgb, 138, 180, 248), 0.08), transparent 55%),
+    linear-gradient(135deg, rgba(0,0,0,0.10), rgba(0,0,0,0.35));
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.55);
 }
 
 .dark-mode .hero-callouts__intro h3,
@@ -598,6 +601,14 @@ a:hover { color: var(--accent-2); }
               var(--surface);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 16px 38px rgba(0, 0, 0, 0.55);
+}
+
+.dark-mode .hero-callout-card--admin {
+  border-image: linear-gradient(70deg, var(--accent), var(--accent-2)) 1;
+}
+
+.dark-mode .hero-callout-card--user {
+  border-image: linear-gradient(70deg, var(--accent-2), var(--accent)) 1;
 }
 
 .hero-callout-card__link {
