@@ -866,6 +866,48 @@ class SiteConfig(TenantScopedMixin, db.Model):
             "Optimism is an occupational hazard of programming; feedback is the cure.",
             "In engineering, absence of evidence is not evidence of absence.",
         ],
+        "productivity": [
+            "Eat the frog first and the rest of the day is easy.",
+            "You can do anything, but not everything.",
+            "Progress, not perfection.",
+            "A to-do list is good; a done list is better.",
+            "Do the hard work now so it’s easy tomorrow.",
+        ],
+        "leadership": [
+            "Leaders eat last.",
+            "Manage the system, not the people.",
+            "Don’t ask others to do what you wouldn’t do yourself.",
+            "Earn trust before asking for effort.",
+            "Leadership is influence, not title.",
+        ],
+        "innovation": [
+            "Fail fast, learn faster.",
+            "Question assumptions; they’re free to discard.",
+            "If it hasn’t been done, it may not be worth doing—or you may be the first.",
+            "Disrupt yourself before someone else does.",
+            "Creativity is intelligence having fun.",
+        ],
+        "customer-centric": [
+            "Start with the customer and work backwards.",
+            "Delight > satisfy.",
+            "Listen twice as much as you speak.",
+            "Solve problems they didn’t know they had.",
+            "Know your user better than they know themselves.",
+        ],
+        "coffee-humour": [
+            "Code runs faster after coffee.",
+            "Decaf is for the weak.",
+            "Instant human, just add coffee.",
+            "Behind every successful developer is a substantial amount of coffee.",
+            "Coffee: because adulting is hard.",
+        ],
+        "wellbeing": [
+            "Take a walk; the code will still be there.",
+            "Rest is not a reward; it’s a requirement.",
+            "You are not a machine; mind the breaks.",
+            "Healthy body, healthy debugging.",
+            "Step away from the screen; your eyes will thank you.",
+        ],
     }
 
     @property
