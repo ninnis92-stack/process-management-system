@@ -531,6 +531,10 @@
     return `rgb(${Math.round(a.r * wa + b.r * wb)}, ${Math.round(a.g * wa + b.g * wb)}, ${Math.round(a.b * wa + b.b * wb)})`;
   }
 
+  // helper used by the theme engine to know whether the page is currently
+  // in dark mode.  the <body> tag receives a `dark-mode` class server-side
+  // based on the authenticated user's preference; external themes do not
+  // toggle this class, they merely apply their own CSS rules.
   function isDarkModeEnabled() {
     return document.body.classList.contains('dark-mode');
   }
@@ -583,7 +587,10 @@
       }
     }catch(e){}
   }
-  // If page opts out of vibe (no-vibe class), skip theme application
+  // If an admin-imported external theme or logo is active the body gets the
+  // `no-vibe` class; in that case we should leave the CSS alone and not
+  // override the accent colors or dark-mode colors.  this keeps branding
+  // intact when a site-specific stylesheet is loaded.
   if(document.body.classList.contains('no-vibe')) return;
 
   function isUserLoggedIn() {

@@ -36,7 +36,7 @@ Key capabilities:
 - **Field verification** powered by third‑party tracker integrations
 - **Guest submission and lookup** via external blueprints
 - **SSO/OIDC support** with optional admin sync
-- **Theme/vibe system**, dark mode, and per‑user preferences
+- **Theme/vibe system**, dark mode (now integrated with vibe accents) and per‑user preferences
 
 Everything is covered by a comprehensive test suite and deploys automatically
 using a release script that migrates the database, creates missing columns,
@@ -203,7 +203,7 @@ page displays the last few steps and suggests next actions to the user.
 - **Admin console**: located under `/admin` with subpages for users, departments,
   workflows, statuses, site configuration, integrations, feature flags, guest
   form templates, etc.
-- **User settings**: dark mode, theme/vibe selection, quote set, rotating
+- **User settings**: dark mode (tints with the chosen vibe), theme/vibe selection, quote set, rotating
   quotes.
 - **Templates & requirements**: rich form editing with grouped fields, hints,
   and other metadata.
@@ -218,7 +218,10 @@ folder.
 
 All notable changes are tracked in git history; refer to commit messages for
 more detail.  Recent updates include schema fixes, health checks, seeding
-behavior, and the admin‑template/requirement engine.
+behavior, admin‑template/requirement engine, and a redesign of dark mode:
+when vibe/theming is active the dark UI now inherits accent colors, while
+external/imported themes will revert to a basic, compatible dark palette.
+
 
 ---
 
