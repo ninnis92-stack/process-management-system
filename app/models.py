@@ -98,6 +98,82 @@ class Notification(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
+class WebhookSubscription(db.Model):
+    """Outgoing webhook destinations registered by external systems."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(2048), nullable=False)
+    # list of event names (e.g. ["request.created", "status.changed"])
+    events = db.Column(db.JSON, nullable=False, default=list)
+    # optional shared secret used to HMAC-sign payloads
+    secret = db.Column(db.String(255), nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ProcessMetricEvent(db.Model):
+    """Normalized process analytics event for request lifecycle tracking."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False, index=True)
+    request = db.relationship("Request", backref="process_metric_events")
+
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
+    actor_user = db.relationship("User", foreign_keys=[actor_user_id])
+
+    actor_department = db.Column(db.String(2), nullable=True, index=True)
+    owner_department = db.Column(db.String(2), nullable=True, index=True)
+    event_type = db.Column(db.String(64), nullable=False, index=True)
+    from_status = db.Column(db.String(40), nullable=True)
+    to_status = db.Column(db.String(40), nullable=True)
+    assigned_to_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    assigned_to_user = db.relationship("User", foreign_keys=[assigned_to_user_id])
+
+    # time between this event and the previous tracked event on the request
+    since_last_event_seconds = db.Column(db.Integer, nullable=True)
+    # total request age at the time of this event
+    request_age_seconds = db.Column(db.Integer, nullable=True)
+
+    metadata_json = db.Column(db.JSON, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class MetricsConfig(db.Model):
+    """Singleton configuration for process and user-efficiency metrics."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=True)
+    track_request_created = db.Column(db.Boolean, nullable=False, default=True)
+    track_assignments = db.Column(db.Boolean, nullable=False, default=True)
+    track_status_changes = db.Column(db.Boolean, nullable=False, default=True)
+    lookback_days = db.Column(db.Integer, nullable=False, default=30)
+    user_metrics_limit = db.Column(db.Integer, nullable=False, default=15)
+    target_completion_hours = db.Column(db.Integer, nullable=False, default=48)
+    slow_event_threshold_hours = db.Column(db.Integer, nullable=False, default=8)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    @classmethod
+    def get(cls):
+        try:
+            cfg = cls.query.first()
+        except Exception:
+            try:
+                db.session.rollback()
+                cfg = cls.query.first()
+            except Exception:
+                cfg = None
+        if not cfg:
+            cfg = cls()
+            db.session.add(cfg)
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        return cfg
+
+
 class Request(db.Model):
     """Primary work item moving across departments; may be guest-accessible."""
 
@@ -387,7 +463,10 @@ class SpecialEmailConfig(db.Model):
         db.Boolean, nullable=False, default=False
     )
     nudge_enabled = db.Column(db.Boolean, nullable=False, default=False)
-    nudge_interval_hours = db.Column(db.Integer, nullable=True)
+    # configurable interval (in hours) between reminder nudges; supports
+    # fractional values like 0.5 for thirty minutes so admin can choose finer
+    # grained timers. Stored as a float so the database can represent halves.
+    nudge_interval_hours = db.Column(db.Float, nullable=True)
     # Minimum hours after request creation before nudges may start.
     # Defaults to 4 hours; admin may only extend (enforced in admin UI).
     nudge_min_delay_hours = db.Column(db.Integer, nullable=False, default=4)
@@ -611,23 +690,28 @@ class SiteConfig(db.Model):
             "Fresh socks, fresh perspective.",
             "Turn laundry into a tiny ritual of calm.",
         ],
+        # two new themes requested by the user, each matching the default count
         "sales": [
             "Sell the problem you solve, not the product.",
             "Follow up once is good; follow up twice closes deals.",
             "People buy solutions, not features.",
             "Ask more questions; you sell fewer assumptions.",
+            "Pitch benefits over features and watch interest grow.",
         ],
         "motivational": [
             "Progress, not perfection.",
             "Small habits compound into big results.",
             "Show up today; momentum finds you tomorrow.",
             "Focus on the next right step.",
+            "Your only limit is the one you set yourself.",
         ],
-        "riddles": [
+        # rename riddles to be explicitly laundry-themed and add a fifth
+        "laundry riddles": [
             "I speak without a mouth and hear without ears. What am I? (An echo)",
             "I have keys but no locks. What am I? (A piano)",
             "What has hands but cannot clap? (A clock)",
             "The more you take, the more you leave behind. What are they? (Footsteps)",
+            "What gets wetter the more it dries? (A towel)",
         ],
     }
 
@@ -854,6 +938,7 @@ class DepartmentEditor(db.Model):
     user = db.relationship("User", backref="dept_editor_roles")
     department = db.Column(db.String(2), nullable=False, index=True)
     can_edit = db.Column(db.Boolean, nullable=False, default=True)
+    can_view_metrics = db.Column(db.Boolean, nullable=False, default=False)
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (
         db.UniqueConstraint("user_id", "department", name="uq_user_dept_editor"),

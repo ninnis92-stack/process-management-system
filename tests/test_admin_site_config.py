@@ -107,6 +107,15 @@ def test_departments_crud_and_site_config(app, client):
         assert cfg.rolling_quotes_enabled is True
         assert isinstance(cfg.rolling_quotes, list)
 
+        # DEFAULT_QUOTE_SETS now ships with two extra themes and a laundry riddles
+        # set; each should have the same number of entries as the default list.
+        defaults = SiteConfig.DEFAULT_QUOTE_SETS
+        base_len = len(defaults.get("default", []))
+        assert base_len == 5
+        for name, quotes in defaults.items():
+            assert isinstance(quotes, list)
+            assert len(quotes) == base_len, f"{name} has wrong count"
+
     # Dashboard should include the banner or the first rolling quote
     rv = client.get("/dashboard")
     assert rv.status_code == 200
