@@ -238,6 +238,8 @@ def test_navbar_department_dropdown_for_multi_dept_user(app, client):
     html = page.get_data(as_text=True)
     assert 'id="navbarDeptSelect"' in html
     assert 'data-bs-target="#chooseDeptModal"' not in html
+    # inline script should skip the modal when the navbar dropdown exists
+    assert 'if (!loggedIn || active || isAdmin || navbarDept) return;' in html
     assert 'if (!loggedIn || active || isAdmin || navbarDept)' in html
 
     # switch departments via the new navbar form

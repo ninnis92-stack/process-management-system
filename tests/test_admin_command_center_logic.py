@@ -41,9 +41,9 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
     # reload (especially noticeable on phones).
     assert 'data-user-is-admin="1"' in html
     # our inline script should also include the early-return check for
-    # isAdmin (and optionally navbarDept once we added the dropdown) so the
-    # modal never even attempts to show up.
-    assert 'if (!loggedIn || active || isAdmin' in html
+    # admin status and for the presence of a navbar department selector.
+    # when either condition is true the modal logic returns early.
+    assert 'if (!loggedIn || active || isAdmin || navbarDept) return;' in html
 
     expected_labels = {
         "Users",
