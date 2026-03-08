@@ -764,6 +764,22 @@ class FeatureFlags(TenantScopedMixin, db.Model):
             # row[0] is the id
             f = db.session.get(cls, row[0])
             if f:
+                # ensure no None values linger; treat them as defaults
+                for attr, default in (
+                    ("enable_notifications", True),
+                    ("enable_nudges", True),
+                    ("allow_user_nudges", False),
+                    ("vibe_enabled", True),
+                    ("sso_admin_sync_enabled", True),
+                    ("sso_department_sync_enabled", False),
+                    ("enable_external_forms", False),
+                    ("rolling_quotes_enabled", True),
+                ):
+                    if getattr(f, attr, None) is None:
+                        try:
+                            setattr(f, attr, default)
+                        except Exception:
+                            pass
                 return f
         except Exception:
             try:

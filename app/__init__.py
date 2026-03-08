@@ -441,8 +441,13 @@ def create_app():
             # site config (singleton)
             try:
                 quote_user = None
+                selected_quote_key = None
                 try:
                     if current_user.is_authenticated:
+                        try:
+                            db.session.expire_all()
+                        except Exception:
+                            pass
                         quote_user = db.session.get(User, current_user.id)
                 except Exception:
                     quote_user = None
@@ -461,9 +466,9 @@ def create_app():
                     rolling_quotes = []
                 else:
                     try:
-                        selected_key = cfg.resolve_quote_set_name_for_user(quote_user)
-                        if selected_key and cfg.rolling_quote_sets:
-                            rolling_quotes = cfg.rolling_quote_sets.get(selected_key, [])
+                        selected_quote_key = cfg.resolve_quote_set_name_for_user(quote_user)
+                        if selected_quote_key and cfg.rolling_quote_sets:
+                            rolling_quotes = cfg.rolling_quote_sets.get(selected_quote_key, [])
                     except Exception:
                         pass
                 if getattr(cfg, "logo_filename", None):
@@ -487,6 +492,7 @@ def create_app():
                 banner_html = ""
                 rolling_quotes_enabled = False
                 rolling_quotes = []
+                selected_quote_key = None
 
             # If an external theme/logo is present we intentionally
             # suppress the rolling quotes UI to preserve imported branding.
@@ -517,9 +523,11 @@ def create_app():
                 # Respect both the admin rolling-quotes flag and the global
                 # vibe_enabled flag. If the vibe button is disabled we also
                 # suppress rolling quotes to keep the UI consistent.
-                if not getattr(ff, "rolling_quotes_enabled", True):
+                # disable rolling quotes only when flag is explicitly False
+                if getattr(ff, "rolling_quotes_enabled", True) is False:
                     rolling_quotes_enabled = False
-                if not getattr(ff, "vibe_enabled", True):
+                # vibe is independent but when unset should default to True
+                if getattr(ff, "vibe_enabled", True) is False:
                     rolling_quotes_enabled = False
                 allow_user_nudges_enabled = bool(
                     getattr(ff, "allow_user_nudges", False)
@@ -556,6 +564,7 @@ def create_app():
                         dept_labels[code] = label
             except Exception:
                 pass
+
 
             return dict(
                 active_theme_css=css,
