@@ -76,6 +76,21 @@
   background: rgba(248, 250, 252, 0.9);
 }
 
+.template-section-block {
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.template-section-block__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
 @media (max-width: 768px) {
   .template-intake-summary,
   .admin-template-settings {

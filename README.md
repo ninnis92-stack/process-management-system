@@ -148,6 +148,37 @@ application also audits any changes made via the admin UI: updates to
 `site_config_update`, ensuring that later reviewers can see who changed the
 banner, theme, or quote sets.
 
+## Admin-built smart request forms
+
+Dynamic request templates now support three admin-managed behaviors that work
+together on the main request form:
+
+- **Section grouping** – each template field may be assigned a section name so
+   the request form renders fields in logical groups rather than one flat list.
+- **Verification-driven prefills** – a verified source field can populate linked
+   sibling fields from tracker or verification responses when the template toggle
+   is enabled.
+- **Conditional requirements** – admins can declare that a field, a whole
+   section, or an upload area becomes required when another field is populated,
+   equals a value, is one of several values, verifies successfully, or when a
+   named section becomes populated.
+
+Conditional requirement rules are edited per field in the admin UI and stored
+as JSON. Supported operators are:
+
+- `populated`
+- `empty`
+- `equals`
+- `not_equals`
+- `one_of`
+- `verified`
+- `any_populated` (section rule)
+- `all_populated` (section rule)
+
+This lets admins model common business rules such as “require a supporting
+document upload when request type is instructions” or “require the follow-up
+section when the primary identifier was verified successfully.”
+
 ## Admin-built request forms
 
 Dynamic request templates can now behave more like guided product forms instead

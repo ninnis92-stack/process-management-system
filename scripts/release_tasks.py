@@ -443,6 +443,34 @@ def main():
                             )
                         )
                     print("schema_fix=form_template.verification_prefill_enabled_added")
+
+                form_field_cols = (
+                    {c["name"] for c in insp.get_columns("form_field")}
+                    if "form_field" in insp.get_table_names()
+                    else set()
+                )
+                if (
+                    "form_field" in insp.get_table_names()
+                    and "section_name" not in form_field_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE form_field ADD COLUMN section_name VARCHAR(200)"
+                            )
+                        )
+                    print("schema_fix=form_field.section_name_added")
+                if (
+                    "form_field" in insp.get_table_names()
+                    and "requirement_rules" not in form_field_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE form_field ADD COLUMN requirement_rules JSON"
+                            )
+                        )
+                    print("schema_fix=form_field.requirement_rules_added")
                 # Ensure feature_flags has expected columns added in recent releases.
                 if "feature_flags" in insp.get_table_names():
                     ff_cols = {c["name"] for c in insp.get_columns("feature_flags")}

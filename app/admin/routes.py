@@ -39,7 +39,7 @@ from .forms import StatusBucketForm
 from .forms import FormTemplateAdminForm, FormFieldInlineForm
 from .forms import DepartmentAssignmentForm
 from ..models import FormTemplate, FormField, DepartmentFormAssignment
-from .forms import FieldVerificationForm
+from .forms import FieldVerificationForm, FieldRequirementForm
 from ..models import FieldVerification
 from .forms import GuestFormAdminForm
 from ..models import GuestForm
@@ -995,12 +995,15 @@ def edit_template_fields(template_id: int):
         for f in t.fields:
             lab = flask_request.form.get(f"field_{f.id}_label")
             nm = flask_request.form.get(f"field_{f.id}_name")
+            section = flask_request.form.get(f"field_{f.id}_section")
             req = flask_request.form.get(f"field_{f.id}_required")
             ft = flask_request.form.get(f"field_{f.id}_type")
             if lab is not None:
                 f.label = lab.strip()
             if nm is not None:
                 f.name = nm.strip() or f.name
+            if section is not None:
+                f.section_name = section.strip() or None
             if ft is not None:
                 f.field_type = ft
             f.required = bool(req)
@@ -1159,6 +1162,55 @@ def edit_field_verification(field_id: int):
         )
 
     return render_template("admin_field_verification.html", form=form, field=f, fv=fv)
+
+
+@admin_bp.route("/fields/<int:field_id>/requirements", methods=["GET", "POST"])
+@login_required
+def edit_field_requirements(field_id: int):
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    f = get_or_404(FormField, field_id)
+    form = FieldRequirementForm()
+    current_rules = getattr(f, "requirement_rules", None) or {}
+
+    if flask_request.method == "GET" and isinstance(current_rules, dict):
+        form.enabled.data = bool(current_rules.get("enabled", False))
+        form.scope.data = current_rules.get("scope") or "field"
+        form.mode.data = current_rules.get("mode") or "all"
+        form.message.data = current_rules.get("message") or ""
+        try:
+            form.rules_json.data = json.dumps(current_rules.get("rules") or [], indent=2)
+        except Exception:
+            form.rules_json.data = "[]"
+
+    if form.validate_on_submit():
+        rule_config = None
+        if form.enabled.data:
+            raw_rules = (form.rules_json.data or "").strip() or "[]"
+            try:
+                parsed_rules = json.loads(raw_rules)
+            except Exception:
+                flash("Invalid JSON in rules field.", "danger")
+                return render_template("admin_field_requirements.html", form=form, field=f)
+            if not isinstance(parsed_rules, list):
+                flash("Rules JSON must be a JSON array.", "danger")
+                return render_template("admin_field_requirements.html", form=form, field=f)
+            rule_config = {
+                "enabled": True,
+                "scope": form.scope.data or "field",
+                "mode": form.mode.data or "all",
+                "message": (form.message.data or "").strip() or None,
+                "rules": parsed_rules,
+            }
+        f.requirement_rules = rule_config
+        db.session.add(f)
+        db.session.commit()
+        flash("Conditional requirement rules saved.", "success")
+        return redirect(url_for("admin.edit_template_fields", template_id=f.template_id))
+
+    return render_template("admin_field_requirements.html", form=form, field=f)
 
 
 @admin_bp.route("/notifications_retention", methods=["GET", "POST"])

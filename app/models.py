@@ -521,8 +521,10 @@ class FormField(db.Model):
     field_type = db.Column(db.String(50), nullable=False)
     required = db.Column(db.Boolean, nullable=False, default=False)
     order = db.Column(db.Integer, nullable=False, default=0)
+    section_name = db.Column(db.String(200), nullable=True)
     hint = db.Column(db.String(300), nullable=True)
     verification = db.Column(db.JSON, nullable=True)
+    requirement_rules = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

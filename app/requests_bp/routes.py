@@ -76,9 +76,11 @@ from ..services.request_creation import (
     collect_template_submission_data,
     create_form_submission,
     get_template_prefill_target_names,
+    group_template_spec_by_section,
     load_latest_field_verification_map,
     run_template_field_verifications,
     save_template_file_attachments,
+    validate_conditional_template_submission,
     validate_required_template_submission,
 )
 from ..services.ticketing import TicketingClient
@@ -1500,6 +1502,7 @@ def request_new():
             key=lambda f: getattr(f, "created_at", getattr(f, "id", 0)),
         )
     template_spec = None
+    template_sections = None
     if template and template_fields:
         latest_map = load_latest_field_verification_map(template_fields)
         template_spec = build_template_spec(
@@ -1509,6 +1512,7 @@ def request_new():
                 getattr(template, "verification_prefill_enabled", False)
             ),
         )
+        template_sections = group_template_spec_by_section(template_spec)
 
         # If the template is configured to use an external form, redirect or show a link.
         if template and getattr(template, "external_enabled", False):
@@ -1585,6 +1589,7 @@ def request_new():
                     template=template,
                     template_fields=template_fields,
                     template_spec=template_spec,
+                    template_sections=template_sections,
                 )
 
             verification_results = run_template_field_verifications(
@@ -1611,6 +1616,27 @@ def request_new():
                     template=template,
                     template_fields=template_fields,
                     template_spec=template_spec,
+                    template_sections=template_sections,
+                )
+
+            conditional_missing_field, conditional_meta = validate_conditional_template_submission(
+                template_fields,
+                submission_data,
+                verification_results,
+            )
+            if conditional_missing_field:
+                flash(
+                    conditional_meta.get("message")
+                    or f"Field {conditional_missing_field} is required by the current form rules.",
+                    "danger",
+                )
+                return render_template(
+                    "request_new.html",
+                    form=form,
+                    template=template,
+                    template_fields=template_fields,
+                    template_spec=template_spec,
+                    template_sections=template_sections,
                 )
 
         # Provide a temporary default title and request_type so flush won't violate NOT NULL constraints.
@@ -1820,6 +1846,7 @@ def request_new():
         template=template,
         template_fields=template_fields,
         template_spec=template_spec,
+        template_sections=template_sections,
     )
 
 

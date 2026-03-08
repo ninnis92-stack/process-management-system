@@ -114,8 +114,16 @@
           </div>
         </section>
         {{ section_heading('Additional fields', 'These fields are configured by the admin team for this workflow. Verification-backed fields can validate values and, when enabled, fill in related fields automatically.', compact=True) }}
-        <div class="row">
-          {% for field in template_spec %}
+        {% for section in (template_sections or []) %}
+        <section class="template-section-block mb-4">
+          <div class="template-section-block__header">
+            <div>
+              <div class="eyebrow-label">Configured section</div>
+              <h5 class="mb-1">{{ section.name }}</h5>
+            </div>
+          </div>
+          <div class="row">
+          {% for field in section.fields %}
             <div class="col-md-6 mb-3">
               <div class="dynamic-field-card" data-template-field="{{ field.name }}">
               <label class="form-label">{{ field.label }}{% if field.required %} *{% endif %}</label>
@@ -123,6 +131,7 @@
                 {% if field.required %}<span class="badge rounded-pill text-bg-light">Required</span>{% endif %}
                 {% if field.verification and field.verification.enabled %}<span class="badge rounded-pill text-bg-light">Verified</span>{% endif %}
                 {% if field.verification and field.verification.prefill_enabled %}<span class="badge rounded-pill text-bg-primary">Auto-fills {{ field.verification.prefill_targets|length }} linked field{% if field.verification.prefill_targets|length != 1 %}s{% endif %}</span>{% endif %}
+                {% if field.requirements and field.requirements.enabled %}<span class="badge rounded-pill text-bg-warning">Conditionally required</span>{% endif %}
               </div>
               {% if field.field_type == 'textarea' %}
                 <textarea class="form-control js-template-field" id="dynamic-field-{{ field.name }}" name="{{ field.name }}" rows="4">{{ request.form.get(field.name, '') }}</textarea>
@@ -141,6 +150,9 @@
               {% if field.hint %}
                 <div class="form-text">{{ field.hint }}</div>
               {% endif %}
+              {% if field.requirements and field.requirements.summary %}
+                <div class="form-text mt-1">Required when {{ field.requirements.summary }}.</div>
+              {% endif %}
               {% if field.verification and field.verification.prefill_enabled and field.verification.prefill_targets %}
                 <div class="form-text mt-1">When this value verifies successfully, the form can populate: {{ field.verification.prefill_targets|join(', ') }}.</div>
               {% endif %}
@@ -148,7 +160,9 @@
               </div>
             </div>
           {% endfor %}
-        </div>
+          </div>
+        </section>
+        {% endfor %}
         <script id="template-spec-data" type="application/json">{{ template_spec|tojson }}</script>
       {% endif %}
 

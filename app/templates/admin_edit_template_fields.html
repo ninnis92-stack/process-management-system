@@ -25,18 +25,20 @@
   <div class="table-responsive">
   <table class="table align-middle mb-0">
     <thead>
-      <tr><th>Label</th><th>Name/key</th><th>Type</th><th>Required</th><th>Automation</th></tr>
+      <tr><th>Label</th><th>Name/key</th><th>Section</th><th>Type</th><th>Required</th><th>Automation</th></tr>
     </thead>
     <tbody>
       {% for f in fields %}
       <tr>
         <td><input class="form-control" name="field_{{ f.id }}_label" value="{{ f.label }}"/></td>
         <td><input class="form-control" name="field_{{ f.id }}_name" value="{{ f.name }}"/></td>
+        <td><input class="form-control" name="field_{{ f.id }}_section" value="{{ f.section_name or '' }}" placeholder="Example: Customer details"/></td>
         <td>
           <select name="field_{{ f.id }}_type" class="form-select">
             <option value="text" {% if f.field_type=='text' %}selected{% endif %}>Text</option>
             <option value="textarea" {% if f.field_type=='textarea' %}selected{% endif %}>Textarea</option>
             <option value="select" {% if f.field_type=='select' %}selected{% endif %}>Select</option>
+            <option value="file" {% if f.field_type=='file' %}selected{% endif %}>File upload</option>
           </select>
         </td>
         <td><input type="checkbox" name="field_{{ f.id }}_required" value="1" {% if f.required %}checked{% endif %}></td>
@@ -45,7 +47,11 @@
             {% if f.verification or f.verifications %}
               <span class="badge text-bg-light">Verification linked</span>
             {% endif %}
+            {% if f.requirement_rules %}
+              <span class="badge text-bg-warning">Conditional requirement</span>
+            {% endif %}
             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.edit_field_verification', field_id=f.id) }}">Configure</a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.edit_field_requirements', field_id=f.id) }}">Requirement</a>
           </div>
         </td>
       </tr>

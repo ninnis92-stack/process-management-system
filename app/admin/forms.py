@@ -351,6 +351,7 @@ class FormTemplateAdminForm(FlaskForm):
 class FormFieldInlineForm(FlaskForm):
     label = StringField("Field label", validators=[DataRequired(), Length(max=200)])
     name = StringField("Field name/key", validators=[Optional(), Length(max=200)])
+    section_name = StringField("Section", validators=[Optional(), Length(max=200)])
     field_type = SelectField(
         "Type",
         choices=[("text", "Text"), ("textarea", "Textarea"), ("select", "Select")],
@@ -418,6 +419,55 @@ class FieldVerificationForm(FlaskForm):
         "Trigger automatic denial when verification fails", default=False
     )
     submit = SubmitField("Save Verification")
+
+
+class FieldRequirementForm(FlaskForm):
+    enabled = BooleanField("Enable conditional requirement", default=False)
+    source_field = SelectField("Trigger field", choices=[], validators=[Optional()])
+    operator = SelectField(
+        "When",
+        choices=[
+            ("populated", "Trigger field is populated"),
+            ("empty", "Trigger field is empty"),
+            ("equals", "Trigger field equals"),
+            ("one_of", "Trigger field matches one of these values"),
+            ("verified", "Trigger field verifies successfully"),
+        ],
+        validators=[Optional()],
+    )
+    expected_value = StringField(
+        "Expected value(s)", validators=[Optional(), Length(max=500)]
+    )
+    message = StringField(
+        "User-facing explanation", validators=[Optional(), Length(max=300)]
+    )
+    submit = SubmitField("Save Requirement Rule")
+
+
+class FieldRequirementForm(FlaskForm):
+    enabled = BooleanField("Enable conditional requirement", default=False)
+    scope = SelectField(
+        "Apply requirement to",
+        choices=[
+            ("field", "This field only"),
+            ("section", "All fields in this field's section"),
+        ],
+        default="field",
+        validators=[Optional()],
+    )
+    mode = SelectField(
+        "Match mode",
+        choices=[("all", "All rules must match"), ("any", "Any rule may match")],
+        default="all",
+        validators=[Optional()],
+    )
+    rules_json = TextAreaField(
+        "Rules (JSON)", validators=[Optional(), Length(max=5000)]
+    )
+    message = StringField(
+        "User-facing message", validators=[Optional(), Length(max=300)]
+    )
+    submit = SubmitField("Save Requirement Rules")
 
 
 class FeatureFlagsForm(FlaskForm):
