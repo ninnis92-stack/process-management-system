@@ -447,7 +447,9 @@ body.theme-preset-midnight:not(.dark-mode) {
 }
 
 #admin-dept-view-form,
-#admin-dept-view-form .form-select {
+#admin-dept-view-form .form-select,
+#navbar-dept-switch-form,
+#navbar-dept-switch-form .form-select {
   max-width: 100%;
 }
 
@@ -1885,8 +1887,10 @@ pre,
 /* Force the admin department selector to render with black text and a
   white background in dark-mode so the selected department is always
   readable and consistent with the requested appearance. */
-.dark-mode form#admin-dept-view-form .form-select { color: #000 !important; background: #ffffff !important; border-color: rgba(0,0,0,0.06) !important; }
-.dark-mode form#admin-dept-view-form .form-select option { color: #000 !important; background: #ffffff !important; }
+.dark-mode form#admin-dept-view-form .form-select,
+.dark-mode form#navbar-dept-switch-form .form-select { color: #000 !important; background: #ffffff !important; border-color: rgba(0,0,0,0.06) !important; }
+.dark-mode form#admin-dept-view-form .form-select option,
+.dark-mode form#navbar-dept-switch-form .form-select option { color: #000 !important; background: #ffffff !important; }
 
 /* Admin cards should reflect the status bucket color in dark-mode.
    Use a subtle tinted top border and a faint background tint derived

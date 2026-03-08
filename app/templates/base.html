@@ -124,6 +124,21 @@
                   <option value="C" {% if request.args.get('as_dept')=='C' %}selected{% endif %}>{{ department_labels.get('C', 'Dept C') }}</option>
                 </select>
               </form>
+            {% else %}
+              {# non-admin users with multiple departments get their own switcher in the
+                 navbar.  this replicates the behaviour of the admin form but hits
+                 the POST /auth/switch_dept endpoint so that the session is
+                 updated correctly without needing a modal. #}
+              {% if user_has_multiple_departments(current_user) %}
+                <form method="post" action="{{ url_for('auth.switch_department') }}" class="m-0 d-inline" id="navbar-dept-switch-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <select id="navbarDeptSelect" name="department" onchange="this.form.submit()" class="form-select form-select-sm text-dark" style="display:inline-block; width:auto; margin-right:8px;">
+                    {% for d in get_user_departments(current_user) %}
+                      <option value="{{ d }}" {% if session.get('active_dept') == d %}selected{% endif %}>{{ department_labels.get(d, 'Dept ' ~ d) }}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+              {% endif %}
             {% endif %}
             {# Account dropdown: compact avatar button that reveals user info + settings. Always shown. #}
             <div class="dropdown ms-2">
@@ -138,10 +153,15 @@
                 </li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="{{ url_for('auth.settings') }}">Settings</a></li>
-                {% if user_has_multiple_departments(current_user) %}
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#chooseDeptModal">Switch Department</a></li>
-                {% endif %}
-                <li>
+                {# switch dept link previously appeared here for all users with
+                   multiple departments.  now we offer a navbar dropdown, so the
+                   modal link is no longer needed and is removed to reduce
+                   confusion.  the modal still exists if the user explicitly
+                   navigates to `/auth/choose_dept`, but it won't open on its
+                   own. #}
+                {# empty placeholder for backward compatibility in case some
+                   custom template relied on the list structure. #}
+                                <li>
                   <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="dropdown-item">Logout</button>
@@ -394,9 +414,11 @@
         const loggedIn = document.body.getAttribute('data-user-logged-in') === '1';
         const active = (document.body.getAttribute('data-active-dept') || '').trim();
         const isAdmin = document.body.getAttribute('data-user-is-admin') === '1';
-        // do not bother prompting admins, they manage departments via command
-        // center and never need an active department for permission checks.
-        if (!loggedIn || active || isAdmin) return;
+        const navbarDept = document.getElementById('navbarDeptSelect');
+        // do not bother prompting admins or anyone who already has a
+        // department dropdown in the navbar; the selector is sufficient and
+        // the modal would just be noisy (especially on phones).
+        if (!loggedIn || active || isAdmin || navbarDept) return;
         fetch('/auth/departments').then(r => r.json()).then(j => {
           const depts = j && j.departments ? j.departments : [];
           if (depts.length <= 1) return;

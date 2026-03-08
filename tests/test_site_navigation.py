@@ -3,7 +3,7 @@ import re
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import User, SiteConfig
+from app.models import User, SiteConfig, UserDepartment
 
 
 NAV_LINK_RE = re.compile(r'href="([^"]+)"')
@@ -182,8 +182,9 @@ def test_admin_navigation_links_resolve(app, client):
     # side logic (like the department picker modal) skips itself.
     assert 'data-user-is-admin="1"' in html
     # sanity check: the inline script includes the branch that looks for
-    # isAdmin when deciding whether to show the modal.
-    assert 'if (!loggedIn || active || isAdmin) return;' in html
+    # isAdmin when deciding whether to show the modal (navbarDept may be added
+    # later too).
+    assert 'if (!loggedIn || active || isAdmin' in html
 
     assert "Admin" in html
     assert "Guest Forms" in html
@@ -209,6 +210,41 @@ def test_admin_navigation_links_resolve(app, client):
         assert resp.status_code in (200, 302), route
         location = resp.headers.get("Location", "")
         assert not location.endswith("/static/app.js"), route
+
+
+def test_navbar_department_dropdown_for_multi_dept_user(app, client):
+    # users assigned to more than one department should see a dropdown in the
+    # navbar instead of the modal chooser that pops up on reload.  ensure the
+    # dropdown is rendered, the modal link is removed, and switching actually
+    # updates session state.
+    with app.app_context():
+        user = User(
+            email="multidept@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+        )
+        db.session.add(user)
+        db.session.commit()
+        ud = UserDepartment(user_id=user.id, department="B")
+        db.session.add(ud)
+        db.session.commit()
+
+    rv = _login(client, "multidept@example.com")
+    assert rv.status_code == 200
+
+    page = client.get("/dashboard")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert 'id="navbarDeptSelect"' in html
+    assert 'data-bs-target="#chooseDeptModal"' not in html
+    assert 'if (!loggedIn || active || isAdmin || navbarDept)' in html
+
+    # switch departments via the new navbar form
+    resp = client.post("/auth/switch_dept", data={"department": "B"}, follow_redirects=True)
+    assert resp.status_code == 200
+    page2 = client.get("/dashboard")
+    assert 'data-active-dept="B"' in page2.get_data(as_text=True)
 
 
 def test_department_list_endpoint(app, client):

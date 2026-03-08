@@ -1080,7 +1080,41 @@ def create_app():
                         pass
                     return False
 
-            return dict(avatar_url_for=avatar_url_for, user_has_multiple_departments=user_has_multiple_departments, can_view_metrics_for_user=can_view_metrics_for_user)
+            def get_user_departments(user):
+                """Return ordered list of department codes the user may act as.
+
+                Mostly duplicates _get_user_departments() from auth.routes; used in
+                templates where the request context may not be available.
+                """
+                if not user or not getattr(user, 'id', None):
+                    return []
+                try:
+                    depts = []
+                    primary = getattr(user, 'department', None)
+                    if primary:
+                        depts.append(primary)
+                    for ud in getattr(user, 'departments', []) or []:
+                        d = getattr(ud, 'department', None)
+                        if d and d not in depts:
+                            depts.append(d)
+                    if getattr(user, 'is_admin', False):
+                        from .models import Department
+
+                        rows = (
+                            Department.query.filter_by(is_active=True)
+                            .order_by(Department.order.asc())
+                            .all()
+                        )
+                        depts = [r.code for r in rows]
+                    return depts
+                except Exception:
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
+                    return [getattr(user, 'department', None)]
+
+            return dict(avatar_url_for=avatar_url_for, user_has_multiple_departments=user_has_multiple_departments, can_view_metrics_for_user=can_view_metrics_for_user, get_user_departments=get_user_departments)
         except Exception:
             return dict(avatar_url_for=lambda u, size=34: f'https://www.gravatar.com/avatar/?d=mp&s={size}', user_has_multiple_departments=lambda u: False, can_view_metrics_for_user=lambda u: False)
     return app

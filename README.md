@@ -234,6 +234,13 @@ page displays the last few steps and suggests next actions to the user.
   refresh.  The modal only appears when they intentionally choose “Switch
   Dept” (this makes the command center experience smoother on phones and other
   devices where the previous automatic picker was distracting).
+- Non‑admin users who belong to multiple departments now see a permanent
+  dropdown picker in the top‑nav bar.  It functions exactly like the admin
+  selector but updates the session via a simple POST to `/auth/switch_dept`.
+  Because the dropdown is always present, the automatic choose‑department
+  modal is suppressed (the UI still includes the page but it only opens if the
+  user deliberately navigates there).  This avoids annoying popups on mobile
+  while keeping department switching quick and obvious.
 - **User settings**: dark mode (tints with the chosen vibe), theme/vibe selection, quote set, rotating
   quotes.
 - **Templates & requirements**: rich form editing with grouped fields, hints,
