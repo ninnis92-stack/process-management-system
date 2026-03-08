@@ -4,7 +4,7 @@
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post">
+    <form method="post" {% if template_spec %}enctype="multipart/form-data"{% endif %}>
       {{ form.hidden_tag() }}
 
       {% if form.errors %}
@@ -82,6 +82,35 @@
         <label class="form-label">Description</label>
         {{ form.description(class="form-control", rows="6") }}
       </div>
+
+      {% if template_spec %}
+        <hr/>
+        <h5 class="mb-3">Additional Fields</h5>
+        <div class="row">
+          {% for field in template_spec %}
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ field.label }}{% if field.required %} *{% endif %}</label>
+              {% if field.field_type == 'textarea' %}
+                <textarea class="form-control" name="{{ field.name }}" rows="4">{{ request.form.get(field.name, '') }}</textarea>
+              {% elif field.field_type == 'select' %}
+                <select class="form-select" name="{{ field.name }}">
+                  <option value="">-- Select --</option>
+                  {% for opt in field.options %}
+                    <option value="{{ opt.value }}" {% if request.form.get(field.name) == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                  {% endfor %}
+                </select>
+              {% elif field.field_type == 'file' %}
+                <input class="form-control" type="file" name="{{ field.name }}">
+              {% else %}
+                <input class="form-control" type="text" name="{{ field.name }}" value="{{ request.form.get(field.name, '') }}">
+              {% endif %}
+              {% if field.hint %}
+                <div class="form-text">{{ field.hint }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
 
       <button class="btn btn-primary w-100" type="submit">Submit Request</button>
     </form>

@@ -58,8 +58,8 @@ class SiteConfigForm(FlaskForm):
         "Navbar banner text", validators=[Optional(), Length(max=500)]
     )
     show_banner = BooleanField("Show banner", default=False)
-    rolling_quotes = StringField(
-        "Rolling quotes (JSON list)", validators=[Optional(), Length(max=4000)]
+    rolling_quotes = TextAreaField(
+        "Rotating quotes (one per line)", validators=[Optional(), Length(max=4000)]
     )
     rolling_quote_sets = TextAreaField(
         "Rolling quote sets (JSON map)", validators=[Optional(), Length(max=8000)]
@@ -141,6 +141,9 @@ class DepartmentEditorForm(FlaskForm):
         validators=[DataRequired()],
     )
     can_edit = BooleanField("Can edit selections / form fields", default=True)
+    can_view_metrics = BooleanField(
+        "Department head: can view department metrics", default=False
+    )
     submit = SubmitField("Save Editor")
 
 
@@ -230,7 +233,21 @@ class SpecialEmailConfigForm(FlaskForm):
         validators=[Optional(), Length(max=4000)],
     )
     nudge_enabled = BooleanField("Enable nudges", default=False)
-    nudge_interval_hours = IntegerField("Nudge interval (hours)", default=24)
+    # present a dropdown with a handful of sensible intervals; the stored
+    # value is a float representing hours.
+    nudge_interval_hours = SelectField(
+        "Nudge interval",
+        choices=[
+            ("0.5", "30 minutes"),
+            ("1", "1 hour"),
+            ("2", "2 hours"),
+            ("4", "4 hours"),
+            ("8", "8 hours"),
+            ("12", "12 hours"),
+            ("24", "24 hours"),
+        ],
+        default="24",
+    )
     nudge_min_delay_hours = IntegerField(
         "Minimum delay before first nudge (hours)", default=4
     )
@@ -328,6 +345,15 @@ class FieldVerificationForm(FlaskForm):
         validators=[DataRequired()],
     )
     external_key = StringField("External key", validators=[Optional(), Length(max=200)])
+    verify_each_separated_value = BooleanField(
+        "Verify each separated value individually", default=False
+    )
+    value_separator = StringField(
+        "Value separator", validators=[Optional(), Length(max=20)], default="," 
+    )
+    bulk_input_hint = StringField(
+        "User entry hint", validators=[Optional(), Length(max=300)]
+    )
     params_json = TextAreaField(
         "Params (JSON)", validators=[Optional(), Length(max=2000)]
     )
@@ -354,6 +380,18 @@ class FeatureFlagsForm(FlaskForm):
         "Enable rolling quotes in the header/footer", default=True
     )
     submit = SubmitField("Save Flags")
+
+
+class MetricsConfigForm(FlaskForm):
+    enabled = BooleanField("Enable process metrics tracking", default=True)
+    track_request_created = BooleanField("Track request creation events", default=True)
+    track_assignments = BooleanField("Track assignment events", default=True)
+    track_status_changes = BooleanField("Track status-change events", default=True)
+    lookback_days = IntegerField("Default lookback days", default=30)
+    user_metrics_limit = IntegerField("Users to show in metrics tables", default=15)
+    target_completion_hours = IntegerField("Target completion time (hours)", default=48)
+    slow_event_threshold_hours = IntegerField("Slow-event threshold (hours)", default=8)
+    submit = SubmitField("Save Metrics Settings")
 
 
 class GuestFormAdminForm(FlaskForm):

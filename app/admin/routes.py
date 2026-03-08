@@ -1786,11 +1786,24 @@ def edit_field_verification(field_id: int):
             )
         except Exception:
             form.triggers_auto_reject.data = False
+        try:
+            params = fv.params if isinstance(fv.params, dict) else {}
+        except Exception:
+            params = {}
+        form.verify_each_separated_value.data = bool(
+            params.get("verify_each_separated_value", False)
+        )
+        form.value_separator.data = str(
+            params.get("value_separator") or params.get("separator") or ","
+        )
+        form.bulk_input_hint.data = (
+            params.get("bulk_input_hint") or params.get("entry_hint") or ""
+        )
 
     if form.validate_on_submit():
         import json
 
-        params = None
+        params = {}
         if form.params_json.data:
             try:
                 params = json.loads(form.params_json.data)
@@ -1799,6 +1812,22 @@ def edit_field_verification(field_id: int):
                 return render_template(
                     "admin_field_verification.html", form=form, field=f, fv=fv
                 )
+            if not isinstance(params, dict):
+                flash("Params JSON must be a JSON object.", "danger")
+                return render_template(
+                    "admin_field_verification.html", form=form, field=f, fv=fv
+                )
+
+        params["verify_each_separated_value"] = bool(
+            form.verify_each_separated_value.data
+        )
+        params["value_separator"] = (
+            (form.value_separator.data or "").strip() or ","
+        )
+        if (form.bulk_input_hint.data or "").strip():
+            params["bulk_input_hint"] = form.bulk_input_hint.data.strip()
+        else:
+            params.pop("bulk_input_hint", None)
 
         # Replace existing mapping (simple policy: create new row)
         new = FieldVerification(

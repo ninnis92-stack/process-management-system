@@ -45,6 +45,7 @@ from ..models import (
     User,
     Notification,
     RejectRequestConfig,
+    DepartmentEditor,
 )
 from ..models import SpecialEmailConfig
 from ..models import StatusBucket, BucketStatus
@@ -69,6 +70,11 @@ from ..notifcations import notify_users, users_in_department
 from .. import notifcations as notifications_module
 from ..services.inventory import InventoryService
 from ..services.ticketing import TicketingClient
+from ..services.integrations import emit_webhook_event, serialize_request
+from ..services.process_metrics import (
+    build_process_metrics_summary,
+    record_process_metric_event,
+)
 from ..services.verification import VerificationService
 from .permissions import (
     allowed_comment_scopes_for_user,
@@ -85,6 +91,53 @@ from .workflow import (
 
 # Blueprint for request routes
 requests_bp = Blueprint("requests", __name__)
+
+
+def _metric_departments_for_user(user) -> list[str]:
+    try:
+        if not user or not getattr(user, "id", None):
+            return []
+        if getattr(user, "is_admin", False):
+            return ["A", "B", "C"]
+        rows = DepartmentEditor.query.filter_by(user_id=user.id).all()
+        depts = sorted(
+            {
+                (row.department or "").strip().upper()
+                for row in rows
+                if getattr(row, "can_view_metrics", False)
+                and (row.department or "").strip().upper() in {"A", "B", "C"}
+            }
+        )
+        return depts
+    except Exception:
+        return []
+
+
+def _user_is_dept_head(user, dept: str) -> bool:
+    """Return True if *user* is considered the head/editor for *dept*.
+
+    Admins are heads for everything.  Otherwise we treat a
+    DepartmentEditor entry with ``can_view_metrics`` as signifying a
+    department-head role (the same flag used to grant metrics access)."""
+    if not user or not getattr(user, "id", None):
+        return False
+    if getattr(user, "is_admin", False):
+        return True
+    try:
+        row = (
+            DepartmentEditor.query.filter_by(user_id=user.id, department=dept)
+            .first()
+        )
+        return bool(row and getattr(row, "can_view_metrics", False))
+    except Exception:
+        return False
+
+
+def _require_metrics_access(user) -> list[str]:
+    allowed = _metric_departments_for_user(user)
+    if not allowed:
+        abort(403)
+    return allowed
 
 # Optional cache helper (Flask-Caching may not be available in some test envs).
 try:
@@ -197,14 +250,23 @@ def _resolve_verification_rule(field: FormField, latest_map: Dict[int, object]):
     }
 
 
-def _run_field_verification(field: FormField, rule, submission_data: Dict):
-    value = submission_data.get(field.name)
-    if value is None or str(value).strip() == "":
-        return {"ok": None, "reason": "empty", "type": "external_lookup"}
+def _normalize_bulk_separator(raw_value):
+    raw = str(raw_value or "").strip()
+    if not raw:
+        return ","
+    aliases = {
+        "comma": ",",
+        "semicolon": ";",
+        "pipe": "|",
+        "newline": "\n",
+        "\\n": "\n",
+        "tab": "\t",
+        "\\t": "\t",
+    }
+    return aliases.get(raw.lower(), raw)
 
-    if not isinstance(rule, dict):
-        return {"ok": None, "reason": "invalid_rule", "type": "external_lookup"}
 
+def _run_single_field_verification(field: FormField, rule, value):
     provider = (rule.get("provider") or rule.get("type") or "").strip().lower()
     external_key = (rule.get("external_key") or rule.get("key") or field.name or "").strip().lower()
     params = rule.get("params") or {}
@@ -250,6 +312,49 @@ def _run_field_verification(field: FormField, rule, submission_data: Dict):
     result.setdefault("type", "external_lookup")
     result.setdefault("triggers_auto_reject", bool(rule.get("triggers_auto_reject")))
     return result
+
+
+def _run_field_verification(field: FormField, rule, submission_data: Dict):
+    value = submission_data.get(field.name)
+    if value is None or str(value).strip() == "":
+        return {"ok": None, "reason": "empty", "type": "external_lookup"}
+
+    if not isinstance(rule, dict):
+        return {"ok": None, "reason": "invalid_rule", "type": "external_lookup"}
+
+    params = rule.get("params") or {}
+    if not bool(params.get("verify_each_separated_value")):
+        return _run_single_field_verification(field, rule, value)
+
+    separator = _normalize_bulk_separator(
+        params.get("value_separator") or params.get("separator")
+    )
+    raw_value = str(value)
+    if separator == "\n":
+        pieces = [piece.strip() for piece in raw_value.splitlines() if piece.strip()]
+    else:
+        pieces = [piece.strip() for piece in raw_value.split(separator) if piece.strip()]
+
+    if not pieces:
+        return {"ok": None, "reason": "empty", "type": "external_lookup"}
+
+    item_results = []
+    for piece in pieces:
+        single = _run_single_field_verification(field, rule, piece)
+        item_results.append({"value": piece, **single})
+
+    first = item_results[0] if item_results else {}
+    return {
+        "ok": all(item.get("ok") is True for item in item_results),
+        "bulk": True,
+        "count": len(item_results),
+        "separator": separator,
+        "items": item_results,
+        "provider": first.get("provider"),
+        "external_key": first.get("external_key"),
+        "type": first.get("type", "external_lookup"),
+        "triggers_auto_reject": bool(rule.get("triggers_auto_reject")),
+    }
 
 
 def _log(req, action_type, note=None, from_status=None, to_status=None):
@@ -404,38 +509,49 @@ def dashboard():
 
     artifact_form = ArtifactForm()
 
-    if dept == "A":
-        # Dept A should see all open requests owned by Department A
-        my_reqs = (
-            _exclude_old_closed(
-                _request_list_query(ReqModel.query).filter_by(owner_department="A")
-            )
-            .order_by(ReqModel.updated_at.desc())
-            .all()
-        )
-        return render_template(
-            "dashboard.html",
-            mode="A",
-            requests=my_reqs,
-            now=datetime.utcnow(),
-            artifact_form=artifact_form,
-        )
+    # expose an assignment picker for dept heads in the bucket UI
+    can_bulk_assign = _user_is_dept_head(current_user, dept)
+    assignment_form = AssignmentForm()
+    assignment_form.assignee.choices = _assignment_choices(dept)
 
-    if dept == "B":
-        # Allow filtering by a single status via query param `status` or by bucket via `bucket_id`
-        status_filter = request.args.get("status")
-        bucket_id = request.args.get("bucket_id")
-        selected_bucket_mode = False
+    # common bucket lookup for all departments (global or scoped to current dept)
+    status_filter = request.args.get("status")
+    bucket_id = request.args.get("bucket_id")
+    selected_bucket_mode = False
 
-        # Build base query scoped to Dept B (owned by B or explicitly sent to B)
-        base_b = _request_list_query(scope_requests_for_department(ReqModel.query, "B"))
-        # cutoff for 'closed this week' — start of current week (Monday 00:00 UTC)
-        now = datetime.utcnow()
-        closed_cutoff = datetime(now.year, now.month, now.day) - timedelta(
-            days=now.weekday()
+    bucket_list = (
+        StatusBucket.query.filter(StatusBucket.active == True)
+        .filter(
+            (StatusBucket.department_name == None)
+            | (StatusBucket.department_name == "")
+            | (StatusBucket.department_name == dept)
         )
-
-        # Build buckets from admin-configurable StatusBucket entries
+        .order_by(StatusBucket.order.asc())
+        .all()
+    )
+    # seed dept-B defaults if completely empty (analogous to startup code)
+    if dept == "B" and not bucket_list:
+        try:
+            nb = StatusBucket(name="New", department_name="B", order=0, active=True)
+            db.session.add(nb)
+            db.session.flush()
+            db.session.add(BucketStatus(bucket_id=nb.id, status_code="NEW_FROM_A", order=0))
+            ip = StatusBucket(name="In Progress", department_name="B", order=1, active=True)
+            db.session.add(ip)
+            db.session.flush()
+            db.session.add(BucketStatus(bucket_id=ip.id, status_code="B_IN_PROGRESS", order=0))
+            db.session.add(BucketStatus(bucket_id=ip.id, status_code="PENDING_C_REVIEW", order=1))
+            db.session.add(BucketStatus(bucket_id=ip.id, status_code="B_FINAL_REVIEW", order=2))
+            ni = StatusBucket(name="Needs Info", department_name="B", order=2, active=True)
+            db.session.add(ni)
+            db.session.flush()
+            db.session.add(BucketStatus(bucket_id=ni.id, status_code="NEEDS_INFO", order=0))
+            db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
         bucket_list = (
             StatusBucket.query.filter(StatusBucket.active == True)
             .filter(
@@ -447,7 +563,82 @@ def dashboard():
             .all()
         )
 
-        # If a `bucket_id` is provided, filter by that bucket; otherwise use either `status` filter or show all buckets
+    # helper to compute counts for current bucket_list using provided base query
+    def _compute_status_counts(base_q):
+        counts = {}
+        for b in bucket_list:
+            scs = [s.status_code for s in b.statuses.order_by(BucketStatus.order.asc()).all()]
+            if scs:
+                q = base_q.filter(ReqModel.status.in_(scs))
+            else:
+                q = base_q
+            counts[b.id] = q.count()
+        return counts
+
+    # Allow filtering by bucket for any department; we handle mode-specific semantics below
+    if bucket_id:
+        selected_bucket_mode = True
+        b = db.session.get(StatusBucket, int(bucket_id))
+        if b:
+            status_codes = [s.status_code for s in b.statuses.order_by(BucketStatus.order.asc()).all()]
+        else:
+            status_codes = None
+
+    if dept == "A":
+        # Dept A should see all open requests owned by Department A
+        base_a = _exclude_old_closed(
+            _request_list_query(ReqModel.query).filter_by(owner_department="A")
+        )
+
+        if bucket_id:
+            if status_codes is None:
+                items = []
+            elif status_codes:
+                items = (
+                    base_a.filter(ReqModel.status.in_(status_codes))
+                    .order_by(ReqModel.updated_at.desc())
+                    .all()
+                )
+            else:
+                items = base_a.order_by(ReqModel.updated_at.desc()).all()
+            status_counts = _compute_status_counts(base_a)
+            return render_template(
+                "dashboard.html",
+                mode="A",
+                requests=items,
+                bucket_list=bucket_list,
+                status_counts=status_counts,
+                now=datetime.utcnow(),
+                artifact_form=artifact_form,
+            )
+
+        # no bucket filter; show all
+        my_reqs = base_a.order_by(ReqModel.updated_at.desc()).all()
+        status_counts = _compute_status_counts(base_a)
+        return render_template(
+            "dashboard.html",
+            mode="A",
+            requests=my_reqs,
+            bucket_list=bucket_list,
+            status_counts=status_counts,
+            now=datetime.utcnow(),
+            artifact_form=artifact_form,
+        )
+
+    if dept == "B":
+        # existing B-specific code follows unchanged
+        # Allow filtering by a single status via query param `status` or by bucket via `bucket_id`
+        selected_bucket_mode = selected_bucket_mode
+        # Build base query scoped to Dept B (owned by B or explicitly sent to B)
+        base_b = _request_list_query(scope_requests_for_department(ReqModel.query, "B"))
+        # cutoff for 'closed this week' — start of current week (Monday 00:00 UTC)
+        now = datetime.utcnow()
+        closed_cutoff = datetime(now.year, now.month, now.day) - timedelta(
+            days=now.weekday()
+        )
+        # bucket_list already prepared above
+        
+        # first handle bucket selection explicitly (works for any department)
         if bucket_id:
             selected_bucket_mode = True
             b = db.session.get(StatusBucket, int(bucket_id))
@@ -479,109 +670,110 @@ def dashboard():
                 now=datetime.utcnow(),
                 artifact_form=artifact_form,
             )
-        else:
-            # If an explicit legacy status filter is provided, keep existing semantics
-            if status_filter:
-                sf = status_filter
-                if sf == "in_progress":
-                    items = (
-                        base_b.filter(
-                            ReqModel.status == "B_IN_PROGRESS",
-                        )
-                        .order_by(ReqModel.updated_at.desc())
-                        .all()
-                    )
-                elif sf == "method_created":
-                    items = (
-                        base_b.join(Artifact)
-                        .filter(
-                            Artifact.artifact_type == "instructions",
-                        )
-                        .order_by(ReqModel.updated_at.desc())
-                        .distinct()
-                        .all()
-                    )
-                elif sf == "part_number_created":
-                    items = (
-                        base_b.join(Artifact)
-                        .filter(
-                            Artifact.artifact_type == "part_number",
-                            (Artifact.target_part_number.isnot(None))
-                            | (Artifact.donor_part_number.isnot(None)),
-                        )
-                        .order_by(ReqModel.updated_at.desc())
-                        .distinct()
-                        .all()
-                    )
-                elif sf == "under_review_by_department_c":
-                    items = (
-                        base_b.filter(
-                            ReqModel.status == "PENDING_C_REVIEW",
-                        )
-                        .order_by(ReqModel.updated_at.desc())
-                        .all()
-                    )
-                elif sf == "waiting_on_department_a":
-                    items = (
-                        base_b.filter(
-                            ReqModel.status == "WAITING_ON_A_RESPONSE",
-                        )
-                        .order_by(ReqModel.updated_at.desc())
-                        .all()
-                    )
-                elif sf == "under_final_review":
-                    items = (
-                        base_b.filter(
-                            ReqModel.status == "B_FINAL_REVIEW",
-                        )
-                        .order_by(ReqModel.updated_at.desc())
-                        .all()
-                    )
-                elif sf == "exec_approval":
-                    items = (
-                        base_b.filter(
-                            ReqModel.status == "EXEC_APPROVAL",
-                        )
-                        .order_by(ReqModel.updated_at.desc())
-                        .all()
-                    )
-                elif sf == "request_denied":
-                    items = (
-                        base_b.filter(
-                            ReqModel.status == "CLOSED",
-                        )
-                        .order_by(ReqModel.updated_at.desc())
-                        .all()
-                    )
-                else:
-                    items = (
-                        base_b.filter(
-                            ReqModel.status == status_filter,
-                        )
-                        .order_by(ReqModel.updated_at.desc())
-                        .all()
-                    )
 
-                label = STATUS_LABELS.get(status_filter, status_filter)
-                buckets = {label: items}
-                status_counts = {}
+        # legacy status filter semantics if no bucket selected
+        if status_filter:
+            sf = status_filter
+            if sf == "in_progress":
+                items = (
+                    base_b.filter(
+                        ReqModel.status == "B_IN_PROGRESS",
+                    )
+                    .order_by(ReqModel.updated_at.desc())
+                    .all()
+                )
+            elif sf == "method_created":
+                items = (
+                    base_b.join(Artifact)
+                    .filter(
+                        Artifact.artifact_type == "instructions",
+                    )
+                    .order_by(ReqModel.updated_at.desc())
+                    .distinct()
+                    .all()
+                )
+            elif sf == "part_number_created":
+                items = (
+                    base_b.join(Artifact)
+                    .filter(
+                        Artifact.artifact_type == "part_number",
+                        (Artifact.target_part_number.isnot(None))
+                        | (Artifact.donor_part_number.isnot(None)),
+                    )
+                    .order_by(ReqModel.updated_at.desc())
+                    .distinct()
+                    .all()
+                )
+            elif sf == "under_review_by_department_c":
+                items = (
+                    base_b.filter(
+                        ReqModel.status == "PENDING_C_REVIEW",
+                    )
+                    .order_by(ReqModel.updated_at.desc())
+                    .all()
+                )
+            elif sf == "waiting_on_department_a":
+                items = (
+                    base_b.filter(
+                        ReqModel.status == "WAITING_ON_A_RESPONSE",
+                    )
+                    .order_by(ReqModel.updated_at.desc())
+                    .all()
+                )
+            elif sf == "under_final_review":
+                items = (
+                    base_b.filter(
+                        ReqModel.status == "B_FINAL_REVIEW",
+                    )
+                    .order_by(ReqModel.updated_at.desc())
+                    .all()
+                )
+            elif sf == "exec_approval":
+                items = (
+                    base_b.filter(
+                        ReqModel.status == "EXEC_APPROVAL",
+                    )
+                    .order_by(ReqModel.updated_at.desc())
+                    .all()
+                )
+            elif sf == "request_denied":
+                items = (
+                    base_b.filter(
+                        ReqModel.status == "CLOSED",
+                    )
+                    .order_by(ReqModel.updated_at.desc())
+                    .all()
+                )
             else:
-                # No specific filter: build buckets from configured StatusBucket entries
-                buckets = {}
-                status_counts = {}
-                for b in bucket_list:
-                    status_codes = [
-                        s.status_code
-                        for s in b.statuses.order_by(BucketStatus.order.asc()).all()
-                    ]
-                    if status_codes:
-                        q = base_b.filter(ReqModel.status.in_(status_codes))
-                    else:
-                        q = base_b
-                    items = q.order_by(ReqModel.updated_at.desc()).all()
-                    buckets[b.name] = items
-                    status_counts[b.id] = q.count()
+                items = (
+                    base_b.filter(
+                        ReqModel.status == status_filter,
+                    )
+                    .order_by(ReqModel.updated_at.desc())
+                    .all()
+                )
 
+            label = STATUS_LABELS.get(status_filter, status_filter)
+            buckets = {label: items}
+            status_counts = {}
+        else:
+            # No specific filter: build buckets from configured StatusBucket entries
+            buckets = {}
+            status_counts = {}
+            for b in bucket_list:
+                status_codes = [
+                    s.status_code
+                    for s in b.statuses.order_by(BucketStatus.order.asc()).all()
+                ]
+                if status_codes:
+                    q = base_b.filter(ReqModel.status.in_(status_codes))
+                else:
+                    q = base_b
+                items = q.order_by(ReqModel.updated_at.desc()).all()
+                buckets[b.name] = items
+                status_counts[b.id] = q.count()
+
+        # Semantic status filters for Dept B dashboard
         # Semantic status filters for Dept B dashboard
         STATUS_LABELS = {
             "in_progress": "In progress by Department B",
@@ -809,21 +1001,54 @@ def dashboard():
             status_counts=status_counts,
             now=datetime.utcnow(),
             artifact_form=artifact_form,
+            assignment_form=assignment_form,
+            can_bulk_assign=can_bulk_assign,
         )
 
     if dept == "C":
+        # Dept C normally sees only items awaiting C review
+        base_c = _request_list_query(ReqModel.query)
+
+        if bucket_id:
+            if status_codes is None:
+                items = []
+            elif status_codes:
+                items = (
+                    base_c.filter(ReqModel.status.in_(status_codes))
+                    .order_by(ReqModel.updated_at.desc())
+                    .all()
+                )
+            else:
+                items = base_c.order_by(ReqModel.updated_at.desc()).all()
+            status_counts = _compute_status_counts(base_c)
+            return render_template(
+                "dashboard.html",
+                mode="C",
+                requests=items,
+                bucket_list=bucket_list,
+                status_counts=status_counts,
+                now=datetime.utcnow(),
+                artifact_form=artifact_form,
+                assignment_form=assignment_form,
+                can_bulk_assign=can_bulk_assign,
+            )
+
         pending = (
-            _request_list_query(ReqModel.query)
-            .filter_by(status="PENDING_C_REVIEW")
+            base_c.filter_by(status="PENDING_C_REVIEW")
             .order_by(ReqModel.updated_at.desc())
             .all()
         )
+        status_counts = _compute_status_counts(base_c)
         return render_template(
             "dashboard.html",
             mode="C",
             requests=pending,
+            bucket_list=bucket_list,
+            status_counts=status_counts,
             now=datetime.utcnow(),
             artifact_form=artifact_form,
+            assignment_form=assignment_form,
+            can_bulk_assign=can_bulk_assign,
         )
 
     abort(403)
@@ -862,6 +1087,146 @@ def department_dashboard(dept: str):
         abort(403)
 
     return redirect(url_for("requests.dashboard", as_dept=code))
+
+
+@requests_bp.route("/dashboard/assign_bucket", methods=["POST"])
+@login_required
+def assign_bucket():
+    """Bulk-assign all items currently in a bucket to a user.
+
+    This endpoint is primarily surfaced to department heads via the
+    dashboard UI.  It respects the same one-assignment-per-user rule
+    enforced by :func:`assign_request`.
+    """
+    # determine department in the same way the dashboard does
+    dept = current_user.department
+    if getattr(current_user, "is_admin", False):
+        as_dept = (request.form.get("as_dept") or "").upper()
+        if as_dept in ("A", "B", "C"):
+            dept = as_dept
+
+    if not _user_is_dept_head(current_user, dept):
+        abort(403)
+
+    form = AssignmentForm()
+    form.assignee.choices = _assignment_choices(dept)
+    bucket_id = request.form.get("bucket_id")
+    if not form.validate_on_submit() or not bucket_id:
+        flash("Choose a valid assignee and bucket.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    selected_id = form.assignee.data
+    new_assignee = None
+    if selected_id != -1:
+        new_assignee = User.query.filter_by(
+            id=selected_id, department=dept, is_active=True
+        ).first()
+        if not new_assignee:
+            flash("Invalid assignee for your department.", "danger")
+            return redirect(url_for("requests.dashboard"))
+
+    # resolve bucket statuses to know which requests to touch
+    try:
+        b = db.session.get(StatusBucket, int(bucket_id))
+    except Exception:
+        b = None
+    status_codes = []
+    if b:
+        status_codes = [
+            s.status_code
+            for s in b.statuses.order_by(BucketStatus.order.asc()).all()
+        ]
+
+    # fetch requests that live in this bucket and department
+    query = ReqModel.query.filter(ReqModel.owner_department == dept)
+    if status_codes:
+        query = query.filter(ReqModel.status.in_(status_codes))
+    requests = query.all()
+
+    # enforce assignment rules similar to assign_request
+    if new_assignee:
+        # check for any other active assignment outside this set
+        existing = (
+            ReqModel.query.filter(
+                ReqModel.assigned_to_user_id == new_assignee.id,
+                ReqModel.status != "CLOSED",
+                ReqModel.is_denied == False,
+                ~ReqModel.id.in_([r.id for r in requests]),
+            )
+            .order_by(ReqModel.created_at.asc())
+            .first()
+        )
+        if existing:
+            flash(
+                f"{new_assignee.name or new_assignee.email} is already assigned to Request #{existing.id}. Clear that assignment first.",
+                "warning",
+            )
+            return redirect(url_for("requests.dashboard"))
+
+    # perform assignments
+    any_changed = False
+    for req in requests:
+        previous = (
+            db.session.get(User, req.assigned_to_user_id)
+            if req.assigned_to_user_id
+            else None
+        )
+        if (previous.id if previous else None) == (
+            new_assignee.id if new_assignee else None
+        ):
+            continue
+        req.assigned_to_user = new_assignee
+        prev_label = (previous.name or previous.email) if previous else "Unassigned"
+        new_label = (
+            (new_assignee.name or new_assignee.email) if new_assignee else "Unassigned"
+        )
+        _log(
+            req,
+            "assignment_changed",
+            note=f"Assignment changed: {prev_label} → {new_label}",
+        )
+        notif_targets = []
+        if new_assignee and new_assignee.id != current_user.id:
+            notif_targets.append(new_assignee)
+        if req.created_by_user_id and req.created_by_user_id != current_user.id:
+            creator = db.session.get(User, req.created_by_user_id)
+            if creator and getattr(creator, "is_active", True):
+                notif_targets.append(creator)
+        if notif_targets:
+            unique = {u.id: u for u in notif_targets}.values()
+            notify_users(
+                unique,
+                title=f"Request #{req.id} assigned to {new_label}",
+                body=req.title,
+                url=url_for("requests.request_detail", request_id=req.id),
+                ntype="assignment",
+                request_id=req.id,
+            )
+        any_changed = True
+    if any_changed:
+        db.session.commit()
+        flash("Bucket assignments updated.", "success")
+        try:
+            for req in requests:
+                record_process_metric_event(
+                    req,
+                    event_type="assignment_changed",
+                    actor_user=current_user,
+                    actor_department=getattr(current_user, "department", None),
+                    metadata={"bucket_id": bucket_id},
+                )
+            metrics_module.assignment_changes_total.labels(
+                dept=dept, action="assigned" if new_assignee else "cleared"
+            ).inc()
+            metrics_module.update_owner_gauge(db.session, ReqModel)
+        except Exception:
+            current_app.logger.exception(
+                "Failed to update metrics on bulk assignment"
+            )
+    else:
+        flash("No assignments changed.", "info")
+
+    return redirect(url_for("requests.dashboard", bucket_id=bucket_id))
 
 
 @requests_bp.route("/search")
@@ -943,79 +1308,147 @@ def search_requests():
 @login_required
 @cached_view(timeout=60, prefix="metrics_ui")
 def metrics_ui():
-    """Simple DB-backed metrics UI: counts per owner department and recent activity."""
+    """DB-backed metrics UI with department flow and user-efficiency summaries."""
+    allowed_depts = _require_metrics_access(current_user)
     # Accept a `range` parameter: daily, weekly, monthly, yearly (defaults to weekly)
     r = (request.args.get("range") or "weekly").lower()
-    now = datetime.utcnow()
-    if r == "daily":
-        cutoff = datetime(now.year, now.month, now.day)
-        label = "Daily (since today 00:00 UTC)"
-    elif r == "monthly":
-        cutoff = datetime(now.year, now.month, 1)
-        label = "Monthly (since start of month)"
-    elif r == "yearly":
-        cutoff = datetime(now.year, 1, 1)
-        label = "Yearly (since start of year)"
-    else:
-        # weekly (default): start of current week (Monday 00:00 UTC)
-        cutoff = datetime(now.year, now.month, now.day) - timedelta(days=now.weekday())
-        label = "Weekly (since start of week)"
+    selected_dept = (request.args.get("dept") or "").strip().upper()
+    visible_depts = [selected_dept] if selected_dept in allowed_depts else allowed_depts
+    q = (request.args.get("q") or "").strip()
 
-    # Total requests by owner department
-    totals = dict(
-        db.session.query(ReqModel.owner_department, func.count(ReqModel.id))
-        .group_by(ReqModel.owner_department)
-        .all()
-    )
+    # optional user filtering; multiple values may be supplied
+    user_filters = request.args.getlist("user")
 
-    # Open requests (not CLOSED) by owner dept
-    opens = dict(
-        db.session.query(ReqModel.owner_department, func.count(ReqModel.id))
-        .filter(ReqModel.status != "CLOSED")
-        .group_by(ReqModel.owner_department)
-        .all()
-    )
+    snapshot = build_process_metrics_summary(range_key=r, depts=visible_depts, query=q)
 
-    # Requests created in the selected window by owner dept
-    created_window = dict(
-        db.session.query(ReqModel.owner_department, func.count(ReqModel.id))
-        .filter(ReqModel.created_at >= cutoff)
-        .group_by(ReqModel.owner_department)
-        .all()
-    )
+    # if user filters were provided, narrow the user list
+    if user_filters:
+        # allow filtering by id (string of int) or exact email
+        filtered = []
+        for u in snapshot.get("users", []):
+            if str(u.get("user_id")) in user_filters or u.get("email") in user_filters:
+                filtered.append(u)
+        snapshot["users"] = filtered
 
-    # Requests closed in the selected window by owner dept
-    closed_window = dict(
-        db.session.query(ReqModel.owner_department, func.count(ReqModel.id))
-        .filter(ReqModel.status == "CLOSED", ReqModel.updated_at >= cutoff)
-        .group_by(ReqModel.owner_department)
-        .all()
-    )
+    # compute available users from snapshot for UI selection
+    available_users = snapshot.get("users", []) if not user_filters else []
+    # if filtering was applied we still want to show all possible users so
+    # admins can change filters; rebuild from unfiltered summary if needed
+    if user_filters:
+        # rebuild unfiltered snapshot to list all users
+        unfiltered = build_process_metrics_summary(range_key=r, depts=visible_depts, query=q)
+        available_users = unfiltered.get("users", [])
 
-    # Determine which departments the current user may view
-    if getattr(current_user, "is_admin", False):
-        depts = ["A", "B", "C"]
-    else:
-        depts = [current_user.department]
-    metrics = []
-    for d in depts:
-        metrics.append(
+
+    # export support
+    if request.args.get("export") == "csv":
+        # compile department summary into CSV
+        rows = [
+            [
+                "Department",
+                "Total",
+                "Open",
+                "Created",
+                "Closed",
+                "Tracked events",
+                "Avg completion (h)",
+                "On target %",
+            ]
+        ]
+        for m in snapshot["by_dept"]:
+            rows.append([
+                m["dept"],
+                m["total"],
+                m["open"],
+                m["created_window"],
+                m["closed_window"],
+                m["tracked_events"],
+                m["avg_completion_hours"] if m["avg_completion_hours"] is not None else "",
+                m["within_target_pct"] if m["within_target_pct"] is not None else "",
+            ])
+        # also include user-level breakdown and interactions for a full export
+        # users section (always output headers so readers know structure)
+        rows.append([])
+        rows.append([
+            "Users",
+            "Department",
+            "Events",
+            "Status changes",
+            "Assignments",
+            "Slow events",
+            "Avg gap (h)",
+            "Avg completion (h)",
+            "Closed count",
+        ])
+        for u in snapshot.get("users", []):
+            rows.append([
+                u.get("email") or "",
+                u.get("department") or "",
+                u.get("events"),
+                u.get("status_changes"),
+                u.get("assignments"),
+                u.get("slow_events"),
+                u.get("avg_gap_hours") if u.get("avg_gap_hours") is not None else "",
+                u.get("avg_completion_hours") if u.get("avg_completion_hours") is not None else "",
+                u.get("closed_count"),
+            ])
+        # interactions section
+        rows.append([])
+        rows.append([
+            "From dept",
+            "To dept",
+            "Count",
+        ])
+        for i in snapshot.get("interactions", []):
+            rows.append([
+                i.get("from_department"),
+                i.get("to_department"),
+                i.get("count"),
+            ])
+        output = []
+        for rrow in rows:
+            # ensure proper quoting if any commas in text? simple join is ok for now
+            output.append(",".join(str(x) for x in rrow))
+        return Response("\n".join(output), content_type="text/csv")
+
+    dept_buckets = []
+    for dept_metrics in snapshot["by_dept"]:
+        dept_code = dept_metrics["dept"]
+        dept_buckets.append(
             {
-                "dept": d,
-                "total": totals.get(d, 0),
-                "open": opens.get(d, 0),
-                "created_window": created_window.get(d, 0),
-                "closed_window": closed_window.get(d, 0),
+                "dept": dept_code,
+                "metrics": dept_metrics,
+                "users": [
+                    row
+                    for row in snapshot["users"]
+                    if (row.get("department") or "").strip().upper() == dept_code
+                ],
+                "interactions": [
+                    row
+                    for row in snapshot["interactions"]
+                    if (row.get("from_department") == dept_code)
+                    or (row.get("to_department") == dept_code)
+                ],
             }
         )
 
     return render_template(
         "metrics.html",
-        metrics=metrics,
-        now=now,
-        cutoff=cutoff,
-        range_label=label,
-        range_key=r,
+        metrics=snapshot["by_dept"],
+        dept_buckets=dept_buckets,
+        users=snapshot["users"],
+        interactions=snapshot["interactions"],
+        summary=snapshot["summary"],
+        now=snapshot["now"],
+        cutoff=snapshot["cutoff"],
+        range_label=snapshot["range_label"],
+        range_key=snapshot["range_key"],
+        allowed_metric_departments=allowed_depts,
+        selected_metric_department=selected_dept,
+        q=q,
+        user_filters=user_filters,
+        available_users=available_users,
+        metrics_view_endpoint="requests.metrics_ui",
     )
 
 
@@ -1031,100 +1464,37 @@ def metrics():
 
 
 @requests_bp.route("/metrics/json")
+@login_required
 def metrics_json():
-    # Metrics JSON is cached for a short interval to avoid DB pressure
-    if cache is not None:
-        try:
-            key = _make_cache_key("metrics_json")
-            cached = cache.get(key)
-            if cached is not None:
-                body, status, content_type = cached
-                return Response(body, status=status, content_type=content_type)
-        except Exception:
-            pass
+    _require_metrics_access(current_user)
     """Machine-friendly JSON metrics for external integrations."""
     try:
-        cutoff = datetime.utcnow() - timedelta(days=7)
-
-        totals = dict(
-            db.session.query(ReqModel.owner_department, func.count(ReqModel.id))
-            .group_by(ReqModel.owner_department)
-            .all()
-        )
-        opens = dict(
-            db.session.query(ReqModel.owner_department, func.count(ReqModel.id))
-            .filter(ReqModel.status != "CLOSED")
-            .group_by(ReqModel.owner_department)
-            .all()
-        )
-        created_week = dict(
-            db.session.query(ReqModel.owner_department, func.count(ReqModel.id))
-            .filter(ReqModel.created_at >= cutoff)
-            .group_by(ReqModel.owner_department)
-            .all()
-        )
-        closed_week = dict(
-            db.session.query(ReqModel.owner_department, func.count(ReqModel.id))
-            .filter(ReqModel.status == "CLOSED", ReqModel.updated_at >= cutoff)
-            .group_by(ReqModel.owner_department)
-            .all()
-        )
-
-        # Support `range` param for JSON endpoint as well
+        allowed_depts = _metric_departments_for_user(current_user)
+        selected_dept = (request.args.get("dept") or "").strip().upper()
         r = (request.args.get("range") or "weekly").lower()
-        now = datetime.utcnow()
-        if r == "daily":
-            cutoff = datetime(now.year, now.month, now.day)
-        elif r == "monthly":
-            cutoff = datetime(now.year, now.month, 1)
-        elif r == "yearly":
-            cutoff = datetime(now.year, 1, 1)
-        else:
-            cutoff = datetime(now.year, now.month, now.day) - timedelta(
-                days=now.weekday()
-            )
+        q = (request.args.get("q") or "").strip()
+        visible_depts = [selected_dept] if selected_dept in allowed_depts else allowed_depts
+        user_filters = request.args.getlist("user")
+        snapshot = build_process_metrics_summary(range_key=r, depts=visible_depts, query=q)
 
-        created_window = dict(
-            db.session.query(ReqModel.owner_department, func.count(ReqModel.id))
-            .filter(ReqModel.created_at >= cutoff)
-            .group_by(ReqModel.owner_department)
-            .all()
-        )
-        closed_window = dict(
-            db.session.query(ReqModel.owner_department, func.count(ReqModel.id))
-            .filter(ReqModel.status == "CLOSED", ReqModel.updated_at >= cutoff)
-            .group_by(ReqModel.owner_department)
-            .all()
-        )
+        if user_filters:
+            filtered = []
+            for u in snapshot.get("users", []):
+                if str(u.get("user_id")) in user_filters or u.get("email") in user_filters:
+                    filtered.append(u)
+            snapshot["users"] = filtered
 
         payload = {
-            "now": now.isoformat() + "Z",
-            "cutoff": cutoff.isoformat() + "Z",
-            "range": r,
-            "by_dept": {},
+            "now": snapshot["now"].isoformat() + "Z",
+            "cutoff": snapshot["cutoff"].isoformat() + "Z",
+            "range": snapshot["range_key"],
+            "summary": snapshot["summary"],
+            "by_dept": {row["dept"]: row for row in snapshot["by_dept"]},
+            "users": snapshot["users"],
+            "interactions": snapshot["interactions"],
+            "allowed_departments": allowed_depts,
         }
-        for d in ("A", "B", "C"):
-            payload["by_dept"][d] = {
-                "total": totals.get(d, 0),
-                "open": opens.get(d, 0),
-                "created_window": created_window.get(d, 0),
-                "closed_window": closed_window.get(d, 0),
-            }
-        response = jsonify(payload)
-        if cache is not None:
-            try:
-                cache.set(
-                    _make_cache_key("metrics_json"),
-                    (
-                        response.get_data(as_text=True),
-                        response.status_code,
-                        response.content_type,
-                    ),
-                    timeout=60,
-                )
-            except Exception:
-                pass
-        return response
+        return jsonify(payload)
     except Exception:
         current_app.logger.exception("Failed to render JSON metrics")
         abort(500)
@@ -1156,6 +1526,28 @@ def request_new():
         )
     template_spec = None
     if template and template_fields:
+        latest_map = {}
+        try:
+            from ..models import FieldVerification
+            from sqlalchemy import inspect as sa_inspect
+
+            fids = [f.id for f in template_fields]
+            if fids and sa_inspect(db.engine).has_table("field_verification"):
+                fvs = (
+                    db.session.query(FieldVerification)
+                    .filter(FieldVerification.field_id.in_(fids))
+                    .order_by(
+                        FieldVerification.field_id.asc(),
+                        FieldVerification.created_at.desc(),
+                    )
+                    .all()
+                )
+                for fv in fvs:
+                    if fv.field_id not in latest_map:
+                        latest_map[fv.field_id] = fv
+        except Exception:
+            latest_map = {}
+
         template_spec = []
         for f in template_fields:
             opts = []
@@ -1167,6 +1559,11 @@ def request_new():
                         "label": getattr(o, "value", None),
                     }
                 )
+            verification_rule = _resolve_verification_rule(f, latest_map)
+            field_hint = getattr(f, "hint", None)
+            if not field_hint and isinstance(verification_rule, dict):
+                rule_params = verification_rule.get("params") or {}
+                field_hint = rule_params.get("bulk_input_hint") or None
             template_spec.append(
                 {
                     "id": f.id,
@@ -1174,7 +1571,7 @@ def request_new():
                     "label": getattr(f, "label", None),
                     "field_type": getattr(f, "field_type", None),
                     "required": bool(getattr(f, "required", False)),
-                    "hint": getattr(f, "verification", None),
+                    "hint": field_hint,
                     "options": opts,
                 }
             )
@@ -1567,6 +1964,14 @@ def request_new():
                 dept=req.owner_department
             ).inc()
             metrics_module.update_owner_gauge(db.session, ReqModel)
+            record_process_metric_event(
+                req,
+                event_type="request_created",
+                actor_user=current_user,
+                actor_department=getattr(current_user, "department", None),
+                to_status=req.status,
+                metadata={"request_type": req.request_type, "priority": req.priority},
+            )
         except Exception:
             current_app.logger.exception("Failed to update metrics on request creation")
 
@@ -2002,6 +2407,14 @@ def assign_self(request_id: int):
             dept=current_user.department, action="assigned"
         ).inc()
         metrics_module.update_owner_gauge(db.session, ReqModel)
+        record_process_metric_event(
+            req,
+            event_type="assignment_changed",
+            actor_user=current_user,
+            actor_department=getattr(current_user, "department", None),
+            to_status=req.status,
+            metadata={"assignment_action": "assigned_to_self"},
+        )
     except Exception:
         current_app.logger.exception("Failed to update metrics on assignment")
 
@@ -3248,6 +3661,29 @@ def do_transition(request_id: int):
                 )
 
         db.session.commit()
+        try:
+            emit_webhook_event(
+                "request.status_changed",
+                {
+                    "request": serialize_request(req),
+                    "from_status": from_status,
+                    "to_status": to_status,
+                },
+            )
+        except Exception:
+            current_app.logger.exception("Failed to emit status-change event")
+        try:
+            record_process_metric_event(
+                req,
+                event_type="status_changed",
+                actor_user=current_user,
+                actor_department=getattr(current_user, "department", None),
+                from_status=from_status,
+                to_status=to_status,
+                metadata={"handoff_department": req.owner_department},
+            )
+        except Exception:
+            current_app.logger.exception("Failed to record status-change metric event")
         flash(f"Moved to {to_status}.", "success")
         try:
             if current_app.testing:
@@ -3380,6 +3816,17 @@ def assign_request(request_id: int):
             action="assigned" if new_assignee else "cleared",
         ).inc()
         metrics_module.update_owner_gauge(db.session, ReqModel)
+        record_process_metric_event(
+            req,
+            event_type="assignment_changed",
+            actor_user=current_user,
+            actor_department=getattr(current_user, "department", None),
+            to_status=req.status,
+            metadata={
+                "assignment_action": "assigned" if new_assignee else "cleared",
+                "assigned_to_user_id": getattr(new_assignee, "id", None),
+            },
+        )
     except Exception:
         current_app.logger.exception("Failed to update metrics on assignment change")
 

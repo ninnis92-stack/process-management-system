@@ -13,6 +13,23 @@
     <label class="form-label">External Key</label>
     {{ form.external_key(class="form-control") }}
   </div>
+  <div class="form-check mb-3">
+    {{ form.verify_each_separated_value(class="form-check-input") }}
+    <label class="form-check-label">{{ form.verify_each_separated_value.label.text }}</label>
+    <div class="form-text">Use this when one field will contain multiple values and every value should be checked on its own.</div>
+  </div>
+  <div class="row">
+    <div class="col-md-4 mb-3">
+      <label class="form-label">{{ form.value_separator.label.text }}</label>
+      {{ form.value_separator(class="form-control", placeholder=",") }}
+      <div class="form-text">Examples: <code>,</code>, <code>;</code>, <code>|</code>, or <code>newline</code>.</div>
+    </div>
+    <div class="col-md-8 mb-3">
+      <label class="form-label">{{ form.bulk_input_hint.label.text }}</label>
+      {{ form.bulk_input_hint(class="form-control", placeholder="Example: Enter values separated by commas") }}
+      <div class="form-text">Shown to users on the request form so admins can customize instructions for this field.</div>
+    </div>
+  </div>
   <div class="mb-3">
     <label class="form-label">Params (JSON)</label>
     {{ form.params_json(class="form-control", rows=6) }}
