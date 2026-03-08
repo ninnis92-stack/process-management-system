@@ -599,13 +599,11 @@ def login():
         # otherwise restore last-active or set primary department into session.
         try:
             depts = _get_user_departments(user)
-            if len(depts) > 1:
-                # store next for after the department selection step
-                next_url = request.args.get('next') or request.form.get('next')
-                if next_url and next_url.startswith('/') and not next_url.startswith('//'):
-                    _session['next_after_choose_dept'] = next_url
-                return redirect(url_for("auth.choose_dept"))
-            # single choice - restore last active if present and allowed
+            # unlike earlier versions, we no longer force a dedicated
+            # /auth/choose_dept step when a user can select departments via
+            # the navbar dropdown (admins and multi-dept users).  simply
+            # default to the first department and let the picker handle
+            # further switches.
             restored = False
             if getattr(user, "last_active_dept", None):
                 try:
@@ -740,8 +738,8 @@ def totp_verify():
             return redirect(url_for("admin.index"))
         try:
             depts = _get_user_departments(u)
-            if len(depts) > 1:
-                return redirect(url_for("auth.choose_dept"))
+            # same logic during 2FA login path; skip explicit chooser even if
+            # multiple departments are available.
             if getattr(u, "last_active_dept", None):
                 _restore_last_active_dept_for_user(u)
             else:

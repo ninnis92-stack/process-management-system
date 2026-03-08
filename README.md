@@ -246,8 +246,11 @@ page displays the last few steps and suggests next actions to the user.
   while keeping department switching quick and obvious.
 - Rolling quotes are seeded and normalized on every deployment; the release
   command logs `quote_sets=ok` and authenticated pages include a
-  `#rolling-quotes-data` script tag when quotes are enabled.  Smoke tests and
-  unit tests verify the banner text appears.
+  `#rolling-quotes-data` script tag when quotes are enabled.  To avoid the
+  placeholder <code>Loading inspiration…</code> appearing if the client-side
+  script fails, the server now injects the first quote directly into the HTML
+  and the JavaScript falls back to a built-in list when a configured set is
+  empty.  Smoke tests and unit tests verify the banner text appears.
 - **User settings**: dark mode (tints with the chosen vibe), theme/vibe selection, quote set, rotating
   quotes.
 - **Templates & requirements**: rich form editing with grouped fields, hints,

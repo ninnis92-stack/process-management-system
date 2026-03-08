@@ -102,6 +102,34 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
         assert response.status_code in (200, 302), hero_url
 
 
+def test_admin_navbar_department_switch_updates_session(app, client):
+    # Admins should see the navbar dropdown and be able to POST to switch_dept,
+    # which persists their active department rather than relying solely on ?as_dept.
+    with app.app_context():
+        admin = User(
+            email="admin-switch@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+    rv = _login_admin(client, email="admin-switch@example.com")
+    assert rv.status_code == 200
+    page = client.get("/admin/")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert 'id="navbarDeptSelect"' in html
+
+    # choose a different department via POST
+    resp = client.post("/auth/switch_dept", data={"department": "A"}, follow_redirects=True)
+    assert resp.status_code == 200
+    dash = client.get("/dashboard")
+    assert 'data-active-dept="A"' in dash.get_data(as_text=True)
+
+
 def test_admin_notifications_card_toggles_feature_flag(app, client):
     with app.app_context():
         admin = User(

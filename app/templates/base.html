@@ -72,7 +72,7 @@
         {% endif %}
         <div>
           <div class="brand-title">{{ site_brand_name or 'FreshProcess' }}</div>
-          <div id="motivation" class="brand-quote" aria-live="polite">Loading inspiration…</div>
+          <div id="motivation" class="brand-quote" aria-live="polite">{{ initial_quote or 'Loading inspiration…' }}</div>
         </div>
       </a>
 
@@ -116,29 +116,20 @@
             {% if FeatureFlags.get().vibe_enabled %}
               <button id="vibeBtn" type="button" class="btn btn-outline-light btn-sm">Vibe · <span id="vibeLabel">—</span></button>
             {% endif %}
-            {% if current_user.is_admin %}
-              <form method="get" action="{{ url_for('requests.dashboard') }}" class="m-0 d-inline" id="admin-dept-view-form">
-                <select name="as_dept" onchange="this.form.submit()" class="form-select form-select-sm text-dark" style="display:inline-block; width:auto; margin-right:8px;">
-                  <option value="A" {% if request.args.get('as_dept')=='A' %}selected{% endif %}>{{ department_labels.get('A', 'Dept A') }}</option>
-                  <option value="B" {% if request.args.get('as_dept')=='B' %}selected{% endif %}>{{ department_labels.get('B', 'Dept B') }}</option>
-                  <option value="C" {% if request.args.get('as_dept')=='C' %}selected{% endif %}>{{ department_labels.get('C', 'Dept C') }}</option>
+            {% if current_user.is_admin or user_has_multiple_departments(current_user) %}
+              {# unified department switcher for admins and other multi-department users;
+                 always POST so active_dept is saved in session (and persisted to
+                 last_active_dept).  Admins still retain support for ?as_dept via
+                 query strings elsewhere but the navbar control no longer uses
+                 a GET redirect. #}
+              <form method="post" action="{{ url_for('auth.switch_department') }}" class="m-0 d-inline" id="navbar-dept-switch-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <select id="navbarDeptSelect" name="department" onchange="this.form.submit()" class="form-select form-select-sm text-dark" style="display:inline-block; width:auto; margin-right:8px;">
+                  {% for d in get_user_departments(current_user) %}
+                    <option value="{{ d }}" {% if session.get('active_dept') == d %}selected{% endif %}>{{ department_labels.get(d, 'Dept ' ~ d) }}</option>
+                  {% endfor %}
                 </select>
               </form>
-            {% else %}
-              {# non-admin users with multiple departments get their own switcher in the
-                 navbar.  this replicates the behaviour of the admin form but hits
-                 the POST /auth/switch_dept endpoint so that the session is
-                 updated correctly without needing a modal. #}
-              {% if user_has_multiple_departments(current_user) %}
-                <form method="post" action="{{ url_for('auth.switch_department') }}" class="m-0 d-inline" id="navbar-dept-switch-form">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <select id="navbarDeptSelect" name="department" onchange="this.form.submit()" class="form-select form-select-sm text-dark" style="display:inline-block; width:auto; margin-right:8px;">
-                    {% for d in get_user_departments(current_user) %}
-                      <option value="{{ d }}" {% if session.get('active_dept') == d %}selected{% endif %}>{{ department_labels.get(d, 'Dept ' ~ d) }}</option>
-                    {% endfor %}
-                  </select>
-                </form>
-              {% endif %}
             {% endif %}
             {# Account dropdown: compact avatar button that reveals user info + settings. Always shown. #}
             <div class="dropdown ms-2">

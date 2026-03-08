@@ -591,6 +591,15 @@ def create_app():
                 site_banner_html=banner_html,
                 rolling_quotes_enabled=rolling_quotes_enabled,
                 rolling_quotes=rolling_quotes,
+                # choose an initial quote to render server-side; fallback to the
+                # first entry of the active list or the default set.  this
+                # ensures that when JS fails or loads slowly the placeholder is
+                # replaced with something meaningful.
+                initial_quote=(
+                    rolling_quotes[0]
+                    if rolling_quotes and rolling_quotes_enabled
+                    else (SiteConfig.DEFAULT_QUOTE_SETS.get('default', [None])[0])
+                ),
                 allow_user_nudges_enabled=allow_user_nudges_enabled,
                 FeatureFlags=FeatureFlags,
             )

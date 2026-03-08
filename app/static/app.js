@@ -41,6 +41,37 @@
     "Folded clothes, elevated mood."
   ];
 
+  // If the configured list was empty we should still show the built-in
+  // lines rather than ending up with an empty array which leads to
+  // undefined text and can leave the placeholder unchanged.
+  if (!lines || lines.length === 0) {
+    lines = [
+      "Sort today: socks first, worries later.",
+      "A folded stack is a small victory.",
+      "One load at a time, one win at a time.",
+      "Tackle the smallest basket first.",
+      "Fresh socks, fresh perspective.",
+      "Turn laundry into a tiny ritual of calm.",
+      "Don't wait for motivation—start the wash.",
+      "Clean clothes, clearer head.",
+      "Fold with intention; carry less chaos.",
+      "A warm dryer is a hug for your clothes.",
+      "Separate colors, not your priorities.",
+      "Make today productive—finish one load.",
+      "Every matched pair is progress.",
+      "Treat stains as experiments, not failures.",
+      "Declutter your closet, declutter your day.",
+      "A neat drawer frees mental space.",
+      "Air-dry patience; speed comes after practice.",
+      "Small care preserves the longest wear.",
+      "Refresh your routine with a fresh load.",
+      "Laundry fi is peace earned.",
+      "Celebrate a completed basket.",
+      "Put it away; let it be finished.",
+      "Socks find their way home eventually.",
+      "Folded clothes, elevated mood."
+    ];
+  }
   // Stable per-day seed (days since epoch) so the order changes each day.
   const daySeed = Math.floor(Date.now() / 86400000);
   function mulberry32(a) {

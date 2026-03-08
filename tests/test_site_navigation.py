@@ -214,9 +214,10 @@ def test_admin_navigation_links_resolve(app, client):
 
 def test_navbar_department_dropdown_for_multi_dept_user(app, client):
     # users assigned to more than one department should see a dropdown in the
-    # navbar instead of the modal chooser that pops up on reload.  ensure the
-    # dropdown is rendered, the modal link is removed, and switching actually
-    # updates session state.
+    # navbar (same for admins) rather than the modal chooser that pops up on
+    # reload.  ensure the dropdown is rendered, the modal link is removed, and
+    # switching via POST updates session state.  also verify login does not
+    # reroute to /auth/choose_dept when a navbar switcher exists.
     with app.app_context():
         user = User(
             email="multidept@example.com",
@@ -247,6 +248,26 @@ def test_navbar_department_dropdown_for_multi_dept_user(app, client):
     assert resp.status_code == 200
     page2 = client.get("/dashboard")
     assert 'data-active-dept="B"' in page2.get_data(as_text=True)
+
+    # logging in again should not redirect to choose_dept page
+    rv2 = _login(client, "multidept@example.com")
+    assert rv2.status_code == 200
+    # since we follow redirects the Location header may be empty; just inspect
+    # the body for the chooser text.
+    assert b"Select Department" not in rv2.data
+
+
+def test_initial_quote_on_dashboard(app, client):
+    # the motivation slot should be populated with a real quote (at least the
+    # first built-in line) rather than the generic placeholder. this ensures the
+    # server-side fallback is wired up properly.
+    _create_user(app, email="quote-user@example.com", department="A")
+    _login(client, "quote-user@example.com")
+    resp = client.get("/dashboard")
+    html = resp.get_data(as_text=True)
+    assert "Loading inspiration" not in html
+    # check for a known fragment from the default set
+    assert "Sort today" in html
 
 
 def test_department_list_endpoint(app, client):
