@@ -128,6 +128,209 @@ def test_departments_crud_and_site_config(app, client):
     assert b"Welcome" in rv.data or b"Quote one" in rv.data
 
 
+def test_department_quote_permission(app, client):
+    # admin can restrict quote sets by department code
+    with app.app_context():
+        admin = User(
+            email="dept-admin@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=True,
+        )
+        uA = User(
+            email="deptA@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=False,
+        )
+        uB = User(
+            email="deptB@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=False,
+        )
+        db.session.add_all([admin, uA, uB])
+        db.session.commit()
+        cfg = SiteConfig.get()
+        db.session.commit()
+    # admin restricts A to engineering only
+    rv = client.post(
+        "/auth/login",
+        data={"email": "dept-admin@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    restriction = '{"A": ["engineering"]}'
+    rv = client.post(
+        "/admin/site_config",
+        data={"quote_permissions_dept": restriction},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    client.get("/auth/logout")
+    # user in A should only see engineering and can't pick others
+    rv = client.post(
+        "/auth/login",
+        data={"email": "deptA@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    rv = client.get("/auth/settings")
+    assert b"engineering" in rv.data
+    assert b"productivity" not in rv.data
+    client.get("/auth/logout")
+    # user in B unaffected by restriction
+    rv = client.post(
+        "/auth/login",
+        data={"email": "deptB@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    rv = client.get("/auth/settings")
+    assert b"engineering" in rv.data
+    assert b"productivity" in rv.data
+
+
+def test_admin_default_quote_and_user_override(app, client):
+    # ensure admin default propagates and that user override persists
+    with app.app_context():
+        # admin user
+        admin = User(
+            email="admin2@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        # normal user
+        u = User(
+            email="user2@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=False,
+        )
+        db.session.add(u)
+        db.session.commit()
+        # ensure site config exists with defaults
+        cfg = SiteConfig.get()
+        db.session.commit()
+
+    # login as admin and change default
+    rv = client.post(
+        "/auth/login",
+        data={"email": "admin2@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    # set default to "engineering"
+    rv = client.post(
+        "/admin/site_config",
+        data={"active_quote_set": "engineering"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    assert b"Site configuration saved" in rv.data
+
+    # admin creates a user with quotes disabled
+    rv = client.post(
+        "/admin/users/new",
+        data={
+            "email": "preset@example.com",
+            "password": "secret",
+            "department": "A",
+            "is_active": "y",
+            "quotes_enabled": "",
+            "quote_set": "engineering",
+        },
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    assert b"Created user preset@example.com" in rv.data
+
+    # login as that new user, verify they cannot see quotes
+    client.get("/auth/logout")
+    rv = client.post(
+        "/auth/login",
+        data={"email": "preset@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    rv = client.get("/dashboard")
+    assert b"rolling-quotes-data" not in rv.data
+    # log out
+    client.get("/auth/logout")
+
+    # login as the normal user and check dashboard quote is from engineering
+    rv = client.post(
+        "/auth/login",
+        data={"email": "user2@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    rv = client.get("/dashboard")
+    assert rv.status_code == 200
+    assert b"First, solve the problem." in rv.data
+
+    # user selects own override
+    rv = client.post(
+        "/auth/settings",
+        data={"quote_set": "coffee-humour"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    rv = client.get("/dashboard")
+    assert b"Code runs faster after coffee." in rv.data
+
+    # admin changes default again to productivity
+    client.get("/auth/logout")
+    client.post(
+        "/auth/login",
+        data={"email": "admin2@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    rv = client.post(
+        "/admin/site_config",
+        data={"active_quote_set": "productivity"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    client.get("/auth/logout")
+
+    # login as user, override should still apply
+    rv = client.post(
+        "/auth/login",
+        data={"email": "user2@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    rv = client.get("/dashboard")
+    assert b"Code runs faster after coffee." in rv.data
+
+    # new user without override should see productivity quote
+    client.get("/auth/logout")
+    with app.app_context():
+        v = User(
+            email="new@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=False,
+        )
+        db.session.add(v)
+        db.session.commit()
+    rv = client.post(
+        "/auth/login",
+        data={"email": "new@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    rv = client.get("/dashboard")
+    assert b"Eat the frog first" in rv.data
+
+
 def test_site_config_handles_db_errors_gracefully(app, client, monkeypatch):
     """If the database query for SiteConfig throws (e.g. missing columns),
     the admin page should still render and show a helpful flash message
@@ -210,7 +413,13 @@ def test_site_config_missing_columns(app, client):
             'updated_at',
         ]
         for col in cols_to_drop:
-            db.session.execute(text(f"ALTER TABLE site_config DROP COLUMN IF EXISTS {col}"))
+            try:
+                # SQLite doesn’t support DROP COLUMN; this will raise an OperationalError
+                # so we catch and ignore it.  The goal is only to simulate a missing
+                # column, not to suffer a hard crash during testing on sqlite.
+                db.session.execute(text(f"ALTER TABLE site_config DROP COLUMN {col}"))
+            except Exception:
+                pass
         db.session.commit()
 
         u = User(

@@ -359,6 +359,28 @@ a:hover { color: var(--accent-2); }
   transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.12s ease;
 }
 
+/* Make dashboard tiles clearly interactive and accessible */
+.admin-card
+{
+  cursor: pointer;
+}
+
+/* hover / focus feedback for better discoverability */
+.admin-card:hover,
+.admin-card:focus
+{
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+/* ensure keyboard users see focus outline, not just shadow */
+.admin-card:focus
+{
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 2px;
+}
+
+
 .admin-card.hidden-by-filter {
   opacity: 0.18;
   pointer-events: none;

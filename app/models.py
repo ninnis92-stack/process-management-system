@@ -210,6 +210,8 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     # user preference: quote set for rolling quotes (matches keys of
     # SiteConfig.DEFAULT_QUOTE_SETS).
     quote_set = db.Column(db.String(80), nullable=True)
+    # user preference: whether rotating quotes should appear on their dashboard
+    quotes_enabled = db.Column(db.Boolean, nullable=False, default=True)
     # Persist the last department the user was viewing when they logged out
     # or switched contexts. This is used to restore their active department
     # on subsequent logins when they have multiple department assignments.
@@ -825,6 +827,7 @@ class SiteConfig(TenantScopedMixin, db.Model):
         "rolling_quote_sets", db.Text, nullable=True
     )  # JSON map of named sets -> list of strings
     active_quote_set = db.Column(db.String(80), nullable=True, default="default")
+    quote_permissions = db.Column(db.Text, nullable=True)  # JSON: {"departments":{code:[sets]},"users":{email:[sets]}}
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
@@ -1002,6 +1005,41 @@ class SiteConfig(TenantScopedMixin, db.Model):
                     line.strip() for line in str(self._rolling_quotes).splitlines() if line.strip()
                 ]}
         return type(self).DEFAULT_QUOTE_SETS.copy()
+
+    @property
+    def parsed_quote_permissions(self):
+        """Return normalized quote permissions for departments and users."""
+        empty = {"departments": {}, "users": {}}
+        if not self.quote_permissions:
+            return empty
+        try:
+            parsed = json.loads(self.quote_permissions)
+        except Exception:
+            return empty
+        if not isinstance(parsed, dict):
+            return empty
+
+        def _normalize(mapping):
+            if not isinstance(mapping, dict):
+                return {}
+            normalized = {}
+            for key, values in mapping.items():
+                name = str(key or "").strip()
+                if not name:
+                    continue
+                if isinstance(values, list):
+                    cleaned = [str(v).strip() for v in values if str(v).strip()]
+                elif isinstance(values, str):
+                    cleaned = [str(v).strip() for v in values.split(",") if str(v).strip()]
+                else:
+                    cleaned = []
+                normalized[name] = cleaned
+            return normalized
+
+        return {
+            "departments": _normalize(parsed.get("departments")),
+            "users": _normalize(parsed.get("users")),
+        }
 
     @rolling_quotes.setter
     def rolling_quotes(self, value):

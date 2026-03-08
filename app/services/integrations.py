@@ -62,11 +62,43 @@ INTEGRATION_KIND_SCAFFOLDS: dict[str, dict[str, Any]] = {
         "default_config": {
             "version": "2026-03",
             "provider": "generic_verification",
-            "capabilities": ["lookup", "validate", "bulk_validate"],
+            "capabilities": ["lookup", "validate", "bulk_validate", "route_by_content"],
             "auth": {"type": "token", "token_env": ""},
             "endpoints": {"base_url": "", "lookup": "", "validate": ""},
             "mapping": {"input": "value", "ok": "ok", "details": "details"},
-            "compatibility": {"request_format": "json", "response_format": "json", "supports_bulk_lookup": True},
+            "request": {
+                "method": "GET",
+                "payload_location": "query",
+                "timeout_seconds": 5,
+                "query_template": {"value": "{value}", "field": "{external_key}"},
+                "body_template": {},
+                "headers": {},
+            },
+            "response": {"ok_path": "ok", "detail_path": "details", "reason_path": "reason"},
+            "routing": {
+                "default_tracker": "default",
+                "rules": [
+                    {
+                        "name": "Email-like values",
+                        "tracker": "default",
+                        "external_keys": ["email", "requester_email"],
+                        "contains": ["@"],
+                    }
+                ],
+            },
+            "trackers": {
+                "default": {
+                    "enabled": True,
+                    "endpoints": {"validate": ""},
+                    "request": {
+                        "method": "GET",
+                        "payload_location": "query",
+                        "query_template": {"value": "{value}", "field": "{external_key}"},
+                    },
+                    "response": {"ok_path": "ok", "detail_path": "details", "reason_path": "reason"},
+                }
+            },
+            "compatibility": {"request_format": "json", "response_format": "json", "supports_bulk_lookup": True, "supports_content_routing": True},
         },
     },
 }

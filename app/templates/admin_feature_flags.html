@@ -1,54 +1,31 @@
 {% extends "base.html" %}
+{% from 'admin/_macros.html' import toggle_checkbox %}
 
 {% block content %}
   <h2>Feature Flags</h2>
   <form method="post">
     {{ form.hidden_tag() }}
 
-    <div class="form-check mb-3">
-      {{ form.enable_notifications(class_='form-check-input') }}
-      {{ form.enable_notifications.label(class_='form-check-label') }}
-    </div>
+    {{ toggle_checkbox(form.enable_notifications, 'Disable notifications', 'Enable notifications') }}
 
-    <div class="form-check mb-3">
-      {{ form.enable_nudges(class_='form-check-input') }}
-      {{ form.enable_nudges.label(class_='form-check-label') }}
-    </div>
+    {{ toggle_checkbox(form.enable_nudges, 'Disable nudges', 'Enable nudges') }}
 
-    <div class="form-check mb-3">
-      {{ form.allow_user_nudges(class_='form-check-input') }}
-      {{ form.allow_user_nudges.label(class_='form-check-label') }}
+    {{ toggle_checkbox(form.allow_user_nudges, 'Disable user nudges', 'Enable user nudges') }}
       <div class="form-text">When enabled, users may push nudges to other users (not recommended).</div>
-    </div>
 
-    <div class="form-check mb-3">
-      {{ form.vibe_enabled(class_='form-check-input') }}
-      {{ form.vibe_enabled.label(class_='form-check-label') }}
-    </div>
+    {{ toggle_checkbox(form.vibe_enabled, 'Disable Vibe button UI', 'Enable Vibe button UI') }}
 
-    <div class="form-check mb-3">
-      {{ form.rolling_quotes_enabled(class_='form-check-input') }}
-      {{ form.rolling_quotes_enabled.label(class_='form-check-label') }}
+    {{ toggle_checkbox(form.rolling_quotes_enabled, 'Disable rolling quotes', 'Enable rolling quotes') }}
       <div class="form-text">When disabled, rolling quotes will not be shown anywhere in the UI.</div>
-    </div>
 
-    <div class="form-check mb-3">
-      {{ form.sso_admin_sync_enabled(class_='form-check-input') }}
-      {{ form.sso_admin_sync_enabled.label(class_='form-check-label') }}
+    {{ toggle_checkbox(form.sso_admin_sync_enabled, 'Disable SSO admin sync', 'Enable SSO admin sync') }}
       <div class="form-text">When enabled, users can be allocated admin access from organization-managed SSO claims or APIs. Manual admin assignment in the app still works either way.</div>
-    </div>
 
-    <div class="form-check mb-3">
-      {{ form.sso_department_sync_enabled(class_='form-check-input') }}
-      {{ form.sso_department_sync_enabled.label(class_='form-check-label') }}
+    {{ toggle_checkbox(form.sso_department_sync_enabled, 'Disable SSO department sync', 'Enable SSO department sync') }}
       <div class="form-text">When enabled, SSO-linked users whose primary department is not marked as admin-managed will have it reassigned from the configured SSO department claim on login.</div>
-    </div>
 
-    <div class="form-check mb-3">
-      {{ form.enable_external_forms(class_='form-check-input') }}
-      {{ form.enable_external_forms.label(class_='form-check-label') }}
+    {{ toggle_checkbox(form.enable_external_forms, 'Disable external forms', 'Enable external forms') }}
       <div class="form-text">When enabled, admins may mark a Form Template as using an external 3rd-party form; those templates will direct users to the external provider and accept webhook callbacks.</div>
-    </div>
 
     <button class="btn btn-primary">Save</button>
   </form>

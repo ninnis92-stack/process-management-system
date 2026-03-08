@@ -11,6 +11,7 @@ from app.models import (
 from app.extensions import db, get_or_404
 from datetime import datetime
 from app.services.integrations import fetch_external_data, serialize_request
+from app.services.request_creation import run_template_field_verifications
 
 app = create_app()
 
@@ -69,31 +70,16 @@ def api_template_verify(template_id: int):
 
     t = get_or_404(FormTemplate, template_id)
     data = request.get_json() or {}
+    try:
+        fields = list(t.fields.order_by(FormField.order.asc()).all())
+    except Exception:
+        fields = sorted(list(t.fields or []), key=lambda field: getattr(field, "order", 0))
+    verification_results = run_template_field_verifications(fields, data)
     results = {}
-    for f in t.fields:
+    for f in fields:
         val = data.get(f.name)
-        # default pass for empty optional
-        results[f.name] = {"ok": True, "value": val}
-        # apply simple verification rules (regex or external lookup can be configured later)
-        if f.verification:
-            try:
-                # simple example: {'type':'regex','pattern':'^\d{4}$'}
-                if f.verification.get("type") == "regex":
-                    import re
-
-                    pat = f.verification.get("pattern")
-                    if pat and val is not None:
-                        results[f.name]["ok"] = bool(re.match(pat, str(val)))
-                    else:
-                        results[f.name]["ok"] = False
-                elif f.verification.get("type") == "external_lookup":
-                    # external DB verification will be implemented by admin-configured params
-                    # For now, mark as pending
-                    results[f.name]["ok"] = False
-                    results[f.name]["reason"] = "external_lookup_not_implemented"
-            except Exception as e:
-                results[f.name]["ok"] = False
-                results[f.name]["error"] = str(e)
+        results[f.name] = verification_results.get(f.name) or {"ok": True, "value": val}
+        results[f.name].setdefault("value", val)
 
     return jsonify({"ok": True, "template_id": t.id, "results": results})
 

@@ -21,6 +21,14 @@ primary_region = 'ord'
     handlers = ["tls", "http"]
     port = 443
 
+  [[services.http_checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+    method = "get"
+    path = "/health"
+    protocol = "http"
+
 [processes]
 # Tuned for small shared-cpu instances: 3 workers, 4 threads each.
 # Adjust `-w` and `--threads` for your target machine size and workload.

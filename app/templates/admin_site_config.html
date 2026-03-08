@@ -128,6 +128,16 @@
                     {{ form.rolling_quote_sets(class_='form-control', rows=8, placeholder='{"default": ["Small wins create momentum."], "motivational": ["Progress, not perfection."]}') }}
                     <div class="form-text">Optional JSON map of quote groups for advanced setups.</div>
                   </div>
+                  <div class="mb-3">
+                    {{ form.quote_permissions_dept.label(class_='form-label') }}
+                    {{ form.quote_permissions_dept(class_='form-control', rows=4, placeholder='{"A": ["default", "engineering"], "B": ["coffee-humour"]}') }}
+                    <div class="form-text">JSON object mapping department codes to allowed quote sets. Leave empty for no restriction.</div>
+                  </div>
+                  <div class="mb-3">
+                    {{ form.quote_permissions_user.label(class_='form-label') }}
+                    {{ form.quote_permissions_user(class_='form-control', rows=4, placeholder='{"user@example.com": ["productivity"]}') }}
+                    <div class="form-text">JSON object mapping user emails to allowed quote sets. Specific users override department restrictions.</div>
+                  </div>
                 </div>
               </details>
             </div>

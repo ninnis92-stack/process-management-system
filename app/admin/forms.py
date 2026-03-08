@@ -32,6 +32,9 @@ class AdminCreateUserForm(FlaskForm):
     )
     is_active = BooleanField("Active", default=True)
     is_admin = BooleanField("Admin", default=False)
+    # quote preferences for new user
+    quote_set = SelectField("Initial quote set", choices=[], validators=[Optional()])
+    quotes_enabled = BooleanField("Enable rotating quotes", default=True)
     submit = SubmitField("Create / Update User")
 
 
@@ -70,6 +73,12 @@ class SiteConfigForm(FlaskForm):
     active_quote_set = SelectField(
         "Active quote set", choices=[], validators=[Optional()]
     )
+    quote_permissions_dept = TextAreaField(
+        "Allowed quote sets by department (JSON)", validators=[Optional(), Length(max=4000)]
+    )
+    quote_permissions_user = TextAreaField(
+        "Allowed quote sets by user (JSON)", validators=[Optional(), Length(max=4000)]
+    )
     def validate_rolling_quote_sets(form, field):
         """Validate that `rolling_quote_sets` is a JSON object mapping names to lists of strings."""
         raw = (field.data or "").strip()
@@ -89,6 +98,35 @@ class SiteConfigForm(FlaskForm):
             for item in val:
                 if not isinstance(item, str):
                     raise ValidationError(f"All quotes must be strings (error in set '{name}').")
+
+    def _validate_permissions(self, field, kind):
+        # helper used by both department and user validators; "self" is the form
+        raw = (field.data or "").strip()
+        if not raw:
+            return
+        try:
+            import json as _json
+
+            parsed = _json.loads(raw)
+        except Exception:
+            raise ValidationError(f"{kind} permissions must be valid JSON.")
+        if not isinstance(parsed, dict):
+            raise ValidationError(f"{kind} permissions must be a JSON object mapping keys to lists.")
+        for name, val in parsed.items():
+            if not (isinstance(name, str) and name):
+                raise ValidationError(f"Invalid key in {kind} permissions: {name}")
+            if not isinstance(val, list):
+                raise ValidationError(f"Value for '{name}' must be a JSON array.")
+            for item in val:
+                if not isinstance(item, str):
+                    raise ValidationError(f"All entries in {kind} permissions must be strings (error for key '{name}').")
+
+    def validate_quote_permissions_dept(form, field):
+        return form._validate_permissions(field, "Department")
+
+    def validate_quote_permissions_user(form, field):
+        return form._validate_permissions(field, "User")
+
     submit = SubmitField("Save Site Config")
 
 
@@ -344,7 +382,11 @@ class BulkDepartmentAssignForm(FlaskForm):
 class FieldVerificationForm(FlaskForm):
     provider = SelectField(
         "Provider",
-        choices=[("inventory", "Inventory Service")],
+        choices=[
+            ("inventory", "Inventory Service"),
+            ("verification", "Realtime tracker / verification integration"),
+            ("api", "Legacy verification API"),
+        ],
         validators=[DataRequired()],
     )
     external_key = StringField("External key", validators=[Optional(), Length(max=200)])

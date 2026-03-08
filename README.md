@@ -60,13 +60,102 @@ and release task to create any missing columns.
 - SSO/OIDC login with optional admin syncing
 - Admin UI for users, departments, workflows, feature flags, site config, etc.
 - Simple external integration layer and webhooks
+- Realtime field verification routing for third-party company trackers via admin-managed verification integration JSON
 - Fly deployment helpers (`make deploy-safe`, `release_tasks.py`)
+
+## Realtime tracker-backed field verification
+
+The app now supports a compatibility layer for third-party realtime data-point trackers that verify request field values before or during request submission.
+
+How it works:
+
+- Create or edit an integration at [app/templates/admin_integrations.html](app/templates/admin_integrations.html) using kind `verification`.
+- Define one or more tracker handles under `trackers`.
+- Add `routing.rules` to choose a tracker by field key or field contents.
+- Point a form field verification mapping at provider `verification`.
+- Optional field params such as `tracker_handle` can force a specific tracker for one field.
+
+Example verification integration JSON:
+
+```json
+{
+   "provider": "generic_verification",
+   "routing": {
+      "default_tracker": "erp",
+      "rules": [
+         {
+            "name": "Serial lookup",
+            "tracker": "serial_hub",
+            "external_keys": ["serial_number"],
+            "starts_with": ["SN-"]
+         },
+         {
+            "name": "Email lookup",
+            "tracker": "people_directory",
+            "external_keys": ["employee_email"],
+            "contains": ["@"]
+         }
+      ]
+   },
+   "trackers": {
+      "erp": {
+         "endpoints": {
+            "base_url": "https://erp.example.com",
+            "validate": "/api/verify"
+         },
+         "auth": {
+            "type": "token",
+            "token_env": "ERP_VERIFY_TOKEN"
+         },
+         "request": {
+            "method": "GET",
+            "payload_location": "query",
+            "query_template": {
+               "value": "{value}",
+               "field": "{external_key}"
+            }
+         },
+         "response": {
+            "ok_path": "ok",
+            "detail_path": "details",
+            "reason_path": "reason"
+         }
+      }
+   }
+}
+```
+
+Supported routing matchers in `routing.rules`:
+
+- `external_keys`
+- `equals` / `equals_any`
+- `contains` / `contains_any`
+- `starts_with` / `starts_with_any`
+- `ends_with` / `ends_with_any`
+- `regex`
+- `min_length` / `max_length`
+- `option_matches` for rule selection from extra params
 
 ## Deployment
 
 Deployments use Fly.  `make deploy-safe` runs tests locally, builds a container,
 and pushes it to Fly.  The container’s release command runs
 `python scripts/release_tasks.py` to automatically fix schema mismatches.
+
+Fly polish already included in this repo:
+
+- `fly.toml` points readiness checks at `/health`
+- `Dockerfile` runs the app on port `8080`
+- `scripts/entrypoint.sh` waits for the database before serving traffic
+- release tasks run automatically during deploy
+
+Suggested Fly secrets / env for production:
+
+- `SECRET_KEY`
+- `DATABASE_URL`
+- `SESSION_COOKIE_SECURE=True`
+- `PREFERRED_URL_SCHEME=https`
+- any tracker auth env vars referenced by verification integrations, such as `ERP_VERIFY_TOKEN`
 
 ## Changelog
 

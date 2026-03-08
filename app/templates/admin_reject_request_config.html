@@ -1,14 +1,12 @@
 {% extends "base.html" %}
+{% from 'admin/_macros.html' import toggle_checkbox %}
 
 {% block content %}
   <h2>Reject Request Settings</h2>
   <form method="post">
     {{ form.hidden_tag() }}
 
-    <div class="form-check mb-3">
-      {{ form.enabled(class_='form-check-input') }}
-      {{ form.enabled.label(class_='form-check-label') }}
-    </div>
+    {{ toggle_checkbox(form.enabled, 'Disable reject request', 'Enable reject request') }}
 
     <div class="mb-3">
       {{ form.button_label.label(class_='form-label') }}

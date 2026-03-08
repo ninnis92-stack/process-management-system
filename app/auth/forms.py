@@ -10,6 +10,7 @@ class LoginForm(FlaskForm):
 
 class SettingsForm(FlaskForm):
     dark_mode = BooleanField("Enable dark mode")
-    vibe_index = SelectField("Theme", coerce=int, choices=[])
-    quote_set = SelectField("Quote set", coerce=str, choices=[])
+    vibe_index = SelectField("Theme", coerce=int, choices=[], validate_choice=False)
+    quote_set = SelectField("Quote set", coerce=str, choices=[], validate_choice=False)
+    quotes_enabled = BooleanField("Show rotating quotes", default=True)
     submit = SubmitField("Save settings")

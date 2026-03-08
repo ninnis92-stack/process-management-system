@@ -106,6 +106,8 @@ def run_single_field_verification(field: FormField, rule, value):
     result.setdefault("provider", provider)
     result.setdefault("external_key", external_key)
     result.setdefault("type", "external_lookup")
+    if provider in ("verification", "tracker", "realtime_tracker", "third_party_tracker") or str(provider).startswith("tracker:"):
+        result.setdefault("type", "tracker_lookup")
     result.setdefault("triggers_auto_reject", bool(rule.get("triggers_auto_reject")))
     return result
 

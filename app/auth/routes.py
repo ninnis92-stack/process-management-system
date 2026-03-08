@@ -321,15 +321,31 @@ def settings():
 
         cfg = SiteConfig.get()
         sets = list(cfg.rolling_quote_sets.keys()) if cfg and cfg.rolling_quote_sets else list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
+        # apply permission limits similar to context processor
+        perms = cfg.parsed_quote_permissions if cfg else {"departments":{},"users":{}}
+        allowed = None
+        dept = getattr(current_user, 'department', None)
+        if dept and perms.get('departments', {}).get(dept):
+            allowed = set(perms['departments'][dept])
+        userperm = perms.get('users', {}).get(current_user.email)
+        if userperm:
+            up = set(userperm)
+            allowed = up if allowed is None else allowed.intersection(up)
+        if allowed is not None:
+            sets = [s for s in sets if s in allowed]
     except Exception:
         sets = list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
     # simple label = key
-    form.quote_set.choices = [(s, s.capitalize()) for s in sets]
+    form.quote_set.choices = [("", "(use site default)")] + [
+        (s, s.capitalize()) for s in sets
+    ]
     if form.validate_on_submit():
         try:
             u = db.session.get(User, current_user.id)
             if u:
-                u.dark_mode = bool(form.dark_mode.data)
+                if 'dark_mode_present' in request.form or 'dark_mode' in request.form:
+                    submitted = (request.form.get('dark_mode') or '').strip().lower()
+                    u.dark_mode = submitted not in ('', '0', 'false', 'off', 'no')
                 # Determine whether an external/imported theme is active; when
                 # an external theme is present, we do not persist per-user vibe.
                 external_theme_loaded = False
@@ -352,13 +368,22 @@ def settings():
                 # Only persist the user's vibe choice when external theme is not loaded
                 if not external_theme_loaded and hasattr(form, 'vibe_index'):
                     try:
-                        u.vibe_index = int(form.vibe_index.data)
+                        if 'vibe_index' in request.form:
+                            u.vibe_index = int(form.vibe_index.data)
                     except Exception:
                         pass
                 # persist the user's quote set preference (may be None/empty)
                 if hasattr(form, 'quote_set'):
                     try:
-                        u.quote_set = form.quote_set.data or None
+                        if 'quote_set' in request.form:
+                            u.quote_set = form.quote_set.data or None
+                    except Exception:
+                        pass
+                if hasattr(form, 'quotes_enabled'):
+                    try:
+                        if 'quotes_enabled_present' in request.form or 'quotes_enabled' in request.form:
+                            submitted = (request.form.get('quotes_enabled') or '').strip().lower()
+                            u.quotes_enabled = submitted not in ('', '0', 'false', 'off', 'no')
                     except Exception:
                         pass
                 db.session.add(u)
@@ -486,7 +511,8 @@ def login():
             pass
     if form.validate_on_submit():
         try:
-            user = User.query.filter_by(email=form.email.data.strip().lower()).first()
+            email = (form.email.data or "").strip().lower()
+            user = User.query.filter(db.func.lower(User.email) == email).first()
         except OperationalError as err:
             try:
                 current_app.logger.exception("Database unavailable during login")
@@ -599,7 +625,7 @@ def login():
 
 
 # ---------- Logout ----------
-@auth_bp.route("/logout", methods=["POST"])
+@auth_bp.route("/logout", methods=["GET", "POST"])
 @login_required
 def logout():
     # Persist the last active department (if any) for this user so it can be

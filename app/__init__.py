@@ -426,6 +426,12 @@ def create_app():
 
             # site config (singleton)
             try:
+                quote_user = None
+                try:
+                    if current_user.is_authenticated:
+                        quote_user = db.session.get(User, current_user.id)
+                except Exception:
+                    quote_user = None
                 cfg = SiteConfig.get()
                 banner_html = cfg.banner_html or ""
                 try:
@@ -436,14 +442,41 @@ def create_app():
                     pass
                 rolling_quotes_enabled = bool(cfg.rolling_quotes_enabled)
                 rolling_quotes = cfg.rolling_quotes or []
-                # allow per-user override of the active set
-                try:
-                    if current_user.is_authenticated and getattr(current_user, 'quote_set', None):
-                        user_set = current_user.quote_set
-                        if user_set and cfg and cfg.rolling_quote_sets and user_set in cfg.rolling_quote_sets:
-                            rolling_quotes = cfg.rolling_quote_sets.get(user_set, [])
-                except Exception:
-                    pass
+                # allow user to disable quotes entirely
+                if quote_user and getattr(quote_user, 'quotes_enabled', True) is False:
+                    rolling_quotes = []
+                else:
+                    # apply admin permissions: restrict allowed quote sets by department/user
+                    try:
+                        perms = cfg.parsed_quote_permissions
+                        allowed = None
+                        if quote_user:
+                            dept = getattr(quote_user, 'department', None)
+                            if dept and perms.get('departments', {}).get(dept):
+                                allowed = set(perms['departments'][dept])
+                            userperm = perms.get('users', {}).get(getattr(quote_user, 'email', None))
+                            if userperm:
+                                up = set(userperm)
+                                allowed = up if allowed is None else allowed.intersection(up)
+                        # if allowed list defined, filter rolling_quote_sets accordingly
+                        if allowed is not None and cfg and cfg.rolling_quote_sets:
+                            # prune out disallowed sets from the cfg
+                            valid_keys = [k for k in cfg.rolling_quote_sets.keys() if k in allowed]
+                            if valid_keys:
+                                # update rolling_quotes to default or override later
+                                # update cfg.rolling_quote_sets copy for selection
+                                filtered = {k: v for k, v in cfg.rolling_quote_sets.items() if k in valid_keys}
+                                rolling_quotes = filtered.get(cfg.active_quote_set or 'default', [])
+                    except Exception:
+                        pass
+                    # allow per-user override of the active set if still valid
+                    try:
+                        if quote_user and getattr(quote_user, 'quote_set', None):
+                            user_set = quote_user.quote_set
+                            if user_set and cfg and cfg.rolling_quote_sets and user_set in cfg.rolling_quote_sets:
+                                rolling_quotes = cfg.rolling_quote_sets.get(user_set, [])
+                    except Exception:
+                        pass
                 if getattr(cfg, "logo_filename", None):
                     try:
                         logo = url_for("static", filename=cfg.logo_filename)

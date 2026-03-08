@@ -325,7 +325,9 @@
 
   <!-- User state provided via data attributes on <body> to avoid JS parser diagnostics in templates -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+  {% if rolling_quotes %}
   <script id="rolling-quotes-data" type="application/json" defer>{{ rolling_quotes|tojson }}</script>
+  {% endif %}
   <script src="{{ url_for('static', filename='app.js', v='20260308a') }}" defer></script>
   <script>
     (function(){
@@ -480,6 +482,18 @@
         });
       });
     })();
+  </script>
+  <!-- dynamic toggle labels -->
+  <script>
+    document.querySelectorAll('.form-check-input[data-toggle-text-on]').forEach(cb=>{
+      var lbl = cb.closest('.form-check') && cb.closest('.form-check').querySelector('.form-check-label');
+  if (lbl == null) return;
+  var on = cb.dataset.toggleTextOn;
+  var off = cb.dataset.toggleTextOff;
+  var upd = ()=> lbl.textContent = cb.checked ? on : off;
+  cb.addEventListener('change', upd);
+  upd();
+});
   </script>
 </body>
 </html>

@@ -26,7 +26,15 @@ if not hasattr(hashlib, "scrypt"):
 
 @pytest.fixture(scope="function")
 def app(monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    # To avoid the per-connection isolation of SQLite in-memory databases we
+    # instead use a temporary file-backed database for each test.  This ensures
+    # that client requests, teardown hooks, and the test harness all see the
+    # same data without worrying about pooling behavior.  The temporary file is
+    # removed when the fixture completes.
+    import tempfile
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{path}")
     monkeypatch.setenv("AUTO_CREATE_DB", "True")
 
     application = create_app()
@@ -35,6 +43,13 @@ def app(monkeypatch):
         WTF_CSRF_ENABLED=False,
         SERVER_NAME="localhost",
     )
+    # store the path on the app so the teardown block can remove it later
+    application._test_sqlite_path = path
+
+    # The `poolclass` setting must be interpreted by SQLAlchemy; the simple
+    # string above is converted to StaticPool in the app factory so we don't
+    # have to import it here and risk circular imports.  (The factory handles
+    # this pattern elsewhere.)
 
     with application.app_context():
         if NotOpenSSLWarning:
@@ -43,6 +58,11 @@ def app(monkeypatch):
         yield application
         db.session.remove()
         db.drop_all()
+    # cleanup the temporary sqlite file
+    try:
+        os.unlink(application._test_sqlite_path)
+    except Exception:
+        pass
 
 
 @pytest.fixture(scope="function")

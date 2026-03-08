@@ -31,10 +31,11 @@ def test_user_can_select_quote_set(app, client):
     rv = login(client)
     assert rv.status_code == 200
 
-    # load settings page and verify quote_set field present
+    # load settings page and verify quote_set field and toggle present
     rv = client.get("/auth/settings")
     assert rv.status_code == 200
     assert b"Rolling Quote Set" in rv.data
+    assert b"Show rotating quotes" in rv.data
 
     # select the engineering set and save
     rv = client.post(
@@ -61,3 +62,13 @@ def test_user_can_select_quote_set(app, client):
     assert rv.status_code == 200
     # default set includes "Sort today" phrase
     assert b"Sort today: socks first" in rv.data
+
+    # now disable quotes entirely and verify dashboard hides them
+    rv = client.post(
+        "/auth/settings",
+        data={"quotes_enabled": ""},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    rv = client.get("/dashboard")
+    assert b"rolling-quotes-data" not in rv.data

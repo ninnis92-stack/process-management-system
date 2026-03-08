@@ -42,6 +42,10 @@
       <code>exists</code>, <code>valid</code>, <code>populated</code>, or <code>found</code>
       set to <code>false</code>.
     </div>
+    <div class="alert alert-info mt-2 mb-0">
+      <div><strong>Realtime tracker routing</strong></div>
+      <div class="small mt-2">Use provider <code>verification</code> to route field values into the enabled department verification integration. Add params such as <code>{"tracker_handle": "erp"}</code> to pin a tracker, or let the integration's <code>routing.rules</code> choose a tracker by <code>external_keys</code>, <code>contains</code>, <code>starts_with</code>, <code>ends_with</code>, or <code>regex</code>.</div>
+    </div>
     <div class="alert alert-secondary mt-2 mb-0">
       <div><strong>Example response shapes</strong></div>
       <pre class="mb-0 mt-2">{"ok": true, "details": {"stock_count": 12}}

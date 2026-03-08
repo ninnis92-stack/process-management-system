@@ -31,7 +31,7 @@
     <div class="mb-3 mt-2">
       {{ form.config_json.label }}
       {{ form.config_json(class_='form-control', rows=6) }}
-      <div class="form-text">Use the scaffolded JSON contract below as the compatibility layer for future providers. Keep provider-specific values inside this object so new connectors can reuse the same structure.</div>
+      <div class="form-text">Use the scaffolded JSON contract below as the compatibility layer for future providers. Keep provider-specific values inside this object so new connectors can reuse the same structure. Verification integrations now support named tracker handles plus routing rules that choose a tracker based on field keys and field contents.</div>
     </div>
     <div class="mb-3">
       <button type="button" class="btn btn-outline-secondary btn-sm" id="loadIntegrationScaffold">Load starter scaffold</button>
@@ -46,6 +46,9 @@
   <section class="surface-panel">
     <h5 class="section-title">Compatibility scaffold</h5>
     <pre id="integrationScaffoldPreview" class="bg-light p-3 border rounded small mb-0">{{ (scaffold.default_config if scaffold else {})|tojson(indent=2) }}</pre>
+    {% if scaffold and scaffold.label == 'Verification' %}
+      <div class="form-text mt-3">Tip: define tracker handles under <code>trackers</code> and route values with <code>routing.rules</code>. Example matchers include <code>external_keys</code>, <code>contains</code>, <code>starts_with</code>, and <code>regex</code>.</div>
+    {% endif %}
   </section>
 
   <script>

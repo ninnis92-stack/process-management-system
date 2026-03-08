@@ -2,7 +2,7 @@ from werkzeug.security import generate_password_hash
 
 from app import create_app
 from app.extensions import db
-from app.models import User, Request as ReqModel, WebhookSubscription
+from app.models import User, Request as ReqModel, WebhookSubscription, FormTemplate, FormField, IntegrationConfig
 from datetime import datetime, timedelta
 from app.services.integrations import get_integration_scaffold, normalize_integration_config
 
@@ -101,3 +101,73 @@ def test_admin_integration_edit_shows_scaffold(client, app):
     assert rv.status_code == 200
     assert b"Load starter scaffold" in rv.data
     assert b"generic_ticketing" in rv.data or b"generic_webhook" in rv.data
+
+
+def test_api_template_verify_uses_tracker_integration(client, app, monkeypatch):
+    import importlib
+    import api.index as api_index
+
+    api_index = importlib.reload(api_index)
+    api_app = api_index.app
+
+    class DummyHTTPResponse:
+        def __init__(self, payload, status_code=200):
+            self._payload = payload
+            self.status_code = status_code
+            self.ok = 200 <= status_code < 300
+            self.text = str(payload)
+
+        def json(self):
+            return self._payload
+
+    with api_app.app_context():
+        admin = User(
+            email="verify-api-admin@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+        template = FormTemplate(name="API Verify Template", description="Template verify")
+        db.session.add(template)
+        db.session.commit()
+        template_id = template.id
+
+        field = FormField(
+            template_id=template.id,
+            name="badge_id",
+            label="Badge ID",
+            field_type="text",
+            required=True,
+            verification={"provider": "verification", "external_key": "badge_id", "params": {"department": "A"}},
+        )
+        db.session.add(field)
+
+        cfg = IntegrationConfig(
+            department="A",
+            kind="verification",
+            enabled=True,
+            config='{"trackers": {"default": {"endpoints": {"base_url": "https://directory.example.com", "validate": "/check"}, "request": {"method": "GET", "payload_location": "query", "query_template": {"badge": "{value}"}}, "response": {"ok_path": "ok", "detail_path": "details"}}}}',
+        )
+        db.session.add(cfg)
+        db.session.commit()
+
+    monkeypatch.setattr(
+        "requests.sessions.Session.request",
+        lambda self, method, url, **kwargs: DummyHTTPResponse({"ok": True, "details": {"badge": kwargs.get("params", {}).get("badge")}}),
+    )
+
+    api = api_app.test_client()
+    headers = {"X-Api-Key": "test-key"}
+    rv = api.post(
+        f"/api/templates/{template_id}/verify",
+        json={"badge_id": "B-100"},
+        headers=headers,
+    )
+    assert rv.status_code == 200
+    body = rv.get_json()
+    assert body["results"]["badge_id"]["ok"] is True
+    assert body["results"]["badge_id"]["details"]["badge"] == "B-100"

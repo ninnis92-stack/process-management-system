@@ -14,3 +14,10 @@
     {% endif %}
   </section>
 {% endmacro %}
+
+{% macro toggle_checkbox(field, on_label, off_label) %}
+  <div class="form-check mb-3">
+    {{ field(class_='form-check-input', **{'data-toggle-text-on': on_label, 'data-toggle-text-off': off_label}) }}
+    <label class="form-check-label">{{ on_label if field.data else off_label }}</label>
+  </div>
+{% endmacro %}

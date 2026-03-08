@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from 'admin/_macros.html' import toggle_checkbox %}
 
 {% block content %}
   <div class="card">
@@ -7,13 +8,17 @@
     </div>
     <div class="card-body">
       {% set dark_mode_enabled = form.dark_mode.data if form.dark_mode.data is not none else current_user.dark_mode %}
-      <form method="post" action="{{ url_for('auth.settings') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% set quotes_enabled = form.quotes_enabled.data if form.quotes_enabled.data is not none else current_user.quotes_enabled %}
+        <form method="post" action="{{ url_for('auth.settings') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="dark_mode_present" value="1">
+          <input type="hidden" name="quotes_enabled_present" value="1">
 
-        <div class="form-check mb-3">
-          <input class="form-check-input" type="checkbox" id="dark_mode" name="dark_mode" value="1" {% if current_user.dark_mode %}checked{% endif %}>
-          <label class="form-check-label" for="dark_mode" id="darkModeLabel">{{ 'Disable dark mode' if dark_mode_enabled else 'Enable dark mode' }}</label>
-        </div>
+          <div class="form-check mb-3">
+            {{ form.dark_mode(class_='form-check-input') }}
+            <label class="form-check-label" for="dark_mode" id="darkModeLabel">{{ 'Disable dark mode' if dark_mode_enabled else 'Enable dark mode' }}</label>
+          </div>
+          {{ toggle_checkbox(form.quotes_enabled, 'Hide rotating quotes', 'Show rotating quotes') }}
 
         {% set external_theme = (active_theme_css or site_theme_preset != 'default') %}
         {% if not external_theme and form.vibe_index %}
@@ -32,7 +37,6 @@
           <div class="mb-3">
             <label for="quote_set" class="form-label">Rolling Quote Set</label>
             <select class="form-select" id="quote_set" name="quote_set">
-              <option value="">(use site default)</option>
               {% for val, label in form.quote_set.choices %}
                 <option value="{{ val }}" {% if (current_user.quote_set is not none and current_user.quote_set == val) or (form.quote_set.data is not none and form.quote_set.data == val) %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -63,4 +67,5 @@
       syncDarkModeText();
     })();
   </script>
+
 {% endblock %}

@@ -438,6 +438,20 @@ def site_config():
             )
 
     form = SiteConfigForm(obj=cfg)
+    # regardless of request method, populate active_quote_set choices so that
+    # validation succeeds on POST even when the admin is changing the value.  A
+    # failing validation here previously caused "Not a valid choice" and made
+    # the page render again without the success flash.
+    try:
+        keys = list((getattr(cfg, "rolling_quote_sets", {}) or {}).keys())
+        if not keys:
+            keys = list(cfg.rolling_quote_sets.keys()) if cfg else ['default']
+        if 'default' not in keys:
+            keys.insert(0, 'default')
+        form.active_quote_set.choices = [(k, k.title()) for k in keys]
+    except Exception:
+        form.active_quote_set.choices = [('default', 'Default')]
+
     if flask_request.method == "GET" and cfg:
         form.brand_name.data = getattr(cfg, "brand_name", None)
         form.theme_preset.data = getattr(cfg, "theme_preset", "default") or "default"
@@ -457,8 +471,20 @@ def site_config():
             form.rolling_quote_sets.data = json.dumps(sets, indent=2)
         except Exception:
             form.rolling_quote_sets.data = None
+        # load permissions JSON if available
         try:
-            # populate choices for active set selector
+            perms = getattr(cfg, "quote_permissions", None)
+            if perms:
+                parsed = json.loads(perms)
+                dept = parsed.get("departments")
+                user = parsed.get("users")
+                form.quote_permissions_dept.data = json.dumps(dept or {}, indent=2)
+                form.quote_permissions_user.data = json.dumps(user or {}, indent=2)
+        except Exception:
+            form.quote_permissions_dept.data = None
+            form.quote_permissions_user.data = None
+        try:
+            # populate choices for active set selector (also refresh data value)
             keys = list((getattr(cfg, "rolling_quote_sets", {}) or {}).keys())
             if not keys:
                 keys = list(cfg.rolling_quote_sets.keys()) if cfg else ['default']
@@ -486,9 +512,13 @@ def site_config():
         if "rolling_enabled" in flask_request.form:
             rolling_enabled = True
 
-        rolling_input = form.rolling_quotes.data
-        if not rolling_input:
-            rolling_input = flask_request.form.get("rolling_csv")
+        # only consider updating rolling quotes if admin actually typed or
+        # pasted something into the textarea (or provided the legacy CSV field).
+        rolling_input = None
+        if 'rolling_quotes' in flask_request.form or 'rolling_csv' in flask_request.form:
+            rolling_input = form.rolling_quotes.data
+            if not rolling_input:
+                rolling_input = flask_request.form.get("rolling_csv")
 
         cfg.brand_name = (form.brand_name.data or "").strip() or None
         cfg.theme_preset = (form.theme_preset.data or "default").strip().lower()
@@ -516,23 +546,50 @@ def site_config():
 
         cfg.banner_html = _sanitize_banner_html(banner) or None
         cfg.rolling_quotes_enabled = rolling_enabled
-        cfg.rolling_quotes = rolling_input or None
-        # save named quote sets if provided (expect JSON map string)
+        if rolling_input is not None:
+            # preserve existing quotes when no data submitted
+            cfg.rolling_quotes = rolling_input or None
+        # save named quote sets if provided (expect JSON map string).  only
+        # update the column when the field is actually included in the POST data
+        # so that a simple change to another setting (e.g. active_quote_set) does
+        # not inadvertently clear the existing sets.
         try:
-            if form.rolling_quote_sets.data:
-                parsed = json.loads(form.rolling_quote_sets.data)
-                if isinstance(parsed, dict):
-                    cfg._rolling_quote_sets = json.dumps(parsed)
-                else:
-                    cfg._rolling_quote_sets = None
-            else:
-                cfg._rolling_quote_sets = None
+            # only update when admin has actually provided non-empty JSON in the
+            # textarea; blank submissions (common when changing other settings) should
+            # not erase previously configured sets.
+            if 'rolling_quote_sets' in flask_request.form:
+                raw = form.rolling_quote_sets.data or flask_request.form.get('rolling_quote_sets')
+                if raw and raw.strip():
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict):
+                        cfg._rolling_quote_sets = json.dumps(parsed)
+                    else:
+                        cfg._rolling_quote_sets = None
+                # else: leave existing value alone
         except Exception:
-            cfg._rolling_quote_sets = None
+            # ignore invalid JSON, sanitize on next GET
+            pass
         try:
             cfg.active_quote_set = form.active_quote_set.data or 'default'
         except Exception:
             cfg.active_quote_set = 'default'
+        # handle quote permissions
+        try:
+            perms = {"departments": {}, "users": {}}
+            raw_dept = form.quote_permissions_dept.data or flask_request.form.get('quote_permissions_dept')
+            raw_user = form.quote_permissions_user.data or flask_request.form.get('quote_permissions_user')
+            if raw_dept:
+                imported = json.loads(raw_dept)
+                if isinstance(imported, dict):
+                    perms['departments'] = imported
+            if raw_user:
+                imported = json.loads(raw_user)
+                if isinstance(imported, dict):
+                    perms['users'] = imported
+            cfg.quote_permissions = json.dumps(perms)
+        except Exception:
+            # ignore invalid JSON, sanitize on next GET
+            pass
         try:
             db.session.commit()
             flash("Site configuration saved.", "success")

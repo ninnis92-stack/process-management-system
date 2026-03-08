@@ -8,6 +8,7 @@ from app.models import (
     FieldVerification,
     Submission,
     Attachment,
+    IntegrationConfig,
 )
 from app.extensions import db
 
@@ -18,6 +19,17 @@ class DummyInv:
 
     def validate_sales_list_number(self, n):
         return n == "SKU-1"
+
+
+class DummyHTTPResponse:
+    def __init__(self, payload, status_code=200):
+        self._payload = payload
+        self.status_code = status_code
+        self.ok = 200 <= status_code < 300
+        self.text = str(payload)
+
+    def json(self):
+        return self._payload
 
 
 def test_field_verification_inventory(app, client, monkeypatch):
@@ -174,3 +186,146 @@ def test_bulk_separated_field_verification_and_hint(app, client, monkeypatch):
     assert result2.get("bulk") is True
     assert result2.get("ok") is False
     assert [item.get("ok") for item in result2.get("items", [])] == [True, False]
+
+
+def test_field_verification_routes_to_tracker_handle_by_content(app, client, monkeypatch):
+        u = User(
+                email="tracker@example.com",
+                name="Tracker",
+                department="A",
+                is_active=True,
+                password_hash=generate_password_hash("password"),
+        )
+        db.session.add(u)
+        db.session.commit()
+
+        rv = client.post(
+                "/auth/login",
+                data={"email": "tracker@example.com", "password": "password"},
+                follow_redirects=True,
+        )
+        assert rv.status_code in (200, 302)
+
+        t = FormTemplate(name="Tracker Template", description="Realtime tracker test")
+        db.session.add(t)
+        db.session.commit()
+        f = FormField(
+                template_id=t.id,
+                name="employee_identifier",
+                label="Employee Identifier",
+                field_type="text",
+                required=True,
+        )
+        db.session.add(f)
+        db.session.commit()
+
+        a = DepartmentFormAssignment(template_id=t.id, department_name="A")
+        db.session.add(a)
+        db.session.commit()
+
+        fv = FieldVerification(
+                field_id=f.id,
+                provider="verification",
+                external_key="employee_identifier",
+        )
+        db.session.add(fv)
+        db.session.commit()
+
+        cfg = IntegrationConfig(
+                department="A",
+                kind="verification",
+                enabled=True,
+                config="""
+                {
+                    "provider": "generic_verification",
+                    "routing": {
+                        "default_tracker": "erp",
+                        "rules": [
+                            {
+                                "name": "ACME IDs",
+                                "tracker": "acme",
+                                "external_keys": ["employee_identifier"],
+                                "starts_with": ["ACME-"]
+                            }
+                        ]
+                    },
+                    "trackers": {
+                        "erp": {
+                            "endpoints": {
+                                "base_url": "https://erp.example.com",
+                                "validate": "/verify"
+                            },
+                            "request": {
+                                "method": "GET",
+                                "payload_location": "query",
+                                "query_template": {"value": "{value}", "field": "{external_key}"}
+                            },
+                            "response": {
+                                "ok_path": "ok",
+                                "detail_path": "details"
+                            }
+                        },
+                        "acme": {
+                            "endpoints": {
+                                "base_url": "https://acme.example.com",
+                                "validate": "/verify"
+                            },
+                            "request": {
+                                "method": "GET",
+                                "payload_location": "query",
+                                "query_template": {"identifier": "{value}"}
+                            },
+                            "response": {
+                                "ok_path": "valid",
+                                "detail_path": "payload"
+                            }
+                        }
+                    }
+                }
+                """,
+        )
+        db.session.add(cfg)
+        db.session.commit()
+
+        calls = []
+
+        def fake_request(self, method, url, **kwargs):
+                calls.append({"method": method, "url": url, "kwargs": kwargs})
+                if "acme.example.com" in url:
+                        return DummyHTTPResponse({"valid": True, "payload": {"source": "acme"}})
+                return DummyHTTPResponse({"ok": True, "details": {"source": "erp"}})
+
+        monkeypatch.setattr("requests.sessions.Session.request", fake_request)
+
+        rv = client.post(
+                "/requests/new",
+                data={"employee_identifier": "ACME-42", "due_at": "2030-01-01"},
+                follow_redirects=True,
+        )
+        assert rv.status_code in (200, 302)
+
+        sub = Submission.query.order_by(Submission.created_at.desc()).first()
+        assert sub is not None
+        result = sub.data.get("_verifications", {}).get("employee_identifier", {})
+        assert result.get("ok") is True
+        assert result.get("tracker_handle") == "acme"
+        assert result.get("matched_rule") == "ACME IDs"
+        assert result.get("details", {}).get("source") == "acme"
+        assert calls[-1]["url"] == "https://acme.example.com/verify"
+        assert calls[-1]["kwargs"]["params"]["identifier"] == "ACME-42"
+
+        rv = client.post(
+                "/requests/new",
+                data={"employee_identifier": "EMP-7", "due_at": "2030-01-01"},
+                follow_redirects=True,
+        )
+        assert rv.status_code in (200, 302)
+
+        sub2 = Submission.query.order_by(Submission.created_at.desc()).first()
+        assert sub2 is not None
+        result2 = sub2.data.get("_verifications", {}).get("employee_identifier", {})
+        assert result2.get("ok") is True
+        assert result2.get("tracker_handle") == "erp"
+        assert result2.get("details", {}).get("source") == "erp"
+        assert calls[-1]["url"] == "https://erp.example.com/verify"
+        assert calls[-1]["kwargs"]["params"]["value"] == "EMP-7"
