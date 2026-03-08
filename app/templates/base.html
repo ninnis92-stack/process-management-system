@@ -546,5 +546,35 @@
       upd();
     });
   </script>
+  <!-- preserve toggle state in session storage so page refreshes retain user selections -->
+  <script>
+    (function(){
+      const storageKey = 'toggle_states';
+      const path = location.pathname;
+      function restore(){
+        try{
+          const all = JSON.parse(sessionStorage.getItem(storageKey)||'{}');
+          const saved = all[path];
+          if(saved && Array.isArray(saved)){
+            saved.forEach(s=>{
+              const cb = document.querySelector(`.form-check-input[name="${s.name}"]`);
+              if(cb) cb.checked = s.checked;
+            });
+          }
+        }catch(e){}
+      }
+      function save(){
+        try{
+          const all = JSON.parse(sessionStorage.getItem(storageKey)||'{}');
+          const list = Array.from(document.querySelectorAll('.form-check-input[data-toggle-text-on]')).map(cb=>({name:cb.name,checked:cb.checked}));
+          all[path] = list;
+          sessionStorage.setItem(storageKey, JSON.stringify(all));
+        }catch(e){}
+      }
+      document.addEventListener('DOMContentLoaded', restore);
+      const form = document.querySelector('form');
+      if(form) form.addEventListener('submit', save);
+    })();
+  </script>
 </body>
 </html>

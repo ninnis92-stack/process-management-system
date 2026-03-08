@@ -161,3 +161,14 @@ def test_hero_dashboard_button_targets_match_view_context(app, client):
     assert 'data-state-close-label="Close staff dashboard"' in staff_html
     assert 'data-state-open-url="/dashboard"' in staff_html
     assert 'data-state-close-url="/admin/"' in staff_html
+
+
+def test_toggle_persistence_script_present(client, app):
+    # feature flags page should include our session-storage persistence logic
+    _create_user(app, email="script-admin@example.com", is_admin=True)
+    _login(client, "script-admin@example.com")
+    rv = client.get("/admin/feature_flags")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+    assert 'toggle_states' in html  # key used by script
+    assert 'sessionStorage' in html  # ensure storage logic is included
