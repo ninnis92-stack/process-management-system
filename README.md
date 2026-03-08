@@ -168,6 +168,7 @@ admin site config for quick sanity checks against any environment.
 - Ran `bash scripts/smoke_test.sh https://process-management-prototype-lingering-bush-6175.fly.dev` (home, `/admin/site_config`, `/dashboard`) and confirmed the basic endpoints returned HTTP 200/redirects.
 - Cleaned local state afterward with `make smoke-clean`, which deletes `instance/app.db` so future dev runs start from a fresh SQLite file.
 - Checked readiness with `curl -fsS https://process-management-prototype-lingering-bush-6175.fly.dev/ready`; the response reported `database.status:ok`, showing the Fly health and Postgres connectivity are passing.
+- During the release command the `user.show_hints` migration previously logged a Postgres `DATATYPE_MISMATCH` because it defaulted to `1`; the migration now uses `server_default=sa.text('TRUE')` so future deployments will complete the ALTER without error.
 
 ---
 

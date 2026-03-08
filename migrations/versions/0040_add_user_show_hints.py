@@ -21,7 +21,7 @@ def upgrade():
     if 'show_hints' not in cols:
         op.add_column(
             'user',
-            sa.Column('show_hints', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+            sa.Column('show_hints', sa.Boolean(), nullable=False, server_default=sa.text('TRUE')),
         )
         # remove server default after backfilling
         op.alter_column('user', 'show_hints', server_default=None)
