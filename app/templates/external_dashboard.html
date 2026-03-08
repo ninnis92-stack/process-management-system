@@ -12,7 +12,7 @@
   {{ helper_card('Use the same email from submission', 'The email must match the one used when the guest request was created.', '📧') }}
   {{ helper_card('Tracking links still work directly', 'If you saved the original tracking link, opening it is still the quickest path back to the request.', '🔗') }}
 </section>
-<form method="post" class="surface-panel guest-dashboard-form" style="max-width: 480px;">
+<form method="post" class="surface-panel guest-dashboard-form">
   {{ form.hidden_tag() }}
   <div class="mb-3">
     <label class="form-label">Request Number</label>

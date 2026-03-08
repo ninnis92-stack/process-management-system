@@ -5,15 +5,15 @@
 <section class="surface-panel list-surface">
   <ul class="list-group list-group-flush">
   {% for b in buckets %}
-    <li class="list-group-item d-flex justify-content-between align-items-center">
+    <li class="list-group-item d-flex justify-content-between align-items-center gap-3 flex-wrap">
       <div>
         <strong>{{ b.name }}</strong>
         {% if b.department_name %}<br/><small class="text-muted">Dept: {{ b.department_name }}</small>{% endif %}
       </div>
-      <div>
+      <div class="admin-actions-group">
         <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.buckets_edit', bucket_id=b.id) }}">Edit</a>
-        <form method="post" action="{{ url_for('admin.buckets_delete', bucket_id=b.id) }}" style="display:inline" onsubmit="return confirm('Delete bucket?');">
-          <button class="btn btn-sm btn-danger">Delete</button>
+        <form method="post" action="{{ url_for('admin.buckets_delete', bucket_id=b.id) }}" class="admin-inline-form" onsubmit="return confirm('Delete bucket?');">
+          <button class="btn btn-sm btn-outline-danger">Delete</button>
         </form>
       </div>
     </li>

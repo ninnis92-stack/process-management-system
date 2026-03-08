@@ -214,7 +214,7 @@ class Config:
 
     # Redis connection URL used for caching and background queues. If not
     # provided, the app will continue running without cache (graceful).
-    REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+    REDIS_URL = os.getenv("REDIS_URL")
 
     # Flask-Caching defaults
     CACHE_DEFAULT_TIMEOUT = int(os.getenv("CACHE_DEFAULT_TIMEOUT", "300"))

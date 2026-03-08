@@ -337,7 +337,7 @@ def create_app():
         return
 
     from .auth.routes import auth_bp
-    from .requests_bp.routes import requests_bp
+    from .requests_bp import requests_bp
     from .external.routes import external_bp
     from .notifications.routes import notifications_bp
     from .admin.routes import admin_bp
@@ -746,12 +746,15 @@ def create_app():
             redis_required = bool(app.config.get("HEALTHCHECK_REDIS_REQUIRED"))
             redis_url = app.config.get("REDIS_URL")
             try:
-                from .extensions import redis_client as _redis_client
+                from .extensions import redis_client as _redis_client, init_redis_client
             except Exception:
                 _redis_client = None
+                init_redis_client = None
 
             if redis_required or redis_url:
                 try:
+                    if _redis_client is None and init_redis_client is not None:
+                        _redis_client = init_redis_client(app)
                     if _redis_client is None:
                         raise RuntimeError("redis client not initialized")
                     _redis_client.ping()

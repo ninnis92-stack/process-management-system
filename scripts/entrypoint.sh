@@ -36,8 +36,22 @@ else
   echo "Warning: DB did not become responsive within ${DB_READY_TIMEOUT}s"
 fi
 
-# Optional seeding on boot when SEED_ON_BOOT=1
-if [ "${SEED_ON_BOOT:-0}" = "1" ]; then
+# If Redis is configured, wait for Redis readiness too so cache/queue-backed
+# features don't start in a partially unavailable state.
+if [ -n "${REDIS_URL:-}" ]; then
+  REDIS_READY_TIMEOUT=${REDIS_READY_TIMEOUT:-30}
+  REDIS_READY_INTERVAL=${REDIS_READY_INTERVAL:-1}
+  echo "Waiting up to ${REDIS_READY_TIMEOUT}s for Redis readiness..."
+  if python3 scripts/wait_for_redis_ready.py --timeout "$REDIS_READY_TIMEOUT" --interval "$REDIS_READY_INTERVAL"; then
+    echo "Redis is responsive"
+  else
+    echo "Warning: Redis did not become responsive within ${REDIS_READY_TIMEOUT}s"
+  fi
+fi
+
+# Optional seeding on boot when SEED_ON_BOOT=1 (defaults on so restarts keep
+# baseline/demo records available; `seed.py` is idempotent).
+if [ "${SEED_ON_BOOT:-1}" = "1" ]; then
   echo "SEED_ON_BOOT=1: running seed.py (best-effort)"
   # run but don't fail boot if seeding fails
   python3 seed.py || true

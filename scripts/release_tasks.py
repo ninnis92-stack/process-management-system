@@ -142,6 +142,17 @@ def main():
                         )
                     print("schema_fix=notification.read_at_added")
 
+                # ensure user.quote_set column exists (migrations occasionally fail)
+                user_cols = {c["name"] for c in insp.get_columns("user")}
+                if "quote_set" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN quote_set VARCHAR(80)"
+                            )
+                        )
+                    print("schema_fix=user.quote_set_added")
+
                 special_cols = (
                     {c["name"] for c in insp.get_columns("special_email_config")}
                     if "special_email_config" in insp.get_table_names()
@@ -663,15 +674,13 @@ def main():
         except Exception as exc:
             print("schema_fix_failed", exc, file=sys.stderr)
 
-        # If SSO is enabled for this deployment, skip seeding so real SSO
-        # users are authoritative. Otherwise run the local seed to ensure demo
-        # accounts are present for UI/login flows.
-        sso_enabled = bool(app.config.get("SSO_ENABLED"))
-        if sso_enabled:
-            print("SSO enabled; skipping seed")
+        run_seed_on_release = os.getenv("RUN_SEED_ON_RELEASE", "1") == "1"
+        if not run_seed_on_release:
+            print("RUN_SEED_ON_RELEASE=0; skipping seed")
             return
 
-        # Run the idempotent seed script if present
+        # Run the idempotent seed script on every release by default so demo,
+        # admin, and baseline records are always present after deployments.
         try:
             import seed
 

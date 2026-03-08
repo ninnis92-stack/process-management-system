@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from 'admin/_macros.html' import section_heading, helper_card %}
+{% from 'admin/_macros.html' import section_heading, helper_card, meta_badge %}
 {% block content %}
 <section class="page-header">
   <div>
@@ -107,31 +107,34 @@
             <p class="text-muted mb-0">{{ template.description or 'This request form was configured by an admin. Labels, validation, verification, and linked auto-fill behavior all come from the template setup.' }}</p>
           </div>
           <div class="template-intake-summary__meta">
-            <span class="badge text-bg-light">{{ template_spec|length }} configured field{% if template_spec|length != 1 %}s{% endif %}</span>
+            {{ meta_badge(template_spec|length ~ ' configured field' ~ ('s' if template_spec|length != 1 else '')) }}
             {% if template.verification_prefill_enabled %}
-              <span class="badge text-bg-primary">Verification auto-fill enabled</span>
+              {{ meta_badge('Verification auto-fill enabled', 'primary') }}
             {% endif %}
           </div>
         </section>
         {{ section_heading('Additional fields', 'These fields are configured by the admin team for this workflow. Verification-backed fields can validate values and, when enabled, fill in related fields automatically.', compact=True) }}
         {% for section in (template_sections or []) %}
         <section class="template-section-block mb-4">
-          <div class="template-section-block__header">
+          <div class="template-section-block__header" data-section-header>
             <div>
               <div class="eyebrow-label">Configured section</div>
               <h5 class="mb-1">{{ section.name }}</h5>
             </div>
+            <div class="template-section-progress" data-section-progress data-section-name="{{ section.name }}">
+              {{ meta_badge('0 / ' ~ section.fields|length ~ ' complete', 'light', False, None, 'data-section-progress-label') }}
+            </div>
           </div>
-          <div class="row">
+          <div class="row" data-section-body="{{ section.name }}">
           {% for field in section.fields %}
             <div class="col-md-6 mb-3">
-              <div class="dynamic-field-card" data-template-field="{{ field.name }}">
+              <div class="dynamic-field-card" data-template-field="{{ field.name }}" data-section-member="{{ section.name }}" data-field-type="{{ field.field_type }}">
               <label class="form-label">{{ field.label }}{% if field.required %} *{% endif %}</label>
               <div class="dynamic-field-card__badges mb-2">
-                {% if field.required %}<span class="badge rounded-pill text-bg-light">Required</span>{% endif %}
-                {% if field.verification and field.verification.enabled %}<span class="badge rounded-pill text-bg-light">Verified</span>{% endif %}
-                {% if field.verification and field.verification.prefill_enabled %}<span class="badge rounded-pill text-bg-primary">Auto-fills {{ field.verification.prefill_targets|length }} linked field{% if field.verification.prefill_targets|length != 1 %}s{% endif %}</span>{% endif %}
-                {% if field.requirements and field.requirements.enabled %}<span class="badge rounded-pill text-bg-warning">Conditionally required</span>{% endif %}
+                {% if field.required %}{{ meta_badge('Required', 'light', True) }}{% endif %}
+                {% if field.verification and field.verification.enabled %}{{ meta_badge('Verified', 'light', True) }}{% endif %}
+                {% if field.verification and field.verification.prefill_enabled %}{{ meta_badge('Auto-fills ' ~ field.verification.prefill_targets|length ~ ' linked field' ~ ('s' if field.verification.prefill_targets|length != 1 else ''), 'primary', True) }}{% endif %}
+                {% if field.requirements and field.requirements.enabled %}{{ meta_badge('Conditionally required', 'warning', True, field.requirements.summary or '') }}{% endif %}
               </div>
               {% if field.field_type == 'textarea' %}
                 <textarea class="form-control js-template-field" id="dynamic-field-{{ field.name }}" name="{{ field.name }}" rows="4">{{ request.form.get(field.name, '') }}</textarea>
@@ -152,6 +155,7 @@
               {% endif %}
               {% if field.requirements and field.requirements.summary %}
                 <div class="form-text mt-1">Required when {{ field.requirements.summary }}.</div>
+                <div class="form-text mt-1 text-danger requirement-hint d-none" data-field="{{ field.name }}" data-requirement-message="{{ field.requirements.config.message if field.requirements and field.requirements.config and field.requirements.config.message else '' }}">This field is now required.</div>
               {% endif %}
               {% if field.verification and field.verification.prefill_enabled and field.verification.prefill_targets %}
                 <div class="form-text mt-1">When this value verifies successfully, the form can populate: {{ field.verification.prefill_targets|join(', ') }}.</div>

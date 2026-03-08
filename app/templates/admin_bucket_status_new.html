@@ -12,7 +12,9 @@
   {{ form.hidden_tag() }}
   <div class="mb-3">{{ form.status_code.label }}{{ form.status_code(class_='form-control') }}</div>
   <div class="mb-3">{{ form.order.label }}{{ form.order(class_='form-control') }}</div>
-  <button class="btn btn-primary">Add</button>
+  <div class="admin-actions-group">
+    <button class="btn btn-primary">Add</button>
+  </div>
 </form>
 </section>
 {% endblock %}

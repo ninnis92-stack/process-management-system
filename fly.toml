@@ -8,6 +8,8 @@ primary_region = 'ord'
   FLASK_DEBUG = "0"
   AUTO_CREATE_DB = "0"
   WAIT_FOR_DB = "true"
+  RUN_SEED_ON_RELEASE = "1"
+  SEED_ON_BOOT = "1"
 
 [[services]]
   internal_port = 8080

@@ -156,6 +156,9 @@ def test_conditional_requirement_makes_target_field_required(app, client):
     assert rv.status_code == 200
     assert b"Configured section" in rv.data
     assert b"Required when request_reason is filled in" in rv.data
+    # the new JS hint container should also be present (initially hidden)
+    assert b"requirement-hint" in rv.data
+    assert b"data-section-progress-label" in rv.data
 
     rv = client.post(
         "/requests/new",

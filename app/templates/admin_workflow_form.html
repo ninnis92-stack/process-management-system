@@ -1,71 +1,85 @@
 {% extends 'base.html' %}
+{% from 'admin/_macros.html' import page_header, section_heading %}
 
 {% block content %}
-<h2>{% if wf %}Edit{% else %}New{% endif %} Workflow</h2>
+{{ page_header((('Edit' if wf else 'New') ~ ' Workflow'), None, 'New', 'Workflow control', 'Define ordered status steps, department handoffs, and implementation behavior in one editor.') }}
 {% set rendered_spec = editor_spec if editor_spec is defined and editor_spec else (wf.spec if wf and wf.spec else none) %}
-<form method="post">
+<form method="post" class="workflow-editor surface-panel">
   {{ form.hidden_tag() }}
-  <div class="form-group">
-    {{ form.name.label }}
-    {{ form.name(class='form-control') }}
-  </div>
-  <div class="form-group">
-    {{ form.description.label }}
-    {{ form.description(class='form-control', rows=3) }}
-  </div>
-  <div class="form-group">
-    {{ form.department_code.label }}
-    {{ form.department_code(class='form-control') }}
-  </div>
-  <div class="form-group">
-    {{ form.active() }} {{ form.active.label }}
-  </div>
-  <div class="form-group">
-    <label class="form-label">Workflow steps</label>
-    <div id="workflow-steps" class="list-group mb-2" aria-label="Workflow steps">
+  <section>
+    {{ section_heading('Workflow details', 'Set the name, scope, and activation state before editing the step path.', compact=True) }}
+    <div class="workflow-editor__grid">
+      <div>
+        {{ form.name.label(class='form-label') }}
+        {{ form.name(class='form-control') }}
+      </div>
+      <div>
+        {{ form.department_code.label(class='form-label') }}
+        {{ form.department_code(class='form-control') }}
+      </div>
+      <div>
+        <label class="form-label d-block">Availability</label>
+        <label class="form-check admin-toggle-card mb-0">
+          {{ form.active(class='form-check-input') }}
+          <span>
+            <span class="fw-semibold d-block">{{ form.active.label.text }}</span>
+            <span class="small text-muted">Inactive workflows stay configurable without being active in operations.</span>
+          </span>
+        </label>
+      </div>
+    </div>
+    <div class="mt-3">
+      {{ form.description.label(class='form-label') }}
+      {{ form.description(class='form-control', rows=3) }}
+    </div>
+  </section>
+
+  <section>
+    {{ section_heading('Workflow steps', 'Build the ordered handoff path. Move or remove steps before saving.', compact=True) }}
+    <div id="workflow-steps" class="workflow-steps-list mb-2" aria-label="Workflow steps">
       {% if rendered_spec and rendered_spec.steps %}
         {% for s in rendered_spec.steps %}
           {# support legacy step as string or new step as mapping with from_dept/to_dept/status #}
           {% set step = s if s is mapping else ({'status': s} if s is string else {}) %}
-          <div class="list-group-item d-flex align-items-center" data-from-dept="{{ step.from_dept if step.from_dept is defined else '' }}" data-to-dept="{{ step.to_dept if step.to_dept is defined else '' }}" data-status="{{ step.status if step.status is defined else '' }}">
-            <span class="me-2 drag-handle" aria-hidden>≡</span>
-            <select class="form-select form-select-sm me-2 step-from-dept" style="width:120px">
+          <div class="workflow-step-card" data-from-dept="{{ step.from_dept if step.from_dept is defined else '' }}" data-to-dept="{{ step.to_dept if step.to_dept is defined else '' }}" data-status="{{ step.status if step.status is defined else '' }}">
+            <span class="drag-handle" aria-hidden>≡</span>
+            <select class="form-select form-select-sm step-from-dept">
               <option value="">(From)</option>
               <option value="A" {% if step.from_dept is defined and step.from_dept == 'A' %}selected{% endif %}>A</option>
               <option value="B" {% if step.from_dept is defined and step.from_dept == 'B' %}selected{% endif %}>B</option>
               <option value="C" {% if step.from_dept is defined and step.from_dept == 'C' %}selected{% endif %}>C</option>
             </select>
-            <select class="form-select form-select-sm me-2 step-to-dept" style="width:120px">
+            <select class="form-select form-select-sm step-to-dept">
               <option value="">(To)</option>
               <option value="A" {% if step.to_dept is defined and step.to_dept == 'A' %}selected{% endif %}>A</option>
               <option value="B" {% if step.to_dept is defined and step.to_dept == 'B' %}selected{% endif %}>B</option>
               <option value="C" {% if step.to_dept is defined and step.to_dept == 'C' %}selected{% endif %}>C</option>
             </select>
-            <input class="form-control form-control-sm me-2 step-status" style="max-width:220px" placeholder="Status code" value="{{ step.status if step.status is defined else '' }}" list="" />
-            <div class="btn-group ms-2 me-2" role="group" aria-label="Move">
+            <input class="form-control form-control-sm step-status" placeholder="Status code" value="{{ step.status if step.status is defined else '' }}" list="" />
+            <div class="workflow-step-actions btn-group" role="group" aria-label="Move">
               <button type="button" class="btn btn-sm btn-light move-up" title="Move up">▲</button>
               <button type="button" class="btn btn-sm btn-light move-down" title="Move down">▼</button>
             </div>
-            <button type="button" class="btn btn-sm btn-danger remove-step">Remove</button>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-step">Remove</button>
           </div>
         {% endfor %}
       {% endif %}
     </div>
-    <div class="input-group mb-2">
-      <select id="new-step-from" class="form-select" style="width:120px">
+    <div class="workflow-step-builder mb-2">
+      <select id="new-step-from" class="form-select">
         <option value="">(From)</option>
         <option value="A">A</option>
         <option value="B">B</option>
         <option value="C">C</option>
       </select>
-      <select id="new-step-to" class="form-select" style="width:120px">
+      <select id="new-step-to" class="form-select">
         <option value="">(To)</option>
         <option value="A">A</option>
         <option value="B">B</option>
         <option value="C">C</option>
       </select>
-      <input id="new-step-status" class="form-control" style="max-width:220px" placeholder="Status code" list="" />
-      <button id="add-step-btn" type="button" class="btn btn-outline-primary">Add</button>
+      <input id="new-step-status" class="form-control" placeholder="Status code" list="" />
+      <button id="add-step-btn" type="button" class="btn btn-outline-primary">Add step</button>
     </div>
     {{ form.spec_json(class='form-control d-none', id='spec_json') }}
     <script>window.ADMIN_STATUS_OPTIONS = {{ status_options_map|default({})|tojson }};</script>
@@ -73,12 +87,12 @@
     <datalist id="status-options-B"></datalist>
     <datalist id="status-options-C"></datalist>
     <datalist id="status-options-all"></datalist>
-    <small class="form-text text-muted">Use the arrows to reorder steps; they will be serialized to JSON on save.</small>
-  </div>
-  <div class="form-group">
+    <small class="form-text text-muted">Status suggestions follow the selected “to” department. Save to serialize the full workflow JSON.</small>
+  </section>
+  <div class="workflow-editor__footer">
     <button name="action" value="save" class="btn btn-secondary">Save Draft</button>
     <button name="action" value="implement" class="btn btn-primary">Save &amp; Implement</button>
-    <a class="btn btn-link" href="{{ url_for('admin.list_workflows') }}">Cancel</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_workflows') }}">Cancel</a>
   </div>
 </form>
 {% endblock %}
@@ -91,7 +105,7 @@
     if(!list) return;
     // small CSS tweaks to improve affordance and disable text selection on non-interactive parts
     const style = document.createElement('style');
-    style.textContent = '.drag-handle{cursor:default; user-select:none; -webkit-user-select:none; padding-right:8px;} .list-group-item{touch-action:none;} .list-group-item input, .list-group-item button{user-select:text; -webkit-user-select:text;}';
+      style.textContent = '.drag-handle{cursor:default; user-select:none; -webkit-user-select:none; padding-right:8px;} .workflow-step-card{touch-action:none;} .workflow-step-card input, .workflow-step-card select, .workflow-step-card button{user-select:text; -webkit-user-select:text;}';
     document.head.appendChild(style);
 
     try{
@@ -99,7 +113,7 @@
       list.addEventListener('selectstart', function(e){ const interactive = e.target.closest && e.target.closest('a,button,input,textarea,select,label'); if(!interactive) e.preventDefault(); });
 
       function syncSteps(){
-          const items = Array.from(list.querySelectorAll('.list-group-item'));
+        const items = Array.from(list.querySelectorAll('.workflow-step-card'));
         const form = list.closest('form');
         if(!form) return;
         const existing = document.getElementById('steps_hidden_container');
@@ -175,7 +189,7 @@
         });
         // Also include any statuses currently present in the workflow steps
         try{
-          const items = Array.from(document.querySelectorAll('#workflow-steps .list-group-item'));
+          const items = Array.from(document.querySelectorAll('#workflow-steps .workflow-step-card'));
           items.forEach(function(item){
             const statusEl = item.querySelector('.step-status');
             const toEl = item.querySelector('.step-to-dept');
@@ -209,7 +223,7 @@
       function bindStatusInputLists(root){
         // ensure each step's status input has its list attribute bound to the 'to' dept datalist
         const container = root || document;
-        const items = Array.from(container.querySelectorAll('.list-group-item'));
+        const items = Array.from(container.querySelectorAll('.workflow-step-card'));
         items.forEach(function(item){
           const toEl = item.querySelector('.step-to-dept');
           const statusEl = item.querySelector('.step-status');
@@ -245,26 +259,28 @@
       // require at least a status to add
       if(!status) return;
       const el = document.createElement('div');
-      el.className = 'list-group-item d-flex align-items-center';
-      el.innerHTML = '<span class="me-2 drag-handle" aria-hidden>≡</span>' +
-                     '<select class="form-select form-select-sm me-2 step-from-dept" style="width:120px">' +
+      el.className = 'workflow-step-card';
+      el.innerHTML = '<div class="workflow-step-actions">' +
+                       '<span class="drag-handle" aria-hidden>≡</span>' +
+                       '<div class="btn-group" role="group" aria-label="Move">' +
+                         '<button type="button" class="btn btn-sm btn-light move-up" title="Move up">▲</button>' +
+                         '<button type="button" class="btn btn-sm btn-light move-down" title="Move down">▼</button>' +
+                       '</div>' +
+                       '<button type="button" class="btn btn-sm btn-outline-danger remove-step">Remove</button>' +
+                     '</div>' +
+                     '<select class="form-select form-select-sm step-from-dept">' +
                        '<option value="">(From)</option>' +
                        '<option value="A" '+(from==='A'?'selected':'')+'>A</option>' +
                        '<option value="B" '+(from==='B'?'selected':'')+'>B</option>' +
                        '<option value="C" '+(from==='C'?'selected':'')+'>C</option>' +
                      '</select>' +
-                     '<select class="form-select form-select-sm me-2 step-to-dept" style="width:120px">' +
+                     '<select class="form-select form-select-sm step-to-dept">' +
                        '<option value="">(To)</option>' +
                        '<option value="A" '+(to==='A'?'selected':'')+'>A</option>' +
                        '<option value="B" '+(to==='B'?'selected':'')+'>B</option>' +
                        '<option value="C" '+(to==='C'?'selected':'')+'>C</option>' +
                      '</select>' +
-                     '<input class="form-control form-control-sm me-2 step-status" placeholder="Status code" value="'+(status||'')+'">' +
-                     '<div class="btn-group ms-2 me-2" role="group" aria-label="Move">' +
-                       '<button type="button" class="btn btn-sm btn-light move-up" title="Move up">▲</button>' +
-                       '<button type="button" class="btn btn-sm btn-light move-down" title="Move down">▼</button>' +
-                     '</div>' +
-                     '<button type="button" class="btn btn-sm btn-danger remove-step">Remove</button>';
+                     '<input class="form-control form-control-sm step-status" placeholder="Status code" value="'+(status||'')+'">';
       list.appendChild(el);
       // populate datalists and bind the new item's status input
       populateStatusDatalists();
@@ -272,16 +288,35 @@
       document.getElementById('new-step-from').value = '';
       document.getElementById('new-step-to').value = '';
       document.getElementById('new-step-status').value = '';
+      bindStatusInputLists();
       try{ syncSteps(); }catch(e){}
     });
 
+    const newStepTo = document.getElementById('new-step-to');
+    if(newStepTo){
+      newStepTo.addEventListener('change', function(){
+        bindStatusInputLists();
+      });
+    }
+
     // react when a step's 'to' department changes so the status input suggestions follow
     list.addEventListener('change', function(e){
-      const sel = e.target.closest && e.target.closest('.step-to-dept');
-      if(!sel) return;
-      const item = sel.closest('.list-group-item');
+      const item = e.target.closest && e.target.closest('.workflow-step-card');
       if(!item) return;
-      bindStatusInputLists(item);
+      if(e.target.closest('.step-to-dept')){
+        bindStatusInputLists(item);
+        populateStatusDatalists();
+      }
+      try{ syncSteps(); }catch(e){}
+    });
+
+    list.addEventListener('input', function(e){
+      if(!e.target.closest || !e.target.closest('.workflow-step-card')) return;
+      if(e.target.classList && e.target.classList.contains('step-status')){
+        populateStatusDatalists();
+        bindStatusInputLists(list);
+      }
+      try{ syncSteps(); }catch(e){}
     });
 
     list.addEventListener('click', function(e){
@@ -289,12 +324,12 @@
       const up = e.target.closest && e.target.closest('.move-up');
       const down = e.target.closest && e.target.closest('.move-down');
       if(rem){
-        const li = rem.closest('.list-group-item');
+        const li = rem.closest('.workflow-step-card');
         if(li) li.remove();
         try{ syncSteps(); }catch(e){}
       } else if(up || down){
         const btn = up || down;
-        const li = btn.closest('.list-group-item');
+        const li = btn.closest('.workflow-step-card');
         if(!li) return;
         if(up){
           const prev = li.previousElementSibling;

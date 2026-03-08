@@ -38,7 +38,49 @@
       {{ form.message(class='form-control', placeholder='Example: Upload supporting documents when request_type equals instructions.') }}
     </div>
 
+    <!-- friendly rule builder -->
+    <div id="requirementBuilder" class="mb-4">
+      <div class="row rule-row align-items-end">
+        <div class="col-md-5 mb-3">
+          <label class="form-label">Trigger (field or section)</label>
+          <select class="form-select builder-source">
+            <option value="">-- select --</option>
+            {% for f in field_list %}
+              <option value="field|{{ f.name }}">Field: {{ f.label }}</option>
+            {% endfor %}
+            {% for s in section_list %}
+              <option value="section|{{ s }}">Section: {{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label">Operator</label>
+          <select class="form-select builder-operator">
+            <option value="populated">is populated</option>
+            <option value="empty">is empty</option>
+            <option value="equals">equals</option>
+            <option value="not_equals">does not equal</option>
+            <option value="one_of">matches one of</option>
+            <option value="verified">verifies successfully</option>
+            <option value="any_populated">any value in section</option>
+            <option value="all_populated">all values in section</option>
+          </select>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Value(s)</label>
+          <input type="text" class="form-control builder-value" placeholder="comma-separated for one_of" />
+          <div class="form-text small text-muted">Leave blank for operators like populated/empty/verified.</div>
+        </div>
+      </div>
+    </div>
+
     <div class="mb-3">
+      <div class="form-text mb-2">
+        <a href="#" id="toggle-json-rules">Show advanced JSON editor</a>
+      </div>
+    </div>
+
+    <div class="mb-3 d-none" id="advanced-rules-editor">
       <label class="form-label">{{ form.rules_json.label.text }}</label>
       {{ form.rules_json(class='form-control', rows=8, placeholder='[{"source_type": "field", "source": "request_type", "operator": "equals", "value": "instructions"}]') }}
       <div class="form-text">

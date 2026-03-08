@@ -577,8 +577,8 @@ def test_admin_dashboard_cards_navigate(app, client):
 def test_base_template_bumps_static_asset_version(client):
     rv = client.get("/auth/login")
     assert rv.status_code == 200
-    assert b"/static/styles.css?v=20260308a" in rv.data
-    assert b"/static/app.js?v=20260308a" in rv.data
+    assert b"/static/styles.css?v=20260308b" in rv.data
+    assert b"/static/app.js?v=20260308b" in rv.data
 
 
 def test_login_next_redirection(client, app):
@@ -640,7 +640,7 @@ def test_banner_html_is_sanitized_and_does_not_break_navigation(app, client):
     rv = login_admin(client, email="admin-banner@example.com")
     assert rv.status_code == 200
 
-    malicious_banner = '<a href="/static/app.js?v=20260308a">bad</a><form action="/static/styles.css?v=20260308a"><button>go</button></form><script>alert(1)</script><div>Safe text</div>'
+    malicious_banner = '<a href="/static/app.js?v=20260308b">bad</a><form action="/static/styles.css?v=20260308b"><button>go</button></form><script>alert(1)</script><div>Safe text</div>'
     rv = client.post(
         "/admin/site_config",
         data={

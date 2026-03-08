@@ -257,7 +257,7 @@
       {{ section_heading('Handoffs and submissions', 'Review what was sent between departments and any submitted data or attachments.', compact=True) }}
         {% for s in submissions %}
           <div class="border rounded p-2 mb-2">
-            <div class="d-flex justify-content-between">
+            <div class="request-detail-inline-header">
               <strong>{{ s.from_department }} → {{ s.to_department }}</strong>
               <small class="text-muted">{{ s.created_at }}</small>
             </div>
@@ -276,7 +276,7 @@
             {% if s.data %}
               <div class="mt-2">
                 <div class="small text-muted">Submitted form data</div>
-                <table class="table table-sm mt-1">
+                <table class="table table-sm mt-1 request-detail-table">
                   <tbody>
                     {% for k, v in (s.data or {}).items() %}
                       <tr>
@@ -440,7 +440,7 @@
         <div class="border rounded p-2 mb-3 detail-scroll-panel">
           {% for c in comments %}
             <div class="mb-2">
-              <div class="d-flex justify-content-between">
+              <div class="request-detail-inline-header">
                 <strong>
                   {% if c.author_type == "user" %}{{ c.author_user.email }}{% else %}Guest: {{ c.author_guest_email }}{% endif %}
                 </strong>
@@ -477,7 +477,7 @@
         <div class="border rounded p-2 detail-scroll-panel">
           {% for a in audit %}
             <div class="mb-2">
-              <div class="d-flex justify-content-between">
+              <div class="request-detail-inline-header">
                 <strong>{{ a.action_type }}</strong>
                 <small class="text-muted">{{ a.created_at }}</small>
               </div>

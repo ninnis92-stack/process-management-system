@@ -907,6 +907,183 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 })();
 
+// Initialize the friendly conditional requirement rule builder on admin pages
+(function initRequirementBuilder(){
+  document.addEventListener('DOMContentLoaded', function(){
+    const builder = document.getElementById('requirementBuilder');
+    const textarea = document.querySelector('textarea[name="rules_json"]');
+    if(!builder || !textarea) return;
+
+    function serializeRules(){
+      const source = builder.querySelector('.builder-source').value || '';
+      const operator = builder.querySelector('.builder-operator').value || '';
+      const value = builder.querySelector('.builder-value').value || '';
+      if(!source || !operator){
+        textarea.value = '[]';
+        return;
+      }
+      const [srcType, srcName] = source.split('|');
+      const rule = { source_type: srcType, source: srcName, operator: operator };
+      if(value && !['populated','empty','verified','any_populated','all_populated'].includes(operator)){
+        if(operator === 'one_of'){
+          rule['values'] = value.split(',').map(s=>s.trim()).filter(Boolean);
+        } else {
+          rule['value'] = value;
+        }
+      }
+      textarea.value = JSON.stringify([rule], null, 2);
+    }
+
+    function populateBuilderFromJson(){
+      try{
+        const arr = JSON.parse(textarea.value||'[]');
+        if(Array.isArray(arr) && arr.length){
+          const r = arr[0];
+          const src = r.source_type + '|' + (r.source||'');
+          builder.querySelector('.builder-source').value = src;
+          builder.querySelector('.builder-operator').value = r.operator || '';
+          if(r.operator === 'one_of' && Array.isArray(r.values)){
+            builder.querySelector('.builder-value').value = r.values.join(',');
+          } else if(r.value !== undefined){
+            builder.querySelector('.builder-value').value = r.value;
+          }
+        }
+      }catch(e){ /* ignore */ }
+    }
+
+    builder.querySelectorAll('.builder-source, .builder-operator, .builder-value').forEach(el=>{
+      el.addEventListener('change', serializeRules);
+      el.addEventListener('input', serializeRules);
+    });
+
+    const toggle = document.getElementById('toggle-json-rules');
+    if(toggle){
+      const container = document.getElementById('advanced-rules-editor');
+      toggle.addEventListener('click', function(ev){
+        ev.preventDefault();
+        if(container.classList.contains('d-none')){
+          container.classList.remove('d-none');
+          toggle.textContent = 'Hide advanced JSON editor';
+        } else {
+          container.classList.add('d-none');
+          toggle.textContent = 'Show advanced JSON editor';
+        }
+      });
+    }
+
+    populateBuilderFromJson();
+    serializeRules();
+    if(toggle) toggle.textContent = 'Show advanced JSON editor';
+  });
+})();
+
+// Show dynamic hints on request forms when conditional requirements become active
+(function initConditionalRequirementHints(){
+  document.addEventListener('DOMContentLoaded', function(){
+    const specEl = document.getElementById('template-spec-data');
+    const form = document.querySelector('form');
+    if(!specEl || !form) return;
+    let spec = [];
+    try{ spec = JSON.parse(specEl.textContent||'[]'); }catch(e){ return; }
+    if(!Array.isArray(spec) || !spec.length) return;
+
+    const sectionMap = {};
+    spec.forEach(f=>{
+      if(f.section_name){
+        sectionMap[f.section_name] = sectionMap[f.section_name]||[];
+        sectionMap[f.section_name].push(f.name);
+      }
+    });
+
+    function valueIsPopulated(v){
+      return v !== null && v !== undefined && String(v).trim() !== '';
+    }
+    function evaluateRule(rule, vals){
+      const source = rule.source;
+      const operator = rule.operator;
+      const srcType = rule.source_type || 'field';
+      const value = vals[source];
+      if(operator === 'populated') return valueIsPopulated(value);
+      if(operator === 'empty') return !valueIsPopulated(value);
+      if(operator === 'equals') return String(value||'') === String(rule.value||'');
+      if(operator === 'not_equals') return String(value||'') !== String(rule.value||'');
+      if(operator === 'one_of'){
+        const arr = Array.isArray(rule.values) ? rule.values : [];
+        return arr.map(String).includes(String(value||''));
+      }
+      if(operator === 'any_populated' && srcType==='section'){
+        const members = sectionMap[source]||[];
+        return members.some(n=>valueIsPopulated(vals[n]));
+      }
+      if(operator === 'all_populated' && srcType==='section'){
+        const members = sectionMap[source]||[];
+        return members.every(n=>valueIsPopulated(vals[n]));
+      }
+      // ignore verified cases on client
+      return false;
+    }
+    function isRequirementActive(f){
+      if(!(f.requirements && f.requirements.config && f.requirements.config.enabled)) return false;
+      const cfg = f.requirements.config;
+      const vals = {};
+      new FormData(form).forEach((v,k)=>{ vals[k]=v; });
+      const results = (cfg.rules||[]).map(r=>evaluateRule(r, vals));
+      return cfg.mode === 'any' ? results.some(Boolean) : results.every(Boolean);
+    }
+
+    function updateHints(){
+      spec.forEach(f=>{
+        if(!(f.requirements && f.requirements.enabled)) return;
+        const triggered = isRequirementActive(f);
+        const hint = form.querySelector(`.requirement-hint[data-field="${f.name}"]`);
+        if(hint){
+          const msg = hint.dataset.requirementMessage || '';
+          hint.textContent = triggered && msg ? msg : 'This field is now required.';
+          hint.classList.toggle('d-none', !triggered);
+        }
+      });
+    }
+
+    form.addEventListener('input', updateHints);
+    form.addEventListener('change', updateHints);
+    updateHints();
+  });
+})();
+
+(function initTemplateSectionProgress(){
+  document.addEventListener('DOMContentLoaded', function(){
+    const sections = Array.from(document.querySelectorAll('[data-section-progress]'));
+    if(!sections.length) return;
+
+    function isFilled(input){
+      if(!input) return false;
+      if(input.type === 'file') return Boolean(input.files && input.files.length);
+      return String(input.value || '').trim() !== '';
+    }
+
+    function updateSection(sectionEl){
+      const sectionName = sectionEl.dataset.sectionName;
+      const members = Array.from(document.querySelectorAll(`[data-section-member="${sectionName}"] input, [data-section-member="${sectionName}"] textarea, [data-section-member="${sectionName}"] select`));
+      const total = members.length;
+      const completed = members.filter(isFilled).length;
+      const label = sectionEl.querySelector('[data-section-progress-label]');
+      if(label){
+        label.textContent = `${completed} / ${total} complete`;
+        label.classList.toggle('text-bg-success', completed === total && total > 0);
+        label.classList.toggle('text-bg-light', !(completed === total && total > 0));
+      }
+    }
+
+    function updateAll(){
+      sections.forEach(updateSection);
+    }
+
+    document.addEventListener('input', updateAll);
+    document.addEventListener('change', updateAll);
+    updateAll();
+  });
+})();
+
 // Monitor transition select and require screenshot when sending from A -> B
 (function monitorTransitionScreenshotRequirement(){
   document.addEventListener('DOMContentLoaded', function(){

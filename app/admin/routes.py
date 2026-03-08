@@ -51,6 +51,13 @@ from ..services.integrations import (
     normalize_integration_config,
 )
 from ..services.field_verification import apply_bulk_verification_params
+from ..services.template_admin import (
+    build_grouped_template_fields,
+    build_requirement_editor_context,
+    parse_requirement_rules_form,
+    populate_requirement_form_from_rules,
+    update_template_field_settings,
+)
 from ..services.tenant_context import get_current_tenant, tenant_role_for_user, user_has_permission, ensure_user_tenant_membership
 from .utils import _is_admin_user
 
@@ -992,42 +999,7 @@ def edit_template_fields(template_id: int):
     t = get_or_404(FormTemplate, template_id)
     # Handle simple bulk update: inputs named field_<id>_label, field_<id>_required
     if flask_request.method == "POST":
-        for f in t.fields:
-            lab = flask_request.form.get(f"field_{f.id}_label")
-            nm = flask_request.form.get(f"field_{f.id}_name")
-            section = flask_request.form.get(f"field_{f.id}_section")
-            req = flask_request.form.get(f"field_{f.id}_required")
-            ft = flask_request.form.get(f"field_{f.id}_type")
-            if lab is not None:
-                f.label = lab.strip()
-            if nm is not None:
-                f.name = nm.strip() or f.name
-            if section is not None:
-                f.section_name = section.strip() or None
-            if ft is not None:
-                f.field_type = ft
-            f.required = bool(req)
-            db.session.add(f)
-        # save external integration settings if present
-        try:
-            # checkbox present means 'on' or '1'
-            t.verification_prefill_enabled = bool(
-                flask_request.form.get("verification_prefill_enabled")
-            )
-            ext_enabled = flask_request.form.get("external_enabled")
-            t.external_enabled = bool(ext_enabled)
-            t.external_provider = (
-                flask_request.form.get("external_provider") or ""
-            ).strip() or None
-            t.external_form_url = (
-                flask_request.form.get("external_form_url") or ""
-            ).strip() or None
-            t.external_form_id = (
-                flask_request.form.get("external_form_id") or ""
-            ).strip() or None
-            db.session.add(t)
-        except Exception:
-            pass
+        update_template_field_settings(t, flask_request.form, db.session)
         db.session.commit()
         flash("Fields updated.", "success")
         return redirect(url_for("admin.list_templates"))
@@ -1036,7 +1008,13 @@ def edit_template_fields(template_id: int):
     fields = sorted(
         list(t.fields), key=lambda ff: getattr(ff, "created_at", getattr(ff, "id", 0))
     )
-    return render_template("admin_edit_template_fields.html", template=t, fields=fields)
+    grouped_fields = build_grouped_template_fields(fields)
+    return render_template(
+        "admin_edit_template_fields.html",
+        template=t,
+        fields=fields,
+        grouped_fields=grouped_fields,
+    )
 
 
 @admin_bp.route("/fields/<int:field_id>/verification", methods=["GET", "POST"])
@@ -1172,45 +1150,48 @@ def edit_field_requirements(field_id: int):
         return redirect(url_for("requests.dashboard"))
 
     f = get_or_404(FormField, field_id)
+    editor_context = build_requirement_editor_context(f)
+
     form = FieldRequirementForm()
     current_rules = getattr(f, "requirement_rules", None) or {}
 
     if flask_request.method == "GET" and isinstance(current_rules, dict):
-        form.enabled.data = bool(current_rules.get("enabled", False))
-        form.scope.data = current_rules.get("scope") or "field"
-        form.mode.data = current_rules.get("mode") or "all"
-        form.message.data = current_rules.get("message") or ""
-        try:
-            form.rules_json.data = json.dumps(current_rules.get("rules") or [], indent=2)
-        except Exception:
-            form.rules_json.data = "[]"
+        populate_requirement_form_from_rules(form, current_rules)
 
     if form.validate_on_submit():
-        rule_config = None
         if form.enabled.data:
-            raw_rules = (form.rules_json.data or "").strip() or "[]"
             try:
-                parsed_rules = json.loads(raw_rules)
-            except Exception:
+                rule_config = parse_requirement_rules_form(form)
+            except json.JSONDecodeError:
                 flash("Invalid JSON in rules field.", "danger")
-                return render_template("admin_field_requirements.html", form=form, field=f)
-            if not isinstance(parsed_rules, list):
-                flash("Rules JSON must be a JSON array.", "danger")
-                return render_template("admin_field_requirements.html", form=form, field=f)
-            rule_config = {
-                "enabled": True,
-                "scope": form.scope.data or "field",
-                "mode": form.mode.data or "all",
-                "message": (form.message.data or "").strip() or None,
-                "rules": parsed_rules,
-            }
+                return render_template(
+                    "admin_field_requirements.html",
+                    form=form,
+                    field=f,
+                    **editor_context,
+                )
+            except ValueError as exc:
+                flash(str(exc), "danger")
+                return render_template(
+                    "admin_field_requirements.html",
+                    form=form,
+                    field=f,
+                    **editor_context,
+                )
+        else:
+            rule_config = None
         f.requirement_rules = rule_config
         db.session.add(f)
         db.session.commit()
         flash("Conditional requirement rules saved.", "success")
         return redirect(url_for("admin.edit_template_fields", template_id=f.template_id))
 
-    return render_template("admin_field_requirements.html", form=form, field=f)
+    return render_template(
+        "admin_field_requirements.html",
+        form=form,
+        field=f,
+        **editor_context,
+    )
 
 
 @admin_bp.route("/notifications_retention", methods=["GET", "POST"])

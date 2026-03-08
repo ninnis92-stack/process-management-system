@@ -10,7 +10,7 @@
 </section>
 <section class="surface-panel table-shell">
 <div class="table-responsive">
-  <table class="table table-sm table-striped table-bordered align-middle admin-status-table">
+  <table class="table table-sm table-striped table-bordered align-middle admin-status-table admin-data-table">
     <colgroup>
       <col class="col-code" />
       <col class="col-label" />
@@ -39,24 +39,30 @@
       <td>{{ s.code }}</td>
       <td>{{ s.label }}</td>
       <td>{{ s.target_department or '-' }}</td>
-      <td class="text-center">{{ 'on transfer only' if (s.notify_on_transfer_only|default(false)) else ( 'enabled' if (s.notify_enabled|default(false)) else 'disabled') }}</td>
-      <td class="text-center">{{ 'originator only' if (s.notify_to_originator_only|default(false)) else 'department' }}</td>
-      <td class="text-center">{{ 'email' if (s.email_enabled|default(false)) else 'no email' }}</td>
-      <td class="text-center">{{ 'required' if (s.screenshot_required|default(false)) else 'no' }}</td>
+      <td class="text-center">
+        <span class="admin-status-pill {{ 'is-warning' if (s.notify_on_transfer_only|default(false)) else ('is-success' if (s.notify_enabled|default(false)) else 'is-neutral') }}">
+          {{ 'Transfer only' if (s.notify_on_transfer_only|default(false)) else ( 'Enabled' if (s.notify_enabled|default(false)) else 'Disabled') }}
+        </span>
+      </td>
+      <td class="text-center"><span class="admin-status-pill is-neutral">{{ 'Originator only' if (s.notify_to_originator_only|default(false)) else 'Department' }}</span></td>
+      <td class="text-center"><span class="admin-status-pill {{ 'is-success' if (s.email_enabled|default(false)) else 'is-neutral' }}">{{ 'Email on' if (s.email_enabled|default(false)) else 'Email off' }}</span></td>
+      <td class="text-center"><span class="admin-status-pill {{ 'is-warning' if (s.screenshot_required|default(false)) else 'is-neutral' }}">{{ 'Required' if (s.screenshot_required|default(false)) else 'Optional' }}</span></td>
       <td class="text-center actions-cell">
-        <a href="{{ url_for('admin.edit_status_option', opt_id=s.id) }}" class="btn btn-sm btn-link">Edit</a>
-        <form method="post" action="{{ url_for('admin.delete_status_option', opt_id=s.id) }}" class="d-inline ms-2">
-          <button class="btn btn-sm btn-link" type="submit">Delete</button>
-        </form>
-        <form method="post" action="{{ url_for('admin.toggle_status_screenshot', opt_id=s.id) }}" class="d-inline ms-2">
-          <button class="btn btn-sm btn-link">{{ 'Disable' if s.screenshot_required else 'Enable' }} screenshot</button>
-        </form>
-        <form method="post" action="{{ url_for('admin.toggle_status_notify_scope', opt_id=s.id) }}" class="d-inline ms-2">
-          <button class="btn btn-sm btn-link">{{ 'Set Department' if (s.notify_to_originator_only|default(false)) else 'Set Originator Only' }}</button>
-        </form>
-        <form method="post" action="{{ url_for('admin.toggle_status_email', opt_id=s.id) }}" class="d-inline ms-2">
-          <button class="btn btn-sm btn-link">{{ 'Disable Email' if (s.email_enabled|default(false)) else 'Enable Email' }}</button>
-        </form>
+        <div class="admin-actions-group justify-content-center">
+          <a href="{{ url_for('admin.edit_status_option', opt_id=s.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+          <form method="post" action="{{ url_for('admin.toggle_status_screenshot', opt_id=s.id) }}" class="admin-inline-form">
+            <button class="btn btn-sm btn-outline-secondary">{{ 'Disable' if s.screenshot_required else 'Enable' }} screenshot</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.toggle_status_notify_scope', opt_id=s.id) }}" class="admin-inline-form">
+            <button class="btn btn-sm btn-outline-secondary">{{ 'Set department' if (s.notify_to_originator_only|default(false)) else 'Originator only' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.toggle_status_email', opt_id=s.id) }}" class="admin-inline-form">
+            <button class="btn btn-sm btn-outline-secondary">{{ 'Disable email' if (s.email_enabled|default(false)) else 'Enable email' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.delete_status_option', opt_id=s.id) }}" class="admin-inline-form">
+            <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+          </form>
+        </div>
       </td>
     </tr>
   {% endfor %}

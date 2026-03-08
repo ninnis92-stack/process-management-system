@@ -5,7 +5,7 @@
 {{ page_header('Workflows', url_for('admin.create_workflow'), 'New Workflow', 'Workflow control', 'Review active flows, scope them by department, and toggle them without leaving the page.') }}
 <section class="surface-panel table-shell">
   <div class="table-responsive">
-    <table class="table align-middle mb-0">
+    <table class="table align-middle mb-0 admin-workflows-table admin-data-table">
       <thead>
         <tr><th>Name</th><th>Department</th><th>Active</th><th>Actions</th></tr>
       </thead>
@@ -20,11 +20,13 @@
               <label class="form-check-label" for="wfToggle{{ wf.id }}">{{ 'Active' if wf.active else 'Inactive' }}</label>
             </div>
           </td>
-          <td>
-            <a href="{{ url_for('admin.edit_workflow', wf_id=wf.id) }}">Edit</a>
-            <form style="display:inline" method="post" action="{{ url_for('admin.delete_workflow', wf_id=wf.id) }}">
-              <button class="btn btn-link" type="submit" onclick="return confirm('Delete workflow?')">Delete</button>
-            </form>
+          <td class="actions-cell">
+            <div class="admin-actions-group">
+              <a href="{{ url_for('admin.edit_workflow', wf_id=wf.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <form class="admin-inline-form" method="post" action="{{ url_for('admin.delete_workflow', wf_id=wf.id) }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete workflow?')">Delete</button>
+              </form>
+            </div>
           </td>
         </tr>
       {% else %}

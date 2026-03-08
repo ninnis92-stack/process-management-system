@@ -45,3 +45,7 @@
     </div>
   </div>
 {% endmacro %}
+
+{% macro meta_badge(text, tone='light', pill=False, title=None, attrs=None) %}
+  <span class="badge{% if pill %} rounded-pill{% endif %} text-bg-{{ tone }}"{% if title %} title="{{ title }}"{% endif %}{% if attrs %} {{ attrs|safe }}{% endif %}>{{ text }}</span>
+{% endmacro %}
