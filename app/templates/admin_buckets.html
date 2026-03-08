@@ -1,24 +1,25 @@
 {% extends "base.html" %}
+{% from 'admin/_macros.html' import page_header %}
 {% block content %}
-<h2>Status Buckets</h2>
-<a class="btn btn-primary" href="{{ url_for('admin.buckets_new') }}">New Bucket</a>
-<hr/>
-<ul class="list-group">
-{% for b in buckets %}
-  <li class="list-group-item d-flex justify-content-between align-items-center">
-    <div>
-      <strong>{{ b.name }}</strong>
-      {% if b.department_name %}<br/><small class="text-muted">Dept: {{ b.department_name }}</small>{% endif %}
-    </div>
-    <div>
-      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.buckets_edit', bucket_id=b.id) }}">Edit</a>
-      <form method="post" action="{{ url_for('admin.buckets_delete', bucket_id=b.id) }}" style="display:inline" onsubmit="return confirm('Delete bucket?');">
-        <button class="btn btn-sm btn-danger">Delete</button>
-      </form>
-    </div>
-  </li>
-{% else %}
-  <li class="list-group-item">No buckets yet.</li>
-{% endfor %}
-</ul>
+{{ page_header('Status Buckets', url_for('admin.buckets_new'), 'New Bucket', 'Workflow control', 'Organize dashboard groupings by department and keep status routing easier to scan.') }}
+<section class="surface-panel list-surface">
+  <ul class="list-group list-group-flush">
+  {% for b in buckets %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <div>
+        <strong>{{ b.name }}</strong>
+        {% if b.department_name %}<br/><small class="text-muted">Dept: {{ b.department_name }}</small>{% endif %}
+      </div>
+      <div>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.buckets_edit', bucket_id=b.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('admin.buckets_delete', bucket_id=b.id) }}" style="display:inline" onsubmit="return confirm('Delete bucket?');">
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </div>
+    </li>
+  {% else %}
+    <li class="list-group-item text-muted">No buckets yet.</li>
+  {% endfor %}
+  </ul>
+</section>
 {% endblock %}

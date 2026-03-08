@@ -83,18 +83,20 @@ def send_high_priority_nudges(app, commit: bool = False):
     if flags and not getattr(flags, "enable_nudges", True):
         return
 
-    interval = int(cfg.nudge_interval_hours or 24)
+    # allow fractional-hour intervals (e.g. 0.5 for 30 minutes)
+    try:
+        interval = float(cfg.nudge_interval_hours or 24)
+    except Exception:
+        interval = 24.0
     now = datetime.utcnow()
     cutoff = now - timedelta(hours=interval)
     # Respect administrative minimum delay: do not nudge requests created
     # within `nudge_min_delay_hours` of their creation. Default is 4 hours.
     try:
         raw_min_delay = getattr(cfg, "nudge_min_delay_hours", None)
-        min_delay = 4 if raw_min_delay is None else int(raw_min_delay)
+        min_delay = 4 if raw_min_delay is None else float(raw_min_delay)
     except Exception:
-        min_delay = 4
-
-    # Find high-priority requests still open
+        min_delay = 4.0
     reqs = (
         ReqModel.query.filter(ReqModel.priority == "high")
         .filter(ReqModel.status != "CLOSED")

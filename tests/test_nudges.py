@@ -31,51 +31,64 @@ def app():
     yield app
 
 
+import pytest
+
+
 def test_send_nudges_creates_notification(app):
-    with app.app_context():
-        # ensure config
-        cfg = SpecialEmailConfig.get()
-        flags = FeatureFlags.get()
-        flags.enable_nudges = True
-        cfg.nudge_enabled = True
-        cfg.nudge_interval_hours = 1
-        cfg.nudge_min_delay_hours = 4
-        db.session.commit()
+    # iterate explicit intervals, resetting the database each time to avoid
+    # cross-test interference (parameterization proved flakey).
+    for interval in [0.5, 1, 24]:
+        with app.app_context():
+            # clear any previous rows so each iteration is isolated
+            Notification.query.delete()
+            ReqModel.query.delete()
+            User.query.delete()
+            db.session.commit()
 
-        # create user and high-priority request
-        u = User(
-            email="nudge_test@example.com",
-            password_hash="x",
-            department="B",
-            is_active=True,
-        )
-        db.session.add(u)
-        db.session.commit()
+            # ensure config
+            cfg = SpecialEmailConfig.get()
+            flags = FeatureFlags.get()
+            flags.enable_nudges = True
+            cfg.nudge_enabled = True
+            cfg.nudge_interval_hours = interval
+            cfg.nudge_min_delay_hours = 4
+            db.session.commit()
 
-        r = ReqModel(
-            title="Urgent",
-            request_type="both",
-            pricebook_status="unknown",
-            description="x",
-            priority="high",
-            status="B_IN_PROGRESS",
-            owner_department="B",
-            submitter_type="user",
-            due_at=(datetime.utcnow() + timedelta(days=3)),
-        )
-        db.session.add(r)
-        db.session.commit()
+            # create user and high-priority request
+            u = User(
+                email=f"nudge_test_{interval}@example.com",
+                password_hash="x",
+                department="B",
+                is_active=True,
+            )
+            db.session.add(u)
+            db.session.commit()
 
-        # assign to user
-        r.assigned_to_user_id = u.id
-        # move request creation time back beyond minimum nudge delay
-        r.created_at = datetime.utcnow() - timedelta(hours=5)
-        db.session.commit()
+            r = ReqModel(
+                title="Urgent",
+                request_type="both",
+                pricebook_status="unknown",
+                description="x",
+                priority="high",
+                status="B_IN_PROGRESS",
+                owner_department="B",
+                submitter_type="user",
+                due_at=(datetime.utcnow() + timedelta(days=3)),
+            )
+            db.session.add(r)
+            db.session.commit()
 
-        # run nudges
-        send_high_priority_nudges(app)
+            # assign to user
+            r.assigned_to_user_id = u.id
+            # move request creation time back beyond minimum nudge delay
+            r.created_at = datetime.utcnow() - timedelta(hours=5)
+            db.session.commit()
 
-        n = Notification.query.filter_by(
-            user_id=u.id, type="nudge", request_id=r.id
-        ).first()
-        assert n is not None
+            # run nudges
+            send_high_priority_nudges(app)
+
+            all_notifs = Notification.query.all()
+            n = Notification.query.filter_by(
+                user_id=u.id, type="nudge", request_id=r.id
+            ).first()
+            assert n is not None

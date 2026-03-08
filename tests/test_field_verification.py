@@ -67,9 +67,8 @@ def test_field_verification_inventory(app, client, monkeypatch):
 
     # enable external verification for the test and monkeypatch the InventoryService
     app.config["ENABLE_EXTERNAL_VERIFICATION"] = True
-    from app.requests_bp.routes import InventoryService
 
-    monkeypatch.setattr("app.requests_bp.routes.InventoryService", lambda: DummyInv())
+    monkeypatch.setattr("app.services.field_verification.InventoryService", lambda: DummyInv())
 
     # submit valid PN -> should pass verification
     data = {"donor_part_number": "VALID123", "due_at": "2030-01-01"}
@@ -144,7 +143,7 @@ def test_bulk_separated_field_verification_and_hint(app, client, monkeypatch):
     db.session.add(fv)
     db.session.commit()
 
-    monkeypatch.setattr("app.requests_bp.routes.InventoryService", lambda: DummyInv())
+    monkeypatch.setattr("app.services.field_verification.InventoryService", lambda: DummyInv())
 
     rv = client.get("/requests/new")
     assert rv.status_code == 200

@@ -27,6 +27,7 @@ from .sso import sso_user_is_admin
 from sqlalchemy.exc import OperationalError
 from flask import session as _session
 from ..models import UserDepartment, Department
+from ..services.tenant_context import ensure_user_tenant_membership, set_active_tenant
 
 
 def _restore_last_active_dept_for_user(user):
@@ -200,6 +201,10 @@ def sso_callback():
 
     db.session.commit()
 
+    tenant = ensure_user_tenant_membership(user)
+    if tenant:
+        set_active_tenant(tenant)
+
     if not user.is_active:
         return "Account disabled.", 403
 
@@ -211,6 +216,15 @@ def sso_callback():
         session.pop("sso_mfa", None)
 
     login_user(user)
+    # admins always land on the admin console by default; this happens before
+    # any department-selection logic so that they never get kicked back to the
+    # /auth/choose_dept page.  We still respect a `next` URL if present so that
+    # automated flows continue to work.
+    if getattr(user, "is_admin", False):
+        next_url = request.args.get('next') or request.form.get('next')
+        if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+            return redirect(next_url)
+        return redirect(url_for("admin.index"))
     try:
         depts = _get_user_departments(user)
         if len(depts) > 1:
@@ -402,6 +416,11 @@ def switch_department():
     # For convenience return JSON for AJAX callers
     if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify({"ok": True, "active_dept": dept})
+    # if we landed here from the login flow and a next-url was preserved,
+    # redirect there now that the department has been chosen
+    next_url = _session.pop('next_after_choose_dept', None)
+    if next_url and isinstance(next_url, str) and next_url.startswith('/') and not next_url.startswith('//'):
+        return redirect(next_url)
     return redirect(url_for("requests.dashboard"))
 
 
@@ -473,6 +492,15 @@ def login():
 
         try:
             login_user(user)
+            tenant = ensure_user_tenant_membership(user)
+            if tenant:
+                set_active_tenant(tenant)
+            # redirect admins immediately to the admin console; skip department flow
+            if getattr(user, "is_admin", False):
+                next_url = request.args.get('next') or request.form.get('next')
+                if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+                    return redirect(next_url)
+                return redirect(url_for("admin.index"))
         except Exception:
             try:
                 current_app.logger.exception(
@@ -492,6 +520,10 @@ def login():
         try:
             depts = _get_user_departments(user)
             if len(depts) > 1:
+                # store next for after the department selection step
+                next_url = request.args.get('next') or request.form.get('next')
+                if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+                    _session['next_after_choose_dept'] = next_url
                 return redirect(url_for("auth.choose_dept"))
             # single choice - restore last active if present and allowed
             restored = False
@@ -507,6 +539,11 @@ def login():
                 )
         except Exception:
             pass
+        # Respect a `next` parameter when redirecting after login.  Only
+        # allow internal paths to avoid open-redirect attacks.
+        next_url = request.args.get('next') or request.form.get('next')
+        if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+            return redirect(next_url)
         return redirect(url_for("requests.dashboard"))
 
     return render_template("login.html", form=form)
@@ -618,6 +655,9 @@ def totp_verify():
         session.pop("pre_2fa_userid", None)
         login_user(u)
         session["totp_verified"] = True
+        # TOTP flow also honours admin landing
+        if getattr(u, "is_admin", False):
+            return redirect(url_for("admin.index"))
         try:
             depts = _get_user_departments(u)
             if len(depts) > 1:

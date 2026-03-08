@@ -13,6 +13,7 @@ from flask import current_app
 from ..extensions import db
 from ..models import Request as ReqModel
 from ..models import WebhookSubscription
+from .event_bus import publish_event, mark_event_delivered, mark_event_failed
 
 
 INTEGRATION_KIND_SCAFFOLDS: dict[str, dict[str, Any]] = {
@@ -204,6 +205,13 @@ def _post_json(url: str, body: dict[str, Any], *, secret: str | None = None, tim
 def emit_webhook_event(event_name: str, payload: dict[str, Any]) -> None:
     """Send an event payload to all matching webhook subscribers."""
 
+    boundary_event = publish_event(
+        event_name,
+        payload,
+        destination_kind="webhook",
+        metadata={"subscription_count": 0},
+    )
+
     try:
         subscriptions = WebhookSubscription.query.filter_by(active=True).all()
     except Exception:
@@ -212,6 +220,13 @@ def emit_webhook_event(event_name: str, payload: dict[str, Any]) -> None:
         except Exception:
             pass
         subscriptions = []
+
+    boundary_event.metadata_json = {
+        **(boundary_event.metadata_json or {}),
+        "subscription_count": len(subscriptions),
+    }
+    db.session.add(boundary_event)
+    db.session.commit()
 
     for sub in subscriptions:
         events = sub.events or []
@@ -227,7 +242,9 @@ def emit_webhook_event(event_name: str, payload: dict[str, Any]) -> None:
                 },
                 secret=sub.secret,
             )
+            mark_event_delivered(boundary_event)
         except (HTTPError, URLError, TimeoutError, ValueError):
+            mark_event_failed(boundary_event, Exception(f"Delivery failed for {sub.url}"))
             try:
                 current_app.logger.exception(
                     "Failed delivering webhook event '%s' to %s", event_name, sub.url

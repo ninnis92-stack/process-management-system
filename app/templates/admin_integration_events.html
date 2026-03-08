@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <div class="page-header__eyebrow">Admin command center</div>
+      <h2 class="page-header__title">Integration boundary events</h2>
+      <p class="page-header__lede">Outbox-style event history for future integrations, retained even when no external system is connected.</p>
+    </div>
+  </section>
+
+  <section class="surface-panel table-shell">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>Destination</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Delivered</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in events %}
+            <tr>
+              <td>{{ event.event_name }}</td>
+              <td>{{ event.destination_kind }}</td>
+              <td>{{ event.status }}</td>
+              <td>{{ event.created_at.strftime('%Y-%m-%d %H:%M') if event.created_at else '—' }}</td>
+              <td>{{ event.delivered_at.strftime('%Y-%m-%d %H:%M') if event.delivered_at else '—' }}</td>
+              <td class="small text-muted">{{ event.last_error or '—' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="text-muted">No integration events recorded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

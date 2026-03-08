@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-<h3 class="mb-3">Guest Submission</h3>
-<div class="card shadow-sm">
-  <div class="card-body">
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">External intake</div>
+    <h3 class="page-header__title mb-0">Guest Submission</h3>
+    <p class="page-header__lede mb-0">Submit a request without signing in, route it to the correct department, and receive a tracking link after submission.</p>
+  </div>
+</section>
+<section class="surface-panel">
     <form method="post">
       {{ form.hidden_tag() }}
       {% if form.errors %}
@@ -101,8 +106,7 @@
 
       <button id="submitBtn" class="btn btn-primary" type="submit">Submit Request</button>
     </form>
-  </div>
-</div>
+</section>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   const form = document.querySelector("form");

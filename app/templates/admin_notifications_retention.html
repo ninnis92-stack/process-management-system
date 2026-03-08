@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h2>Notification Retention</h2>
+  <section class="page-header">
+    <div>
+      <div class="page-header__eyebrow">Notification settings</div>
+      <h2 class="page-header__title mb-0">Notification Retention</h2>
+      <p class="page-header__lede mb-0">Control how long notifications remain visible and how many are stored per user.</p>
+    </div>
+  </section>
+  <section class="surface-panel">
   <form method="post">
     {{ form.hidden_tag() }}
     <div class="form-check mb-3">
@@ -27,4 +34,5 @@
 
     <button class="btn btn-primary">Save</button>
   </form>
+  </section>
 {% endblock %}

@@ -1,0 +1,139 @@
+import re
+
+from werkzeug.security import generate_password_hash
+
+from app.extensions import db
+from app.models import User
+
+
+NAV_LINK_RE = re.compile(r'href="([^"]+)"')
+
+
+def _extract_nav_links(html):
+    links = set()
+    for href in NAV_LINK_RE.findall(html):
+        if not href.startswith("/"):
+            continue
+        if href.startswith("/static/"):
+            continue
+        links.add(href)
+    return sorted(links)
+
+
+def _create_user(app, *, email, password="secret", department="B", is_admin=False):
+    with app.app_context():
+        user = User(
+            email=email,
+            password_hash=generate_password_hash(password),
+            department=department,
+            is_active=True,
+            is_admin=is_admin,
+        )
+        db.session.add(user)
+        db.session.commit()
+
+
+def _login(client, email, password="secret"):
+    return client.post(
+        "/auth/login",
+        data={"email": email, "password": password},
+        follow_redirects=True,
+    )
+
+
+def test_public_navigation_links_resolve(client):
+    rv = client.get("/auth/login")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+
+    assert "Guest Dashboard" in html
+    assert "Guest Submit" in html
+
+    links = _extract_nav_links(html)
+    expected = {
+        "/auth/login",
+        "/dashboard",
+        "/external/dashboard",
+        "/external/new",
+    }
+    assert expected.issubset(set(links))
+
+    for route in expected:
+        resp = client.get(route, follow_redirects=False)
+        assert resp.status_code in (200, 302), route
+        location = resp.headers.get("Location", "")
+        assert not location.endswith("/static/app.js"), route
+
+
+def test_local_test_config_uses_non_secure_session_cookie(app):
+    assert app.config["SESSION_COOKIE_SECURE"] is False
+
+
+def test_department_a_navigation_links_resolve(app, client):
+    _create_user(app, email="dept-a@example.com", department="A")
+
+    rv = _login(client, "dept-a@example.com")
+    assert rv.status_code == 200
+
+    page = client.get("/dashboard")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+
+    assert "New Request" in html
+    assert "Guest Dashboard" in html
+    assert "Guest Submit" in html
+
+    links = _extract_nav_links(html)
+    expected = {
+        "/dashboard",
+        "/requests/new",
+        "/external/dashboard",
+        "/external/new",
+        "/auth/settings",
+    }
+    assert expected.issubset(set(links))
+
+    for route in expected:
+        resp = client.get(route, follow_redirects=False)
+        assert resp.status_code in (200, 302), route
+        location = resp.headers.get("Location", "")
+        assert not location.endswith("/static/app.js"), route
+
+
+def test_admin_navigation_links_resolve(app, client):
+    _create_user(app, email="nav-admin@example.com", is_admin=True)
+
+    rv = _login(client, "nav-admin@example.com")
+    assert rv.status_code == 200
+    # login should land on the admin console rather than the department picker
+    body = rv.get_data(as_text=True)
+    assert "Admin Console" in body
+
+    page = client.get("/admin/")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+
+    assert "Admin" in html
+    assert "Guest Forms" in html
+    assert "Metrics" in html
+    assert "Retention" in html  # ensure retention card text shows up
+    assert "Switch Dept" in html  # card we just added
+
+    links = _extract_nav_links(html)
+    expected = {
+        "/admin/",
+        "/admin/guest_forms",
+        "/admin/metrics_config",
+        "/admin/notifications_retention",
+        "/auth/choose_dept",
+        "/external/dashboard",
+        "/external/new",
+        "/auth/settings",
+    }
+    assert expected.issubset(set(links))
+
+    for route in expected:
+        resp = client.get(route, follow_redirects=False)
+        assert resp.status_code in (200, 302), route
+        location = resp.headers.get("Location", "")
+        assert not location.endswith("/static/app.js"), route

@@ -1,29 +1,31 @@
 {% extends "base.html" %}
 {% block content %}
-<h3 class="mb-3">Admin Monitor — Dept {{ dept }}</h3>
-<div class="mb-3 d-flex gap-2 flex-wrap align-items-center">
-  <a class="btn btn-sm btn-outline-primary" href="?dept=A">View Dept A</a>
-  <a class="btn btn-sm btn-outline-primary" href="?dept=B">View Dept B</a>
-  <a class="btn btn-sm btn-outline-primary" href="?dept=C">View Dept C</a>
-  <!-- Department-facing vibe button mirrors global vibe control and keeps layout compact -->
-  <button id="vibeBtnDept" class="btn btn-sm btn-outline-secondary">Vibe · <span class="vibeLabel">—</span></button>
-</div>
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Live operations</div>
+    <h3 class="page-header__title mb-0">Admin Monitor — Dept {{ dept }}</h3>
+    <p class="page-header__lede mb-0">Observe department activity, review recent issues, and open a live mini-view for debugging.</p>
+  </div>
+  <div class="page-header__actions">
+    <a class="btn btn-sm btn-outline-primary" href="?dept=A">View Dept A</a>
+    <a class="btn btn-sm btn-outline-primary" href="?dept=B">View Dept B</a>
+    <a class="btn btn-sm btn-outline-primary" href="?dept=C">View Dept C</a>
+    <button id="vibeBtnDept" class="btn btn-sm btn-outline-secondary">Vibe · <span class="vibeLabel">—</span></button>
+  </div>
+</section>
 
 <div class="row g-3">
   <div class="col-md-4">
-    <div class="card mb-3">
-      <div class="card-body">
+    <div class="surface-panel mb-3">
         <h5>Stats</h5>
-        <ul class="list-unstyled mb-0">
-          <li>Total users: <strong>{{ total_users }}</strong></li>
-          <li>Active users: <strong>{{ active_users }}</strong></li>
-          <li>Admins: <strong>{{ admin_count }}</strong></li>
-        </ul>
-      </div>
+        <div class="metric-grid">
+          <div class="metric-card"><span class="metric-chip__label">Total users</span><strong class="metric-chip__value">{{ total_users }}</strong></div>
+          <div class="metric-card"><span class="metric-chip__label">Active users</span><strong class="metric-chip__value">{{ active_users }}</strong></div>
+          <div class="metric-card"><span class="metric-chip__label">Admins</span><strong class="metric-chip__value">{{ admin_count }}</strong></div>
+        </div>
     </div>
 
-    <div class="card mb-3">
-      <div class="card-body">
+    <div class="surface-panel mb-3">
         <h5>Recent email issues</h5>
         {% if recent_email_issues %}
           <ul class="list-unstyled small mb-0">
@@ -38,13 +40,11 @@
         {% else %}
           <div class="text-muted">No recent issues.</div>
         {% endif %}
-      </div>
     </div>
   </div>
 
   <div class="col-md-8">
-    <div class="card mb-3">
-      <div class="card-body">
+    <div class="surface-panel mb-3">
         <h5>Department view (interactive mini window)</h5>
         <div class="mb-2 d-flex gap-2 align-items-center">
           <input id="miniUrl" class="form-control form-control-sm" type="text" placeholder="Enter path or URL (e.g. /dashboard or /requests/1)" value="/dashboard?dept={{ dept }}" />
@@ -57,7 +57,6 @@
           <iframe id="deptMiniWin" src="/dashboard?dept={{ dept }}" title="Department mini view" sandbox="allow-same-origin allow-forms allow-scripts allow-popups" style="width:100%; height:480px; border:1px solid var(--border); border-radius:8px;"></iframe>
         </div>
         <div class="mt-2 small text-muted">The mini window loads any internal path for debugging; actions performed here will run against the current database and session.</div>
-      </div>
     </div>
   </div>
 </div>

@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>{% if template %}Edit Template{% else %}New Template{% endif %}</h2>
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Template management</div>
+    <h2 class="page-header__title mb-0">{% if template %}Edit Template{% else %}New Template{% endif %}</h2>
+    <p class="page-header__lede mb-0">Update the template definition and review the fields currently attached to it.</p>
+  </div>
+</section>
+<section class="surface-panel mb-3">
 <form method="post">
   {{ form.hidden_tag() }}
   <div class="mb-3">
@@ -13,11 +20,14 @@
   </div>
   <button class="btn btn-primary">Save</button>
 </form>
+</section>
 
 {% if template %}
-  <hr/>
-  <h4>Fields</h4>
-  <a class="btn btn-sm btn-outline-success" href="{{ url_for('admin.form_field_new', template_id=template.id) }}">Add Field</a>
+  <section class="surface-panel">
+  <div class="page-toolbar mb-3">
+    <h4 class="mb-0">Fields</h4>
+    <a class="btn btn-sm btn-outline-success" href="{{ url_for('admin.form_field_new', template_id=template.id) }}">Add Field</a>
+  </div>
   <ul class="list-group mt-2">
   {% for f in fields %}
     <li class="list-group-item">
@@ -28,5 +38,6 @@
     <li class="list-group-item">No fields yet.</li>
   {% endfor %}
   </ul>
+  </section>
 {% endif %}
 {% endblock %}

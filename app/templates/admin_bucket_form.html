@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-  <h2>{{ 'Edit Bucket' if bucket else 'New Bucket' }}</h2>
+  <section class="page-header">
+    <div>
+      <div class="page-header__eyebrow">Workflow control</div>
+      <h2 class="page-header__title mb-0">{{ 'Edit Bucket' if bucket else 'New Bucket' }}</h2>
+      <p class="page-header__lede mb-0">Configure how requests are grouped on dashboards and maintain the statuses mapped to each bucket.</p>
+    </div>
+  </section>
 
+  <section class="surface-panel mb-3">
   <form method="post">
     {{ form.hidden_tag() }}
     <div class="mb-3">
@@ -29,10 +36,11 @@
     <button class="btn btn-primary">{{ 'Save' }}</button>
     <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.list_buckets') }}">Cancel</a>
   </form>
+  </section>
 
   {% if bucket %}
-    <hr/>
-    <h4>Statuses</h4>
+    <section class="surface-panel mb-3">
+    <h4 class="section-title">Statuses</h4>
     <ul id="bucket-status-list" class="list-group mb-3" aria-label="Bucket statuses">
       {% for s in statuses %}
         <li class="list-group-item d-flex justify-content-between align-items-center" data-id="{{ s.id }}">
@@ -75,10 +83,11 @@
         </div>
       </div>
     </form>
+    </section>
 
     {% if workflows %}
-      <hr/>
-      <h4>Workflows available for this department</h4>
+      <section class="surface-panel">
+      <h4 class="section-title">Workflows available for this department</h4>
       <ul class="list-group mb-3">
         {% for wf in workflows %}
           <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -95,6 +104,7 @@
           <li class="list-group-item text-muted">No workflows available.</li>
         {% endfor %}
       </ul>
+      </section>
     {% endif %}
   {% endif %}
 

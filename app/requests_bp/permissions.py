@@ -1,6 +1,7 @@
 from flask_login import current_user
 from flask import current_app
 from ..models import Request, Submission
+from ..services.tenant_context import get_current_tenant_id, user_can_access_tenant
 
 
 def can_view_request(req: Request) -> bool:
@@ -14,6 +15,14 @@ def can_view_request(req: Request) -> bool:
     """
     if not current_user.is_authenticated:
         return False
+
+    request_tenant_id = getattr(req, "tenant_id", None)
+    current_tenant_id = get_current_tenant_id()
+    if request_tenant_id is not None:
+        if current_tenant_id is not None and request_tenant_id != current_tenant_id:
+            return False
+        if not user_can_access_tenant(current_user, request_tenant_id):
+            return False
 
     # Allow admins to view debug requests regardless of department
     if getattr(req, "is_debug", False) and getattr(current_user, "is_admin", False):

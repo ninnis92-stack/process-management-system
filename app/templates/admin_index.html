@@ -1,79 +1,168 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h2>Admin Console</h2>
-  <div class="mb-3 d-flex gap-2">
-    <input id="adminQuickSearch" class="form-control" placeholder="Quick find admin page (type to filter)…" />
-  </div>
+  <section class="page-header">
+    <div>
+      <div class="page-header__eyebrow">Admin command center</div>
+      <h2 class="page-header__title">Admin Console</h2>
+      <p class="page-header__lede">Manage core configuration, workflows, and operational tooling from one place.</p>
+    </div>
+    <div class="page-header__actions">
+      <div class="metric-chip">
+        <span class="metric-chip__label">Users</span>
+        <strong class="metric-chip__value">{{ total_users }}</strong>
+      </div>
+      <div class="metric-chip">
+        <span class="metric-chip__label">Departments</span>
+        <strong class="metric-chip__value">{{ total_depts }}</strong>
+      </div>
+      <div class="metric-chip">
+        <span class="metric-chip__label">Audit entries</span>
+        <strong class="metric-chip__value">{{ total_audit }}</strong>
+      </div>
+      <div class="metric-chip">
+        <span class="metric-chip__label">Workspace</span>
+        <strong class="metric-chip__value">{{ current_tenant_name }}</strong>
+      </div>
+      <div class="metric-chip">
+        <span class="metric-chip__label">Workspaces</span>
+        <strong class="metric-chip__value">{{ total_tenants }}</strong>
+      </div>
+    </div>
+  </section>
 
-  <div class="admin-grid">
-    <!-- Legacy labels for automated tests / bookmarks (kept hidden) -->
-    <div style="display:none" aria-hidden="true">Email Form Generation</div>
-    <div style="display:none" aria-hidden="true">Manage Email Form Settings</div>
-    <a class="admin-tile admin-card" href="{{ url_for('admin.list_users') }}">
-      <div class="tile-ico">👥</div>
+  <section class="surface-panel surface-panel-muted">
+    <div class="page-toolbar">
+      <input id="adminQuickSearch" class="form-control" placeholder="Quick find an admin page…" />
+      <span class="text-muted small">Type to narrow the dashboard tiles instantly.</span>
+    </div>
+  </section>
+
+  <div class="admin-section surface-panel">
+    <h3>Configuration</h3>
+    <div class="admin-grid">
+      <!-- Legacy labels for automated tests / bookmarks (kept hidden) -->
+      <div style="display:none" aria-hidden="true">Email Form Generation</div>
+      <div style="display:none" aria-hidden="true">Manage Email Form Settings</div>
+      <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_users') }}" onclick="window.location.assign('{{ url_for('admin.list_users') }}'); return false;">
+      <div class="tile-ico"><i class="fas fa-users"></i></div>
       <div class="tile-title">Users</div>
       <div class="tile-sub">Manage accounts · {{ total_users }}</div>
-    </a>
+    </button>
 
-    <a class="admin-tile admin-card" href="{{ url_for('admin.list_departments') }}">
-      <div class="tile-ico">🏷️</div>
+    <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_departments') }}" onclick="window.location.assign('{{ url_for('admin.list_departments') }}'); return false;">
+      <div class="tile-ico"><i class="fas fa-tags"></i></div>
       <div class="tile-title">Departments</div>
       <div class="tile-sub">Manage department settings · {{ total_depts }}</div>
-    </a>
+    </button>
 
-    <a class="admin-tile admin-card" href="{{ url_for('admin.site_config') }}">
-      <div class="tile-ico">🌐</div>
+    <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.site_config') }}" onclick="window.location.assign('{{ url_for('admin.site_config') }}'); return false;">
+      <div class="tile-ico"><i class="fas fa-globe"></i></div>
       <div class="tile-title">Site</div>
-      <div class="tile-sub">Branding & rolling quotes</div>
-    </a>
+      <div class="tile-sub">Branding, banner & theme</div>
+    </button>
 
-    <a class="admin-tile admin-card" href="{{ url_for('admin.special_email') }}">
-      <div class="tile-ico">✉️</div>
+    <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.site_config') }}#quotes-settings" onclick="window.location.assign('{{ url_for('admin.site_config') }}#quotes-settings'); return false;">
+      <div class="tile-ico"><i class="fas fa-quote-left"></i></div>
+      <div class="tile-title">Quotes</div>
+      <div class="tile-sub">Rolling quotes & quote sets</div>
+    </button>
+
+    <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.special_email') }}" onclick="window.location.assign('{{ url_for('admin.special_email') }}'); return false;">
+      <div class="tile-ico"><i class="fas fa-envelope"></i></div>
       <div class="tile-title">Email Forms</div>
       <div class="tile-sub">Inbound form settings</div>
-    </a>
+    </button>
 
-    <a class="admin-tile admin-card" href="{{ url_for('admin.monitor') }}">
-      <div class="tile-ico">📊</div>
+    <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.monitor') }}" onclick="window.location.assign('{{ url_for('admin.monitor') }}'); return false;">
+      <div class="tile-ico"><i class="fas fa-chart-bar"></i></div>
       <div class="tile-title">Monitor</div>
       <div class="tile-sub">Admin dashboards · {{ total_audit }}</div>
-    </a>
+    </button>
+    </div> <!-- /.admin-grid -->
+  </div> <!-- /.admin-section -->
 
-    <a class="admin-tile admin-card" href="{{ url_for('admin.list_status_options') }}">
-      <div class="tile-ico">⚙️</div>
+  <div class="admin-section surface-panel">
+    <h3>Workflow &amp; status</h3>
+    <div class="admin-grid">
+    <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_status_options') }}" onclick="window.location.assign('{{ url_for('admin.list_status_options') }}'); return false;">
+      <div class="tile-ico"><i class="fas fa-cogs"></i></div>
+      <div class="tile-title">Status Options</div>
+      <div class="tile-sub">Manage all codes and settings</div>
+    </button>
+
+    <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_workflows') }}" onclick="window.location.assign('{{ url_for('admin.list_workflows') }}'); return false;">
+      <div class="tile-ico"><i class="fas fa-project-diagram"></i></div>
       <div class="tile-title">Workflows</div>
-      <div class="tile-sub">Status & workflow control</div>
-    </a>
+      <div class="tile-sub">Configure progress flows</div>
+    </button>
 
-    <a class="admin-tile admin-card" href="{{ url_for('admin.list_buckets') }}">
-      <div class="tile-ico">📁</div>
+    <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_buckets') }}" onclick="window.location.assign('{{ url_for('admin.list_buckets') }}'); return false;">
+      <div class="tile-ico"><i class="fas fa-folder-open"></i></div>
       <div class="tile-title">Buckets</div>
       <div class="tile-sub">Dashboard buckets</div>
+    </button>
+    </div> <!-- /.admin-grid -->
+  </div> <!-- /.admin-section -->
+
+  <div class="admin-section surface-panel">
+    <h3>Utilities</h3>
+    <div class="admin-grid">
+    <!-- allow admins to jump into the department chooser if they want to inspect a
+         particular department.  most of the time they land on the admin home
+         page, so this card provides a convenient one-click access. -->
+    <a class="admin-tile admin-card" href="{{ url_for('auth.choose_dept') }}" data-nav-url="{{ url_for('auth.choose_dept') }}">
+      <div class="tile-ico"><i class="fas fa-exchange-alt"></i></div>
+      <div class="tile-title">Switch Dept</div>
+      <div class="tile-sub">Choose active department</div>
     </a>
 
-    <a class="admin-tile admin-card" href="{{ url_for('admin.notifications_retention') }}">
-      <div class="tile-ico">🔔</div>
+    <a class="admin-tile admin-card" href="{{ url_for('admin.notifications_retention') }}" data-nav-url="{{ url_for('admin.notifications_retention') }}">
+      <div class="tile-ico"><i class="fas fa-bell"></i></div>
       <div class="tile-title">Notifications</div>
       <div class="tile-sub">Retention & routing</div>
     </a>
 
-    <a class="admin-tile admin-card" href="{{ url_for('admin.feature_flags') }}">
+    <a class="admin-tile admin-card" href="{{ url_for('admin.feature_flags') }}" data-nav-url="{{ url_for('admin.feature_flags') }}">
       <div class="tile-ico">🚦</div>
       <div class="tile-title">Integrations & Flags</div>
       <div class="tile-sub">Flags · Integrations · Unmapped</div>
     </a>
 
-    <a class="admin-tile admin-card" href="{{ url_for('admin.migration_status') }}">
+    <a class="admin-tile admin-card" href="{{ url_for('admin.migration_status') }}" data-nav-url="{{ url_for('admin.migration_status') }}">
       <div class="tile-ico">🛠️</div>
       <div class="tile-title">Migrations</div>
       <div class="tile-sub">Check DB migration status</div>
     </a>
 
-    <a class="admin-tile admin-card" href="{{ url_for('admin.debug_workspace') }}">
+    <a class="admin-tile admin-card" href="{{ url_for('admin.debug_workspace') }}" data-nav-url="{{ url_for('admin.debug_workspace') }}">
       <div class="tile-ico">🧰</div>
       <div class="tile-title">Debug</div>
       <div class="tile-sub">Debug workspace & helpers</div>
     </a>
+    </div> <!-- /.admin-grid -->
+  </div> <!-- /.admin-section -->
+
+  <div class="admin-section surface-panel">
+    <h3>SaaS foundation</h3>
+    <div class="admin-grid">
+      <a class="admin-tile admin-card" href="{{ url_for('admin.tenant_overview') }}" data-nav-url="{{ url_for('admin.tenant_overview') }}">
+        <div class="tile-ico"><i class="fas fa-building"></i></div>
+        <div class="tile-title">Tenants</div>
+        <div class="tile-sub">Workspace scope · {{ current_tenant_role or 'member' }}</div>
+      </a>
+
+      <a class="admin-tile admin-card" href="{{ url_for('admin.job_overview') }}" data-nav-url="{{ url_for('admin.job_overview') }}">
+        <div class="tile-ico"><i class="fas fa-tasks"></i></div>
+        <div class="tile-title">Jobs</div>
+        <div class="tile-sub">Reliable background work · {{ total_jobs }}</div>
+      </a>
+
+      <a class="admin-tile admin-card" href="{{ url_for('admin.integration_events') }}" data-nav-url="{{ url_for('admin.integration_events') }}">
+        <div class="tile-ico"><i class="fas fa-plug"></i></div>
+        <div class="tile-title">Integration Events</div>
+        <div class="tile-sub">Outbox boundary · {{ total_events }}</div>
+      </a>
+    </div>
   </div>
 {% endblock %}

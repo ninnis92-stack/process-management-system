@@ -158,6 +158,39 @@ def main():
                             )
                         )
                     print("schema_fix=special_email_config.nudge_min_delay_hours_added")
+                # ensure interval/delay columns are stored as floats on
+                # databases that support strong typing; this is a no-op on
+                # SQLite as it treats types loosely.
+                if (
+                    "special_email_config" in insp.get_table_names()
+                    and "nudge_interval_hours" in special_cols
+                    and engine.dialect.name != "sqlite"
+                ):
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE special_email_config ALTER COLUMN nudge_interval_hours TYPE FLOAT"
+                                )
+                            )
+                        print("schema_fix=special_email_config.nudge_interval_hours_float")
+                    except Exception:
+                        pass
+                if (
+                    "special_email_config" in insp.get_table_names()
+                    and "nudge_min_delay_hours" in special_cols
+                    and engine.dialect.name != "sqlite"
+                ):
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE special_email_config ALTER COLUMN nudge_min_delay_hours TYPE FLOAT"
+                                )
+                            )
+                        print("schema_fix=special_email_config.nudge_min_delay_hours_float")
+                    except Exception:
+                        pass
                 if (
                     "special_email_config" in insp.get_table_names()
                     and "request_form_department" not in special_cols
@@ -470,6 +503,51 @@ def main():
                                     db.session.rollback()
                 except Exception:
                     pass
+
+                # if we have any workflows but no status options, bootstrap them
+                try:
+                    from app.models import StatusOption
+                    if (
+                        "workflow" in insp.get_table_names()
+                        and "status_option" in insp.get_table_names()
+                    ):
+                        # count existing status options using raw SQL to avoid ORM issues
+                        count = 0
+                        with engine.begin() as conn:
+                            count = conn.execute(text("SELECT count(*) FROM status_option")).scalar()
+                        if count == 0:
+                            # iterate workflows via ORM (safe because we've imported models)
+                            for wf in Workflow.query.all():
+                                spec = wf.spec or {}
+                                from app.admin.workflows import _normalize_workflow_spec
+                                spec = _normalize_workflow_spec(spec, wf.name)
+                                steps = spec.get("steps") or []
+                                for step in steps:
+                                    code = None
+                                    target = None
+                                    if isinstance(step, dict):
+                                        code = step.get("status") or step.get("code")
+                                        target = step.get("to_dept") or step.get("to")
+                                    elif isinstance(step, str):
+                                        code = step
+                                    if not code:
+                                        continue
+                                    label = code.replace("_", " ").title()
+                                    params = {"c": code, "l": label}
+                                    stmt = "INSERT INTO status_option (code,label"
+                                    if target:
+                                        stmt += ",target_department"
+                                        params["t"] = target
+                                    stmt += ") VALUES (:c,:l"
+                                    if target:
+                                        stmt += ",:t"
+                                    stmt += ")"
+                                    with engine.begin() as conn:
+                                        conn.execute(text(stmt), params)
+                            print("schema_fix=status_options_generated_from_workflows")
+                except Exception:
+                    # don't crash the release process for this bootstrap
+                    print("status_options_bootstrap_failed")
         except Exception as exc:
             print("schema_fix_failed", exc, file=sys.stderr)
 

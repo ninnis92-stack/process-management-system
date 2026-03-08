@@ -48,8 +48,147 @@ ACTION_TYPES = (
 )
 
 
-class User(db.Model, UserMixin):
+TENANT_ROLES = (
+    "platform_admin",
+    "tenant_admin",
+    "analyst",
+    "member",
+    "viewer",
+)
+
+
+class TenantScopedMixin:
+    """Mixin for records that belong to a single tenant."""
+
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenant.id"), nullable=True, index=True)
+
+
+class SubscriptionPlan(db.Model):
+    """Commercial plan metadata and configurable limits."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    name = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    max_users = db.Column(db.Integer, nullable=False, default=25)
+    max_requests_per_month = db.Column(db.Integer, nullable=False, default=2000)
+    max_departments = db.Column(db.Integer, nullable=False, default=10)
+    feature_flags_json = db.Column(db.JSON, nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    @classmethod
+    def get_default(cls):
+        plan = cls.query.filter_by(code="growth").first()
+        if plan:
+            return plan
+        plan = cls(
+            code="growth",
+            name="Growth",
+            description="Default internal SaaS plan for workflow teams.",
+            max_users=50,
+            max_requests_per_month=5000,
+            max_departments=12,
+            feature_flags_json={
+                "custom_branding": True,
+                "workflow_builder": True,
+                "audit_exports": True,
+                "event_outbox": True,
+            },
+        )
+        db.session.add(plan)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        return plan
+
+
+class Tenant(db.Model):
+    """Top-level customer account / workspace boundary."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    slug = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    plan_id = db.Column(db.Integer, db.ForeignKey("subscription_plan.id"), nullable=True)
+    plan = db.relationship("SubscriptionPlan", backref="tenants")
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    @classmethod
+    def get_default(cls):
+        tenant = cls.query.filter_by(slug="default").first()
+        if tenant:
+            return tenant
+        tenant = cls(name="Default Workspace", slug="default")
+        db.session.add(tenant)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        return tenant
+
+
+class TenantMembership(db.Model):
+    """Maps users to tenants with an explicit SaaS role."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey("tenant.id"), nullable=False, index=True)
+    tenant = db.relationship("Tenant", backref="memberships")
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    user = db.relationship("User", backref="tenant_memberships", foreign_keys=[user_id])
+    role = db.Column(db.String(40), nullable=False, default="member")
+    is_default = db.Column(db.Boolean, nullable=False, default=False)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("tenant_id", "user_id", name="uq_tenant_user_membership"),
+    )
+
+
+class JobRecord(TenantScopedMixin, db.Model):
+    """Persistent job ledger for reliable background work and observability."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_name = db.Column(db.String(120), nullable=False, index=True)
+    queue_name = db.Column(db.String(80), nullable=False, default="default")
+    status = db.Column(db.String(30), nullable=False, default="queued", index=True)
+    payload_json = db.Column(db.JSON, nullable=True)
+    result_json = db.Column(db.JSON, nullable=True)
+    error_text = db.Column(db.Text, nullable=True)
+    retry_count = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    started_at = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+
+
+class IntegrationEvent(TenantScopedMixin, db.Model):
+    """Outbound integration boundary event retained even before providers are connected."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_name = db.Column(db.String(120), nullable=False, index=True)
+    destination_kind = db.Column(db.String(60), nullable=False, default="outbox")
+    status = db.Column(db.String(30), nullable=False, default="pending", index=True)
+    payload_json = db.Column(db.JSON, nullable=True)
+    metadata_json = db.Column(db.JSON, nullable=True)
+    last_error = db.Column(db.Text, nullable=True)
+    delivered_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class User(TenantScopedMixin, db.Model, UserMixin):
     """Application user account (local or SSO-backed)."""
+
+    # relationship mapping to the Tenant record; explicit primaryjoin is
+    # required because the tenant_id column comes from the mixin rather than
+    # being defined directly on `User`.
+    tenant = db.relationship(
+        "Tenant",
+        primaryjoin="Tenant.id==User.tenant_id",
+        foreign_keys="[User.tenant_id]",
+        uselist=False,
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     sso_sub = db.Column(db.String(255), unique=True, nullable=True, index=True)
@@ -73,7 +212,7 @@ class User(db.Model, UserMixin):
     last_active_dept = db.Column(db.String(2), nullable=True)
 
 
-class Notification(db.Model):
+class Notification(TenantScopedMixin, db.Model):
     """In-app notification with optional deep link and dedupe key."""
 
     id = db.Column(db.Integer, primary_key=True)
@@ -98,7 +237,7 @@ class Notification(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
-class WebhookSubscription(db.Model):
+class WebhookSubscription(TenantScopedMixin, db.Model):
     """Outgoing webhook destinations registered by external systems."""
 
     id = db.Column(db.Integer, primary_key=True)
@@ -111,7 +250,7 @@ class WebhookSubscription(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-class ProcessMetricEvent(db.Model):
+class ProcessMetricEvent(TenantScopedMixin, db.Model):
     """Normalized process analytics event for request lifecycle tracking."""
 
     id = db.Column(db.Integer, primary_key=True)
@@ -138,7 +277,7 @@ class ProcessMetricEvent(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
 
 
-class MetricsConfig(db.Model):
+class MetricsConfig(TenantScopedMixin, db.Model):
     """Singleton configuration for process and user-efficiency metrics."""
 
     id = db.Column(db.Integer, primary_key=True)
@@ -174,7 +313,7 @@ class MetricsConfig(db.Model):
         return cfg
 
 
-class Request(db.Model):
+class Request(TenantScopedMixin, db.Model):
     """Primary work item moving across departments; may be guest-accessible."""
 
     id = db.Column(db.Integer, primary_key=True)
@@ -327,7 +466,7 @@ class Submission(db.Model):
     data = db.Column(db.JSON, nullable=True)
 
 
-class FormTemplate(db.Model):
+class FormTemplate(TenantScopedMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
@@ -342,7 +481,7 @@ class FormTemplate(db.Model):
     external_form_id = db.Column(db.String(255), nullable=True)
 
 
-class GuestForm(db.Model):
+class GuestForm(TenantScopedMixin, db.Model):
     """Admin-manageable guest form instance used for public/guest submissions.
 
     Allows per-form toggles such as requiring an SSO-linked account to submit.
@@ -385,7 +524,7 @@ class FormFieldOption(db.Model):
     order = db.Column(db.Integer, nullable=False, default=0)
 
 
-class DepartmentFormAssignment(db.Model):
+class DepartmentFormAssignment(TenantScopedMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     template_id = db.Column(
         db.Integer, db.ForeignKey("form_template.id"), nullable=False
@@ -437,7 +576,7 @@ class Attachment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-class SpecialEmailConfig(db.Model):
+class SpecialEmailConfig(TenantScopedMixin, db.Model):
     """Singleton configuration for special email/autoresponder and nudges."""
 
     id = db.Column(db.Integer, primary_key=True)
@@ -496,7 +635,7 @@ class SpecialEmailConfig(db.Model):
         return cfg
 
 
-class FeatureFlags(db.Model):
+class FeatureFlags(TenantScopedMixin, db.Model):
     """Singleton feature flags for admin toggles.
 
     Use `FeatureFlags.get()` to access the single row.
@@ -568,7 +707,7 @@ class FeatureFlags(db.Model):
         return cls()
 
 
-class RejectRequestConfig(db.Model):
+class RejectRequestConfig(TenantScopedMixin, db.Model):
     """Singleton configuration for assignee-driven request rejection."""
 
     id = db.Column(db.Integer, primary_key=True)
@@ -610,7 +749,7 @@ class RejectRequestConfig(db.Model):
         return False
 
 
-class StatusBucket(db.Model):
+class StatusBucket(TenantScopedMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     department_name = db.Column(db.String(10), nullable=True)
@@ -632,7 +771,7 @@ class BucketStatus(db.Model):
     order = db.Column(db.Integer, nullable=False, default=0)
 
 
-class AuditLog(db.Model):
+class AuditLog(TenantScopedMixin, db.Model):
     """Immutable audit trail for actions on a request."""
 
     id = db.Column(db.Integer, primary_key=True)
@@ -662,7 +801,7 @@ class AuditLog(db.Model):
     event_ts = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
-class SiteConfig(db.Model):
+class SiteConfig(TenantScopedMixin, db.Model):
     """Singleton site configuration for banner and rolling quotes."""
 
     id = db.Column(db.Integer, primary_key=True)
@@ -857,7 +996,7 @@ class SiteConfig(db.Model):
         return cfg
 
 
-class Department(db.Model):
+class Department(TenantScopedMixin, db.Model):
     """Optional persisted department metadata (code A/B/C and display label)."""
 
     id = db.Column(db.Integer, primary_key=True)
@@ -877,7 +1016,7 @@ class Department(db.Model):
         self.label = v
 
 
-class StatusOption(db.Model):
+class StatusOption(TenantScopedMixin, db.Model):
     """Admin-manageable metadata for status selections.
 
     Each row corresponds to a status code and can control where the
@@ -913,7 +1052,7 @@ class StatusOption(db.Model):
     notify_to_originator_only = db.Column(db.Boolean, nullable=False, default=False)
 
 
-class Workflow(db.Model):
+class Workflow(TenantScopedMixin, db.Model):
     """Admin-definable workflow specification.
 
     Stores an admin-editable JSON `spec` describing steps and transitions.
@@ -934,7 +1073,7 @@ class Workflow(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-class DepartmentEditor(db.Model):
+class DepartmentEditor(TenantScopedMixin, db.Model):
     """Per-department edit privileges assigned to users by admins."""
 
     id = db.Column(db.Integer, primary_key=True)
@@ -949,7 +1088,7 @@ class DepartmentEditor(db.Model):
     )
 
 
-class UserDepartment(db.Model):
+class UserDepartment(TenantScopedMixin, db.Model):
     """Additional department assignments for users.
 
     This table allows an admin to assign a user to multiple departments
@@ -969,7 +1108,7 @@ class UserDepartment(db.Model):
     )
 
 
-class IntegrationConfig(db.Model):
+class IntegrationConfig(TenantScopedMixin, db.Model):
     """Per-department integration configuration for outbound connectors.
 
     `kind` is one of: 'ticketing', 'webhook', 'inventory', 'verification'.
@@ -985,7 +1124,7 @@ class IntegrationConfig(db.Model):
     __table_args__ = (db.UniqueConstraint("department", "kind", name="uq_dept_kind"),)
 
 
-class NotificationRetention(db.Model):
+class NotificationRetention(TenantScopedMixin, db.Model):
     """Singleton configuration for notification retention and caps.
 
     - When `retain_until_eod` is True notifications that were read before
@@ -1026,7 +1165,7 @@ class NotificationRetention(db.Model):
         return cfg
 
 
-class EmailRouting(db.Model):
+class EmailRouting(TenantScopedMixin, db.Model):
     """Admin-managed mappings from received mailbox/email to department handlers.
 
     Multiple rows may exist for the same `recipient_email` to indicate that

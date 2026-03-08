@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
+{% from 'admin/_macros.html' import page_header %}
 
 {% block content %}
-<h2>Integrations</h2>
-<p><a href="{{ url_for('admin.create_integration') }}" class="btn btn-primary">New integration</a></p>
-<table class="table">
+{{ page_header('Integrations', url_for('admin.create_integration'), 'New integration', 'Integration control', 'Review provider bindings, enabled state, and normalized configuration for every department.') }}
+<section class="surface-panel table-shell">
+<div class="table-responsive">
+<table class="table align-middle mb-0">
   <thead><tr><th>Department</th><th>Kind</th><th>Provider</th><th>Version</th><th>Enabled</th><th>Config</th><th>Actions</th></tr></thead>
   <tbody>
   {% for i in integrations %}
@@ -13,7 +15,7 @@
       <td>{{ summaries[i.id].provider }}</td>
       <td>{{ summaries[i.id].version }}</td>
       <td>{{ 'yes' if i.enabled else 'no' }}</td>
-      <td><pre style="max-width:400px; white-space:pre-wrap;">{{ i.config or '' }}</pre></td>
+      <td><pre style="max-width:400px; white-space:pre-wrap; margin:0;">{{ i.config or '' }}</pre></td>
       <td>
         <a href="{{ url_for('admin.edit_integration', int_id=i.id) }}">Edit</a>
         <form method="post" action="{{ url_for('admin.delete_integration', int_id=i.id) }}" style="display:inline">
@@ -21,7 +23,11 @@
         </form>
       </td>
     </tr>
+  {% else %}
+    <tr><td colspan="7" class="text-muted">No integrations configured.</td></tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
+</section>
 {% endblock %}

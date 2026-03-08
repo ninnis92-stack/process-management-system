@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Admin</div>
+    <h3 class="page-header__title mb-0">{{ 'Edit' if tenant else 'New' }} Tenant</h3>
+  </div>
+</section>
+
+<section class="surface-panel">
+  <form method="post">
+    {{ form.csrf_token }}
+    <div class="mb-3">
+      {{ form.slug.label(class_="form-label") }}
+      {{ form.slug(class_="form-control") }}
+    </div>
+    <div class="mb-3">
+      {{ form.name.label(class_="form-label") }}
+      {{ form.name(class_="form-control") }}
+    </div>
+    <div class="form-check mb-3">
+      {{ form.is_active(class_="form-check-input") }}
+      {{ form.is_active.label(class_="form-check-label") }}
+    </div>
+    <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
+    <a href="{{ url_for('admin.tenant_overview') }}" class="btn btn-link">Cancel</a>
+  </form>
+</section>
+{% endblock %}

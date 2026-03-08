@@ -15,6 +15,9 @@
     <div class="form-check">
       {{ form.can_edit() }} {{ form.can_edit.label }}
     </div>
+    <div class="form-check mt-2">
+      {{ form.can_view_metrics() }} {{ form.can_view_metrics.label }}
+    </div>
     <div class="mt-3">
       <button class="btn btn-primary" type="submit">Save</button>
       <a href="{{ url_for('admin.list_dept_editors') }}" class="btn btn-secondary">Cancel</a>

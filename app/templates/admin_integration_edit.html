@@ -1,13 +1,20 @@
 {% extends 'base.html' %}
 
 {% block content %}
-  <h2>{{ 'Edit' if integration else 'New' }} Integration</h2>
+  <section class="page-header">
+    <div>
+      <div class="page-header__eyebrow">Integration control</div>
+      <h2 class="page-header__title mb-0">{{ 'Edit' if integration else 'New' }} Integration</h2>
+      <p class="page-header__lede mb-0">Maintain the normalized integration contract so future providers can share the same shape and admin workflow.</p>
+    </div>
+  </section>
   {% if scaffold %}
-    <div class="alert alert-info">
+    <div class="alert alert-info hero-note">
       <div><strong>{{ scaffold.label }}</strong></div>
       <div class="small">{{ scaffold.description }}</div>
     </div>
   {% endif %}
+  <section class="surface-panel mb-3">
   <form method="post">
     {{ form.hidden_tag() }}
     <div class="mb-3">
@@ -34,10 +41,12 @@
       <a href="{{ url_for('admin.list_integrations') }}" class="btn btn-secondary">Cancel</a>
     </div>
   </form>
+  </section>
 
-  <hr/>
-  <h5>Compatibility scaffold</h5>
-  <pre id="integrationScaffoldPreview" class="bg-light p-3 border rounded small">{{ (scaffold.default_config if scaffold else {})|tojson(indent=2) }}</pre>
+  <section class="surface-panel">
+    <h5 class="section-title">Compatibility scaffold</h5>
+    <pre id="integrationScaffoldPreview" class="bg-light p-3 border rounded small mb-0">{{ (scaffold.default_config if scaffold else {})|tojson(indent=2) }}</pre>
+  </section>
 
   <script>
     (function(){

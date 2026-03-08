@@ -13,11 +13,12 @@ from werkzeug.security import generate_password_hash
 
 from ..extensions import db, get_or_404
 from ..models import User
-from .forms import AdminCreateUserForm, SiteConfigForm, DepartmentForm, SSOAssignForm
+from .forms import SiteConfigForm, DepartmentForm
 from .forms import NotificationRetentionForm
 from ..models import Request as ReqModel, Artifact, Submission, SiteConfig, Department
 from ..models import StatusOption, DepartmentEditor
 from ..models import IntegrationConfig
+from ..models import Tenant, TenantMembership, JobRecord, IntegrationEvent
 from datetime import datetime, timedelta
 from flask import request as flask_request
 from ..models import (
@@ -37,11 +38,9 @@ from .forms import WorkflowForm
 from .forms import StatusBucketForm
 from .forms import FormTemplateAdminForm, FormFieldInlineForm
 from .forms import DepartmentAssignmentForm
-from .forms import BulkDepartmentAssignForm
 from ..models import FormTemplate, FormField, DepartmentFormAssignment
 from .forms import FieldVerificationForm
 from ..models import FieldVerification
-from ..models import UserDepartment
 from .forms import GuestFormAdminForm
 from ..models import GuestForm
 from ..requests_bp.workflow import owner_for_status
@@ -51,629 +50,19 @@ from ..services.integrations import (
     integration_config_summary,
     normalize_integration_config,
 )
+from ..services.field_verification import apply_bulk_verification_params
+from ..services.tenant_context import get_current_tenant, tenant_role_for_user, user_has_permission, ensure_user_tenant_membership
+from .utils import _is_admin_user
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
-
-def _normalize_department_code(value):
-    raw = (value or "").strip()
-    if not raw:
-        return ""
-    upper = raw.upper()
-    if upper in {"A", "B", "C"}:
-        return upper
-    compact = upper.replace("DEPARTMENT", "").replace("DEPT", "").strip()
-    return compact if compact in {"A", "B", "C"} else ""
-
-
-def _default_workflow_spec():
-    steps = [
-        {"from_dept": "A", "to_dept": "B", "status": "NEW_FROM_A"},
-        {"from_dept": "B", "to_dept": "B", "status": "B_IN_PROGRESS"},
-        {"from_dept": "B", "to_dept": "C", "status": "PENDING_C_REVIEW"},
-        {"from_dept": "C", "to_dept": "B", "status": "B_FINAL_REVIEW"},
-        {"from_dept": "B", "to_dept": "A", "status": "SENT_TO_A"},
-        {"from_dept": "A", "to_dept": "B", "status": "CLOSED"},
-    ]
-    transitions = []
-    for i in range(len(steps) - 1):
-        transitions.append(
-            {
-                "from": steps[i]["status"],
-                "to": steps[i + 1]["status"],
-                "from_status": steps[i]["status"],
-                "to_status": steps[i + 1]["status"],
-                "from_dept": steps[i].get("to_dept") or steps[i].get("from_dept"),
-                "to_dept": steps[i + 1].get("to_dept") or steps[i + 1].get("from_dept"),
-            }
-        )
-    return {"steps": steps, "transitions": transitions}
-
-
-def _normalize_workflow_spec(spec, workflow_name=None):
-    if not isinstance(spec, dict):
-        return spec
-
-    steps = spec.get("steps") or []
-    if not steps:
-        return spec
-    if any(
-        isinstance(step, dict) and (step.get("from_dept") or step.get("to_dept"))
-        for step in steps
-    ):
-        return spec
-
-    statuses = [str(step).strip() for step in steps if isinstance(step, str) and step.strip()]
-    if not statuses:
-        return spec
-
-    default_statuses = [step["status"] for step in _default_workflow_spec()["steps"]]
-    if statuses == default_statuses:
-        normalized = dict(spec)
-        normalized.update(_default_workflow_spec())
-        return normalized
-
-    rich_steps = []
-    prev_status = None
-    prev_to_dept = None
-    for status in statuses:
-        to_dept = _normalize_department_code(owner_for_status(status)) or prev_to_dept or "B"
-        if prev_status is None:
-            from_dept = "A" if status == "NEW_FROM_A" else to_dept
-        else:
-            from_dept = prev_to_dept or _normalize_department_code(owner_for_status(prev_status)) or to_dept
-        rich_steps.append(
-            {"from_dept": from_dept, "to_dept": to_dept, "status": status}
-        )
-        prev_status = status
-        prev_to_dept = to_dept
-
-    transitions = []
-    for i in range(len(rich_steps) - 1):
-        transitions.append(
-            {
-                "from": rich_steps[i]["status"],
-                "to": rich_steps[i + 1]["status"],
-                "from_status": rich_steps[i]["status"],
-                "to_status": rich_steps[i + 1]["status"],
-                "from_dept": rich_steps[i].get("to_dept") or rich_steps[i].get("from_dept"),
-                "to_dept": rich_steps[i + 1].get("to_dept") or rich_steps[i + 1].get("from_dept"),
-            }
-        )
-
-    normalized = dict(spec)
-    normalized["steps"] = rich_steps
-    normalized["transitions"] = transitions
-    return normalized
-
-
-def _build_status_options_map(workflow=None):
-    status_options_map = {"A": set(), "B": set(), "C": set()}
-
-    try:
-        for bs in BucketStatus.query.all():
-            dept = _normalize_department_code(
-                (bs.bucket.department_name or "") if bs.bucket else ""
-            )
-            if dept:
-                status_options_map.setdefault(dept, set()).add(bs.status_code)
-    except Exception:
-        pass
-
-    try:
-        for opt in StatusOption.query.order_by(StatusOption.code.asc()).all():
-            dept = _normalize_department_code(opt.target_department) or _normalize_department_code(owner_for_status(opt.code))
-            if dept:
-                status_options_map.setdefault(dept, set()).add(opt.code)
-    except Exception:
-        pass
-
-    try:
-        workflows = [workflow] if workflow is not None else Workflow.query.all()
-        for wf in workflows:
-            normalized = _normalize_workflow_spec(
-                getattr(wf, "spec", None), getattr(wf, "name", None)
-            ) or {}
-            for step in normalized.get("steps") or []:
-                if not isinstance(step, dict):
-                    continue
-                code = (step.get("status") or step.get("code") or "").strip()
-                depts = {
-                    _normalize_department_code(step.get("from_dept")),
-                    _normalize_department_code(step.get("to_dept")),
-                    _normalize_department_code(step.get("department")),
-                    _normalize_department_code(step.get("department_code")),
-                }
-                for dept in {d for d in depts if d}:
-                    if code:
-                        status_options_map.setdefault(dept, set()).add(code)
-    except Exception:
-        pass
-
-    return {dept: sorted(values) for dept, values in status_options_map.items() if values}
-
-
-def _workflow_scope_label(workflow):
-    explicit = (getattr(workflow, "department_code", None) or "").strip()
-    if explicit:
-        return explicit
-
-    spec = getattr(workflow, "spec", None) or {}
-    steps = spec.get("steps") if isinstance(spec, dict) else []
-    departments = []
-    seen = set()
-
-    for step in steps or []:
-        if not isinstance(step, dict):
-            continue
-        for key in ("from_dept", "to_dept", "department", "department_code"):
-            value = (step.get(key) or "").strip() if isinstance(step.get(key), str) else ""
-            if value and value not in seen:
-                seen.add(value)
-                departments.append(value)
-
-    if departments:
-        return " / ".join(departments)
-
-    name = (getattr(workflow, "name", None) or "").upper()
-    inferred = [dept for dept in ("A", "B", "C") if dept in name]
-    if inferred:
-        return " / ".join(inferred)
-
-    return "Global"
-
-
-def _is_admin_user():
-    # Basic admin check
-    if not (current_user.is_authenticated and getattr(current_user, "is_admin", False)):
-        return False
-
-    # If SSO is enabled and admin access requires MFA, enforce it.
-    if current_app.config.get("SSO_ENABLED") and current_app.config.get(
-        "SSO_REQUIRE_MFA"
-    ):
-        # SSO login flow should set `session['sso_mfa'] = True` when MFA was verified.
-        return bool(session.get("sso_mfa", False))
-
-    return True
-
-
-@admin_bp.route("/users")
-@login_required
-def list_users():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    users = User.query.order_by(User.email).all()
-    return render_template("admin_users.html", users=users)
-
-
-@admin_bp.route("/users/new", methods=["GET", "POST"])
-@login_required
-def create_user():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    form = AdminCreateUserForm()
-    if form.validate_on_submit():
-        email = form.email.data.strip().lower()
-        name = form.name.data.strip() if form.name.data else None
-        dept = form.department.data
-        pw = form.password.data or "password123"
-        is_active = bool(form.is_active.data)
-        is_admin = (getattr(form, "role", None) and form.role.data == "admin") or bool(
-            form.is_admin.data
-        )
-
-        existing = User.query.filter_by(email=email).first()
-        if existing:
-            existing.name = name or existing.name
-            existing.department = dept
-            if form.password.data:
-                existing.password_hash = generate_password_hash(
-                    pw, method="pbkdf2:sha256"
-                )
-            existing.is_active = is_active
-            existing.is_admin = is_admin
-            db.session.commit()
-            flash(f"Updated user {email}.", "success")
-            return redirect(url_for("admin.list_users"))
-
-        u = User(
-            email=email,
-            name=name,
-            department=dept,
-            password_hash=generate_password_hash(pw, method="pbkdf2:sha256"),
-            is_active=is_active,
-            is_admin=is_admin,
-        )
-        db.session.add(u)
-        db.session.commit()
-        flash(f"Created user {email}.", "success")
-        return redirect(url_for("admin.list_users"))
-
-    return render_template("admin_new_user.html", form=form)
-
-
-@admin_bp.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
-@login_required
-def edit_user(user_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    u = get_or_404(User, user_id)
-    form = AdminCreateUserForm(obj=u)
-    # don't prefill password
-    form.password.data = None
-
-    if form.validate_on_submit():
-        u.email = form.email.data.strip().lower()
-        u.name = form.name.data.strip() if form.name.data else None
-        u.department = form.department.data
-        if form.password.data:
-            u.password_hash = generate_password_hash(
-                form.password.data, method="pbkdf2:sha256"
-            )
-        u.is_active = bool(form.is_active.data)
-        u.is_admin = (
-            getattr(form, "role", None) and form.role.data == "admin"
-        ) or bool(form.is_admin.data)
-        db.session.commit()
-        flash(f"Updated user {u.email}.", "success")
-        return redirect(url_for("admin.list_users"))
-
-    return render_template("admin_new_user.html", form=form, edit=u)
-
-
-@admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])
-@login_required
-def delete_user(user_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    if current_user.id == user_id:
-        flash("You cannot delete your own account.", "warning")
-        return redirect(url_for("admin.list_users"))
-
-    u = get_or_404(User, user_id)
-    db.session.delete(u)
-    db.session.commit()
-    flash(f"Deleted user {u.email}.", "success")
-    return redirect(url_for("admin.list_users"))
-
-
-@admin_bp.route("/users/<int:user_id>/departments", methods=["GET", "POST"])
-@login_required
-def manage_user_departments(user_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    u = get_or_404(User, user_id)
-    # Supported department codes (keep in sync with models/choices)
-    choices = ["A", "B", "C"]
-
-    if flask_request.method == "POST":
-        selected = flask_request.form.getlist("departments") or []
-        selected = [s.strip().upper() for s in selected if s and s.strip()]
-
-        # Remove existing assignments not in selected
-        existing = {ud.department: ud for ud in getattr(u, "departments", [])}
-        for dept_code, ud in list(existing.items()):
-            if dept_code not in selected:
-                try:
-                    db.session.delete(ud)
-                except Exception:
-                    db.session.rollback()
-
-        # Add any new assignments
-        for dept in selected:
-            if dept == getattr(u, "department", None):
-                # primary department should not be duplicated as UserDepartment
-                continue
-            if dept not in existing:
-                try:
-                    new = UserDepartment(user_id=u.id, department=dept)
-                    db.session.add(new)
-                except Exception:
-                    db.session.rollback()
-
-        try:
-            db.session.commit()
-            flash("Updated department assignments.", "success")
-        except Exception:
-            try:
-                db.session.rollback()
-            except Exception:
-                pass
-            flash("Failed to save assignments.", "danger")
-
-        return redirect(url_for("admin.list_users"))
-
-    # GET: show current assignments
-    assigned = [ud.department for ud in getattr(u, "departments", [])]
-    return render_template(
-        "admin_user_departments.html", user=u, choices=choices, assigned=assigned
-    )
-
-
-@admin_bp.route("/users/<int:user_id>/impersonate", methods=["POST"])
-@login_required
-def impersonate_user(user_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    if current_user.id == user_id:
-        flash("Cannot impersonate yourself.", "warning")
-        return redirect(url_for("admin.list_users"))
-
-    target = get_or_404(User, user_id)
-    if not target.is_active:
-        flash("Cannot impersonate an inactive user.", "warning")
-        return redirect(url_for("admin.list_users"))
-    # record admin id and the department to impersonate
-    session["impersonate_admin_id"] = current_user.id
-    session["impersonate_dept"] = target.department
-    session["impersonate_started_at"] = datetime.utcnow().isoformat()
-
-    # add an audit entry (system-level; request_id left null)
-    entry = AuditLog(
-        request_id=None,
-        actor_type="user",
-        actor_user_id=current_user.id,
-        actor_label=current_user.email,
-        action_type="impersonation_start",
-        note=f"Started impersonation as department {target.department}",
-        event_ts=datetime.utcnow(),
-    )
-    db.session.add(entry)
-    db.session.commit()
-
-    flash(
-        f"Now acting as a member of Dept {target.department} (you remain {current_user.email}).",
-        "info",
-    )
-    return redirect(url_for("requests.dashboard"))
-
-
-@admin_bp.route("/impersonate/dept", methods=["POST"])
-@login_required
-def impersonate_dept():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    dept = flask_request.form.get("dept") or flask_request.args.get("dept")
-    if not dept or dept.upper() not in ("A", "B", "C"):
-        flash("Invalid department selected.", "warning")
-        return redirect(url_for("admin.list_users"))
-    dept = dept.upper()
-
-    session["impersonate_admin_id"] = current_user.id
-    session["impersonate_dept"] = dept
-    session["impersonate_started_at"] = datetime.utcnow().isoformat()
-
-    entry = AuditLog(
-        request_id=None,
-        actor_type="user",
-        actor_user_id=current_user.id,
-        actor_label=current_user.email,
-        action_type="impersonation_start",
-        note=f"Started impersonation as department {dept}",
-    )
-    db.session.add(entry)
-    db.session.commit()
-
-    flash(
-        f"Now acting as a member of Dept {dept} (you remain {current_user.email}).",
-        "info",
-    )
-    return redirect(url_for("requests.dashboard"))
-
-
-@admin_bp.route("/impersonate/stop", methods=["POST"])
-@login_required
-def stop_impersonation():
-    admin_id = session.get("impersonate_admin_id")
-    if not admin_id:
-        flash("Not currently impersonating.", "warning")
-        return redirect(url_for("requests.dashboard"))
-
-    # record stop audit
-    entry = AuditLog(
-        request_id=None,
-        actor_type="user",
-        actor_user_id=current_user.id,
-        actor_label=current_user.email,
-        action_type="impersonation_stop",
-        note=f"Stopped impersonation; admin {current_user.email} restored their session",
-        event_ts=datetime.utcnow(),
-    )
-    db.session.add(entry)
-    db.session.commit()
-
-    # clear impersonation flags
-    session.pop("impersonate_admin_id", None)
-    session.pop("impersonate_dept", None)
-    session.pop("impersonate_started_at", None)
-    flash("Stopped acting-as; returned to your normal admin session.", "success")
-    return redirect(url_for("admin.list_users"))
-
-
-@admin_bp.route("/set_self_admin", methods=["POST"])
-@login_required
-def set_self_admin():
-    """Allow a logged-in user to mark their account as admin when enabled via config.
-
-    This action is gated by the `ALLOW_SELF_ADMIN` config flag to avoid accidental
-    elevation in production environments.
-    """
-    if not current_app.config.get("ALLOW_SELF_ADMIN"):
-        flash("Self-admin feature is not enabled on this instance.", "danger")
-        return redirect(flask_request.referrer or url_for("requests.dashboard"))
-
-    # mark the current user as admin
-    current_user.is_admin = True
-    try:
-        db.session.commit()
-        flash("Your account has been updated to admin.", "success")
-    except Exception:
-        try:
-            db.session.rollback()
-        except Exception:
-            pass
-        flash("Failed to update admin status.", "danger")
-
-    return redirect(flask_request.referrer or url_for("admin.index"))
-
-
-@admin_bp.route("/monitor")
-@login_required
-def monitor():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    dept = (flask_request.args.get("dept") or "B").upper()
-    now = datetime.utcnow()
-    cutoff = now - timedelta(hours=24)
-
-    # Gather admin-only metrics
-    total_users = User.query.count()
-    active_users = User.query.filter_by(is_active=True).count()
-    admin_count = User.query.filter_by(is_admin=True).count()
-    recent_email_issues = (
-        Notification.query.filter(
-            Notification.type.in_(["email_failed", "email_skipped"])
-        )
-        .order_by(Notification.created_at.desc())
-        .limit(20)
-        .all()
-    )
-
-    if dept == "A":
-        # Show requests created by users in Dept A (monitoring view)
-        reqs = (
-            ReqModel.query.join(User, ReqModel.created_by_user_id == User.id)
-            .filter(User.department == "A")
-            .order_by(ReqModel.updated_at.desc())
-            .all()
-        )
-        dashboard_html = render_template(
-            "dashboard.html", mode="A", requests=reqs, now=now
-        )
-        return render_template(
-            "admin_monitor.html",
-            dept=dept,
-            dashboard_html=dashboard_html,
-            total_users=total_users,
-            active_users=active_users,
-            admin_count=admin_count,
-            recent_email_issues=recent_email_issues,
-        )
-
-    if dept == "B":
-        # Build buckets similar to Dept B dashboard but for monitoring.
-        # Use department-scoped queries so monitoring honors handoffs as well.
-        from ..utils.dept_scope import scope_requests_for_department
-
-        base_b = scope_requests_for_department(ReqModel.query, "B")
-        buckets = {
-            "New from A": base_b.filter(ReqModel.status == "NEW_FROM_A")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "In progress by Department B": base_b.filter(
-                ReqModel.status == "B_IN_PROGRESS"
-            )
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Pending review from Department A": base_b.filter(
-                ReqModel.status == "WAITING_ON_A_RESPONSE"
-            )
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Needs changes": base_b.filter(ReqModel.status == "C_NEEDS_CHANGES")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Exec approval required": base_b.filter(ReqModel.status == "EXEC_APPROVAL")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Approved by C": base_b.filter(ReqModel.status == "C_APPROVED")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Final review": base_b.filter(ReqModel.status == "B_FINAL_REVIEW")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Sent to A": base_b.filter(ReqModel.status == "SENT_TO_A")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Under review by Department C": base_b.filter(
-                ReqModel.status == "PENDING_C_REVIEW"
-            )
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Closed": base_b.filter(ReqModel.status == "CLOSED")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "All (B)": base_b.order_by(ReqModel.updated_at.desc()).all(),
-        }
-
-        status_codes = [
-            "B_IN_PROGRESS",
-            "WAITING_ON_A_RESPONSE",
-            "PENDING_C_REVIEW",
-            "EXEC_APPROVAL",
-            "B_FINAL_REVIEW",
-            "SENT_TO_A",
-            "CLOSED",
-        ]
-        status_counts = {
-            code: base_b.filter(ReqModel.status == code).count()
-            for code in status_codes
-        }
-
-        dashboard_html = render_template(
-            "dashboard.html",
-            mode="B",
-            buckets=buckets,
-            status_counts=status_counts,
-            now=now,
-        )
-        return render_template(
-            "admin_monitor.html",
-            dept=dept,
-            dashboard_html=dashboard_html,
-            total_users=total_users,
-            active_users=active_users,
-            admin_count=admin_count,
-            recent_email_issues=recent_email_issues,
-        )
-
-    if dept == "C":
-        pending = (
-            ReqModel.query.filter_by(status="PENDING_C_REVIEW")
-            .order_by(ReqModel.updated_at.desc())
-            .all()
-        )
-        dashboard_html = render_template(
-            "dashboard.html", mode="C", requests=pending, now=now
-        )
-        return render_template(
-            "admin_monitor.html",
-            dept=dept,
-            dashboard_html=dashboard_html,
-            total_users=total_users,
-            active_users=active_users,
-            admin_count=admin_count,
-            recent_email_issues=recent_email_issues,
-        )
-
-    flash("Unknown department", "warning")
-    return redirect(url_for("admin.monitor", dept="B"))
+# Load auxiliary handlers to keep this file from growing even more.
+# Load auxiliary handlers to keep this file from growing even more.
+# ``tenants`` and ``users`` must be imported after ``admin_bp`` is defined so the
+# routes they declare can attach to the same blueprint.
+from . import tenants  # noqa: F401, E402
+from . import users    # noqa: F401, E402
+from . import workflows  # noqa: F401, E402
 
 
 @admin_bp.route("/guest_forms")
@@ -797,15 +186,152 @@ def index():
         flash("Access denied.", "danger")
         return redirect(url_for("requests.dashboard"))
 
+    tenant = get_current_tenant()
     total_users = User.query.count()
     total_depts = Department.query.count()
     total_audit = AuditLog.query.count()
+    total_jobs = JobRecord.query.count()
+    total_events = IntegrationEvent.query.count()
+    total_tenants = Tenant.query.count()
     return render_template(
         "admin_index.html",
         total_users=total_users,
         total_depts=total_depts,
         total_audit=total_audit,
+        total_jobs=total_jobs,
+        total_events=total_events,
+        total_tenants=total_tenants,
+        current_tenant_name=getattr(tenant, "name", "Default Workspace"),
+        current_tenant_role=tenant_role_for_user(current_user),
     )
+
+
+@admin_bp.route("/monitor")
+@login_required
+def monitor():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    dept = (flask_request.args.get("dept") or "B").upper()
+    now = datetime.utcnow()
+    cutoff = now - timedelta(hours=24)
+
+    # Gather admin-only metrics
+    total_users = User.query.count()
+    active_users = User.query.filter_by(is_active=True).count()
+    admin_count = User.query.filter_by(is_admin=True).count()
+    recent_email_issues = (
+        Notification.query.filter(
+            Notification.type.in_(["email_failed", "email_skipped"])
+        )
+        .order_by(Notification.created_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    if dept == "A":
+        reqs = (
+            ReqModel.query.join(User, ReqModel.created_by_user_id == User.id)
+            .filter(User.department == "A")
+            .order_by(ReqModel.updated_at.desc())
+            .all()
+        )
+        dashboard_html = render_template(
+            "dashboard.html", mode="A", requests=reqs, now=now
+        )
+        return render_template(
+            "admin_monitor.html",
+            dept=dept,
+            dashboard_html=dashboard_html,
+            total_users=total_users,
+            active_users=active_users,
+            admin_count=admin_count,
+            recent_email_issues=recent_email_issues,
+        )
+
+    if dept == "B":
+        from ..utils.dept_scope import scope_requests_for_department
+
+        base_b = scope_requests_for_department(ReqModel.query, "B")
+        buckets = {
+            "New from A": base_b.filter(ReqModel.status == "NEW_FROM_A")
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "In progress by Department B": base_b.filter(
+                ReqModel.status == "B_IN_PROGRESS"
+            )
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "Pending review from Department A": base_b.filter(
+                ReqModel.status == "WAITING_ON_A_RESPONSE"
+            )
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "Needs changes": base_b.filter(ReqModel.status == "C_NEEDS_CHANGES")
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+        }
+
+        dashboard_html = render_template(
+            "dashboard.html",
+            mode="B",
+            buckets=buckets,
+            now=now,
+        )
+        return render_template(
+            "admin_monitor.html",
+            dept=dept,
+            dashboard_html=dashboard_html,
+            total_users=total_users,
+            active_users=active_users,
+            admin_count=admin_count,
+            recent_email_issues=recent_email_issues,
+        )
+
+    if dept == "C":
+        pending = (
+            ReqModel.query.filter_by(status="PENDING_C_REVIEW")
+            .order_by(ReqModel.updated_at.desc())
+            .all()
+        )
+        dashboard_html = render_template(
+            "dashboard.html", mode="C", requests=pending, now=now
+        )
+        return render_template(
+            "admin_monitor.html",
+            dept=dept,
+            dashboard_html=dashboard_html,
+            total_users=total_users,
+            active_users=active_users,
+            admin_count=admin_count,
+            recent_email_issues=recent_email_issues,
+        )
+
+    flash("Unknown department", "warning")
+    return redirect(url_for("admin.monitor", dept="B"))
+
+
+@admin_bp.route("/jobs")
+@login_required
+def job_overview():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    jobs = JobRecord.query.order_by(JobRecord.created_at.desc()).limit(200).all()
+    return render_template("admin_jobs.html", jobs=jobs)
+
+
+@admin_bp.route("/integration_events")
+@login_required
+def integration_events():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    events = IntegrationEvent.query.order_by(IntegrationEvent.created_at.desc()).limit(200).all()
+    return render_template("admin_integration_events.html", events=events)
 
 
 @admin_bp.route("/debug_workspace")
@@ -819,7 +345,6 @@ def debug_workspace():
     path = (
         flask_request.args.get("path") or flask_request.args.get("url") or "/dashboard"
     )
-    # Basic safety: allow only internal paths starting with '/'
     try:
         path = unquote(path)
     except Exception:
@@ -877,113 +402,6 @@ def audit():
         audits = audits.filter(AuditLog.action_type.ilike(f"%{action}%"))
     audits = audits.limit(200).all()
     return render_template("admin_audit.html", audits=audits)
-
-
-@admin_bp.route("/assign_sso", methods=["GET", "POST"])
-@login_required
-def assign_sso():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    form = SSOAssignForm()
-    if form.validate_on_submit():
-        raw = form.emails.data or ""
-        emails = [e.strip().lower() for e in raw.splitlines() if e.strip()]
-        return redirect(url_for("admin.list_users"))
-        dept = form.department.data
-        updated = []
-        skipped = []
-        for em in emails:
-            u = User.query.filter_by(email=em).first()
-            if not u:
-                skipped.append((em, "not_found"))
-                continue
-            if not u.sso_sub:
-                skipped.append((em, "no_sso"))
-                continue
-            u.department = dept
-            u.is_active = True
-            updated.append(em)
-        if updated:
-            db.session.commit()
-        flash(f"Assigned {len(updated)} users to Dept {dept}.", "success")
-        if skipped:
-            flash("Skipped: " + ", ".join([f"{e}({r})" for e, r in skipped]), "warning")
-        return redirect(url_for("admin.list_users"))
-
-    return render_template("admin_assign_sso.html", form=form)
-
-
-@admin_bp.route("/bulk_assign_departments", methods=["GET", "POST"])
-@login_required
-def bulk_assign_departments():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    form = BulkDepartmentAssignForm()
-    if form.validate_on_submit():
-        dept = (form.department.data or "").strip().upper()
-        raw = form.emails.data or ""
-        # Accept newline or comma separated
-        parts = []
-        for line in raw.splitlines():
-            for token in line.split(","):
-                token = token.strip().lower()
-                if token:
-                    parts.append(token)
-
-        report_assigned = []
-        report_missing = []
-        report_skipped_primary = []
-        report_skipped_existing = []
-        report_errors = []
-
-        for em in parts:
-            try:
-                u = User.query.filter_by(email=em).first()
-            except Exception as exc:
-                report_errors.append({"email": em, "error": str(exc)})
-                continue
-            if not u:
-                report_missing.append(em)
-                continue
-
-            if getattr(u, "department", None) == dept:
-                report_skipped_primary.append(em)
-                continue
-
-            existing = UserDepartment.query.filter_by(
-                user_id=u.id, department=dept
-            ).first()
-            if existing:
-                report_skipped_existing.append(em)
-                continue
-
-            try:
-                ud = UserDepartment(user_id=u.id, department=dept)
-                db.session.add(ud)
-                db.session.commit()
-                report_assigned.append(em)
-            except Exception as exc:
-                try:
-                    db.session.rollback()
-                except Exception:
-                    pass
-                report_errors.append({"email": em, "error": str(exc)})
-
-        return render_template(
-            "admin_bulk_assign_report.html",
-            dept=dept,
-            assigned=report_assigned,
-            missing=report_missing,
-            skipped_primary=report_skipped_primary,
-            skipped_existing=report_skipped_existing,
-            errors=report_errors,
-        )
-
-    return render_template("admin_bulk_assign_departments.html", form=form)
 
 
 @admin_bp.route("/site_config", methods=["GET", "POST"])
@@ -1334,222 +752,6 @@ def preview_banner():
     return jsonify({'original': raw, 'cleaned': cleaned})
 
 
-@admin_bp.route("/workflows")
-@login_required
-def list_workflows():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    wfs = Workflow.query.order_by(Workflow.name.asc()).all()
-    workflow_scope_labels = {wf.id: _workflow_scope_label(wf) for wf in wfs}
-    return render_template(
-        "admin_workflows.html",
-        workflows=wfs,
-        workflow_scope_labels=workflow_scope_labels,
-    )
-
-
-@admin_bp.route("/workflows/new", methods=["GET", "POST"])
-@login_required
-def create_workflow():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    form = WorkflowForm()
-    if form.validate_on_submit():
-        wf = Workflow(
-            name=form.name.data.strip(),
-            description=(form.description.data or "").strip() or None,
-            department_code=(form.department_code.data or None) or None,
-            spec=None,
-            active=bool(form.active.data),
-        )
-        # attempt to parse JSON if provided, otherwise accept steps[] fallback
-        import json
-
-        if form.spec_json.data:
-            try:
-                wf.spec = json.loads(form.spec_json.data)
-            except Exception:
-                flash("Invalid JSON for workflow spec.", "danger")
-                return render_template("admin_workflow_form.html", form=form)
-        else:
-            steps = flask_request.form.getlist("steps[]") or flask_request.form.getlist(
-                "steps"
-            )
-            if steps:
-                steps = [s.strip() for s in steps if s and s.strip()]
-                transitions = []
-                for i in range(len(steps) - 1):
-                    transitions.append({"from": steps[i], "to": steps[i + 1]})
-                wf.spec = {"steps": steps, "transitions": transitions}
-        db.session.add(wf)
-        db.session.commit()
-        action = flask_request.form.get('action') or 'save'
-        # If admin chose to implement, create any missing StatusOption rows
-        if action == 'implement':
-            try:
-                from ..models import StatusOption
-
-                steps = []
-                if isinstance(wf.spec, dict):
-                    steps = wf.spec.get('steps') or []
-                for s in steps:
-                    code = None
-                    target_dept = None
-                    if isinstance(s, str):
-                        code = s
-                    elif isinstance(s, dict):
-                        code = s.get('status') or s.get('code')
-                        target_dept = s.get('to_dept') or s.get('to')
-                    if not code:
-                        continue
-                    existing = StatusOption.query.filter_by(code=code).first()
-                    if not existing:
-                        label = code.replace('_', ' ').title()
-                        opt = StatusOption(code=code, label=label)
-                        if target_dept:
-                            opt.target_department = target_dept or None
-                        db.session.add(opt)
-                db.session.commit()
-                flash('Workflow created and status options implemented.', 'success')
-            except Exception:
-                try:
-                    db.session.rollback()
-                except Exception:
-                    pass
-                flash('Workflow created but failed to implement status options.', 'warning')
-            return redirect(url_for('admin.list_workflows'))
-        flash("Workflow created.", "success")
-        return redirect(url_for("admin.list_workflows"))
-    return render_template(
-        "admin_workflow_form.html",
-        form=form,
-        status_options_map=_build_status_options_map(),
-    )
-
-
-@admin_bp.route("/workflows/<int:wf_id>/edit", methods=["GET", "POST"])
-@login_required
-def edit_workflow(wf_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    wf = get_or_404(Workflow, wf_id)
-    form = WorkflowForm(obj=wf)
-    # prefill spec_json
-    if flask_request.method == "GET" and wf.spec is not None:
-        import json
-
-        try:
-            form.spec_json.data = json.dumps(
-                _normalize_workflow_spec(wf.spec, wf.name), indent=2
-            )
-        except Exception:
-            form.spec_json.data = str(wf.spec)
-
-    if form.validate_on_submit():
-        wf.name = form.name.data.strip()
-        wf.description = (form.description.data or "").strip() or None
-        wf.department_code = (form.department_code.data or None) or None
-        wf.active = bool(form.active.data)
-        if form.spec_json.data:
-            import json
-
-            try:
-                wf.spec = json.loads(form.spec_json.data)
-            except Exception:
-                flash("Invalid JSON for workflow spec.", "danger")
-                return render_template("admin_workflow_form.html", form=form, wf=wf)
-        else:
-            steps = flask_request.form.getlist("steps[]") or flask_request.form.getlist(
-                "steps"
-            )
-            if steps:
-                steps = [s.strip() for s in steps if s and s.strip()]
-                transitions = []
-                for i in range(len(steps) - 1):
-                    transitions.append({"from": steps[i], "to": steps[i + 1]})
-                wf.spec = {"steps": steps, "transitions": transitions}
-            else:
-                wf.spec = None
-        db.session.commit()
-        action = flask_request.form.get('action') or 'save'
-        if action == 'implement':
-            try:
-                from ..models import StatusOption
-
-                steps = []
-                if isinstance(wf.spec, dict):
-                    steps = wf.spec.get('steps') or []
-                for s in steps:
-                    code = None
-                    target_dept = None
-                    if isinstance(s, str):
-                        code = s
-                    elif isinstance(s, dict):
-                        code = s.get('status') or s.get('code')
-                        target_dept = s.get('to_dept') or s.get('to')
-                    if not code:
-                        continue
-                    existing = StatusOption.query.filter_by(code=code).first()
-                    if not existing:
-                        label = code.replace('_', ' ').title()
-                        opt = StatusOption(code=code, label=label)
-                        if target_dept:
-                            opt.target_department = target_dept or None
-                        db.session.add(opt)
-                db.session.commit()
-                flash('Workflow updated and status options implemented.', 'success')
-            except Exception:
-                try:
-                    db.session.rollback()
-                except Exception:
-                    pass
-                flash('Workflow updated but failed to implement status options.', 'warning')
-            return redirect(url_for('admin.list_workflows'))
-        flash("Workflow updated.", "success")
-        return redirect(url_for("admin.list_workflows"))
-    return render_template(
-        "admin_workflow_form.html",
-        form=form,
-        wf=wf,
-        editor_spec=_normalize_workflow_spec(wf.spec, wf.name),
-        status_options_map=_build_status_options_map(wf),
-    )
-
-
-@admin_bp.route("/workflows/<int:wf_id>/delete", methods=["POST"])
-@login_required
-def delete_workflow(wf_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    wf = get_or_404(Workflow, wf_id)
-    db.session.delete(wf)
-    db.session.commit()
-    flash("Workflow deleted.", "success")
-    return redirect(url_for("admin.list_workflows"))
-
-
-@admin_bp.route("/workflows/<int:wf_id>/toggle", methods=["POST"])
-@login_required
-def toggle_workflow_active(wf_id: int):
-    if not _is_admin_user():
-        return jsonify({"error": "access_denied"}), 403
-    wf = get_or_404(Workflow, wf_id)
-    try:
-        wf.active = not bool(wf.active)
-        db.session.commit()
-        return jsonify({"ok": True, "active": bool(wf.active)})
-    except Exception:
-        try:
-            db.session.rollback()
-        except Exception:
-            pass
-        return jsonify({"ok": False}), 500
-
-
 @admin_bp.route("/unmapped-submissions")
 @login_required
 def unmapped_submissions():
@@ -1818,16 +1020,12 @@ def edit_field_verification(field_id: int):
                     "admin_field_verification.html", form=form, field=f, fv=fv
                 )
 
-        params["verify_each_separated_value"] = bool(
-            form.verify_each_separated_value.data
+        params = apply_bulk_verification_params(
+            params,
+            verify_each_separated_value=bool(form.verify_each_separated_value.data),
+            value_separator=form.value_separator.data,
+            bulk_input_hint=form.bulk_input_hint.data,
         )
-        params["value_separator"] = (
-            (form.value_separator.data or "").strip() or ","
-        )
-        if (form.bulk_input_hint.data or "").strip():
-            params["bulk_input_hint"] = form.bulk_input_hint.data.strip()
-        else:
-            params.pop("bulk_input_hint", None)
 
         # Replace existing mapping (simple policy: create new row)
         new = FieldVerification(
@@ -2573,101 +1771,6 @@ def list_departments():
     return render_template("admin_departments.html", departments=depts)
 
 
-@admin_bp.route("/status_options")
-@login_required
-def list_status_options():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    # load existing options, but if none are present try to bootstrap from any
-    # workflows that might exist.  this helps new installs or cases where the
-    # workflow page has been used but the admin never clicked "implement".
-    opts = []
-    try:
-        opts = StatusOption.query.order_by(StatusOption.code).all()
-    except Exception:
-        # Defensive: if DB schema is out-of-date (missing columns), avoid 500
-        # and show an empty list with a helpful admin notice.
-        current_app.logger.exception(
-            "Failed to load StatusOption rows for admin list; DB schema may be missing migrations"
-        )
-        try:
-            inspector = db.inspect(db.engine)
-            table_name = StatusOption.__tablename__
-            if not inspector.has_table(table_name):
-                try:
-                    StatusOption.__table__.create(bind=db.engine)
-                    flash(
-                        "Status options table was missing and has been created. Please run `alembic upgrade head` to synchronize migrations.",
-                        "warning",
-                    )
-                except Exception:
-                    current_app.logger.exception("Failed to create StatusOption table")
-                    flash(
-                        "Status options could not be loaded. Ensure DB migrations have been applied (run alembic upgrade head).",
-                        "danger",
-                    )
-                opts = []
-            else:
-                existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
-                model_cols = {c.name for c in StatusOption.__table__.columns}
-                missing = model_cols - existing_cols
-                if missing:
-                    flash(
-                        f"Status options schema mismatch: missing columns: {', '.join(sorted(missing))}. Run `alembic upgrade head`.",
-                        "danger",
-                    )
-                else:
-                    flash(
-                        "Status options could not be loaded due to an unexpected database error. Check application logs for details.",
-                        "danger",
-                    )
-                opts = []
-        except Exception:
-            current_app.logger.exception("Failed to inspect DB schema for StatusOption")
-            flash(
-                "Status options could not be loaded. Ensure DB migrations have been applied (run alembic upgrade head).",
-                "danger",
-            )
-            opts = []
-
-    # if the table exists but is currently empty, attempt to derive rows from any
-    # existing workflows so the admin has something visible immediately.
-    if not opts:
-        try:
-            generated = False
-            for wf in Workflow.query.all():
-                spec = _normalize_workflow_spec(wf.spec, wf.name)
-                steps = spec.get("steps") or []
-                for step in steps:
-                    code = None
-                    target_dept = None
-                    if isinstance(step, dict):
-                        code = step.get("status") or step.get("code")
-                        target_dept = step.get("to_dept") or step.get("to")
-                    elif isinstance(step, str):
-                        code = step
-                    if not code:
-                        continue
-                    if not StatusOption.query.filter_by(code=code).first():
-                        label = code.replace("_", " ").title()
-                        opt = StatusOption(code=code, label=label)
-                        if target_dept:
-                            opt.target_department = target_dept or None
-                        db.session.add(opt)
-                        generated = True
-            if generated:
-                db.session.commit()
-                flash("Status options generated from existing workflows.", "info")
-                opts = StatusOption.query.order_by(StatusOption.code).all()
-        except Exception:
-            # if something goes wrong here just log and continue with empty list
-            current_app.logger.exception("Failed to bootstrap status options from workflows")
-
-    return render_template("admin_status_options.html", status_options=opts)
-
-
 @admin_bp.route("/migrations/status")
 @login_required
 def migration_status():
@@ -2720,147 +1823,6 @@ def migration_status():
     return render_template("admin_migration_status.html", status=status)
 
 
-@admin_bp.route("/status_options/new", methods=["GET", "POST"])
-@login_required
-def create_status_option():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    from .forms import StatusOptionForm
-
-    form = StatusOptionForm()
-    if form.validate_on_submit():
-        code = form.code.data.strip()
-        opt = StatusOption(
-            code=code,
-            label=form.label.data.strip(),
-            target_department=(form.target_department.data or None),
-            notify_enabled=bool(form.notify_enabled.data),
-            notify_on_transfer_only=bool(form.notify_on_transfer_only.data),
-            notify_to_originator_only=bool(
-                getattr(form, "notify_to_originator_only", False).data
-                if getattr(form, "notify_to_originator_only", None)
-                else False
-            ),
-            email_enabled=bool(
-                getattr(form, "email_enabled", False).data
-                if getattr(form, "email_enabled", None)
-                else False
-            ),
-            screenshot_required=bool(
-                getattr(form, "screenshot_required", False).data
-                if getattr(form, "screenshot_required", None)
-                else False
-            ),
-        )
-        db.session.add(opt)
-        db.session.commit()
-        flash("Status option created.", "success")
-        return redirect(url_for("admin.list_status_options"))
-    return render_template("admin_status_edit.html", form=form)
-
-
-@admin_bp.route("/status_options/<int:opt_id>/edit", methods=["GET", "POST"])
-@login_required
-def edit_status_option(opt_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    from .forms import StatusOptionForm
-
-    opt = get_or_404(StatusOption, opt_id)
-    form = StatusOptionForm(obj=opt)
-    if form.validate_on_submit():
-        opt.code = form.code.data.strip()
-        opt.label = form.label.data.strip()
-        opt.target_department = form.target_department.data or None
-        opt.notify_enabled = bool(form.notify_enabled.data)
-        opt.notify_on_transfer_only = bool(form.notify_on_transfer_only.data)
-        opt.notify_to_originator_only = bool(
-            getattr(form, "notify_to_originator_only", False).data
-            if getattr(form, "notify_to_originator_only", None)
-            else False
-        )
-        opt.email_enabled = bool(
-            getattr(form, "email_enabled", False).data
-            if getattr(form, "email_enabled", None)
-            else False
-        )
-        opt.screenshot_required = bool(
-            getattr(form, "screenshot_required", False).data
-            if getattr(form, "screenshot_required", None)
-            else False
-        )
-        db.session.commit()
-        flash("Status option updated.", "success")
-        return redirect(url_for("admin.list_status_options"))
-    return render_template("admin_status_edit.html", form=form, opt=opt)
-
-
-@admin_bp.route("/status_options/<int:opt_id>/delete", methods=["POST"])
-@login_required
-def delete_status_option(opt_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    opt = get_or_404(StatusOption, opt_id)
-    db.session.delete(opt)
-    db.session.commit()
-    flash("Status option deleted.", "success")
-    return redirect(url_for("admin.list_status_options"))
-
-
-@admin_bp.route("/status_options/<int:opt_id>/toggle_screenshot", methods=["POST"])
-@login_required
-def toggle_status_screenshot(opt_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    opt = get_or_404(StatusOption, opt_id)
-    try:
-        opt.screenshot_required = not bool(opt.screenshot_required)
-        db.session.commit()
-        flash("Screenshot requirement updated.", "success")
-    except Exception:
-        db.session.rollback()
-        flash("Failed to update screenshot requirement.", "danger")
-    return redirect(url_for("admin.list_status_options"))
-
-
-@admin_bp.route("/status_options/<int:opt_id>/toggle_notify_scope", methods=["POST"])
-@login_required
-def toggle_status_notify_scope(opt_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    opt = get_or_404(StatusOption, opt_id)
-    try:
-        opt.notify_to_originator_only = not bool(
-            getattr(opt, "notify_to_originator_only", False)
-        )
-        db.session.commit()
-        flash("Notification scope updated.", "success")
-    except Exception:
-        db.session.rollback()
-        flash("Failed to update notification scope.", "danger")
-    return redirect(url_for("admin.list_status_options"))
-
-
-@admin_bp.route("/status_options/<int:opt_id>/toggle_email", methods=["POST"])
-@login_required
-def toggle_status_email(opt_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    opt = get_or_404(StatusOption, opt_id)
-    try:
-        opt.email_enabled = not bool(getattr(opt, "email_enabled", False))
-        db.session.commit()
-        flash("Email setting updated for that status.", "success")
-    except Exception:
-        db.session.rollback()
-        flash("Failed to update email setting.", "danger")
-    return redirect(url_for("admin.list_status_options"))
 
 
 @admin_bp.route("/dept_editors")
@@ -2892,286 +1854,6 @@ def list_integrations():
     )
 
 
-@admin_bp.route("/buckets/import_default", methods=["POST"])
-@login_required
-def import_default_buckets():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    # Recommended default buckets for Dept B (used by tests)
-    try:
-        # In Progress bucket
-        b = StatusBucket.query.filter_by(
-            name="In Progress", department_name="B"
-        ).first()
-        if not b:
-            b = StatusBucket(
-                name="In Progress", department_name="B", order=0, active=True
-            )
-            db.session.add(b)
-            db.session.flush()
-            bs = BucketStatus(bucket_id=b.id, status_code="B_IN_PROGRESS", order=0)
-            db.session.add(bs)
-
-        # Waiting bucket
-        w = StatusBucket.query.filter_by(name="Waiting", department_name="B").first()
-        if not w:
-            w = StatusBucket(name="Waiting", department_name="B", order=1, active=True)
-            db.session.add(w)
-            db.session.flush()
-            ws = BucketStatus(
-                bucket_id=w.id, status_code="WAITING_ON_A_RESPONSE", order=0
-            )
-            db.session.add(ws)
-
-        db.session.commit()
-        flash("Imported recommended buckets.", "success")
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Failed to import default buckets")
-        flash("Failed to import buckets.", "danger")
-    return redirect(url_for("admin.list_departments"))
-
-
-@admin_bp.route("/buckets")
-@login_required
-def list_buckets():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    buckets = StatusBucket.query.order_by(
-        StatusBucket.department_name.asc().nullsfirst(), StatusBucket.order.asc()
-    ).all()
-    return render_template("admin_buckets.html", buckets=buckets)
-
-
-@admin_bp.route("/buckets/new", methods=["GET", "POST"])
-@login_required
-def buckets_new():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    form = StatusBucketForm()
-    # populate workflow choices (global + any department-scoped active workflows)
-    wfs = (
-        Workflow.query.filter(Workflow.active == True)
-        .order_by(Workflow.name.asc())
-        .all()
-    )
-    form.workflow_id.choices = [(0, "-- None --")] + [
-        (w.id, w.name + (f" (Dept {w.department_code})" if w.department_code else ""))
-        for w in wfs
-    ]
-
-    if form.validate_on_submit():
-        b = StatusBucket(
-            name=form.name.data.strip(),
-            department_name=(form.department_name.data or None) or None,
-            order=int(form.order.data or 0),
-            active=bool(form.active.data),
-        )
-        # assign workflow if selected
-        try:
-            sel = int(form.workflow_id.data or 0)
-        except Exception:
-            sel = 0
-        if sel:
-            b.workflow_id = sel
-        db.session.add(b)
-        db.session.commit()
-        flash("Bucket created.", "success")
-        return redirect(url_for("admin.list_buckets"))
-    return render_template("admin_bucket_form.html", form=form)
-
-
-@admin_bp.route("/buckets/<int:bucket_id>/edit", methods=["GET", "POST"])
-@login_required
-def buckets_edit(bucket_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    b = get_or_404(StatusBucket, bucket_id)
-    form = StatusBucketForm(obj=b)
-    # populate workflow choices scoped to department (or global)
-    if b.department_name:
-        wfs = (
-            Workflow.query.filter(
-                (Workflow.department_code == None)
-                | (Workflow.department_code == b.department_name)
-            )
-            .filter(Workflow.active == True)
-            .order_by(Workflow.name.asc())
-            .all()
-        )
-    else:
-        wfs = (
-            Workflow.query.filter(Workflow.active == True)
-            .order_by(Workflow.name.asc())
-            .all()
-        )
-    form.workflow_id.choices = [(0, "-- None --")] + [
-        (w.id, w.name + (f" (Dept {w.department_code})" if w.department_code else ""))
-        for w in wfs
-    ]
-    # prefill selected workflow in form when GET
-    if flask_request.method == "GET":
-        try:
-            form.workflow_id.data = int(b.workflow_id) if b.workflow_id else 0
-        except Exception:
-            form.workflow_id.data = 0
-
-    if form.validate_on_submit():
-        b.name = form.name.data.strip()
-        b.department_name = (form.department_name.data or None) or None
-        b.order = int(form.order.data or 0)
-        b.active = bool(form.active.data)
-        try:
-            sel = int(form.workflow_id.data or 0)
-        except Exception:
-            sel = 0
-        b.workflow_id = sel or None
-        db.session.commit()
-        flash("Bucket updated.", "success")
-        # handle bulk-add statuses if provided
-        bulk = (form.bulk_statuses.data or "").strip()
-        if bulk:
-            lines = [l.strip() for l in bulk.splitlines() if l.strip()]
-            if lines:
-                # compute next order base
-                existing = b.statuses.order_by(BucketStatus.order.desc()).first()
-                base = existing.order + 1 if existing else 0
-                for idx, code in enumerate(lines):
-                    ns = BucketStatus(
-                        bucket_id=b.id, status_code=code, order=base + idx
-                    )
-                    db.session.add(ns)
-                db.session.commit()
-                flash(f"Added {len(lines)} statuses to bucket.", "success")
-        return redirect(url_for("admin.list_buckets"))
-
-    # handle adding a new status code via POST param (supports select or free text)
-    if flask_request.method == "POST" and (
-        flask_request.form.get("new_status_code")
-        or flask_request.form.get("new_status_code_select")
-    ):
-        code = (
-            flask_request.form.get("new_status_code_select")
-            or flask_request.form.get("new_status_code")
-            or ""
-        ).strip()
-        try:
-            ordv = int(flask_request.form.get("new_status_order") or 0)
-        except Exception:
-            ordv = 0
-        if code:
-            ns = BucketStatus(bucket_id=b.id, status_code=code, order=ordv)
-            db.session.add(ns)
-            db.session.commit()
-            flash("Added status to bucket.", "success")
-        return redirect(url_for("admin.buckets_edit", bucket_id=b.id))
-
-    statuses = b.statuses.order_by(BucketStatus.order.asc()).all()
-
-    # Load available status options and workflows scoped to this bucket's department
-    if b.department_name:
-        status_opts = (
-            StatusOption.query.filter(
-                (StatusOption.target_department == None)
-                | (StatusOption.target_department == b.department_name)
-            )
-            .order_by(StatusOption.code.asc())
-            .all()
-        )
-        workflows = (
-            Workflow.query.filter(
-                (Workflow.department_code == None)
-                | (Workflow.department_code == b.department_name)
-            )
-            .filter(Workflow.active == True)
-            .order_by(Workflow.name.asc())
-            .all()
-        )
-    else:
-        status_opts = StatusOption.query.order_by(StatusOption.code.asc()).all()
-        workflows = (
-            Workflow.query.filter(Workflow.active == True)
-            .order_by(Workflow.name.asc())
-            .all()
-        )
-
-    return render_template(
-        "admin_bucket_form.html",
-        form=form,
-        bucket=b,
-        statuses=statuses,
-        status_options=status_opts,
-        workflows=workflows,
-    )
-
-
-@admin_bp.route("/buckets/<int:bucket_id>/delete", methods=["POST"])
-@login_required
-def buckets_delete(bucket_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    b = get_or_404(StatusBucket, bucket_id)
-    db.session.delete(b)
-    db.session.commit()
-    flash("Bucket deleted.", "success")
-    return redirect(url_for("admin.list_buckets"))
-
-
-@admin_bp.route(
-    "/buckets/<int:bucket_id>/status/<int:status_id>/delete", methods=["POST"]
-)
-@login_required
-def buckets_status_delete(bucket_id: int, status_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    s = get_or_404(BucketStatus, status_id)
-    db.session.delete(s)
-    db.session.commit()
-    flash("Bucket status removed.", "success")
-    return redirect(url_for("admin.buckets_edit", bucket_id=bucket_id))
-
-
-@admin_bp.route("/buckets/<int:bucket_id>/reorder_statuses", methods=["POST"])
-@login_required
-def buckets_reorder_statuses(bucket_id: int):
-    if not _is_admin_user():
-        return jsonify({"error": "access_denied"}), 403
-
-    b = get_or_404(StatusBucket, bucket_id)
-    try:
-        payload = flask_request.get_json(force=True)
-    except Exception:
-        payload = None
-    if (
-        not payload
-        or "order" not in payload
-        or not isinstance(payload.get("order"), list)
-    ):
-        return jsonify({"error": "invalid_payload"}), 400
-
-    ids = [int(x) for x in payload.get("order") if str(x).isdigit()]
-    # ensure all ids belong to this bucket
-    items = {
-        s.id: s
-        for s in BucketStatus.query.filter(
-            BucketStatus.bucket_id == b.id, BucketStatus.id.in_(ids)
-        ).all()
-    }
-    # apply new order
-    for idx, sid in enumerate(ids):
-        s = items.get(sid)
-        if s:
-            s.order = int(idx)
-            db.session.add(s)
-    db.session.commit()
-    return jsonify({"ok": True})
 
 
 @admin_bp.route("/integrations/new", methods=["GET", "POST"])

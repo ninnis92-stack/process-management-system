@@ -40,6 +40,11 @@ def test_departments_crud_and_site_config(app, client):
     rv = client.get("/admin/departments")
     assert rv.status_code == 200
 
+    # user list should show workspace column now that multi‑tenant is enabled
+    rv = client.get("/admin/users")
+    assert rv.status_code == 200
+    assert b"Workspace" in rv.data
+
     # create new department
     rv = client.post(
         "/admin/departments/new",
@@ -242,6 +247,7 @@ def test_admin_dashboard_cards_navigate(app, client):
     assert b"data-nav-url=\"/admin/status_options\"" in rv.data
     assert b"data-nav-url=\"/admin/workflows\"" in rv.data
     assert b"data-nav-url=\"/admin/buckets\"" in rv.data
+    assert b"data-nav-url=\"/admin/tenants\"" in rv.data
     assert b"onclick=\"window.location.assign('/admin/site_config'); return false;\"" in rv.data
     assert b"onclick=\"window.location.assign('/admin/site_config#quotes-settings'); return false;\"" in rv.data
     assert b"#quotes-settings" in rv.data

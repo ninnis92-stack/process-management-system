@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+    <div>
+      <h2 class="mb-0">Metrics Settings</h2>
+      <p class="text-muted mb-0">Control what process events are tracked and how efficiency summaries are calculated.</p>
+    </div>
+    <a href="{{ url_for('admin.metrics_overview') }}" class="btn btn-outline-primary">Open full metrics dashboard</a>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <form method="post" class="card">
+        <div class="card-body">
+          {{ form.hidden_tag() }}
+
+          <div class="form-check mb-3">
+            {{ form.enabled(class_='form-check-input') }}
+            {{ form.enabled.label(class_='form-check-label') }}
+          </div>
+
+          <div class="form-check mb-3">
+            {{ form.track_request_created(class_='form-check-input') }}
+            {{ form.track_request_created.label(class_='form-check-label') }}
+          </div>
+
+          <div class="form-check mb-3">
+            {{ form.track_assignments(class_='form-check-input') }}
+            {{ form.track_assignments.label(class_='form-check-label') }}
+          </div>
+
+          <div class="form-check mb-3">
+            {{ form.track_status_changes(class_='form-check-input') }}
+            {{ form.track_status_changes.label(class_='form-check-label') }}
+          </div>
+
+          <div class="mb-3">
+            {{ form.lookback_days.label(class_='form-label') }}
+            {{ form.lookback_days(class_='form-control') }}
+            <div class="form-text">Default reporting window used by summaries and efficiency charts.</div>
+          </div>
+
+          <div class="mb-3">
+            {{ form.user_metrics_limit.label(class_='form-label') }}
+            {{ form.user_metrics_limit(class_='form-control') }}
+            <div class="form-text">How many individual users to show in summary tables.</div>
+          </div>
+
+          <div class="mb-3">
+            {{ form.target_completion_hours.label(class_='form-label') }}
+            {{ form.target_completion_hours(class_='form-control') }}
+            <div class="form-text">Requests closed within this threshold are counted as on-target.</div>
+          </div>
+
+          <div class="mb-3">
+            {{ form.slow_event_threshold_hours.label(class_='form-label') }}
+            {{ form.slow_event_threshold_hours(class_='form-control') }}
+            <div class="form-text">Used to flag slow handoffs or long waits between tracked events.</div>
+          </div>
+
+          <button class="btn btn-primary">Save Metrics Settings</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Weekly snapshot</h5>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Tracked events</div>
+                <div class="fs-4 fw-semibold">{{ snapshot.summary.tracked_events_total }}</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Tracked requests</div>
+                <div class="fs-4 fw-semibold">{{ snapshot.summary.tracked_requests_total }}</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="border rounded p-3 h-100">
+                <div class="small text-muted">Active users</div>
+                <div class="fs-4 fw-semibold">{{ snapshot.summary.active_users_total }}</div>
+              </div>
+            </div>
+          </div>
+
+          <h6>Department flow</h6>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Dept</th>
+                  <th class="text-end">Tracked</th>
+                  <th class="text-end">Status</th>
+                  <th class="text-end">Assign</th>
+                  <th class="text-end">Avg gap (h)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in snapshot.by_dept %}
+                  <tr>
+                    <td><strong>{{ row.dept }}</strong></td>
+                    <td class="text-end">{{ row.tracked_events }}</td>
+                    <td class="text-end">{{ row.status_changes }}</td>
+                    <td class="text-end">{{ row.assignments }}</td>
+                    <td class="text-end">{{ row.avg_gap_hours if row.avg_gap_hours is not none else '—' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <h6>User efficiency snapshot</h6>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Dept</th>
+                  <th class="text-end">Events</th>
+                  <th class="text-end">Slow</th>
+                  <th class="text-end">Avg gap (h)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in snapshot.users %}
+                  <tr>
+                    <td>{{ row.email }}</td>
+                    <td>{{ row.department or '—' }}</td>
+                    <td class="text-end">{{ row.events }}</td>
+                    <td class="text-end">{{ row.slow_events }}</td>
+                    <td class="text-end">{{ row.avg_gap_hours if row.avg_gap_hours is not none else '—' }}</td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="5" class="text-muted">No user activity tracked yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+          <h5 class="card-title mb-1">Metrics explorer</h5>
+          <p class="text-muted mb-0">View all departments together or focus on a single department without leaving the settings page.</p>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('admin.metrics_overview', range=explorer.range_key, dept=explorer.selected_metric_department, q=explorer.q, user=explorer.user_filters) }}" class="btn btn-sm btn-outline-secondary">Open this view full screen</a>
+          <a href="{{ url_for('requests.metrics_ui', range=explorer.range_key, dept=explorer.selected_metric_department, q=explorer.q, user=explorer.user_filters) }}" class="btn btn-sm btn-outline-secondary">Open user metrics page</a>
+        </div>
+      </div>
+
+      <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+        <a href="{{ url_for('admin.metrics_config', range='daily', dept=explorer.selected_metric_department, q=explorer.q, user=explorer.user_filters) }}" class="btn btn-sm btn-outline-secondary {% if explorer.range_key=='daily' %}active{% endif %}">Daily</a>
+        <a href="{{ url_for('admin.metrics_config', range='weekly', dept=explorer.selected_metric_department, q=explorer.q, user=explorer.user_filters) }}" class="btn btn-sm btn-outline-secondary {% if explorer.range_key=='weekly' %}active{% endif %}">Weekly</a>
+        <a href="{{ url_for('admin.metrics_config', range='monthly', dept=explorer.selected_metric_department, q=explorer.q, user=explorer.user_filters) }}" class="btn btn-sm btn-outline-secondary {% if explorer.range_key=='monthly' %}active{% endif %}">Monthly</a>
+        <a href="{{ url_for('admin.metrics_config', range='yearly', dept=explorer.selected_metric_department, q=explorer.q, user=explorer.user_filters) }}" class="btn btn-sm btn-outline-secondary {% if explorer.range_key=='yearly' %}active{% endif %}">Yearly</a>
+        <a href="{{ url_for('admin.metrics_config', range='all', dept=explorer.selected_metric_department, q=explorer.q, user=explorer.user_filters) }}" class="btn btn-sm btn-outline-secondary {% if explorer.range_key=='all' %}active{% endif %}">All time</a>
+      </div>
+
+      <div class="mb-3 d-flex flex-wrap gap-2">
+        <a href="{{ url_for('admin.metrics_config', range=explorer.range_key, q=explorer.q, user=explorer.user_filters) }}" class="btn btn-sm btn-outline-primary {% if not explorer.selected_metric_department %}active{% endif %}">All departments</a>
+        {% for dept in explorer.allowed_metric_departments %}
+          <a href="{{ url_for('admin.metrics_config', range=explorer.range_key, dept=dept, q=explorer.q, user=explorer.user_filters) }}" class="btn btn-sm btn-outline-primary {% if explorer.selected_metric_department == dept %}active{% endif %}">Dept {{ dept }}</a>
+        {% endfor %}
+      </div>
+
+      <form class="d-flex mb-3" method="get" action="{{ url_for('admin.metrics_config') }}">
+        <input type="hidden" name="range" value="{{ explorer.range_key }}">
+        {% if explorer.selected_metric_department %}
+          <input type="hidden" name="dept" value="{{ explorer.selected_metric_department }}">
+        {% endif %}
+        <input id="adminMetricsSearch" name="q" class="form-control me-2" type="search" placeholder="Filter requests" value="{{ explorer.q or '' }}">
+        <button class="btn btn-outline-secondary" type="submit">Filter</button>
+        {% if explorer.q %}
+          <a href="{{ url_for('admin.metrics_config', range=explorer.range_key, dept=explorer.selected_metric_department) }}" class="btn btn-link ms-2">Clear</a>
+        {% endif %}
+      </form>
+
+      {% if explorer.available_users %}
+      <form class="mb-3" method="get" action="{{ url_for('admin.metrics_config') }}">
+        <input type="hidden" name="range" value="{{ explorer.range_key }}">
+        {% if explorer.selected_metric_department %}
+          <input type="hidden" name="dept" value="{{ explorer.selected_metric_department }}">
+        {% endif %}
+        {% if explorer.q %}
+          <input type="hidden" name="q" value="{{ explorer.q }}">
+        {% endif %}
+        <label for="adminUserSelect" class="form-label">Filter users</label>
+        <select id="adminUserSelect" name="user" multiple class="form-control">
+          {% for u in explorer.available_users %}
+            <option value="{{ u.user_id }}"{% if u.user_id|string in explorer.user_filters %} selected{% endif %}>{{ u.email }}{% if u.department %} ({{ u.department }}){% endif %}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-outline-secondary mt-2" type="submit">Apply user filter</button>
+        {% if explorer.user_filters %}
+          <a href="{{ url_for('admin.metrics_config', range=explorer.range_key, dept=explorer.selected_metric_department, q=explorer.q) }}" class="btn btn-link ms-2">Clear user filter</a>
+        {% endif %}
+      </form>
+      {% endif %}
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <div class="border rounded p-3 h-100">
+            <div class="small text-muted">Tracked events</div>
+            <div class="fs-4 fw-semibold">{{ explorer.summary.tracked_events_total }}</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="border rounded p-3 h-100">
+            <div class="small text-muted">Tracked requests</div>
+            <div class="fs-4 fw-semibold">{{ explorer.summary.tracked_requests_total }}</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="border rounded p-3 h-100">
+            <div class="small text-muted">Active users</div>
+            <div class="fs-4 fw-semibold">{{ explorer.summary.active_users_total }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-xl-6">
+          <h6>Department flow</h6>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Dept</th>
+                  <th class="text-end">Total</th>
+                  <th class="text-end">Open</th>
+                  <th class="text-end">Tracked</th>
+                  <th class="text-end">Avg gap (h)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in explorer.metrics %}
+                  <tr>
+                    <td><strong>{{ row.dept }}</strong></td>
+                    <td class="text-end">{{ row.total }}</td>
+                    <td class="text-end">{{ row.open }}</td>
+                    <td class="text-end">{{ row.tracked_events }}</td>
+                    <td class="text-end">{{ row.avg_gap_hours if row.avg_gap_hours is not none else '—' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="col-xl-6">
+          <h6>User efficiency</h6>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Dept</th>
+                  <th class="text-end">Events</th>
+                  <th class="text-end">Slow</th>
+                  <th class="text-end">Avg gap (h)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in explorer.users %}
+                  <tr>
+                    <td>{{ row.email }}</td>
+                    <td>{{ row.department or '—' }}</td>
+                    <td class="text-end">{{ row.events }}</td>
+                    <td class="text-end">{{ row.slow_events }}</td>
+                    <td class="text-end">{{ row.avg_gap_hours if row.avg_gap_hours is not none else '—' }}</td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="5" class="text-muted">No user activity tracked yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

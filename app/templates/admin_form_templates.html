@@ -1,9 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Form Templates</h2>
-<a class="btn btn-primary" href="{{ url_for('admin.form_new') }}">New Template</a>
-<hr/>
-<ul class="list-group">
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Template management</div>
+    <h2 class="page-header__title mb-0">Form Templates</h2>
+    <p class="page-header__lede mb-0">Legacy template management view for editing, assignment, and cleanup operations.</p>
+  </div>
+  <div class="page-header__actions">
+    <a class="btn btn-primary" href="{{ url_for('admin.form_new') }}">New Template</a>
+  </div>
+</section>
+<section class="surface-panel list-surface">
+<ul class="list-group list-group-flush">
 {% for t in templates %}
   <li class="list-group-item d-flex justify-content-between align-items-center">
     <div>
@@ -22,4 +30,5 @@
   <li class="list-group-item">No templates yet.</li>
 {% endfor %}
 </ul>
+</section>
 {% endblock %}

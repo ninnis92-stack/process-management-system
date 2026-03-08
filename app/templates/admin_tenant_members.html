@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Admin &raquo; Tenants</div>
+    <h3 class="page-header__title mb-0">Members of {{ tenant.name }}</h3>
+  </div>
+</section>
+
+<section class="surface-panel mb-4">
+  <h3 class="section-title">Add / update membership</h3>
+  <form method="post">
+    {{ form.csrf_token }}
+    <div class="mb-3">
+      {{ form.user_id.label(class_="form-label") }}
+      {{ form.user_id(class_="form-select") }}
+    </div>
+    <div class="mb-3">
+      {{ form.role.label(class_="form-label") }}
+      {{ form.role(class_="form-select") }}
+    </div>
+    <div class="form-check mb-3">
+      {{ form.is_active(class_="form-check-input") }}
+      {{ form.is_active.label(class_="form-check-label") }}
+    </div>
+    <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
+    <a href="{{ url_for('admin.tenant_overview') }}" class="btn btn-link">Back to tenants</a>
+  </form>
+</section>
+
+<section class="surface-panel table-shell">
+  <h3 class="section-title">Existing members</h3>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Role</th>
+          <th>Active</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in memberships %}
+        <tr>
+          <td>{{ m.user.email if m.user else '—' }}</td>
+          <td>{{ m.role }}</td>
+          <td>{{ 'Yes' if m.is_active else 'No' }}</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('admin.delete_tenant_member', tenant_id=tenant.id, member_id=m.id) }}" class="d-inline" onsubmit="return confirm('Remove membership?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted">No members yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

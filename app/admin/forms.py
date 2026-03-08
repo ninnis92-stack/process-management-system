@@ -398,6 +398,31 @@ class GuestFormAdminForm(FlaskForm):
     name = StringField("Guest form name", validators=[DataRequired(), Length(max=200)])
     slug = StringField("Slug (unique)", validators=[DataRequired(), Length(max=200)])
     template_id = SelectField("Template (optional)", coerce=int, validators=[Optional()])
+
+
+# Tenant- and membership‑related forms for SaaS foundation
+class TenantForm(FlaskForm):
+    slug = StringField("Slug", validators=[DataRequired(), Length(max=120)])
+    name = StringField("Name", validators=[DataRequired(), Length(max=200)])
+    is_active = BooleanField("Active", default=True)
+    submit = SubmitField("Save Tenant")
+
+
+class TenantMembershipForm(FlaskForm):
+    user_id = SelectField("User", coerce=int, validators=[DataRequired()])
+    role = SelectField(
+        "Role",
+        choices=[
+            ("member", "Member"),
+            ("tenant_admin", "Tenant Admin"),
+            ("analyst", "Analyst"),
+            ("viewer", "Viewer"),
+            ("platform_admin", "Platform Admin"),
+        ],
+        validators=[DataRequired()],
+    )
+    is_active = BooleanField("Active", default=True)
+    submit = SubmitField("Save Membership")
     require_sso = BooleanField("Require SSO-linked account to submit", default=False)
     owner_department = SelectField(
         "Owner department",

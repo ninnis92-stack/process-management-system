@@ -68,14 +68,23 @@ from ..models import (
 )
 from ..notifcations import notify_users, users_in_department
 from .. import notifcations as notifications_module
-from ..services.inventory import InventoryService
+from ..services.request_creation import (
+    apply_submission_data_to_request,
+    build_initial_artifact,
+    build_template_spec,
+    collect_template_submission_data,
+    create_form_submission,
+    load_latest_field_verification_map,
+    run_template_field_verifications,
+    save_template_file_attachments,
+)
 from ..services.ticketing import TicketingClient
+from ..services.verification import VerificationService
 from ..services.integrations import emit_webhook_event, serialize_request
 from ..services.process_metrics import (
     build_process_metrics_summary,
     record_process_metric_event,
 )
-from ..services.verification import VerificationService
 from .permissions import (
     allowed_comment_scopes_for_user,
     can_view_request,
@@ -110,6 +119,10 @@ def _metric_departments_for_user(user) -> list[str]:
         )
         return depts
     except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
         return []
 
 
@@ -130,6 +143,10 @@ def _user_is_dept_head(user, dept: str) -> bool:
         )
         return bool(row and getattr(row, "can_view_metrics", False))
     except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
         return False
 
 
@@ -182,11 +199,24 @@ def _exclude_old_closed(q):
 
 
 def _assignment_choices(dept: str):
-    users = (
-        User.query.filter_by(department=dept, is_active=True)
-        .order_by(User.name.asc(), User.email.asc())
-        .all()
-    )
+    try:
+        users = (
+            User.query.filter_by(department=dept, is_active=True)
+            .order_by(User.name.asc(), User.email.asc())
+            .all()
+        )
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            current_app.logger.exception(
+                "Failed to load assignment choices for department %s", dept
+            )
+        except Exception:
+            pass
+        return [(-1, "Unassigned")]
     return [(-1, "Unassigned")] + [
         (u.id, u.name or u.email or f"User #{u.id}") for u in users
     ]
@@ -230,131 +260,6 @@ def can_add_artifact(req: ReqModel, dept: str, artifact_type: Optional[str]) -> 
     if dept == "C":
         return bool(getattr(req, "requires_c_review", False) or req.status == "PENDING_C_REVIEW")
     return dept == "B"
-
-
-def _resolve_verification_rule(field: FormField, latest_map: Dict[int, object]):
-    inline = getattr(field, "verification", None)
-    if inline:
-        return inline
-
-    mapped = latest_map.get(getattr(field, "id", None))
-    if not mapped:
-        return None
-
-    return {
-        "provider": getattr(mapped, "provider", None),
-        "external_key": getattr(mapped, "external_key", None),
-        "params": getattr(mapped, "params", None) or {},
-        "triggers_auto_reject": bool(getattr(mapped, "triggers_auto_reject", False)),
-        "type": "external_lookup",
-    }
-
-
-def _normalize_bulk_separator(raw_value):
-    raw = str(raw_value or "").strip()
-    if not raw:
-        return ","
-    aliases = {
-        "comma": ",",
-        "semicolon": ";",
-        "pipe": "|",
-        "newline": "\n",
-        "\\n": "\n",
-        "tab": "\t",
-        "\\t": "\t",
-    }
-    return aliases.get(raw.lower(), raw)
-
-
-def _run_single_field_verification(field: FormField, rule, value):
-    provider = (rule.get("provider") or rule.get("type") or "").strip().lower()
-    external_key = (rule.get("external_key") or rule.get("key") or field.name or "").strip().lower()
-    params = rule.get("params") or {}
-
-    if provider == "regex":
-        import re
-
-        pattern = rule.get("pattern") or params.get("pattern")
-        if not pattern:
-            return {
-                "ok": False,
-                "provider": "regex",
-                "external_key": external_key,
-                "type": "regex",
-                "reason": "missing_pattern",
-            }
-        return {
-            "ok": bool(re.match(pattern, str(value))),
-            "provider": "regex",
-            "external_key": external_key,
-            "type": "regex",
-        }
-
-    if provider in ("inventory", "external_lookup"):
-        inv = InventoryService()
-        key = external_key or field.name.lower()
-        if "sales" in key or "pricebook" in key or "sku" in key:
-            ok = inv.validate_sales_list_number(str(value).strip())
-        else:
-            ok = inv.validate_part_number(str(value).strip())
-        return {
-            "ok": ok,
-            "provider": "inventory",
-            "external_key": external_key,
-            "type": "external_lookup",
-            "triggers_auto_reject": bool(rule.get("triggers_auto_reject")),
-        }
-
-    verifier = VerificationService()
-    result = verifier.verify_lookup(provider, external_key, value, params)
-    result.setdefault("provider", provider)
-    result.setdefault("external_key", external_key)
-    result.setdefault("type", "external_lookup")
-    result.setdefault("triggers_auto_reject", bool(rule.get("triggers_auto_reject")))
-    return result
-
-
-def _run_field_verification(field: FormField, rule, submission_data: Dict):
-    value = submission_data.get(field.name)
-    if value is None or str(value).strip() == "":
-        return {"ok": None, "reason": "empty", "type": "external_lookup"}
-
-    if not isinstance(rule, dict):
-        return {"ok": None, "reason": "invalid_rule", "type": "external_lookup"}
-
-    params = rule.get("params") or {}
-    if not bool(params.get("verify_each_separated_value")):
-        return _run_single_field_verification(field, rule, value)
-
-    separator = _normalize_bulk_separator(
-        params.get("value_separator") or params.get("separator")
-    )
-    raw_value = str(value)
-    if separator == "\n":
-        pieces = [piece.strip() for piece in raw_value.splitlines() if piece.strip()]
-    else:
-        pieces = [piece.strip() for piece in raw_value.split(separator) if piece.strip()]
-
-    if not pieces:
-        return {"ok": None, "reason": "empty", "type": "external_lookup"}
-
-    item_results = []
-    for piece in pieces:
-        single = _run_single_field_verification(field, rule, piece)
-        item_results.append({"value": piece, **single})
-
-    first = item_results[0] if item_results else {}
-    return {
-        "ok": all(item.get("ok") is True for item in item_results),
-        "bulk": True,
-        "count": len(item_results),
-        "separator": separator,
-        "items": item_results,
-        "provider": first.get("provider"),
-        "external_key": first.get("external_key"),
-        "type": first.get("type", "external_lookup"),
-        "triggers_auto_reject": bool(rule.get("triggers_auto_reject")),
-    }
 
 
 def _log(req, action_type, note=None, from_status=None, to_status=None):
@@ -1526,55 +1431,8 @@ def request_new():
         )
     template_spec = None
     if template and template_fields:
-        latest_map = {}
-        try:
-            from ..models import FieldVerification
-            from sqlalchemy import inspect as sa_inspect
-
-            fids = [f.id for f in template_fields]
-            if fids and sa_inspect(db.engine).has_table("field_verification"):
-                fvs = (
-                    db.session.query(FieldVerification)
-                    .filter(FieldVerification.field_id.in_(fids))
-                    .order_by(
-                        FieldVerification.field_id.asc(),
-                        FieldVerification.created_at.desc(),
-                    )
-                    .all()
-                )
-                for fv in fvs:
-                    if fv.field_id not in latest_map:
-                        latest_map[fv.field_id] = fv
-        except Exception:
-            latest_map = {}
-
-        template_spec = []
-        for f in template_fields:
-            opts = []
-            # f.options is an InstrumentedList; iterate safely
-            for o in getattr(f, "options", []) or []:
-                opts.append(
-                    {
-                        "value": getattr(o, "value", None),
-                        "label": getattr(o, "value", None),
-                    }
-                )
-            verification_rule = _resolve_verification_rule(f, latest_map)
-            field_hint = getattr(f, "hint", None)
-            if not field_hint and isinstance(verification_rule, dict):
-                rule_params = verification_rule.get("params") or {}
-                field_hint = rule_params.get("bulk_input_hint") or None
-            template_spec.append(
-                {
-                    "id": f.id,
-                    "name": getattr(f, "name", None),
-                    "label": getattr(f, "label", None),
-                    "field_type": getattr(f, "field_type", None),
-                    "required": bool(getattr(f, "required", False)),
-                    "hint": field_hint,
-                    "options": opts,
-                }
-            )
+        latest_map = load_latest_field_verification_map(template_fields)
+        template_spec = build_template_spec(template_fields, latest_map)
 
         # If the template is configured to use an external form, redirect or show a link.
         if template and getattr(template, "external_enabled", False):
@@ -1651,44 +1509,22 @@ def request_new():
         # If dynamic template provided, gather submitted values
         submission_data = {}
         if template is not None:
-            for f in template_fields:
-                # prefer form values for text inputs, files for file inputs
-                if getattr(f, "field_type", "") == "file":
-                    val = request.files.get(f.name)
-                else:
-                    val = request.form.get(f.name)
-                # basic presence check for required fields
-                if f.required and (
-                    val is None
-                    or (not getattr(val, "filename", None) and str(val).strip() == "")
-                ):
-                    flash(f"Field {getattr(f, 'label', f.name)} is required.", "danger")
-                    db.session.rollback()
-                    return render_template(
-                        "request_new.html",
-                        form=form,
-                        template=template,
-                        template_fields=template_fields,
-                        template_spec=template_spec,
-                    )
-                # For files, store filename placeholder; actual file saved later
-                if getattr(f, "field_type", "") == "file":
-                    submission_data[f.name] = (
-                        getattr(val, "filename", None) if val else None
-                    )
-                else:
-                    submission_data[f.name] = val
+            submission_data, missing_field = collect_template_submission_data(
+                template_fields
+            )
+            if missing_field:
+                flash(f"Field {missing_field} is required.", "danger")
+                db.session.rollback()
+                return render_template(
+                    "request_new.html",
+                    form=form,
+                    template=template,
+                    template_fields=template_fields,
+                    template_spec=template_spec,
+                )
 
             # Map common fields into Request model where possible
-            req.title = (
-                submission_data.get("title")
-                or submission_data.get("summary")
-                or f"Dynamic request {int(time.time())}"
-            )
-            req.description = submission_data.get("description") or ""
-            req.priority = submission_data.get("priority") or "medium"
-            req.request_type = submission_data.get("request_type") or "both"
-            req.pricebook_status = submission_data.get("pricebook_status") or "unknown"
+            apply_submission_data_to_request(req, submission_data)
             # If the dynamic form provided a due date, try to parse and apply it
             # Ensure minimal form instances exist so templates that call
             # `.hidden_tag()` or other form helpers won't fail when we
@@ -1733,48 +1569,11 @@ def request_new():
             now = datetime.utcnow()
 
         # Create an initial artifact based on available submission values (if present)
-        # Decide artifact_type based on request_type
-        rt = (req.request_type or "").strip()
-        if rt == "part_number":
-            artifact_type = "part_number"
-        elif rt == "instructions":
-            artifact_type = "instructions"
-        else:
-            artifact_type = "part_number"
-
-        instructions_url = None
-        donor = None
-        target = None
-        no_donor_reason = None
-        if template is not None:
-            instructions_url = submission_data.get("instructions_url")
-            donor = submission_data.get("donor_part_number")
-            target = submission_data.get("target_part_number")
-            no_donor_reason = submission_data.get("no_donor_reason")
-        else:
-            instructions_field = getattr(form, "instructions_url", None)
-            instructions_url = (
-                (instructions_field.data or "").strip() if instructions_field else None
-            )
-            donor = (
-                getattr(form, "donor_part_number", None).data or ""
-            ).strip() or None
-            target = (
-                getattr(form, "target_part_number", None).data or ""
-            ).strip() or None
-            no_donor_reason = (
-                getattr(form, "no_donor_reason", None).data or ""
-            ).strip() or None
-
-        a = Artifact(
-            request_id=req.id,
-            instructions_url=instructions_url,
-            artifact_type=artifact_type,
-            donor_part_number=donor,
-            target_part_number=target,
-            no_donor_reason=no_donor_reason,
-            created_by_user_id=current_user.id,
-            created_by_department="A",
+        a = build_initial_artifact(
+            req,
+            form,
+            submission_data if template is not None else None,
+            current_user.id,
         )
         db.session.add(a)
         _log(
@@ -1801,85 +1600,18 @@ def request_new():
         # Save structured submission if present
         if template is not None:
             print("SAVING_SUBMISSION: request=", req.id, "template=", getattr(template, "id", None))
-            fs = FormSubmission(
-                template_id=template.id,
-                request_id=req.id,
-                data=submission_data,
-                created_by_user_id=current_user.id,
-            )
-            db.session.add(fs)
-            db.session.commit()
+            fs = create_form_submission(template, req, submission_data, current_user.id)
 
             # Handle file-type fields (attachments)
-            for f in template_fields:
-                if f.field_type == "file":
-                    upload = request.files.get(f.name)
-                    if upload and upload.filename:
-                        from werkzeug.utils import secure_filename
-
-                        fn = secure_filename(upload.filename)
-                        base, ext = os.path.splitext(fn)
-                        stored = f"uploads/{int(time.time())}-{uuid.uuid4().hex}{ext}"
-                        static_upload_dir = os.path.join(
-                            current_app.static_folder or "static", "uploads"
-                        )
-                        os.makedirs(static_upload_dir, exist_ok=True)
-                        dest = os.path.join(
-                            current_app.static_folder or "static", stored
-                        )
-                        upload.save(dest)
-                        # create Attachment linked to the Submission
-                        att = Attachment(
-                            submission_id=fs.id,
-                            original_filename=fn,
-                            stored_filename=stored,
-                            content_type=upload.content_type
-                            or "application/octet-stream",
-                            size_bytes=os.path.getsize(dest),
-                            uploaded_by_user_id=current_user.id,
-                        )
-                        db.session.add(att)
-                        db.session.commit()
+            save_template_file_attachments(fs, template_fields, current_user.id)
 
             # Execute verification rules for fields that have them. Prefer inline
             # `FormField.verification`; otherwise consult DB mappings. Fetch the
             # latest `FieldVerification` rows for all template fields in a single
             # query to avoid subtle visibility/session issues in request contexts.
-            verification_results = {}
-            try:
-                from ..models import FieldVerification
-                from sqlalchemy import inspect as sa_inspect
-
-                fids = [f.id for f in template_fields]
-                latest_map = {}
-                if fids and sa_inspect(db.engine).has_table("field_verification"):
-                    fvs = (
-                        db.session.query(FieldVerification)
-                        .filter(FieldVerification.field_id.in_(fids))
-                        .order_by(
-                            FieldVerification.field_id.asc(),
-                            FieldVerification.created_at.desc(),
-                        )
-                        .all()
-                    )
-                    for fv in fvs:
-                        if fv.field_id not in latest_map:
-                            latest_map[fv.field_id] = fv
-            except Exception:
-                latest_map = {}
-
-            for f in template_fields:
-                v = _resolve_verification_rule(f, latest_map)
-                if not v:
-                    continue
-
-                try:
-                    verification_results[f.name] = _run_field_verification(
-                        f, v, submission_data
-                    )
-                except Exception as e:
-                    current_app.logger.exception("Verification execution failed")
-                    verification_results[f.name] = {"ok": False, "error": str(e)}
+            verification_results = run_template_field_verifications(
+                template_fields, submission_data
+            )
 
             if verification_results:
                 # attach results into Submission.data for later inspection

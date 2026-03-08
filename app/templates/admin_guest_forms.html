@@ -1,9 +1,18 @@
-{% extends "admin_base.html" %}
+{% extends "base.html" %}
 {% block content %}
-<div class="container">
-  <h3>Guest Forms</h3>
-  <a href="{{ url_for('admin.create_guest_form') }}" class="btn btn-primary mb-3">New Guest Form</a>
-  <table class="table table-striped">
+<div class="d-flex justify-content-between align-items-center mb-3 gap-2">
+  <div>
+    <h3 class="mb-1">Guest Forms</h3>
+    <p class="text-muted mb-0">Manage the external forms available to guest users.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin.index') }}" class="btn btn-outline-secondary admin-back-btn">← Admin dashboard</a>
+    <a href="{{ url_for('admin.create_guest_form') }}" class="btn btn-primary">New Guest Form</a>
+  </div>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
     <thead>
       <tr>
         <th>Name</th>
@@ -12,7 +21,7 @@
         <th>Require SSO</th>
         <th>Default</th>
         <th>Active</th>
-        <th></th>
+        <th class="text-end"></th>
       </tr>
     </thead>
     <tbody>
@@ -24,13 +33,17 @@
         <td>{{ 'Yes' if f.require_sso else 'No' }}</td>
         <td>{{ 'Yes' if f.is_default else 'No' }}</td>
         <td>{{ 'Yes' if f.active else 'No' }}</td>
-        <td>
+        <td class="text-end">
           <a href="{{ url_for('admin.edit_guest_form', gf_id=f.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-          <form method="post" action="{{ url_for('admin.delete_guest_form', gf_id=f.id) }}" style="display:inline">
-            {{ csrf_token() }}
+          <form method="post" action="{{ url_for('admin.delete_guest_form', gf_id=f.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this guest form?')">Delete</button>
           </form>
         </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="text-muted">No guest forms configured yet.</td>
       </tr>
       {% endfor %}
     </tbody>

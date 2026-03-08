@@ -38,16 +38,33 @@ def create_app():
     @app.cli.command("notify-due")
     def notify_due():
         from .notifications.due import send_due_soon_notifications
+        from .services.job_dispatcher import run_job
 
         # Persist notifications when run as a CLI command during deploy
-        send_due_soon_notifications(current_app, hours=24, commit=True)
+        run_job(
+            "notify_due",
+            send_due_soon_notifications,
+            current_app,
+            hours=24,
+            commit=True,
+            queue_name="maintenance",
+            payload={"hours": 24},
+        )
 
     @app.cli.command("notify-nudges")
     def notify_nudges():
         from .notifications.due import send_high_priority_nudges
+        from .services.job_dispatcher import run_job
 
         # Persist notifications when run as a CLI command during deploy
-        send_high_priority_nudges(current_app, commit=True)
+        run_job(
+            "notify_nudges",
+            send_high_priority_nudges,
+            current_app,
+            commit=True,
+            queue_name="maintenance",
+            payload={"kind": "high_priority_nudges"},
+        )
 
     @app.cli.command("clear-open-requests")
     @click.confirmation_option(
@@ -126,10 +143,11 @@ def create_app():
     except Exception:
         pass
 
-    # Optional security headers middleware (guarded by SECURITY_HEADERS_ENABLED env)
+    # Optional security/runtime middleware
     try:
-        from .middleware import init_security
+        from .middleware import init_runtime_middleware, init_security
 
+        init_runtime_middleware(app)
         init_security(app)
     except Exception:
         pass
@@ -145,6 +163,13 @@ def create_app():
     db.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
+
+    try:
+        from .services.tenant_context import init_tenant_context
+
+        init_tenant_context(app)
+    except Exception:
+        pass
     # Enable CSRF protection for all forms (create module-level instance so
     # individual routes can be exempted when necessary)
     from . import csrf as _csrf  # local import to ensure module-level var exists
@@ -159,7 +184,7 @@ def create_app():
             cache.init_app(
                 app,
                 config={
-                    "CACHE_TYPE": "redis",
+                    "CACHE_TYPE": "flask_caching.backends.rediscache.RedisCache",
                     "CACHE_REDIS_URL": app.config.get("REDIS_URL"),
                     "CACHE_DEFAULT_TIMEOUT": app.config.get(
                         "CACHE_DEFAULT_TIMEOUT", 300
@@ -399,6 +424,12 @@ def create_app():
             try:
                 cfg = SiteConfig.get()
                 banner_html = cfg.banner_html or ""
+                try:
+                    from .admin.routes import _sanitize_banner_html
+
+                    banner_html = _sanitize_banner_html(banner_html)
+                except Exception:
+                    pass
                 rolling_quotes_enabled = bool(cfg.rolling_quotes_enabled)
                 rolling_quotes = cfg.rolling_quotes or []
                 if getattr(cfg, "logo_filename", None):
@@ -513,6 +544,42 @@ def create_app():
         with app.app_context():
             db.create_all()
 
+    # Lightweight request-time DB readiness check so navigation to admin and
+    # other app pages fails gracefully while the database is still starting.
+    try:
+        from sqlalchemy import text
+        from sqlalchemy.exc import OperationalError
+        from flask import request as _request
+
+        @app.before_request
+        def _ensure_database_ready_before_request():
+            endpoint = (_request.endpoint or "").strip()
+            path = (_request.path or "").strip()
+
+            # Skip static assets, health probes, and common auth endpoints.
+            if endpoint == "static" or path == "/health":
+                return None
+            if endpoint.startswith("auth."):
+                return None
+            if path.startswith("/static/"):
+                return None
+
+            try:
+                db.session.execute(text("SELECT 1"))
+            except OperationalError as err:
+                app.logger.warning(
+                    "Database readiness check failed for %s: %s", path, err
+                )
+                return (
+                    "Service temporarily unavailable — database initializing. Please try again shortly.",
+                    503,
+                )
+            except Exception:
+                # Defer non-operational errors to the normal request flow.
+                return None
+    except Exception:
+        pass
+
     # Return a friendly 503 when the database isn't ready instead of a 500.
     # This avoids exposing a stacktrace to end users during rolling deploys
     # when a machine may briefly not have the DB/tables available.
@@ -570,7 +637,7 @@ def create_app():
 
     # Lightweight health endpoint used by readiness probes. Returns 200 when
     # the DB responds to a trivial query, otherwise 503.
-    from flask import jsonify
+    from flask import jsonify, g
 
     @app.route("/health")
     def _health():
@@ -579,10 +646,21 @@ def create_app():
             from sqlalchemy import text
 
             db.session.execute(text("SELECT 1"))
-            return (jsonify({"status": "ok"}), 200)
+            return (
+                jsonify({"status": "ok", "request_id": getattr(g, "request_id", None)}),
+                200,
+            )
         except Exception as e:
             app.logger.warning("Health check failed: %s", e)
-            return (jsonify({"status": "unhealthy"}), 503)
+            return (
+                jsonify(
+                    {
+                        "status": "unhealthy",
+                        "request_id": getattr(g, "request_id", None),
+                    }
+                ),
+                503,
+            )
 
     # Optionally wait for DB readiness during app startup. When the
     # `WAIT_FOR_DB` env var is set to a truthy value, the application will
@@ -809,9 +887,30 @@ def create_app():
                     uniq = set([d for d in [primary] + addl if d])
                     return len(uniq) > 1
                 except Exception:
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
                     return False
 
-            return dict(avatar_url_for=avatar_url_for, user_has_multiple_departments=user_has_multiple_departments)
+            def can_view_metrics_for_user(user):
+                try:
+                    if not user or not getattr(user, 'id', None):
+                        return False
+                    if getattr(user, 'is_admin', False):
+                        return True
+                    from .models import DepartmentEditor
+
+                    roles = DepartmentEditor.query.filter_by(user_id=user.id).all()
+                    return any(bool(getattr(role, 'can_view_metrics', False)) for role in roles)
+                except Exception:
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
+                    return False
+
+            return dict(avatar_url_for=avatar_url_for, user_has_multiple_departments=user_has_multiple_departments, can_view_metrics_for_user=can_view_metrics_for_user)
         except Exception:
-            return dict(avatar_url_for=lambda u, size=34: f'https://www.gravatar.com/avatar/?d=mp&s={size}', user_has_multiple_departments=lambda u: False)
+            return dict(avatar_url_for=lambda u, size=34: f'https://www.gravatar.com/avatar/?d=mp&s={size}', user_has_multiple_departments=lambda u: False, can_view_metrics_for_user=lambda u: False)
     return app

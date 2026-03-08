@@ -10,8 +10,21 @@ class Config:
         SQLALCHEMY_DATABASE_URI = "sqlite:///app.db"
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    JSON_SORT_KEYS = False
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-fallback")
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "/data/uploads")
+    REQUEST_ID_HEADER = os.getenv("REQUEST_ID_HEADER", "X-Request-ID")
+    PREFERRED_URL_SCHEME = os.getenv("PREFERRED_URL_SCHEME", "http")
+    PROXY_FIX_ENABLED = os.getenv("PROXY_FIX_ENABLED", "False") == "True"
+    PROXY_FIX_X_FOR = int(os.getenv("PROXY_FIX_X_FOR", "1"))
+    PROXY_FIX_X_PROTO = int(os.getenv("PROXY_FIX_X_PROTO", "1"))
+    PROXY_FIX_X_HOST = int(os.getenv("PROXY_FIX_X_HOST", "1"))
+    PROXY_FIX_X_PORT = int(os.getenv("PROXY_FIX_X_PORT", "1"))
+    PROXY_FIX_X_PREFIX = int(os.getenv("PROXY_FIX_X_PREFIX", "1"))
+    SECURITY_HEADERS_ENABLED = os.getenv("SECURITY_HEADERS_ENABLED", "False") == "True"
+    TENANT_REQUIRED = os.getenv("TENANT_REQUIRED", "True") == "True"
+    PLAN_ENFORCEMENT_ENABLED = os.getenv("PLAN_ENFORCEMENT_ENABLED", "True") == "True"
+    RQ_ENABLED = os.getenv("RQ_ENABLED", "False") == "True"
 
     # SSO / OIDC (all optional; guarded by SSO_ENABLED)
     SSO_ENABLED = os.getenv("SSO_ENABLED", "False") == "True"
@@ -112,8 +125,9 @@ class Config:
     ADMIN_EMAILS = [
         e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()
     ]
-    # Session cookie hardening recommended for production
-    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "True") == "True"
+    # Session cookies should remain non-secure by default for local HTTP
+    # development. Production deployments should set SESSION_COOKIE_SECURE=True.
+    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False") == "True"
     SESSION_COOKIE_HTTPONLY = os.getenv("SESSION_COOKIE_HTTPONLY", "True") == "True"
     SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
     # WTForms/CSRF settings

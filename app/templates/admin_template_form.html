@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-<h3>Create Form Template</h3>
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Template management</div>
+    <h3 class="page-header__title mb-0">Create Form Template</h3>
+    <p class="page-header__lede mb-0">Create a dynamic template, seed an initial field count, and optionally connect it to an external provider.</p>
+  </div>
+</section>
+<section class="surface-panel">
 <form method="post">
   {{ form.hidden_tag() }}
   <div class="mb-3">
@@ -36,4 +43,5 @@
   </div>
   <button class="btn btn-primary">Create</button>
 </form>
+</section>
 {% endblock %}

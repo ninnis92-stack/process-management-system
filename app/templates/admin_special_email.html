@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h2>Special Email / Nudge Settings</h2>
+  <section class="page-header">
+    <div>
+      <div class="page-header__eyebrow">Notification settings</div>
+      <h2 class="page-header__title mb-0">Special Email / Nudge Settings</h2>
+      <p class="page-header__lede mb-0">Configure inbound email generation, autoresponder behavior, validation handling, and nudge automation.</p>
+    </div>
+  </section>
+  <section class="surface-panel">
   <form method="post">
     {{ form.hidden_tag() }}
 
@@ -77,4 +84,5 @@
 
     <button class="btn btn-primary">Save</button>
   </form>
+  </section>
 {% endblock %}

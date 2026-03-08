@@ -1,21 +1,52 @@
 {% extends "base.html" %}
 {% block content %}
-<h3 class="mb-3">Admin — Users</h3>
-<a class="btn btn-sm btn-outline-secondary admin-back-btn mb-2" href="{{ url_for('admin.index') }}">← Admin dashboard</a>
-  <div class="d-flex gap-2 mb-3">
-  <a class="btn btn-primary" href="{{ url_for('admin.create_user') }}">Create / Update User</a>
-  <a class="btn btn-outline-secondary" href="{{ url_for('admin.assign_sso') }}">Assign SSO Emails</a>
-  <a class="btn btn-outline-secondary" href="{{ url_for('admin.bulk_assign_departments') }}">Bulk Assign Departments</a>
-  <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=A">Monitor A</a>
-  <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=B">Monitor B</a>
-  <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=C">Monitor C</a>
-</div>
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Administration</div>
+    <h3 class="page-header__title mb-0">Users</h3>
+    <p class="page-header__lede mb-0">Manage access, departments, and impersonation workflows in one place.</p>
+  </div>
+  <div class="page-header__actions">
+    <a class="btn btn-primary" href="{{ url_for('admin.create_user') }}">Create / Update User</a>
+  </div>
+</section>
+
+<section class="surface-panel surface-panel-muted">
+  <div class="page-toolbar d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.assign_sso') }}">Assign SSO Emails</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.bulk_assign_departments') }}">Bulk Assign Departments</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=A">Monitor A</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=B">Monitor B</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=C">Monitor C</a>
+    <form method="get" class="ms-auto d-flex gap-2 align-items-center">
+      <input
+        type="text"
+        name="q"
+        placeholder="Search email"
+        value="{{ q or '' }}"
+        class="form-control form-control-sm"
+      />
+      {% if tenants %}
+      <select name="tenant_id" onchange="this.form.submit()" class="form-select form-select-sm">
+        <option value="" {% if not selected_tenant %}selected{% endif %}>(all)</option>
+        {% for t in tenants %}
+        <option value="{{ t.id }}" {% if selected_tenant==t.id %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Go</button>
+    </form>
+  </div>
+</section>
+
+<section class="surface-panel table-shell">
 <div class="table-responsive">
-  <table class="table table-sm">
+  <table class="table table-sm align-middle">
     <thead>
       <tr>
         <th>Email</th>
         <th>Name</th>
+        <th>Workspace</th>
         <th>Department</th>
         <th>Admin</th>
         <th>Active</th>
@@ -28,6 +59,7 @@
         <tr>
           <td>{{ u.email }}</td>
           <td>{{ u.name or '' }}</td>
+          <td>{{ u.tenant.name if u.tenant else '–' }}</td>
           <td>{{ u.department }}</td>
           <td>{{ 'Yes' if u.is_admin else 'No' }}</td>
           <td>{{ 'Yes' if u.is_active else 'No' }}</td>
@@ -35,7 +67,7 @@
           <td class="text-end">
             <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.edit_user', user_id=u.id) }}">Edit</a>
             <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.manage_user_departments', user_id=u.id) }}">Departments</a>
-            <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.monitor') }}?dept=B">Monitor B</a>
+            <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.monitor') }}?dept={{ u.department }}">Monitor {{ u.department }}</a>
             {% if current_user.id != u.id %}
               <form method="post" action="{{ url_for('admin.impersonate_dept') }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -50,9 +82,10 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="7" class="text-muted">No users.</td></tr>
+        <tr><td colspan="8" class="text-muted">No users.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+ </section>
 {% endblock %}

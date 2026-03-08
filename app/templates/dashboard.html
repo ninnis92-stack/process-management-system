@@ -1,8 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
-<h3 class="mb-3">Dashboard</h3>
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Work management</div>
+    <h3 class="page-header__title mb-0">Dashboard</h3>
+    <p class="page-header__lede mb-0">Track requests, filter active work, and jump directly into the next task.</p>
+  </div>
+  {% if mode == "A" %}
+    <div class="page-header__actions">
+      <a class="btn btn-primary" href="{{ url_for('requests.request_new') }}">New Request</a>
+    </div>
+  {% endif %}
+</section>
 
-<form class="d-flex mb-3" method="get" action="{{ url_for('requests.search_requests') }}">
+<form class="page-toolbar surface-panel dashboard-search" method="get" action="{{ url_for('requests.search_requests') }}">
   <input id="searchInput" name="q" class="form-control me-2" type="search" placeholder="Search by request # or description" aria-label="Search" value="{{ request.args.get('q','') }}">
   <button class="btn btn-outline-secondary" type="submit">Search</button>
   {% if request.args.get('q') %}
@@ -10,55 +21,70 @@
   {% endif %}
 </form>
 
-{% if mode == "A" %}
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-      <h5 class="mb-0">Dept A — Your requests</h5>
-      <small class="text-muted">Submit, approve, or reopen finished work.</small>
-    </div>
-    <a class="btn btn-primary" href="{{ url_for('requests.request_new') }}">New Request</a>
-  </div>
-
-  <div class="row g-3">
-    {% for r in requests or [] %}
-      <div class="col-md-6">
-        <a class="card h-100 text-reset card-link-wrap" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
-          <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start mb-1">
-              <div>
-                <div class="small text-muted">#{{ r.id }}</div>
-                <div class="fw-semibold">{{ r.title }}</div>
-              </div>
-              <span class="badge text-bg-secondary">{{ r.status }}</span>
-            </div>
-            <div class="small text-muted">{{ r.pricebook_display }} · {{ r.priority }} · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}</div>
-          </div>
-        </a>
-      </div>
-    {% else %}
-      <div class="col-12 text-muted">No requests yet.</div>
+{% if bucket_list %}
+  <div class="page-toolbar surface-panel bucket-toolbar">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('requests.dashboard', as_dept=request.args.get('as_dept')) }}">All</a>
+    {% for b in bucket_list %}
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('requests.dashboard', bucket_id=b.id, as_dept=request.args.get('as_dept')) }}">{{ b.name }}{% if status_counts.get(b.id) is not none %} · {{ status_counts.get(b.id) }}{% endif %}</a>
+      {% if can_bulk_assign %}
+        <form method="post" action="{{ url_for('requests.assign_bucket') }}" class="d-inline-block ms-1">
+          {{ assignment_form.hidden_tag() }}
+          <input type="hidden" name="bucket_id" value="{{ b.id }}">
+          <input type="hidden" name="as_dept" value="{{ request.args.get('as_dept','') }}">
+          {{ assignment_form.assignee(class="form-select form-select-sm d-inline-block", style="width:110px;") }}
+          <button class="btn btn-sm btn-outline-secondary">Go</button>
+        </form>
+      {% endif %}
     {% endfor %}
   </div>
+{% endif %}
+
+{% if mode == "A" %}
+  <section class="surface-panel section-intro">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h5 class="mb-0">Dept A — Your requests</h5>
+        <small class="text-muted">Submit, approve, or reopen finished work.</small>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      {% for r in requests or [] %}
+        <div class="col-md-6">
+          <a class="card h-100 text-reset card-link-wrap request-summary-card" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start mb-1">
+                <div>
+                  <div class="small text-muted">#{{ r.id }}</div>
+                  <div class="fw-semibold">{{ r.title }}</div>
+                </div>
+                <span class="badge text-bg-secondary">{{ r.status }}</span>
+              </div>
+              <div class="small text-muted request-summary-meta">{{ r.pricebook_display }} · {{ r.priority }} · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}</div>
+            </div>
+          </a>
+        </div>
+      {% else %}
+        <div class="col-12"><div class="empty-state">No requests yet.</div></div>
+      {% endfor %}
+    </div>
+  </section>
 
 {% elif mode == "B" %}
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <div>
-      <h5 class="mb-0">Dept B — Work queue</h5>
-      <small class="text-muted">Filter by status or browse buckets.</small>
+  <section class="surface-panel section-intro mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <h5 class="mb-0">Dept B — Work queue</h5>
+        <small class="text-muted">Filter by status or browse buckets.</small>
+      </div>
     </div>
-  </div>
 
-  <div class="d-flex flex-wrap gap-2 mb-3">
-    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('requests.dashboard') }}">All</a>
-    {% for b in bucket_list %}
-      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('requests.dashboard', bucket_id=b.id) }}">{{ b.name }}{% if status_counts.get(b.id) is not none %} · {{ status_counts.get(b.id) }}{% endif %}</a>
-    {% else %}
-      <span class="text-muted">No buckets configured.</span>
-    {% endfor %}
-  </div>
+    {% if not bucket_list %}
+      <div class="empty-state mb-0">No buckets configured.</div>
+    {% endif %}
+  </section>
 
   {% for label, items in buckets.items() %}
-    {# Show closed buckets (e.g., 'Closed this week') as-is; otherwise filter out CLOSED items #}
     {% if 'closed' in label|lower %}
       {% set visible_items = items|list %}
     {% else %}
@@ -105,14 +131,16 @@
   {% endfor %}
 
 {% elif mode == "C" %}
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <div>
-      <h5 class="mb-0">Dept C — Pending review</h5>
-      <small class="text-muted">Review handoffs awaiting your approval or change request.</small>
+  <section class="surface-panel section-intro mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <h5 class="mb-0">Dept C — Pending review</h5>
+        <small class="text-muted">Review handoffs awaiting your approval or change request.</small>
+      </div>
     </div>
-  </div>
+  </section>
 
-  <div class="list-group">
+  <div class="list-group surface-panel list-surface">
     {% for r in requests or [] %}
       <a class="list-group-item list-group-item-action text-reset" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
         <div class="d-flex justify-content-between">
@@ -122,7 +150,7 @@
         <small class="text-muted">{{ r.pricebook_display }} · {{ r.priority }} · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}</small>
       </a>
     {% else %}
-      <div class="text-muted">No pending items.</div>
+      <div class="empty-state">No pending items.</div>
     {% endfor %}
   </div>
 {% endif %}

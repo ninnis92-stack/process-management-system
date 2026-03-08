@@ -4,6 +4,15 @@ A small prototype app.
 
 ## Recent fixes (2026-03-07)
 
+- Admin UX and structure: added admin user email search plus workspace/tenant
+  filtering, and split workflow/status/bucket administration into
+  `app/admin/workflows.py` while keeping user and tenant administration in
+  dedicated admin modules.
+- Warning cleanup: replaced legacy SQLAlchemy `Query.get()` usage in tests with
+  `db.session.get()` and updated Flask-Caching configuration to the explicit
+  Redis backend class path to remove deprecation warnings.
+- Validation: local full test suite passed (`71 passed`) before deployment.
+
 - Notifications dropdown: fixed client-side handling for non-OK responses so the
   dropdown no longer stays stuck on "Loading…". The client now checks response
   status before parsing JSON and falls back to a friendly message when the
@@ -439,6 +448,18 @@ flyctl ssh console -a process-management-prototype-lingering-bush-6175 --command
 
 Deployment note (automated):
 
+- 2026-03-08 UTC: added rollback guards around dashboard and template helper
+  queries so swallowed tenant-scope lookup failures no longer poison the active
+  SQLAlchemy transaction during render; local full suite passed (`71 passed in
+  13.15s`), Fly deploy succeeded, deployed smoke passed (`/health` 200,
+  `/auth/login` 200, seeded login 200, `/dashboard` 200), and remote cleanup
+  completed via `scripts/clear_smoke_remote.py` (`deleted 0`).
+
+- 2026-03-08 UTC: local full suite passed (`71 passed in 13.26s`), deployed to
+  Fly successfully, remote smoke checks passed (`/health` 200, `/auth/login`
+  200, seeded login and `/dashboard` fetch succeeded), and remote `SMOKE_`
+  cleanup was run after verification (`deleted 0`).
+
 - 2026-03-07 UTC: dark-mode readability was refined again to keep the existing background theme while brightening only muted/helper/subtext copy to a more realistic live-app dark palette; redeployed to Fly and `/health` returned `{"status":"ok"}`.
 - 2026-03-07 UTC: dark-mode admin contrast was tightened again for status-option tables, link-style action controls, and flashed alert/error notifications so remaining washed-out text stays readable without changing the background theme; redeployed to Fly and `/health` returned `{"status":"ok"}`.
 - 2026-03-07 UTC: the default `A / B / C` workflow was normalized to a department-aware step spec so the workflow editor now repopulates Dept A/B/C handoffs correctly, and dark-mode light-surface components were updated to use darker ink where Bootstrap still renders lighter backgrounds; redeployed to Fly and `/health` returned `{"status":"ok"}`.
@@ -730,6 +751,8 @@ Notes:
 - For production, push the built image to a registry and deploy using your orchestrator (Docker Compose, Kubernetes/Helm, or Fly). The template is intentionally minimal — adapt for your CI/CD and registry.
 
 ## Local testing & new features
+
+Tenant/workspace management has been added to the Admin console.  The dashboard shows a **Tenants** card that leads to a workspace overview where administrators can create, edit, and delete tenants and manage which users belong to each workspace.  Internally the admin blueprint has also been reorganized: user‑related handlers now live in `app/admin/users.py` and tenant logic lives in `app/admin/tenants.py`, keeping `app/admin/routes.py` focused on shared utilities and miscellaneous tools.  This complements the deployment helpers in `deploy/` and lays the groundwork for SaaS multi‑tenant hosting.
 
 This project now includes an admin-managed "Special Emails" feature, an inbound-mail webhook, and a safe inventory integration skeleton. These are all optional and safe for prototype use — nothing is enabled by default.
 

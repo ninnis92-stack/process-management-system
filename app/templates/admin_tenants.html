@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <div class="page-header__eyebrow">Admin command center</div>
+      <h2 class="page-header__title">Tenants</h2>
+      <p class="page-header__lede">Tenant workspaces and workspace membership for the new SaaS foundation.</p>
+    </div>
+  </section>
+
+  <section class="surface-panel table-shell mb-4">
+    <div class="page-toolbar">
+      <a class="btn btn-primary" href="{{ url_for('admin.create_tenant') }}">New Tenant</a>
+    </div>
+    <h3 class="section-title">Workspaces</h3>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Slug</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tenant in tenants %}
+            <tr>
+              <td>{{ tenant.name }}</td>
+              <td>{{ tenant.slug }}</td>
+              <td>{{ 'Active' if tenant.is_active else 'Inactive' }}</td>
+              <td>{{ tenant.created_at.strftime('%Y-%m-%d %H:%M') if tenant.created_at else '—' }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.edit_tenant', tenant_id=tenant.id) }}">Edit</a>
+                <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.tenant_members', tenant_id=tenant.id) }}">Members</a>
+                <form method="post" action="{{ url_for('admin.delete_tenant', tenant_id=tenant.id) }}" class="d-inline" onsubmit="return confirm('Delete tenant {{ tenant.slug }}?');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="text-muted">No tenants configured.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="surface-panel table-shell">
+    <h3 class="section-title">Memberships</h3>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Tenant</th>
+            <th>Role</th>
+            <th>Default</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for membership in memberships %}
+            <tr>
+              <td>{{ membership.user.email if membership.user else '—' }}</td>
+              <td>{{ membership.tenant.name if membership.tenant else '—' }}</td>
+              <td>{{ membership.role }}</td>
+              <td>{{ 'Yes' if membership.is_default else 'No' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="text-muted">No memberships configured.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

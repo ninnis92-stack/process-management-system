@@ -1,9 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-<h3 class="mb-3">New Request (Dept A)</h3>
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Department A intake</div>
+    <h3 class="page-header__title mb-0">New Request</h3>
+    <p class="page-header__lede mb-0">Capture the request details, required part information, and any dynamic fields configured by the admin team.</p>
+  </div>
+</section>
 
-<div class="card shadow-sm">
-  <div class="card-body">
+<section class="surface-panel">
     <form method="post" {% if template_spec %}enctype="multipart/form-data"{% endif %}>
       {{ form.hidden_tag() }}
 
@@ -114,8 +119,7 @@
 
       <button class="btn btn-primary w-100" type="submit">Submit Request</button>
     </form>
-  </div>
-</div>
+</section>
 
     {% if created_req %}
       <!-- Confirmation modal shown after successful submission -->

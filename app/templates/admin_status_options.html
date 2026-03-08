@@ -1,48 +1,67 @@
 {% extends 'base.html' %}
+{% from 'admin/_macros.html' import page_header %}
 
 {% block content %}
-<h2>Status options</h2>
-<p><a href="{{ url_for('admin.create_status_option') }}" class="btn btn-primary">New status option</a></p>
-<table class="table">
-  <thead>
-    <tr>
-      <th>Code</th>
-      <th>Label</th>
-      <th>Target dept</th>
-      <th>Notify</th>
-      <th>Notify Scope</th>
-      <th>Email</th>
-      <th>Screenshot</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
+{{ page_header('Status options', url_for('admin.create_status_option'), 'New status option', 'Workflow control', 'Keep status codes, notifications, and downstream routing aligned across every workflow.') }}
+<section class="surface-panel surface-panel-muted">
+  <div class="page-toolbar">
+    <a href="{{ url_for('admin.list_workflows') }}" class="btn btn-secondary">View workflows</a>
+  </div>
+</section>
+<section class="surface-panel table-shell">
+<div class="table-responsive">
+  <table class="table table-sm table-striped table-bordered align-middle admin-status-table">
+    <colgroup>
+      <col class="col-code" />
+      <col class="col-label" />
+      <col class="col-target" />
+      <col class="col-notify" />
+      <col class="col-scope" />
+      <col class="col-email" />
+      <col class="col-screenshot" />
+      <col class="col-actions" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Label</th>
+        <th>Target dept</th>
+        <th class="text-center">Notify</th>
+        <th class="text-center">Notify Scope</th>
+        <th class="text-center">Email</th>
+        <th class="text-center">Screenshot</th>
+        <th class="text-center">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
   {% for s in status_options %}
     <tr>
       <td>{{ s.code }}</td>
       <td>{{ s.label }}</td>
       <td>{{ s.target_department or '-' }}</td>
-      <td>{{ 'on transfer only' if (s.notify_on_transfer_only|default(false)) else ( 'enabled' if (s.notify_enabled|default(false)) else 'disabled') }}</td>
-      <td>{{ 'originator only' if (s.notify_to_originator_only|default(false)) else 'department' }}</td>
-      <td>{{ 'email' if (s.email_enabled|default(false)) else 'no email' }}</td>
-      <td>{{ 'required' if (s.screenshot_required|default(false)) else 'no' }}</td>
-      <td>
-        <a href="{{ url_for('admin.edit_status_option', opt_id=s.id) }}">Edit</a>
-        <form method="post" action="{{ url_for('admin.delete_status_option', opt_id=s.id) }}" style="display:inline">
-          <button class="btn btn-link" type="submit">Delete</button>
+      <td class="text-center">{{ 'on transfer only' if (s.notify_on_transfer_only|default(false)) else ( 'enabled' if (s.notify_enabled|default(false)) else 'disabled') }}</td>
+      <td class="text-center">{{ 'originator only' if (s.notify_to_originator_only|default(false)) else 'department' }}</td>
+      <td class="text-center">{{ 'email' if (s.email_enabled|default(false)) else 'no email' }}</td>
+      <td class="text-center">{{ 'required' if (s.screenshot_required|default(false)) else 'no' }}</td>
+      <td class="text-center actions-cell">
+        <a href="{{ url_for('admin.edit_status_option', opt_id=s.id) }}" class="btn btn-sm btn-link">Edit</a>
+        <form method="post" action="{{ url_for('admin.delete_status_option', opt_id=s.id) }}" class="d-inline ms-2">
+          <button class="btn btn-sm btn-link" type="submit">Delete</button>
         </form>
-        <form method="post" action="{{ url_for('admin.toggle_status_screenshot', opt_id=s.id) }}" style="display:inline; margin-left:6px">
-          <button class="btn btn-link">{{ 'Disable' if s.screenshot_required else 'Enable' }} screenshot</button>
+        <form method="post" action="{{ url_for('admin.toggle_status_screenshot', opt_id=s.id) }}" class="d-inline ms-2">
+          <button class="btn btn-sm btn-link">{{ 'Disable' if s.screenshot_required else 'Enable' }} screenshot</button>
         </form>
-        <form method="post" action="{{ url_for('admin.toggle_status_notify_scope', opt_id=s.id) }}" style="display:inline; margin-left:6px">
-          <button class="btn btn-link">{{ 'Set Department' if (s.notify_to_originator_only|default(false)) else 'Set Originator Only' }}</button>
+        <form method="post" action="{{ url_for('admin.toggle_status_notify_scope', opt_id=s.id) }}" class="d-inline ms-2">
+          <button class="btn btn-sm btn-link">{{ 'Set Department' if (s.notify_to_originator_only|default(false)) else 'Set Originator Only' }}</button>
         </form>
-        <form method="post" action="{{ url_for('admin.toggle_status_email', opt_id=s.id) }}" style="display:inline; margin-left:6px">
-          <button class="btn btn-link">{{ 'Disable Email' if (s.email_enabled|default(false)) else 'Enable Email' }}</button>
+        <form method="post" action="{{ url_for('admin.toggle_status_email', opt_id=s.id) }}" class="d-inline ms-2">
+          <button class="btn btn-sm btn-link">{{ 'Disable Email' if (s.email_enabled|default(false)) else 'Enable Email' }}</button>
         </form>
       </td>
     </tr>
   {% endfor %}
   </tbody>
-</table>
+  </table>
+</div>
+</section>
 {% endblock %}

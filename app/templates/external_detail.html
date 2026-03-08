@@ -1,14 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
-<h3 class="mb-2">Guest Tracking View</h3>
-<div class="alert alert-info">
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Guest tracking</div>
+    <h3 class="page-header__title mb-0">Guest Tracking View</h3>
+    <p class="page-header__lede mb-0">Review status updates, public handoffs, and comments tied to your request.</p>
+  </div>
+</section>
+<div class="alert alert-info hero-note">
   Save this page URL to track your request and add comments.
 </div>
 
-<div class="card shadow-sm mb-3">
-  <div class="card-body">
+<section class="surface-panel mb-3">
     <h5>#{{ req.id }} · {{ req.title }}</h5>
-    <div class="d-flex gap-2 mb-2 flex-wrap">
+    <div class="meta-badge-row mb-2">
       <span class="badge text-bg-secondary">{{ req.status }}</span>
       <span class="badge text-bg-light text-dark">{{ req.priority }}</span>
       {% if req.requires_c_review %}
@@ -26,11 +31,9 @@
     <div><strong>Due:</strong> {{ req.due_at.strftime("%b %d, %Y %I:%M %p") if req.due_at else "—" }}</div>
     <hr/>
     <div style="white-space:pre-wrap">{{ req.description or "No description provided." }}</div>
-  </div>
-</div>
+</section>
 
-<div class="card shadow-sm mb-3">
-  <div class="card-body">
+<section class="surface-panel mb-3">
     <h5>Public Handoffs</h5>
     {% for s in submissions %}
       <div class="border rounded p-2 mb-2">
@@ -44,26 +47,22 @@
     {% else %}
       <div class="text-muted">No public handoffs yet.</div>
     {% endfor %}
-  </div>
-</div>
+</section>
 
     {% if req.status in ["SENT_TO_A", "CLOSED"] %}
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
+    <section class="surface-panel mb-3">
         <h5>Need changes?</h5>
         <form method="post" action="{{ url_for('external.external_reopen', token=token) }}">
           {{ form.csrf_token }}
           <p class="text-muted mb-2">If something is wrong with the finished product, you can send it back to Dept B.</p>
           <button class="btn btn-outline-warning w-100" type="submit">Reopen ticket (send to Dept B)</button>
         </form>
-      </div>
-    </div>
+    </section>
     {% endif %}
 
-<div class="card shadow-sm mb-3">
-  <div class="card-body">
+<section class="surface-panel mb-3">
     <h5>Public Comments</h5>
-    <div class="border rounded p-2 mb-3" style="max-height: 220px; overflow:auto;">
+    <div class="border rounded p-2 mb-3 detail-scroll-panel">
       {% for c in comments %}
         <div class="mb-2">
           <div class="d-flex justify-content-between">
@@ -85,6 +84,5 @@
       </div>
       <button class="btn btn-outline-primary w-100">Add Comment</button>
     </form>
-  </div>
-</div>
+  </section>
 {% endblock %}

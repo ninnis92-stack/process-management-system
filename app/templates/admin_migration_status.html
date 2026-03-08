@@ -1,13 +1,75 @@
 {% extends "base.html" %}
 
 {% block content %}
+  <style>
+    .migration-status-grid {
+      display: grid;
+      gap: 1rem;
+    }
+    .migration-status-panel {
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 0.85rem;
+      background: #ffffff;
+      padding: 1rem 1.1rem;
+      box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.04);
+    }
+    .migration-status-panel h6,
+    .migration-status-notice strong {
+      margin-bottom: 0.35rem;
+    }
+    .migration-status-notice {
+      border-radius: 0.85rem;
+      padding: 1rem 1.1rem;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: #f8f9fa;
+      color: inherit;
+    }
+    .migration-status-notice pre {
+      margin-top: 0.75rem;
+      margin-bottom: 0.75rem;
+      border-radius: 0.65rem;
+      padding: 0.75rem 0.9rem;
+      background: rgba(0, 0, 0, 0.04);
+      color: inherit;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+    .migration-status-notice-warning {
+      background: #fff8e1;
+      border-color: rgba(255, 193, 7, 0.28);
+    }
+    .migration-status-notice-success {
+      background: #eefaf2;
+      border-color: rgba(25, 135, 84, 0.2);
+    }
+    .dark-mode .migration-status-panel {
+      background: var(--surface) !important;
+      border-color: var(--border) !important;
+      box-shadow: none;
+    }
+    .dark-mode .migration-status-notice {
+      background: rgba(255, 255, 255, 0.04) !important;
+      border-color: rgba(255, 255, 255, 0.08) !important;
+      color: var(--body-text) !important;
+    }
+    .dark-mode .migration-status-notice-warning,
+    .dark-mode .migration-status-notice-success {
+      background: rgba(255, 255, 255, 0.04) !important;
+      border-color: rgba(255, 255, 255, 0.08) !important;
+    }
+    .dark-mode .migration-status-notice pre {
+      background: rgba(255, 255, 255, 0.05) !important;
+      border-color: rgba(255, 255, 255, 0.08) !important;
+      color: var(--body-text) !important;
+    }
+  </style>
   <h2>Migration Status</h2>
   {% if not status %}
     <div class="alert alert-danger">Unable to determine migration status.</div>
   {% else %}
-    <div class="mb-3">
-      <strong>DB migration versions:</strong>
-      <div>
+    <div class="migration-status-grid">
+    <div class="migration-status-panel">
+      <h6>DB migration versions</h6>
+      <div class="mb-0">
         {% if status.db_versions %}
           <ul>
             {% for v in status.db_versions %}
@@ -20,9 +82,9 @@
       </div>
     </div>
 
-    <div class="mb-3">
-      <strong>Migration files:</strong>
-      <div>
+    <div class="migration-status-panel">
+      <h6>Migration files</h6>
+      <div class="mb-0">
         {% if status.migration_files %}
           <small>{{ status.migration_files | length }} files</small>
         {% else %}
@@ -32,7 +94,7 @@
     </div>
 
     {% if status.unapplied and status.unapplied | length > 0 %}
-      <div class="alert alert-warning">
+      <div class="migration-status-notice migration-status-notice-warning migration-status-warning">
         <strong>Unapplied migrations detected:</strong>
         <ul>
           {% for m in status.unapplied %}
@@ -45,8 +107,9 @@
         <pre>FLASK_APP=app flask db upgrade</pre>
       </div>
     {% else %}
-      <div class="alert alert-success">No unapplied migrations detected.</div>
+      <div class="migration-status-notice migration-status-notice-success">No unapplied migrations detected.</div>
     {% endif %}
+    </div>
   {% endif %}
 
 {% endblock %}

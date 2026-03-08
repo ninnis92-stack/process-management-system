@@ -1,33 +1,39 @@
 {% extends 'base.html' %}
+{% from 'admin/_macros.html' import page_header %}
 
 {% block content %}
-<h2>Workflows</h2>
-<p><a class="btn btn-primary" href="{{ url_for('admin.create_workflow') }}">New Workflow</a></p>
-<table class="table">
-  <thead>
-    <tr><th>Name</th><th>Department</th><th>Active</th><th>Actions</th></tr>
-  </thead>
-  <tbody>
-  {% for wf in workflows %}
-    <tr id="wf-row-{{ wf.id }}">
-      <td>{{ wf.name }}</td>
-      <td>{{ workflow_scope_labels.get(wf.id, wf.department_code or 'Global') }}</td>
-      <td>
-        <div class="form-check form-switch">
-          <input class="form-check-input wf-toggle" type="checkbox" role="switch" id="wfToggle{{ wf.id }}" data-wf-id="{{ wf.id }}" {% if wf.active %}checked{% endif %}>
-          <label class="form-check-label" for="wfToggle{{ wf.id }}">{{ 'Active' if wf.active else 'Inactive' }}</label>
-        </div>
-      </td>
-      <td>
-        <a href="{{ url_for('admin.edit_workflow', wf_id=wf.id) }}">Edit</a>
-        <form style="display:inline" method="post" action="{{ url_for('admin.delete_workflow', wf_id=wf.id) }}">
-          <button class="btn btn-link" type="submit" onclick="return confirm('Delete workflow?')">Delete</button>
-        </form>
-      </td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
+{{ page_header('Workflows', url_for('admin.create_workflow'), 'New Workflow', 'Workflow control', 'Review active flows, scope them by department, and toggle them without leaving the page.') }}
+<section class="surface-panel table-shell">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr><th>Name</th><th>Department</th><th>Active</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+      {% for wf in workflows %}
+        <tr id="wf-row-{{ wf.id }}">
+          <td>{{ wf.name }}</td>
+          <td>{{ workflow_scope_labels.get(wf.id, wf.department_code or 'Global') }}</td>
+          <td>
+            <div class="form-check form-switch">
+              <input class="form-check-input wf-toggle" type="checkbox" role="switch" id="wfToggle{{ wf.id }}" data-wf-id="{{ wf.id }}" {% if wf.active %}checked{% endif %}>
+              <label class="form-check-label" for="wfToggle{{ wf.id }}">{{ 'Active' if wf.active else 'Inactive' }}</label>
+            </div>
+          </td>
+          <td>
+            <a href="{{ url_for('admin.edit_workflow', wf_id=wf.id) }}">Edit</a>
+            <form style="display:inline" method="post" action="{{ url_for('admin.delete_workflow', wf_id=wf.id) }}">
+              <button class="btn btn-link" type="submit" onclick="return confirm('Delete workflow?')">Delete</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="text-muted">No workflows configured.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 
 <script>
 document.addEventListener('DOMContentLoaded', function(){

@@ -1,0 +1,204 @@
+from __future__ import annotations
+
+import os
+import time
+import uuid
+
+from flask import current_app, request
+from sqlalchemy import inspect as sa_inspect
+from werkzeug.utils import secure_filename
+
+from ..extensions import db
+from ..models import (
+    Artifact,
+    Attachment,
+    FieldVerification,
+    Submission as FormSubmission,
+)
+from .field_verification import resolve_field_verification_rule, run_field_verification
+
+
+def load_latest_field_verification_map(template_fields) -> dict[int, object]:
+    latest_map: dict[int, object] = {}
+    try:
+        field_ids = [field.id for field in template_fields]
+        if field_ids and sa_inspect(db.engine).has_table("field_verification"):
+            rows = (
+                db.session.query(FieldVerification)
+                .filter(FieldVerification.field_id.in_(field_ids))
+                .order_by(
+                    FieldVerification.field_id.asc(),
+                    FieldVerification.created_at.desc(),
+                )
+                .all()
+            )
+            for row in rows:
+                if row.field_id not in latest_map:
+                    latest_map[row.field_id] = row
+    except Exception:
+        latest_map = {}
+    return latest_map
+
+
+def build_template_spec(template_fields, latest_map: dict[int, object] | None = None):
+    latest_map = latest_map or {}
+    spec = []
+    for field in template_fields:
+        options = [
+            {
+                "value": getattr(option, "value", None),
+                "label": getattr(option, "value", None),
+            }
+            for option in (getattr(field, "options", []) or [])
+        ]
+        verification_rule = resolve_field_verification_rule(field, latest_map)
+        field_hint = getattr(field, "hint", None)
+        if not field_hint and isinstance(verification_rule, dict):
+            rule_params = verification_rule.get("params") or {}
+            field_hint = rule_params.get("bulk_input_hint") or None
+        spec.append(
+            {
+                "id": field.id,
+                "name": getattr(field, "name", None),
+                "label": getattr(field, "label", None),
+                "field_type": getattr(field, "field_type", None),
+                "required": bool(getattr(field, "required", False)),
+                "hint": field_hint,
+                "options": options,
+            }
+        )
+    return spec
+
+
+def collect_template_submission_data(template_fields):
+    submission_data = {}
+    missing_field = None
+    for field in template_fields:
+        if getattr(field, "field_type", "") == "file":
+            value = request.files.get(field.name)
+        else:
+            value = request.form.get(field.name)
+
+        if field.required and (
+            value is None
+            or (not getattr(value, "filename", None) and str(value).strip() == "")
+        ):
+            missing_field = getattr(field, "label", field.name)
+            break
+
+        if getattr(field, "field_type", "") == "file":
+            submission_data[field.name] = getattr(value, "filename", None) if value else None
+        else:
+            submission_data[field.name] = value
+
+    return submission_data, missing_field
+
+
+def apply_submission_data_to_request(req, submission_data: dict):
+    req.title = (
+        submission_data.get("title")
+        or submission_data.get("summary")
+        or f"Dynamic request {int(time.time())}"
+    )
+    req.description = submission_data.get("description") or ""
+    req.priority = submission_data.get("priority") or "medium"
+    req.request_type = submission_data.get("request_type") or "both"
+    req.pricebook_status = submission_data.get("pricebook_status") or "unknown"
+    return req
+
+
+def build_initial_artifact(req, form, submission_data: dict | None, current_user_id: int):
+    request_type = (req.request_type or "").strip()
+    if request_type == "part_number":
+        artifact_type = "part_number"
+    elif request_type == "instructions":
+        artifact_type = "instructions"
+    else:
+        artifact_type = "part_number"
+
+    if submission_data is not None:
+        instructions_url = submission_data.get("instructions_url")
+        donor = submission_data.get("donor_part_number")
+        target = submission_data.get("target_part_number")
+        no_donor_reason = submission_data.get("no_donor_reason")
+    else:
+        instructions_field = getattr(form, "instructions_url", None)
+        instructions_url = (
+            (instructions_field.data or "").strip() if instructions_field else None
+        )
+        donor = (getattr(form, "donor_part_number", None).data or "").strip() or None
+        target = (getattr(form, "target_part_number", None).data or "").strip() or None
+        no_donor_reason = (
+            getattr(form, "no_donor_reason", None).data or ""
+        ).strip() or None
+
+    return Artifact(
+        request_id=req.id,
+        instructions_url=instructions_url,
+        artifact_type=artifact_type,
+        donor_part_number=donor,
+        target_part_number=target,
+        no_donor_reason=no_donor_reason,
+        created_by_user_id=current_user_id,
+        created_by_department="A",
+    )
+
+
+def create_form_submission(template, req, submission_data: dict, current_user_id: int):
+    form_submission = FormSubmission(
+        template_id=template.id,
+        request_id=req.id,
+        data=submission_data,
+        created_by_user_id=current_user_id,
+    )
+    db.session.add(form_submission)
+    db.session.commit()
+    return form_submission
+
+
+def save_template_file_attachments(form_submission, template_fields, current_user_id: int):
+    for field in template_fields:
+        if field.field_type != "file":
+            continue
+        upload = request.files.get(field.name)
+        if not (upload and upload.filename):
+            continue
+
+        filename = secure_filename(upload.filename)
+        _, ext = os.path.splitext(filename)
+        stored = f"uploads/{int(time.time())}-{uuid.uuid4().hex}{ext}"
+        static_upload_dir = os.path.join(current_app.static_folder or "static", "uploads")
+        os.makedirs(static_upload_dir, exist_ok=True)
+        destination = os.path.join(current_app.static_folder or "static", stored)
+        upload.save(destination)
+
+        attachment = Attachment(
+            submission_id=form_submission.id,
+            original_filename=filename,
+            stored_filename=stored,
+            content_type=upload.content_type or "application/octet-stream",
+            size_bytes=os.path.getsize(destination),
+            uploaded_by_user_id=current_user_id,
+        )
+        db.session.add(attachment)
+        db.session.commit()
+
+
+def run_template_field_verifications(template_fields, submission_data: dict):
+    verification_results = {}
+    latest_map = load_latest_field_verification_map(template_fields)
+
+    for field in template_fields:
+        rule = resolve_field_verification_rule(field, latest_map)
+        if not rule:
+            continue
+
+        try:
+            verification_results[field.name] = run_field_verification(
+                field, rule, submission_data
+            )
+        except Exception as exc:
+            current_app.logger.exception("Verification execution failed")
+            verification_results[field.name] = {"ok": False, "error": str(exc)}
+
+    return verification_results

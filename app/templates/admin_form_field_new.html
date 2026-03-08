@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Add Field to {{ template.name }}</h2>
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Template management</div>
+    <h2 class="page-header__title mb-0">Add Field to {{ template.name }}</h2>
+    <p class="page-header__lede mb-0">Define the field label, input type, help text, options, and verification behavior for this template.</p>
+  </div>
+</section>
+<section class="surface-panel">
 <form method="post">
   {{ form.hidden_tag() }}
   <div class="mb-3">{{ form.name.label }}{{ form.name(class_='form-control') }}</div>
@@ -13,4 +20,5 @@
   <div class="mb-3">{{ form.verification_json.label }}{{ form.verification_json(class_='form-control', rows=4) }}</div>
   <button class="btn btn-primary">Add Field</button>
 </form>
+</section>
 {% endblock %}

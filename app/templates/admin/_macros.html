@@ -1,0 +1,16 @@
+{% macro page_header(title, new_url=None, new_label='New', eyebrow='Administration', lede=None) %}
+  <section class="page-header mb-3">
+    <div>
+      <div class="page-header__eyebrow">{{ eyebrow }}</div>
+      <h2 class="page-header__title mb-0">{{ title }}</h2>
+      {% if lede %}
+        <p class="page-header__lede mb-0">{{ lede }}</p>
+      {% endif %}
+    </div>
+    {% if new_url %}
+      <div class="page-header__actions">
+        <a class="btn btn-primary" href="{{ new_url }}">{{ new_label }}</a>
+      </div>
+    {% endif %}
+  </section>
+{% endmacro %}

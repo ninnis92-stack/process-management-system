@@ -7,6 +7,7 @@ Create Date: 2026-03-04 00:00:00.000000
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
 revision = "0001_add_is_admin"
@@ -16,6 +17,14 @@ depends_on = None
 
 
 def upgrade():
+    conn = op.get_bind()
+    try:
+        cols = {c["name"] for c in inspect(conn).get_columns("user")}
+    except Exception:
+        cols = set()
+    if "is_admin" in cols:
+        return
+
     # Add `is_admin` column. Use INTEGER default for SQLite compatibility.
     try:
         op.add_column(
@@ -26,8 +35,7 @@ def upgrade():
         )
     except Exception:
         # Best-effort: direct EXECUTE for sqlite if add_column fails in older Alembic
-        conn = op.get_bind()
-        conn.execute(sa.text("ALTER TABLE user ADD COLUMN is_admin INTEGER DEFAULT 0"))
+        conn.execute(sa.text('ALTER TABLE "user" ADD COLUMN is_admin INTEGER DEFAULT 0'))
 
 
 def downgrade():

@@ -1,14 +1,21 @@
 {% extends "base.html" %}
 {% block content %}
-<h3 class="mb-2">Request #{{ req.id }} · {{ req.title }}</h3>
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Request workspace</div>
+    <h3 class="page-header__title mb-0">Request #{{ req.id }} · {{ req.title }}</h3>
+    <p class="page-header__lede mb-0">Review artifacts, coordinate handoffs, and keep the request moving without leaving this workspace.</p>
+  </div>
+</section>
 {% if next_hint %}
-  <div class="alert alert-primary d-flex align-items-center gap-2">
+  <div class="alert alert-primary d-flex align-items-center gap-2 hero-note">
     <span>🔎</span>
     <div>{{ next_hint }}</div>
   </div>
 {% endif %}
 
-<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+<section class="surface-panel surface-panel-muted mb-3">
+<div class="meta-badge-row mb-3">
   {% set icon = {
     'NEW_FROM_A': '✨',
     'B_IN_PROGRESS': '⏳',
@@ -37,9 +44,10 @@
   {% endif %}
 </div>
 
-<div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
+<div class="meta-badge-row">
   <strong>Due:</strong> {{ req.due_at.strftime("%b %d, %Y %I:%M %p") if req.due_at else "—" }}
 </div>
+</section>
 
 {# Expose status option screenshot requirements to client JS as JSON script to avoid JS linter errors #}
 <script id="status-options-data" type="application/json">{{ status_options_map|default({})|tojson }}</script>
@@ -56,18 +64,15 @@
 <div class="row g-3">
   <div class="col-md-7">
 
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
+    <section class="surface-panel mb-3">
         <h5>Details</h5>
         <div><strong>Type:</strong> {{ req.request_type }}</div>
         <div><strong>Sales list:</strong> {{ req.pricebook_display }}</div>
         <hr/>
         <div style="white-space:pre-wrap">{{ req.description }}</div>
-      </div>
-    </div>
+    </section>
 
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
+    <section class="surface-panel mb-3">
         <h5>Artifacts</h5>
         <ul class="list-unstyled mb-3">
           {% for a in req.artifacts %}
@@ -214,11 +219,9 @@
             <div class="text-muted">Part Number artifact already exists. Edit/update it if needed.</div>
           {% endif %}
         {% endif %}
-      </div>
-    </div>
+    </section>
 
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
+    <section class="surface-panel mb-3">
         <h5>Handoffs / Submissions</h5>
         {% for s in submissions %}
           <div class="border rounded p-2 mb-2">
@@ -257,22 +260,18 @@
         {% else %}
           <div class="text-muted">No submissions yet.</div>
         {% endfor %}
-      </div>
-    </div>
+    </section>
 
   </div>
 
   <div class="col-md-5">
 
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
+    <section class="surface-panel mb-3">
         <h5>Collaboration</h5>
         <div id="presenceList" data-request-id="{{ req.id }}" class="small text-muted">Connecting…</div>
-      </div>
-    </div>
+    </section>
 
-    <div class="card shadow-sm mb-3" id="assign">
-      <div class="card-body">
+    <section class="surface-panel mb-3" id="assign">
         <h5 id="assign-heading">Assignment</h5>
         {% set assignee = req.assigned_to_user %}
         <div class="mb-2">
@@ -289,12 +288,10 @@
             <button class="btn btn-outline-primary w-100">Save Assignment</button>
           </form>
         {% endif %}
-      </div>
-    </div>
+    </section>
 
         {% if current_user.department == "B" %}
-      <div class="card shadow-sm mb-3">
-        <div class="card-body">
+      <section class="surface-panel mb-3">
           <h5>Method / Part (placeholder)</h5>
           <div class="small text-muted mb-2">Enter the created method ID or part number.</div>
           {% if (not req.assigned_to_user) or (req.assigned_to_user and req.assigned_to_user.id == current_user.id) %}
@@ -317,14 +314,12 @@
             {% else %}
               <div class="text-muted">Only the assigned user may perform verification actions.</div>
             {% endif %}
-        </div>
-      </div>
+      </section>
     {% endif %}
 
     {# Dept B Controls moved into Transition section as a checkbox. #}
 
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
+    <section class="surface-panel mb-3">
         <h5>Status Update</h5>
         <div class="small text-muted mb-2">Note: Department A may close a ticket without providing a submission. Dept A may reopen the ticket within 48 hours after closure. Dept B will be notified when a ticket is closed.</div>
         {% if current_user.is_admin %}
@@ -405,15 +400,13 @@
         {% else %}
           <div class="text-muted">No transitions available for your department at this status.</div>
         {% endif %}
-      </div>
-    </div>
+    </section>
 
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
+    <section class="surface-panel mb-3">
         <h5>Comments</h5>
         <div class="small text-muted mb-2">You’ll see public + your department’s internal notes.</div>
 
-        <div class="border rounded p-2 mb-3" style="max-height: 240px; overflow:auto;">
+        <div class="border rounded p-2 mb-3 detail-scroll-panel">
           {% for c in comments %}
             <div class="mb-2">
               <div class="d-flex justify-content-between">
@@ -446,13 +439,11 @@
         {% else %}
           <div class="text-muted">Only the assigned user may add comments on this request.</div>
         {% endif %}
-      </div>
-    </div>
+    </section>
 
-    <div class="card shadow-sm">
-      <div class="card-body">
+    <section class="surface-panel">
         <h5>Audit Timeline</h5>
-        <div class="border rounded p-2" style="max-height: 220px; overflow:auto;">
+        <div class="border rounded p-2 detail-scroll-panel">
           {% for a in audit %}
             <div class="mb-2">
               <div class="d-flex justify-content-between">
@@ -470,9 +461,8 @@
           {% else %}
             <div class="text-muted">No audit entries.</div>
           {% endfor %}
-        </div>
-      </div>
-    </div>
+          </div>
+      </section>
 
   </div>
 </div>

@@ -1,5 +1,36 @@
 import os
-from typing import Callable
+import uuid
+
+from flask import g, request
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+
+def init_runtime_middleware(app):
+    """Install request tracing and proxy-aware middleware."""
+
+    if app.config.get("PROXY_FIX_ENABLED"):
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=int(app.config.get("PROXY_FIX_X_FOR", 1)),
+            x_proto=int(app.config.get("PROXY_FIX_X_PROTO", 1)),
+            x_host=int(app.config.get("PROXY_FIX_X_HOST", 1)),
+            x_port=int(app.config.get("PROXY_FIX_X_PORT", 1)),
+            x_prefix=int(app.config.get("PROXY_FIX_X_PREFIX", 1)),
+        )
+
+    request_id_header = app.config.get("REQUEST_ID_HEADER", "X-Request-ID")
+
+    @app.before_request
+    def _attach_request_id():
+        incoming = (request.headers.get(request_id_header) or "").strip()
+        g.request_id = incoming[:120] if incoming else uuid.uuid4().hex
+
+    @app.after_request
+    def _set_request_id_header(response):
+        request_id = getattr(g, "request_id", None)
+        if request_id:
+            response.headers.setdefault(request_id_header, request_id)
+        return response
 
 
 def init_security(app):

@@ -1,10 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Add Status to {{ bucket.name }}</h2>
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Workflow control</div>
+    <h2 class="page-header__title mb-0">Add Status to {{ bucket.name }}</h2>
+    <p class="page-header__lede mb-0">Append another status code to this bucket and control its display order.</p>
+  </div>
+</section>
+<section class="surface-panel">
 <form method="post">
   {{ form.hidden_tag() }}
   <div class="mb-3">{{ form.status_code.label }}{{ form.status_code(class_='form-control') }}</div>
   <div class="mb-3">{{ form.order.label }}{{ form.order(class_='form-control') }}</div>
   <button class="btn btn-primary">Add</button>
 </form>
+</section>
 {% endblock %}

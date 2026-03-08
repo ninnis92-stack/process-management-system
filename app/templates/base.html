@@ -4,17 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <style>
-    /* Small admin UI helper styles */
-    .admin-card { transition: opacity 0.12s ease; }
-    .admin-card.hidden-by-filter { opacity: 0.18; pointer-events: none; }
-    .admin-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
-    .admin-tile { display:flex; flex-direction:column; gap:6px; padding:12px; border-radius:8px; background:#fff; color:inherit; text-decoration:none; border:1px solid rgba(0,0,0,0.06); }
-    .admin-tile:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
-    .tile-ico { font-size:22px }
-    .tile-title { font-weight:600 }
-    .tile-sub { font-size:0.85rem; color:rgba(0,0,0,0.6) }
-  </style>
   <title>{{ title or "Process Management Prototype" }}</title>
   <!-- Defensive shim early: avoid uncaught errors when third-party extensions expect a Sortable global -->
   <script>
@@ -31,9 +20,14 @@
       }catch(e){}
     })();
   </script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" integrity="sha512-p1Cm0QlW0FQvgw+Vxv0+H5a6uVgnF6V5u0Y2dd4AozqA3BsnF7mk/WvJL3Z8zUuNX1U4MZT+O2e2d3dH+pvGVHg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260307c') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260307e') }}">
   {% if active_theme_css %}
     <script id="active-theme-css-data" type="application/json">{{ active_theme_css|tojson }}</script>
     <script>
@@ -61,6 +55,11 @@
 
   {% set ep = request.endpoint or '' %}
   <nav class="navbar theme-nav navbar-expand-lg navbar-dark">
+    {% if ep.startswith('admin') %}
+      <button class="btn btn-outline-light d-md-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-label="Toggle admin navigation">
+        <i class="fas fa-bars"></i>
+      </button>
+    {% endif %}
     <div class="container-fluid">
       <a class="navbar-brand d-flex align-items-center brand-stack" href="{{ url_for('requests.dashboard') }}">
         {% if theme_logo_url %}
@@ -109,10 +108,10 @@
             </button>
             {% endif %}
             {% if current_user.is_admin %}
-              <button id="toggleNotifBtn" class="btn btn-outline-light btn-sm ms-2" title="Toggle notifications icon">🔕</button>
+              <button id="toggleNotifBtn" type="button" class="btn btn-outline-light btn-sm ms-2" title="Toggle notifications icon">🔕</button>
             {% endif %}
             {% if FeatureFlags.get().vibe_enabled %}
-              <button id="vibeBtn" class="btn btn-outline-light btn-sm">Vibe · <span id="vibeLabel">—</span></button>
+              <button id="vibeBtn" type="button" class="btn btn-outline-light btn-sm">Vibe · <span id="vibeLabel">—</span></button>
             {% endif %}
             {% if current_user.is_admin %}
               <form method="get" action="{{ url_for('requests.dashboard') }}" class="m-0 d-inline" id="admin-dept-view-form">
@@ -125,7 +124,7 @@
             {% endif %}
             {# Account dropdown: compact avatar button that reveals user info + settings. Always shown. #}
             <div class="dropdown ms-2">
-              <button class="btn btn-outline-light btn-sm d-flex align-items-center dropdown-toggle" id="accountMenuBtn" data-bs-toggle="dropdown" aria-expanded="false" data-user-name="{{ current_user.name or '' }}" data-user-email="{{ current_user.email or '' }}" data-sso-sub="{{ current_user.sso_sub or '' }}">
+              <button type="button" class="btn btn-outline-light btn-sm d-flex align-items-center dropdown-toggle" id="accountMenuBtn" data-bs-toggle="dropdown" aria-expanded="false" data-user-name="{{ current_user.name or '' }}" data-user-email="{{ current_user.email or '' }}" data-sso-sub="{{ current_user.sso_sub or '' }}">
                 <img src="{{ avatar_url_for(current_user, size=34) }}" alt="Account avatar" class="avatar avatar-sm me-2" />
                 <span class="visually-hidden">Account</span>
               </button>
@@ -147,7 +146,11 @@
                 </li>
               </ul>
             </div>
-            <a href="{{ url_for('requests.metrics_ui') }}" class="btn btn-outline-light btn-sm ms-2">Metrics</a>
+            {% if current_user.is_admin %}
+              <a href="{{ url_for('admin.metrics_config') }}" class="btn btn-outline-light btn-sm ms-2">Metrics</a>
+            {% elif can_view_metrics_for_user(current_user) %}
+              <a href="{{ url_for('requests.metrics_ui') }}" class="btn btn-outline-light btn-sm ms-2">Metrics</a>
+            {% endif %}
             {% if current_user.is_acting_as %}
               <span class="badge bg-warning text-dark ms-2">{{ current_user.act_as_label }}</span>
             {% endif %}
@@ -169,6 +172,27 @@
       </div>
     </div>
   </nav>
+
+  {% if ep.startswith('admin') %}
+    <nav aria-label="breadcrumb" class="container-fluid mt-2">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{{ url_for('admin.index') }}">Admin</a></li>
+        {% if request.endpoint == 'admin.list_status_options' %}
+          <li class="breadcrumb-item active" aria-current="page">Status Options</li>
+        {% elif request.endpoint == 'admin.list_workflows' %}
+          <li class="breadcrumb-item active" aria-current="page">Workflows</li>
+        {% elif request.endpoint == 'admin.list_departments' %}
+          <li class="breadcrumb-item active" aria-current="page">Departments</li>
+        {% elif request.endpoint == 'admin.site_config' %}
+          <li class="breadcrumb-item active" aria-current="page">Site Configuration</li>
+        {% elif request.endpoint == 'admin.metrics_config' %}
+          <li class="breadcrumb-item active" aria-current="page">Metrics Settings</li>
+        {% elif request.endpoint == 'admin.quotes_config' %}
+          <li class="breadcrumb-item active" aria-current="page">Quotes</li>
+        {% endif %}
+      </ol>
+    </nav>
+  {% endif %}
 
   {% if session.get('impersonate_admin_id') %}
     <div class="impersonation-banner text-dark">
@@ -198,65 +222,81 @@
     </div>
   {% endif %}
 
-  <main id="content" class="main container my-3" role="main" tabindex="-1">
-    {% if site_banner_html %}
-        <div class="mb-3">
-          {{ site_banner_html|safe }}
-          {% if current_user.is_authenticated and config.get('ALLOW_SELF_ADMIN') %}
-            <form method="post" action="{{ url_for('admin.set_self_admin') }}" class="d-inline ms-2">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-sm btn-outline-dark">Make me admin</button>
-            </form>
+  <main id="content" class="main container my-4" role="main" tabindex="-1">
+    {% if ep.startswith('admin') %}
+      <div class="row g-4 admin-layout">
+        <div class="col-md-3 col-lg-2 d-none d-md-block">
+          {% include 'admin/_sidebar.html' %}
+        </div>
+        <div class="col-md-9 col-lg-10">
+    {% endif %}
+
+          <div class="page-shell{% if ep.startswith('admin') %} page-shell-admin{% endif %}">
+
+          {% if site_banner_html %}
+              <div class="mb-3">
+                <div class="alert alert-info mb-0" role="status">{{ site_banner_html|striptags }}</div>
+                {% if current_user.is_authenticated and config.get('ALLOW_SELF_ADMIN') %}
+                  <form method="post" action="{{ url_for('admin.set_self_admin') }}" class="d-inline ms-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-dark">Make me admin</button>
+                  </form>
+                {% endif %}
+              </div>
+          {% elif rolling_quotes_enabled and rolling_quotes and rolling_quotes|length > 0 %}
+            <div class="alert alert-info mb-3" role="status">{{ rolling_quotes[0] }}</div>
           {% endif %}
-        </div>
-    {% elif rolling_quotes_enabled and rolling_quotes and rolling_quotes|length > 0 %}
-      <div class="alert alert-info mb-3" role="status">{{ rolling_quotes[0] }}</div>
-    {% endif %}
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="mb-3">
-          {% for category, message in messages %}
-            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-              {{ message }}
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              <div class="flash-stack">
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endwith %}
 
-    {# If a tracking link was provided in the template context (post-submission), show it in a green banner here too #}
-    {% if tracking_link and created_req %}
-      <div class="mb-3">
-        <div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
-          <div class="me-3 d-flex flex-column" style="min-width:0; max-width:72%;">
-            <div class="d-flex align-items-center mb-1">
-              <strong class="me-2">Request #</strong>
-              <span class="me-3">#{{ created_req.id }}</span>
-              <strong class="me-2">Email</strong>
-              <span class="text-truncate">{{ created_req.guest_email or '' }}</span>
+          {% if tracking_link and created_req %}
+            <div class="mb-3">
+              <div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
+                <div class="me-3 d-flex flex-column" style="min-width:0; max-width:72%;">
+                  <div class="d-flex align-items-center mb-1">
+                    <strong class="me-2">Request #</strong>
+                    <span class="me-3">#{{ created_req.id }}</span>
+                    <strong class="me-2">Email</strong>
+                    <span class="text-truncate">{{ created_req.guest_email or '' }}</span>
+                  </div>
+                  <div class="text-truncate" style="max-width:100%;">
+                    <a id="topTrackingLink" href="{{ tracking_link }}" target="_blank" rel="noopener">{{ tracking_link }}</a>
+                  </div>
+                  <div class="small text-muted mt-1">Save this link or your request number to view updates on the Guest Dashboard. Use the Copy button to save the link.</div>
+                </div>
+                <div class="d-flex align-items-center ms-2 gap-2">
+                  <a class="btn btn-sm btn-outline-light text-dark" href="{{ tracking_link }}" target="_blank" rel="noopener">Open Guest View</a>
+                  <button class="btn btn-sm btn-light text-dark" type="button" onclick="copyTextFromString('{{ tracking_link }}', this)" aria-label="Copy tracking link">Copy</button>
+                </div>
+              </div>
             </div>
-            <div class="text-truncate" style="max-width:100%;">
-              <a id="topTrackingLink" href="{{ tracking_link }}" target="_blank" rel="noopener">{{ tracking_link }}</a>
+          {% endif %}
+
+          {% if ep.startswith('admin') and ep != 'admin.index' %}
+            <div class="mb-3">
+              <a class="btn btn-sm btn-outline-secondary admin-back-btn" href="{{ url_for('admin.index') }}">← Back to admin dashboard</a>
             </div>
-            <div class="small text-muted mt-1">Save this link or your request number to view updates on the Guest Dashboard. Use the Copy button to save the link.</div>
-          </div>
-          <div class="d-flex align-items-center ms-2 gap-2">
-            <a class="btn btn-sm btn-outline-light text-dark" href="{{ tracking_link }}" target="_blank" rel="noopener">Open Guest View</a>
-            <button class="btn btn-sm btn-light text-dark" type="button" onclick="copyTextFromString('{{ tracking_link }}', this)" aria-label="Copy tracking link">Copy</button>
-          </div>
+          {% endif %}
+
+          {% block content %}{% endblock %}
+
+      </div>
+
+    {% if ep.startswith('admin') %}
         </div>
       </div>
     {% endif %}
-
-    {% if ep.startswith('admin') and ep != 'admin.index' %}
-      <div class="mb-3">
-        <a class="btn btn-sm btn-outline-secondary admin-back-btn" href="{{ url_for('admin.index') }}">← Back to admin dashboard</a>
-      </div>
-    {% endif %}
-
-    {% block content %}{% endblock %}
   </main>
 
   <!-- Department chooser modal (auto-shown for users with multiple departments) -->
@@ -283,9 +323,9 @@
   </div>
 
   <!-- User state provided via data attributes on <body> to avoid JS parser diagnostics in templates -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script id="rolling-quotes-data" type="application/json">{{ rolling_quotes|tojson }}</script>
-  <script src="{{ url_for('static', filename='app.js', v='20260307c') }}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+  <script id="rolling-quotes-data" type="application/json" defer>{{ rolling_quotes|tojson }}</script>
+  <script src="{{ url_for('static', filename='app.js', v='20260307e') }}" defer></script>
   <script>
     (function(){
       try{
@@ -315,13 +355,20 @@
           if (!modalEl) return;
           const modal = new bootstrap.Modal(modalEl);
           modal.show();
-        }).catch(()=>{});
+          // ensure backdrop doesn't stick around indefinitely
+          modalEl.addEventListener('hidden.bs.modal', () => {
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+          });
+          // auto-close if user takes no action in 8 seconds
+          setTimeout(() => {
+            if (modalEl.classList.contains('show')) {
+              try { modal.hide(); } catch(e){}
+            }
+          }, 8000);
+        });
       } catch(e){}
     })();
 
-    setTimeout(() => {
-      document.querySelectorAll('.alert').forEach(a => a.remove());
-    }, 4000);
     function copyTextFromString(text, btn) {
       try {
         navigator.clipboard.writeText(String(text));
@@ -333,6 +380,27 @@
       }
     }
   </script>
+  <!-- cleanup any stray backdrops that might linger from unfinished modals/offcanvas or page-cache restores -->
+  <script>
+    function removeAllBackdrops(){
+      document.querySelectorAll('.modal-backdrop, .offcanvas-backdrop').forEach(el => el.remove());
+      document.body.classList.remove('modal-open');
+    }
+    document.addEventListener('DOMContentLoaded', removeAllBackdrops);
+    // also catch bfcache/forward-back navigation where DOM is restored
+    window.addEventListener('pageshow', function(evt){
+      if(evt.persisted) removeAllBackdrops();
+      else removeAllBackdrops();
+    });
+  </script>
+  <style>
+    /* if a backdrop somehow sneaks in before JS runs, hide it via CSS
+       to avoid the grey mask lingering during page load or history restore */
+    .modal-backdrop,
+    .offcanvas-backdrop {
+      display: none !important;
+    }
+  </style>
   <script>
     (function(){
       const toggle = document.getElementById('toggleNotifBtn');
@@ -365,8 +433,36 @@
   <script>
     (function(){
       const input = document.getElementById('adminQuickSearch');
-      if (!input) return;
       const cards = Array.from(document.querySelectorAll('.admin-card'));
+      if (cards.length) {
+        cards.forEach(card => {
+          card.style.cursor = 'pointer';
+          // always drive navigation from `data-nav-url` when available; falls back
+          // to the href attribute as a last resort.
+          const href = card.getAttribute('data-nav-url') || card.getAttribute('href');
+          if (href && card.tagName === 'A' && card.getAttribute('href') !== href) {
+            card.setAttribute('href', href);
+          }
+          if (card.tagName !== 'BUTTON' && !card.hasAttribute('tabindex')) {
+            card.setAttribute('tabindex', '0');
+          }
+          card.addEventListener('click', function(ev){
+            try {
+              ev.preventDefault();
+              if (href) window.location.assign(href);
+            } catch (e) {}
+          });
+          card.addEventListener('keydown', function(ev){
+            try {
+              if (ev.key !== 'Enter' && ev.key !== ' ') return;
+              if (!href) return;
+              ev.preventDefault();
+              window.location.assign(href);
+            } catch (e) {}
+          });
+        });
+      }
+      if (!input) return;
       input.addEventListener('input', function(){
         const q = (input.value || '').trim().toLowerCase();
         if (!q) {

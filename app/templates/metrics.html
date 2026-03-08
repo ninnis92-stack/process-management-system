@@ -1,39 +1,252 @@
 {% extends "base.html" %}
 {% block content %}
-<h3 class="mb-3">Metrics{% if metrics|length == 1 %} — Dept {{ metrics[0].dept }}{% endif %}</h3>
-<p class="text-muted">Snapshot: {{ now.strftime('%Y-%m-%d %H:%M UTC') }} — {{ range_label }}</p>
-<div class="mb-3">
-  <a href="?range=daily" class="btn btn-sm btn-outline-secondary {% if range_key=='daily' %}active{% endif %}">Daily</a>
-  <a href="?range=weekly" class="btn btn-sm btn-outline-secondary {% if range_key=='weekly' %}active{% endif %}">Weekly</a>
-  <a href="?range=monthly" class="btn btn-sm btn-outline-secondary {% if range_key=='monthly' %}active{% endif %}">Monthly</a>
-  <a href="?range=yearly" class="btn btn-sm btn-outline-secondary {% if range_key=='yearly' %}active{% endif %}">Yearly</a>
-</div>
-<div class="card">
-  <div class="card-body">
-    <div class="table-responsive">
-      <table class="table table-sm">
-      <thead>
-        <tr>
-          <th>Department</th>
-          <th class="text-end">Total requests</th>
-          <th class="text-end">Open</th>
-          <th class="text-end">Created (window)</th>
-          <th class="text-end">Closed (window)</th>
-        </tr>
-      </thead>
-        <tbody>
-          {% for m in metrics %}
-        <tr>
-          <td><strong>Dept {{ m.dept }}</strong></td>
-          <td class="text-end">{{ m.total }}</td>
-          <td class="text-end">{{ m.open }}</td>
-          <td class="text-end">{{ m.created_window }}</td>
-          <td class="text-end">{{ m.closed_window }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-      </table>
-    </div>
+<style>
+  .metrics-bucket-card {
+    overflow: hidden;
+  }
+  .metrics-bucket-header {
+    border-bottom: 0;
+  }
+  .metrics-bucket-header.metrics-dept-a {
+    background: linear-gradient(135deg, #0d6efd, #6ea8fe);
+    color: #fff;
+  }
+  .metrics-bucket-header.metrics-dept-b {
+    background: linear-gradient(135deg, #198754, #75b798);
+    color: #fff;
+  }
+  .metrics-bucket-header.metrics-dept-c {
+    background: linear-gradient(135deg, #6f42c1, #b197fc);
+    color: #fff;
+  }
+  .metrics-bucket-toggle {
+    color: inherit;
+    text-decoration: none;
+    border-color: rgba(255,255,255,0.45);
+  }
+  .metrics-bucket-toggle:hover,
+  .metrics-bucket-toggle:focus {
+    color: inherit;
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.65);
+  }
+  .metrics-kpi-box {
+    background: rgba(248, 249, 250, 0.9);
+  }
+</style>
+{% set metrics_endpoint = metrics_view_endpoint or 'requests.metrics_ui' %}
+{% if admin_metrics_mode %}
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Operations analytics</div>
+    <h3 class="page-header__title mb-0">Admin Metrics Overview{% if metrics|length == 1 %} — Dept {{ metrics[0].dept }}{% endif %}</h3>
+    <p class="page-header__lede mb-0">Monitor department throughput, user efficiency, and handoff activity from a single analytics view.</p>
   </div>
+  <div class="page-header__actions">
+    <a href="{{ url_for('admin.metrics_config') }}" class="btn btn-outline-secondary">Back to Metrics Settings</a>
+  </div>
+</section>
+{% else %}
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Operations analytics</div>
+    <h3 class="page-header__title mb-0">Metrics{% if metrics|length == 1 %} — Dept {{ metrics[0].dept }}{% endif %}</h3>
+    <p class="page-header__lede mb-0">Review the current reporting window, filter what you need, and export the same data set when needed.</p>
+  </div>
+</section>
+{% endif %}
+<section class="surface-panel surface-panel-muted">
+  <div class="text-muted mb-0">Snapshot: {{ now.strftime('%Y-%m-%d %H:%M UTC') }} — {{ range_label }}</div>
+</section>
+<div class="surface-panel surface-panel-muted mb-3 mt-3">
+<div class="d-flex flex-wrap gap-2 align-items-center">
+  <a href="{{ url_for(metrics_endpoint, range='daily', dept=selected_metric_department, q=q, user=user_filters) }}" class="btn btn-sm btn-outline-secondary {% if range_key=='daily' %}active{% endif %}">Daily</a>
+  <a href="{{ url_for(metrics_endpoint, range='weekly', dept=selected_metric_department, q=q, user=user_filters) }}" class="btn btn-sm btn-outline-secondary {% if range_key=='weekly' %}active{% endif %}">Weekly</a>
+  <a href="{{ url_for(metrics_endpoint, range='monthly', dept=selected_metric_department, q=q, user=user_filters) }}" class="btn btn-sm btn-outline-secondary {% if range_key=='monthly' %}active{% endif %}">Monthly</a>
+  <a href="{{ url_for(metrics_endpoint, range='yearly', dept=selected_metric_department, q=q, user=user_filters) }}" class="btn btn-sm btn-outline-secondary {% if range_key=='yearly' %}active{% endif %}">Yearly</a>
+  <a href="{{ url_for(metrics_endpoint, range='all', dept=selected_metric_department, q=q, user=user_filters) }}" class="btn btn-sm btn-outline-secondary {% if range_key=='all' %}active{% endif %}">All time</a>
+  <a href="{{ url_for(metrics_endpoint, range=range_key, dept=selected_metric_department, export='csv', q=q, user=user_filters) }}" class="btn btn-sm btn-outline-secondary">Export CSV</a>
+</div>
+</div>
+
+<form class="page-toolbar surface-panel dashboard-search mb-3" method="get" action="{{ url_for(metrics_endpoint) }}">
+  <input type="hidden" name="range" value="{{ range_key }}">
+  {% if selected_metric_department %}
+    <input type="hidden" name="dept" value="{{ selected_metric_department }}">
+  {% endif %}
+  <input id="metricsSearch" name="q" class="form-control me-2" type="search" placeholder="Filter requests" value="{{ q or '' }}">
+  <button class="btn btn-outline-secondary" type="submit">Filter</button>
+  {% if q %}
+    <a href="{{ url_for(metrics_endpoint, range=range_key, dept=selected_metric_department) }}" class="btn btn-link ms-2">Clear</a>
+  {% endif %}
+</form>
+
+{% if available_users %}
+<form class="surface-panel mb-3" method="get" action="{{ url_for(metrics_endpoint) }}">
+  <input type="hidden" name="range" value="{{ range_key }}">
+  {% if selected_metric_department %}
+    <input type="hidden" name="dept" value="{{ selected_metric_department }}">
+  {% endif %}
+  {% if q %}
+    <input type="hidden" name="q" value="{{ q }}">
+  {% endif %}
+  <label for="userSelect" class="form-label">Filter users</label>
+  <select id="userSelect" name="user" multiple class="form-control">
+    {% for u in available_users %}
+      <option value="{{ u.user_id }}"{% if u.user_id|string in user_filters %} selected{% endif %}>{{ u.email }}{% if u.department %} ({{ u.department }}){% endif %}</option>
+    {% endfor %}
+  </select>
+  <button class="btn btn-outline-secondary mt-2" type="submit">Apply user filter</button>
+  {% if user_filters %}
+    <a href="{{ url_for(metrics_endpoint, range=range_key, dept=selected_metric_department, q=q) }}" class="btn btn-link ms-2">Clear user filter</a>
+  {% endif %}
+</form>
+{% endif %}
+{% if allowed_metric_departments|length > 1 %}
+  <div class="surface-panel surface-panel-muted mb-3">
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{{ url_for(metrics_endpoint, range=range_key, q=q, user=user_filters) }}" class="btn btn-sm btn-outline-primary {% if not selected_metric_department %}active{% endif %}">Full site metrics</a>
+    {% for dept in allowed_metric_departments %}
+      <a href="{{ url_for(metrics_endpoint, range=range_key, dept=dept, q=q, user=user_filters) }}" class="btn btn-sm btn-outline-primary {% if selected_metric_department == dept %}active{% endif %}">Dept {{ dept }}</a>
+    {% endfor %}
+  </div>
+  </div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card h-100"><div class="card-body"><div class="small text-muted">Tracked events</div><div class="fs-3 fw-semibold">{{ summary.tracked_events_total }}</div></div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100"><div class="card-body"><div class="small text-muted">Tracked requests</div><div class="fs-3 fw-semibold">{{ summary.tracked_requests_total }}</div></div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100"><div class="card-body"><div class="small text-muted">Active users</div><div class="fs-3 fw-semibold">{{ summary.active_users_total }}</div></div></div>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for bucket in dept_buckets %}
+    {% set m = bucket.metrics %}
+    {% set dept_class = 'metrics-dept-' ~ bucket.dept|lower %}
+    {% set collapse_id = 'metrics-bucket-' ~ bucket.dept|lower %}
+    <div class="col-12 {% if dept_buckets|length > 1 %}col-xl-4 col-lg-6{% endif %}">
+      <div class="card h-100 border-0 shadow-sm metrics-bucket-card">
+        <div class="card-header metrics-bucket-header {{ dept_class }} d-flex justify-content-between align-items-center">
+          <div>
+            <strong>Dept {{ bucket.dept }}</strong>
+            <div class="small text-muted">Department bucket</div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge text-bg-light">{{ m.total }} total</span>
+            <button
+              class="btn btn-sm metrics-bucket-toggle"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#{{ collapse_id }}"
+              aria-expanded="true"
+              aria-controls="{{ collapse_id }}"
+            >Toggle</button>
+          </div>
+        </div>
+        <div id="{{ collapse_id }}" class="collapse show">
+        <div class="card-body">
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <div class="border rounded p-2 h-100 metrics-kpi-box">
+                <div class="small text-muted">Open</div>
+                <div class="fs-5 fw-semibold">{{ m.open }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-2 h-100 metrics-kpi-box">
+                <div class="small text-muted">Created</div>
+                <div class="fs-5 fw-semibold">{{ m.created_window }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-2 h-100 metrics-kpi-box">
+                <div class="small text-muted">Closed</div>
+                <div class="fs-5 fw-semibold">{{ m.closed_window }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-2 h-100 metrics-kpi-box">
+                <div class="small text-muted">Tracked events</div>
+                <div class="fs-5 fw-semibold">{{ m.tracked_events }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-2 h-100 metrics-kpi-box">
+                <div class="small text-muted">Avg completion</div>
+                <div class="fs-6 fw-semibold">{{ m.avg_completion_hours if m.avg_completion_hours is not none else '—' }}{% if m.avg_completion_hours is not none %} h{% endif %}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="border rounded p-2 h-100 metrics-kpi-box">
+                <div class="small text-muted">On target</div>
+                <div class="fs-6 fw-semibold">{{ m.within_target_pct ~ '%' if m.within_target_pct is not none else '—' }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <h6 class="mb-2">User efficiency</h6>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th class="text-end">Events</th>
+                    <th class="text-end">Status</th>
+                    <th class="text-end">Slow</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in bucket.users %}
+                    <tr>
+                      <td>{{ row.email }}</td>
+                      <td class="text-end">{{ row.events }}</td>
+                      <td class="text-end">{{ row.status_changes }}</td>
+                      <td class="text-end">{{ row.slow_events }}</td>
+                    </tr>
+                  {% else %}
+                    <tr><td colspan="4" class="text-muted">No tracked user activity.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <h6 class="mb-2">Interactions</h6>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>From</th>
+                    <th>To</th>
+                    <th class="text-end">Transfers</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in bucket.interactions %}
+                    <tr>
+                      <td>{{ row.from_department }}</td>
+                      <td>{{ row.to_department }}</td>
+                      <td class="text-end">{{ row.count }}</td>
+                    </tr>
+                  {% else %}
+                    <tr><td colspan="3" class="text-muted">No interactions captured.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
 </div>
 {% endblock %}
