@@ -1,0 +1,167 @@
+import re
+
+from werkzeug.security import generate_password_hash
+
+from app.extensions import db
+from app.models import FeatureFlags, User
+
+
+CARD_URL_RE = re.compile(r'data-nav-url="([^"]+)"')
+
+
+def _login_admin(client, email="admin-logic@example.com", password="secret"):
+    return client.post(
+        "/auth/login",
+        data={"email": email, "password": password},
+        follow_redirects=True,
+    )
+
+
+def test_admin_command_center_cards_route_to_expected_pages(app, client):
+    with app.app_context():
+        admin = User(
+            email="admin-logic@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+    rv = _login_admin(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/admin/")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+
+    # ensure the page is aware we're an admin; the client-side department
+    # picker is suppressed for admins so we don't get annoying prompts on
+    # reload (especially noticeable on phones).
+    assert 'data-user-is-admin="1"' in html
+    # our inline script should also include the early-return check for
+    # isAdmin so the modal never even attempts to show up.
+    assert 'if (!loggedIn || active || isAdmin) return;' in html
+
+    expected_labels = {
+        "Users",
+        "Departments",
+        "Site",
+        "Quotes",
+        "Email Forms",
+        "Monitor",
+        "Status Options",
+        "Workflows",
+        "Buckets",
+        "Switch Dept",
+        "Notifications",
+        "Retention",
+        "Integrations & Flags",
+        "Migrations",
+        "Debug",
+        "Tenants",
+        "Jobs",
+        "Integration Events",
+        "Open metrics suite",
+        "Explore feature flags",
+    }
+    for label in expected_labels:
+        assert label in html
+
+    urls = set(CARD_URL_RE.findall(html))
+    expected_urls = {
+        "/admin/users",
+        "/admin/departments",
+        "/admin/site_config",
+        "/admin/site_config#quotes-settings",
+        "/admin/special_email",
+        "/admin/monitor",
+        "/admin/status_options",
+        "/admin/workflows",
+        "/admin/buckets",
+        "/auth/choose_dept",
+        "/admin/notifications_retention",
+        "/admin/feature_flags",
+        "/admin/migrations/status",
+        "/admin/debug_workspace",
+        "/admin/tenants",
+        "/admin/jobs",
+        "/admin/integration_events",
+    }
+    assert expected_urls.issubset(urls)
+
+    for url in expected_urls:
+        route = url.split("#", 1)[0]
+        response = client.get(route, follow_redirects=False)
+        assert response.status_code in (200, 302), route
+
+    for hero_url in ("/admin/metrics_config", "/admin/feature_flags"):
+        response = client.get(hero_url, follow_redirects=False)
+        assert response.status_code in (200, 302), hero_url
+
+
+def test_admin_notifications_card_toggles_feature_flag(app, client):
+    with app.app_context():
+        admin = User(
+            email="admin-toggle@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+        flags = FeatureFlags.get()
+        flags.enable_notifications = True
+        db.session.commit()
+
+    rv = _login_admin(client, email="admin-toggle@example.com")
+    assert rv.status_code == 200
+
+    rv = client.post("/admin/toggle_notifications", follow_redirects=True)
+    assert rv.status_code == 200
+    assert b"Notifications disabled." in rv.data
+
+    with app.app_context():
+        flags = FeatureFlags.get()
+        assert flags.enable_notifications is False
+
+    rv = client.post("/admin/toggle_notifications", follow_redirects=True)
+    assert rv.status_code == 200
+    assert b"Notifications enabled." in rv.data
+
+    with app.app_context():
+        flags = FeatureFlags.get()
+        assert flags.enable_notifications is True
+
+
+def test_user_settings_surface_expected_controls(app, client):
+    with app.app_context():
+        user = User(
+            email="settings-check@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=False,
+        )
+        db.session.add(user)
+        db.session.commit()
+
+    rv = client.post(
+        "/auth/login",
+        data={"email": "settings-check@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+
+    rv = client.get("/auth/settings")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+    for expected in (
+        "Theme",
+        "Rolling Quote Set",
+        "Show rotating quotes",
+    ):
+        assert expected in html

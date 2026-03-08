@@ -141,6 +141,9 @@ def test_department_a_navigation_links_resolve(app, client):
     assert page.status_code == 200
     html = page.get_data(as_text=True)
 
+    # non-admin pages should still include the attribute set to "0"
+    assert 'data-user-is-admin="0"' in html
+
     assert "New Request" in html
     assert "Guest Dashboard" in html
     assert "Guest Submit" in html
@@ -175,6 +178,13 @@ def test_admin_navigation_links_resolve(app, client):
     assert page.status_code == 200
     html = page.get_data(as_text=True)
 
+    # admin pages should flag the user as an administrator so that client-
+    # side logic (like the department picker modal) skips itself.
+    assert 'data-user-is-admin="1"' in html
+    # sanity check: the inline script includes the branch that looks for
+    # isAdmin when deciding whether to show the modal.
+    assert 'if (!loggedIn || active || isAdmin) return;' in html
+
     assert "Admin" in html
     assert "Guest Forms" in html
     assert "Metrics" in html
@@ -199,6 +209,25 @@ def test_admin_navigation_links_resolve(app, client):
         assert resp.status_code in (200, 302), route
         location = resp.headers.get("Location", "")
         assert not location.endswith("/static/app.js"), route
+
+
+def test_department_list_endpoint(app, client):
+    # verify the JSON helper returns correct department lists for users
+    _create_user(app, email="dept-json@example.com", department="A")
+    _login(client, "dept-json@example.com")
+    resp = client.get("/auth/departments")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data and data.get("departments") == ["A"]
+
+    # admin should see all active departments (at least one, usually more)
+    _create_user(app, email="json-admin@example.com", is_admin=True)
+    _login(client, "json-admin@example.com")
+    resp = client.get("/auth/departments")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data and isinstance(data.get("departments"), list)
+    assert len(data.get("departments")) >= 1
 
 
 def test_hero_dashboard_button_targets_match_view_context(app, client):

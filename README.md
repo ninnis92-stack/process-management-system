@@ -230,6 +230,10 @@ page displays the last few steps and suggests next actions to the user.
 - **Command center**: located under `/admin` with subpages for users, departments,
   workflows, statuses, site configuration, integrations, feature flags, guest
   form templates, etc.
+- Admin users no longer see the department‑selection prompt on every page
+  refresh.  The modal only appears when they intentionally choose “Switch
+  Dept” (this makes the command center experience smoother on phones and other
+  devices where the previous automatic picker was distracting).
 - **User settings**: dark mode (tints with the chosen vibe), theme/vibe selection, quote set, rotating
   quotes.
 - **Templates & requirements**: rich form editing with grouped fields, hints,
