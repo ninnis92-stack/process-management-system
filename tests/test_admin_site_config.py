@@ -1,4 +1,5 @@
 import re
+import json
 import pytest
 from app.extensions import db
 from app.models import User, Department, SiteConfig
@@ -222,6 +223,74 @@ def test_department_quote_permission(app, client):
     assert b"productivity" in rv.data
 
 
+def test_user_quote_permission_overrides_department_and_admin_sees_all_sets(app, client):
+    with app.app_context():
+        admin = User(
+            email="quotes-admin@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=True,
+        )
+        restricted = User(
+            email="persona@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=False,
+        )
+        db.session.add_all([admin, restricted])
+        db.session.commit()
+        cfg = SiteConfig.get()
+        cfg._rolling_quote_sets = json.dumps(
+            {
+                "engineering": ["First, solve the problem. Then, write the code."],
+                "productivity": ["Eat the frog first and the rest of the day is easy."],
+                "laundry riddles": ["What gets wetter the more it dries? (A towel)"],
+            }
+        )
+        cfg.active_quote_set = "laundry riddles"
+        db.session.commit()
+
+    rv = client.post(
+        "/auth/login",
+        data={"email": "quotes-admin@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    rv = client.post(
+        "/admin/site_config",
+        data={
+            "quote_permissions_dept": '{"A": ["engineering"]}',
+            "quote_permissions_user": '{"persona@example.com": ["productivity"]}',
+        },
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+
+    rv = client.get("/auth/settings")
+    assert b"engineering" in rv.data
+    assert b"productivity" in rv.data
+    assert b"laundry riddles" in rv.data
+
+    client.get("/auth/logout")
+    rv = client.post(
+        "/auth/login",
+        data={"email": "persona@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    rv = client.get("/auth/settings")
+    assert b"productivity" in rv.data
+    assert b"engineering" not in rv.data
+    assert b"laundry riddles" not in rv.data
+
+    rv = client.get("/dashboard")
+    assert rv.status_code == 200
+    assert b"Eat the frog first" in rv.data
+    assert b"What gets wetter the more it dries" not in rv.data
+
+
 def test_site_config_fills_missing_or_empty_quote_sets(app):
     with app.app_context():
         cfg = SiteConfig.get()
@@ -378,6 +447,39 @@ def test_admin_default_quote_and_user_override(app, client):
     )
     rv = client.get("/dashboard")
     assert b"Eat the frog first" in rv.data
+
+
+def test_admin_user_form_lists_custom_quote_sets(app, client):
+    with app.app_context():
+        admin = User(
+            email="custom-admin@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        cfg = SiteConfig.get()
+        cfg._rolling_quote_sets = json.dumps(
+            {
+                **SiteConfig.DEFAULT_QUOTE_SETS,
+                "factory": [
+                    "Tight tolerances start with steady process control.",
+                ],
+            }
+        )
+        db.session.commit()
+
+    rv = client.post(
+        "/auth/login",
+        data={"email": "custom-admin@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    rv = client.get("/admin/users/new")
+    assert rv.status_code == 200
+    assert b"(use site default)" in rv.data
+    assert b"factory" in rv.data
 
 
 def test_site_config_handles_db_errors_gracefully(app, client, monkeypatch):

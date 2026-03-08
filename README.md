@@ -162,6 +162,27 @@ accept a correctly signed payload for `/integrations/incoming-webhook`.
 Use `python scripts/verify_quote_sets.py` to inspect and normalize stored quote
 sets manually; the command exits non-zero if any quote set still lacks content.
 
+### Quote permissions
+Admins can restrict which named quote sets are available per department or on a
+per-user basis. The site config UI exposes two JSON fields:
+
+```json
+{"A": ["default", "engineering"},
+ "B": ["coffee-humour"]}
+```
+
+and
+
+```json
+{"user@example.com": ["productivity"]}
+```
+
+Department rules apply first; if a specific user email is listed, that list
+replaces any department restriction. Admin users are exempt from these rules and
+always see every configured quote set. When creating or editing a user the
+admin form now includes controls for the initial `quote_set` and `quotes_enabled`
+flag so assignments do not need to be POSTed manually.
+
 Prometheus scrape templates live under [ops/prometheus/fly-scrape.yml](ops/prometheus/fly-scrape.yml)
 and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORING.md).
 

@@ -136,7 +136,7 @@
                   <div class="mb-3">
                     {{ form.quote_permissions_user.label(class_='form-label') }}
                     {{ form.quote_permissions_user(class_='form-control', rows=4, placeholder='{"user@example.com": ["productivity"]}') }}
-                    <div class="form-text">JSON object mapping user emails to allowed quote sets. Specific users override department restrictions.</div>
+                    <div class="form-text">JSON object mapping user emails to allowed quote sets. Specific users override department restrictions, while admins always retain access to every quote set.</div>
                   </div>
                 </div>
               </details>

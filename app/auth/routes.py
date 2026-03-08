@@ -324,19 +324,11 @@ def settings():
         from ..models import SiteConfig
 
         cfg = SiteConfig.get()
-        sets = list(cfg.rolling_quote_sets.keys()) if cfg and cfg.rolling_quote_sets else list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
-        # apply permission limits similar to context processor
-        perms = cfg.parsed_quote_permissions if cfg else {"departments":{},"users":{}}
-        allowed = None
-        dept = getattr(current_user, 'department', None)
-        if dept and perms.get('departments', {}).get(dept):
-            allowed = set(perms['departments'][dept])
-        userperm = perms.get('users', {}).get(current_user.email)
-        if userperm:
-            up = set(userperm)
-            allowed = up if allowed is None else allowed.intersection(up)
-        if allowed is not None:
-            sets = [s for s in sets if s in allowed]
+        sets = (
+            cfg.allowed_quote_set_names_for_user(current_user)
+            if cfg
+            else list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
+        )
     except Exception:
         sets = list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
     # simple label = key
@@ -380,7 +372,9 @@ def settings():
                 if hasattr(form, 'quote_set'):
                     try:
                         if 'quote_set' in request.form:
-                            u.quote_set = form.quote_set.data or None
+                            q = form.quote_set.data or None
+                            # persisted value should be normalized via model
+                            u.quote_set = q
                     except Exception:
                         pass
                 if hasattr(form, 'quotes_enabled'):

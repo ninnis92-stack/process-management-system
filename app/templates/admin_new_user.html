@@ -39,6 +39,16 @@
     <label class="form-check-label ms-2">Admin</label>
     <div class="form-text">Admins can always be allocated manually in the app, regardless of SSO admin sync.</div>
   </div>
+  <div class="mb-3">
+    <label class="form-label">Quote set</label>
+    {{ form.quote_set(class="form-select") }}
+    <div class="form-text">Assign a user-specific quote set or leave it on the site default.</div>
+  </div>
+  <div class="form-check mb-3">
+    {{ form.quotes_enabled(class="form-check-input") }}
+    <label class="form-check-label ms-2">Enable rotating quotes</label>
+    <div class="form-text">Turn this off to hide rotating quotes for this user on signed-in pages.</div>
+  </div>
   <button class="btn btn-primary">Create / Update</button>
 </form>
 {% endblock %}

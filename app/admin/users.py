@@ -75,13 +75,16 @@ def create_user():
         return redirect(url_for("requests.dashboard"))
 
     form = AdminCreateUserForm()
-    # populate quote_set choices dynamically from default sets
+    # populate quote-set choices dynamically from configured sets so admins can
+    # assign built-in or custom sets per user.
     try:
         from ..models import SiteConfig
-        sets = list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
-        form.quote_set.choices = [(s, s.capitalize()) for s in sets]
+
+        cfg = SiteConfig.get()
+        sets = list(cfg.rolling_quote_sets.keys()) if cfg and cfg.rolling_quote_sets else list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
+        form.quote_set.choices = [("", "(use site default)")] + [(s, s.capitalize()) for s in sets]
     except Exception:
-        form.quote_set.choices = []
+        form.quote_set.choices = [("", "(use site default)")]
 
     if form.validate_on_submit():
         email = form.email.data.strip().lower()
@@ -106,8 +109,8 @@ def create_user():
             existing.is_active = is_active
             existing.is_admin = is_admin
             # apply quote preferences if provided
-            if hasattr(form, 'quote_set') and form.quote_set.data:
-                existing.quote_set = form.quote_set.data
+            if hasattr(form, 'quote_set'):
+                existing.quote_set = form.quote_set.data or None
             if hasattr(form, 'quotes_enabled'):
                 existing.quotes_enabled = bool(form.quotes_enabled.data)
             db.session.commit()
@@ -124,8 +127,8 @@ def create_user():
             is_active=is_active,
             is_admin=is_admin,
         )
-        if hasattr(form, 'quote_set') and form.quote_set.data:
-            u.quote_set = form.quote_set.data
+        if hasattr(form, 'quote_set'):
+            u.quote_set = form.quote_set.data or None
         if hasattr(form, 'quotes_enabled'):
             u.quotes_enabled = bool(form.quotes_enabled.data)
         db.session.add(u)
@@ -151,10 +154,12 @@ def edit_user(user_id: int):
     # populate quote_set choices while editing
     try:
         from ..models import SiteConfig
-        sets = list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
-        form.quote_set.choices = [(s, s.capitalize()) for s in sets]
+
+        cfg = SiteConfig.get()
+        sets = list(cfg.rolling_quote_sets.keys()) if cfg and cfg.rolling_quote_sets else list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
+        form.quote_set.choices = [("", "(use site default)")] + [(s, s.capitalize()) for s in sets]
     except Exception:
-        form.quote_set.choices = []
+        form.quote_set.choices = [("", "(use site default)")]
 
     if form.validate_on_submit():
         u.email = form.email.data.strip().lower()
@@ -172,8 +177,8 @@ def edit_user(user_id: int):
             getattr(form, "role", None) and form.role.data == "admin"
         ) or bool(form.is_admin.data)
         # quote prefs
-        if hasattr(form, 'quote_set') and form.quote_set.data:
-            u.quote_set = form.quote_set.data
+        if hasattr(form, 'quote_set'):
+            u.quote_set = form.quote_set.data or None
         if hasattr(form, 'quotes_enabled'):
             u.quotes_enabled = bool(form.quotes_enabled.data)
         db.session.commit()

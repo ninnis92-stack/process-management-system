@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import json
 import secrets
 from flask_login import UserMixin
+from sqlalchemy.orm import validates
 from .extensions import db
 
 DEPARTMENTS = ("A", "B", "C")
@@ -218,6 +219,16 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     quote_set = db.Column(db.String(80), nullable=True)
     # user preference: whether rotating quotes should appear on their dashboard
     quotes_enabled = db.Column(db.Boolean, nullable=False, default=True)
+
+    # Ensure we always store a normalized (lowercase, stripped) key for the
+    # quote set.  This protects against manual database edits or historical
+    # values that differed in case which could otherwise be ignored by the
+    # lookup logic in the layout context processor.
+    @validates("quote_set")
+    def _normalize_quote_set(self, key, value):
+        if value is None:
+            return None
+        return str(value).strip().lower()
     # Persist the last department the user was viewing when they logged out
     # or switched contexts. This is used to restore their active department
     # on subsequent logins when they have multiple department assignments.
@@ -1126,7 +1137,7 @@ class SiteConfig(TenantScopedMixin, db.Model):
         if not isinstance(parsed, dict):
             return empty
 
-        def _normalize(mapping):
+        def _normalize(mapping, *, lowercase_keys=False):
             if not isinstance(mapping, dict):
                 return {}
             normalized = {}
@@ -1134,6 +1145,8 @@ class SiteConfig(TenantScopedMixin, db.Model):
                 name = str(key or "").strip()
                 if not name:
                     continue
+                if lowercase_keys:
+                    name = name.lower()
                 if isinstance(values, list):
                     cleaned = [str(v).strip() for v in values if str(v).strip()]
                 elif isinstance(values, str):
@@ -1145,8 +1158,58 @@ class SiteConfig(TenantScopedMixin, db.Model):
 
         return {
             "departments": _normalize(parsed.get("departments")),
-            "users": _normalize(parsed.get("users")),
+            "users": _normalize(parsed.get("users"), lowercase_keys=True),
         }
+
+    def allowed_quote_set_names_for_user(self, user=None):
+        """Return visible quote-set names for a user in display order.
+
+        Admins always receive the full configured list. For non-admin users,
+        per-user permissions override department restrictions when present.
+        """
+        names = list((self.rolling_quote_sets or {}).keys())
+        if not names:
+            names = list(type(self).DEFAULT_QUOTE_SETS.keys())
+        if not user or getattr(user, "is_admin", False):
+            return names
+
+        perms = self.parsed_quote_permissions
+        email = str(getattr(user, "email", "") or "").strip().lower()
+        dept = str(getattr(user, "department", "") or "").strip()
+
+        user_allowed = perms.get("users", {}).get(email)
+        dept_allowed = perms.get("departments", {}).get(dept)
+        allowed = user_allowed if user_allowed is not None and len(user_allowed) > 0 else dept_allowed
+        if not allowed:
+            return names
+        allowed_set = {str(name).strip() for name in allowed if str(name).strip()}
+        filtered = [name for name in names if name in allowed_set]
+        return filtered or names
+
+    def resolve_quote_set_name_for_user(self, user=None):
+        """Return the effective quote-set key a user should see."""
+        names = self.allowed_quote_set_names_for_user(user)
+        if not names:
+            return None
+
+        preferred = str(getattr(user, "quote_set", "") or "").strip().lower() if user else ""
+        if preferred:
+            for name in names:
+                if str(name).lower() == preferred:
+                    return name
+
+        active = str(getattr(self, "active_quote_set", "") or "").strip().lower()
+        if active:
+            for name in names:
+                if str(name).lower() == active:
+                    return name
+
+        for fallback in ("default",):
+            for name in names:
+                if str(name).lower() == fallback:
+                    return name
+
+        return names[0]
 
     @rolling_quotes.setter
     def rolling_quotes(self, value):
