@@ -538,6 +538,19 @@ def create_app():
                     pass
 
             try:
+                if (
+                    not current_user.is_authenticated
+                    and request.endpoint == "auth.login"
+                    and rolling_quotes_enabled
+                ):
+                    rolling_quotes = SiteConfig.DEFAULT_QUOTE_SETS.get(
+                        "motivational",
+                        [],
+                    )
+            except Exception:
+                pass
+
+            try:
                 rows = (
                     Department.query.filter_by(is_active=True)
                     .order_by(Department.order.asc(), Department.code.asc())

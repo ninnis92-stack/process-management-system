@@ -3,7 +3,7 @@ import re
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import User
+from app.models import User, SiteConfig
 
 
 NAV_LINK_RE = re.compile(r'href="([^"]+)"')
@@ -63,6 +63,37 @@ def test_public_navigation_links_resolve(client):
         assert resp.status_code in (200, 302), route
         location = resp.headers.get("Location", "")
         assert not location.endswith("/static/app.js"), route
+
+
+def test_login_page_always_shows_motivational_quotes(client, app):
+    # The login page should follow the rolling quotes toggle: when the
+    # flag is disabled no quote renders, but enabling it restores the
+    # built-in motivational set so unauthenticated visitors still see a
+    # friendly message without needing a user account.
+    with app.app_context():
+        cfg = SiteConfig.get()
+        cfg.rolling_quotes_enabled = False
+        cfg.rolling_quotes = []
+        cfg.banner_html = '<div>banner</div>'
+        db.session.add(cfg)
+        db.session.commit()
+
+    rv = client.get("/auth/login")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+
+    assert "Progress, not perfection." not in html
+
+    with app.app_context():
+        cfg = SiteConfig.get()
+        cfg.rolling_quotes_enabled = True
+        db.session.add(cfg)
+        db.session.commit()
+
+    rv = client.get("/auth/login")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+    assert "Progress, not perfection." in html
 
 
 def test_local_test_config_uses_non_secure_session_cookie(app):

@@ -1194,6 +1194,18 @@ a:hover { color: var(--accent-2); }
   margin-top: 0.25rem !important;
 }
 
+.admin-feature-flags .form-check {
+  margin-bottom: 0.4rem !important;
+}
+
+.admin-feature-flags .form-text {
+  margin-top: 0.1rem !important;
+  margin-bottom: 1.1rem;
+  margin-left: 2rem;
+  max-width: 610px;
+  color: var(--muted);
+}
+
 button.admin-tile {
   width: 100%;
   text-align: left;

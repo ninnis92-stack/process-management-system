@@ -3,7 +3,7 @@
 
 {% block content %}
   <h2>Feature Flags</h2>
-  <form method="post">
+  <form method="post" class="admin-feature-flags">
     {{ form.hidden_tag() }}
 
     {{ toggle_checkbox(form.enable_notifications, 'Disable notifications', 'Enable notifications') }}
