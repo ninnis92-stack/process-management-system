@@ -1,20 +1,34 @@
 {% extends "base.html" %}
 {% block body_class %}top-nav-layout no-vibe{% endblock %}
 {% block content %}
-<section class="page-header page-header-centered">
-  <div>
+<section class="login-hero surface-panel mb-4">
+  <div class="login-hero__content">
     <div class="page-header__eyebrow">Welcome back</div>
-    <h3 class="page-header__title mb-0">Sign in</h3>
-    <p class="page-header__lede mb-0">Access requests, track progress, and manage handoffs from a single workspace.</p>
+    <h1 class="login-hero__title">Sign in to keep requests moving</h1>
+    <p class="login-hero__lede">Track handoffs, update priorities, send reminders, and manage guest-facing workflows from one polished workspace.</p>
+    <div class="login-hero__chips" aria-label="Platform highlights">
+      <span class="login-hero__chip">Priority controls</span>
+      <span class="login-hero__chip">Reminder automation</span>
+      <span class="login-hero__chip">Guest tracking</span>
+    </div>
+  </div>
+  <div class="login-hero__aside">
+    <div class="login-hero__aside-card">
+      <div class="small text-uppercase text-muted fw-semibold mb-2">Quick paths</div>
+      <a class="btn btn-primary w-100 mb-2" href="{{ url_for('external.external_dashboard') }}">Open Guest Dashboard</a>
+      <a class="btn btn-outline-primary w-100" href="{{ url_for('external.external_new') }}">Start Guest Submission</a>
+      <div class="small text-muted mt-3">Need internal access? Use the department-linked account that owns your saved work and approval rights.</div>
+    </div>
   </div>
 </section>
-<div class="row justify-content-center g-4 align-items-start">
+
+<div class="row justify-content-center g-4 align-items-start login-grid">
   <div class="col-lg-4 col-md-5">
-    <section class="surface-panel helper-stack">
+    <section class="surface-panel helper-stack login-panel-stack">
       <div class="section-heading section-heading-compact mb-0">
         <div>
           <h4 class="section-heading__title">Before signing in</h4>
-          <p class="section-heading__subtitle">A few quick reminders for smoother access.</p>
+          <p class="section-heading__subtitle">A few quick checkpoints for a smoother handoff into the app.</p>
         </div>
       </div>
       <div class="helper-card">
@@ -31,14 +45,21 @@
           <div class="helper-card__text">External request tracking is still available from the Guest Dashboard in the top navigation.</div>
         </div>
       </div>
+      <div class="helper-card">
+        <div class="helper-card__icon" aria-hidden="true">✨</div>
+        <div>
+          <div class="helper-card__title">What you can do after login</div>
+          <div class="helper-card__text">Review request history, update urgency, and keep owners aligned with built-in reminders and status guidance.</div>
+        </div>
+      </div>
     </section>
   </div>
   <div class="col-lg-5 col-md-7">
-    <section class="surface-panel form-shell">
+    <section class="surface-panel form-shell login-form-panel">
       <div class="section-heading">
         <div>
-          <h4 class="section-heading__title">Login</h4>
-          <p class="section-heading__subtitle">Use local credentials or SSO when enabled.</p>
+          <h4 class="section-heading__title">Sign in</h4>
+          <p class="section-heading__subtitle">Use your local credentials or SSO when enabled for your organization.</p>
         </div>
       </div>
         {% if config.SSO_ENABLED %}
@@ -60,6 +81,9 @@
           </div>
           <button class="btn btn-primary w-100">Sign in</button>
         </form>
+        <div class="login-form-panel__footer small text-muted mt-3">
+          Looking for a guest-facing experience instead? Use <a href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a> to track or <a href="{{ url_for('external.external_new') }}">Guest Submit</a> to open a new external request.
+        </div>
       </section>
   </div>
 </div>

@@ -33,6 +33,8 @@ Key capabilities:
 - **Workflow engine** with status transitions, path history and loop protection
 - **Priority and reminder controls** including `highest` priority, automated
   reminders, user-pushed reminders, and per-user daily reminder limits
+- **Polished public sign-in** with clearer guest-path entry points and a more
+  production-ready first impression for external users
 - **Command center** for users, departments, workflows, site config, integrations,
   guest forms, feature flags, and more
 - **Field verification** powered by third‑party tracker integrations
@@ -179,6 +181,8 @@ sets manually; the command exits non-zero if any quote set still lacks content.
   hours, or once per day.
 - Admins can assign each user a daily reminder allowance from 1 to 5.
 - Signed-in users can push manual reminders when that feature flag is enabled.
+- Public login now surfaces direct guest dashboard and guest submit actions so
+  external users do not need to guess which path applies to them.
 - Requests support four priority tiers: `low`, `medium`, `high`, and `highest`.
 - Admins and department heads with the `can_change_priority` permission can
   update request priority directly from the request detail workspace.
@@ -239,6 +243,22 @@ and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORIN
   it’s skipped.
 
 ### Live deployment checks (March 8, 2026)
+- Polished the public sign-in experience with a stronger hero, direct guest
+  entry points, and clearer production-facing copy; also introduced
+  reminder-named aliases such as `notify-reminders`, `/push_reminder`, and
+  `/admin_reminder` while keeping legacy compatibility paths intact.
+- Re-ran the full local suite after the UX pass; it remained green at
+  `161 passed`.
+- Deployed the polish pass to `process-management-prototype-lingering-bush-6175`
+  with `flyctl deploy -a process-management-prototype-lingering-bush-6175`.
+- Verified the live login page now renders the new copy and CTAs including
+  `Sign in to keep requests moving`, `Open Guest Dashboard`, and
+  `Start Guest Submission`.
+- Re-ran deployed smoke checks plus cleanup, then confirmed `/health` and
+  `/ready` both returned `{"status":"ok"}` with the database healthy.
+- Confirmed Fly logs again showed `Seeded users:`, `Quote sets:`, `seeded`,
+  `quote_sets=ok total=11 active=default active_count=5`, and `db_ready`
+  during the post-deploy boot path.
 - Added department-head priority controls in the request workspace, completed
   the reminder wording pass, and documented the new reminder and `highest`
   priority flows; the local suite now passes with `161 passed`.

@@ -60,8 +60,7 @@ def create_app():
             payload={"hours": 24},
         )
 
-    @app.cli.command("notify-nudges")
-    def notify_nudges():
+    def _run_notify_reminders():
         from .notifications.due import send_high_priority_nudges
         from .services.job_dispatcher import run_job
 
@@ -74,6 +73,14 @@ def create_app():
             queue_name="maintenance",
             payload={"kind": "high_priority_nudges"},
         )
+
+    @app.cli.command("notify-nudges")
+    def notify_nudges():
+        _run_notify_reminders()
+
+    @app.cli.command("notify-reminders")
+    def notify_reminders():
+        _run_notify_reminders()
 
     @app.cli.command("check-config")
     def check_config():

@@ -494,7 +494,7 @@
         {% endif %}
         {% if current_user.is_admin %}
           <div class="mb-2">
-            <button id="adminReminderBtn" type="button" class="btn btn-sm btn-outline-secondary" data-reminder-url="{{ url_for('requests.admin_nudge', request_id=req.id) }}">Start 30s Reminder</button>
+            <button id="adminReminderBtn" type="button" class="btn btn-sm btn-outline-secondary" data-reminder-url="{{ url_for('requests.admin_reminder', request_id=req.id) }}">Start 30s Reminder</button>
             <span id="adminReminderCountdown" class="ms-2 small text-muted"></span>
           </div>
           {% if req.workflow_id %}
@@ -509,7 +509,7 @@
         {% endif %}
         {% if allow_user_reminders_enabled and not current_user.is_admin %}
           <div class="mb-2">
-            <form method="post" action="{{ url_for('requests.push_nudge', request_id=req.id) }}" class="d-inline">
+            <form method="post" action="{{ url_for('requests.push_reminder', request_id=req.id) }}" class="d-inline">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-sm btn-outline-secondary">Push reminder</button>
             </form>

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <title>{{ title or "Process Management Prototype" }}</title>
+  <title>{% if title %}{{ title }} · {% endif %}{{ site_brand_name or "FreshProcess" }}</title>
   <!-- Defensive shim early: avoid uncaught errors when third-party extensions expect a Sortable global -->
   <script>
     (function(){

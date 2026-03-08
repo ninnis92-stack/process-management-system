@@ -2595,6 +2595,7 @@ def _dispatch_nudge_notifications(
             pass
 
 
+@requests_bp.route("/requests/<int:request_id>/admin_reminder", methods=["POST"], endpoint="admin_reminder")
 @requests_bp.route("/requests/<int:request_id>/admin_nudge", methods=["POST"])
 @login_required
 def admin_nudge(request_id: int):
@@ -2639,6 +2640,7 @@ def admin_nudge(request_id: int):
     return redirect(url_for("requests.request_detail", request_id=req.id))
 
 
+@requests_bp.route("/requests/<int:request_id>/push_reminder", methods=["POST"], endpoint="push_reminder")
 @requests_bp.route("/requests/<int:request_id>/push_nudge", methods=["POST"])
 @login_required
 def push_nudge(request_id: int):

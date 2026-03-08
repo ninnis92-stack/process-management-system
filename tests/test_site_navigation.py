@@ -46,6 +46,9 @@ def test_public_navigation_links_resolve(client):
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
 
+    assert "Sign in to keep requests moving" in html
+    assert "Open Guest Dashboard" in html
+    assert "Start Guest Submission" in html
     assert "Guest Dashboard" in html
     assert "Guest Submit" in html
 

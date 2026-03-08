@@ -45,7 +45,7 @@ def test_user_push_nudge_obeys_feature_flag(app, client):
     )
     assert rv.status_code == 200
 
-    resp = client.post(f"/requests/{req.id}/push_nudge", follow_redirects=False)
+    resp = client.post(f"/requests/{req.id}/push_reminder", follow_redirects=False)
     assert resp.status_code == 403
 
     with app.app_context():
@@ -53,7 +53,7 @@ def test_user_push_nudge_obeys_feature_flag(app, client):
         flags.allow_user_nudges = True
         db.session.commit()
 
-    resp = client.post(f"/requests/{req.id}/push_nudge", follow_redirects=True)
+    resp = client.post(f"/requests/{req.id}/push_reminder", follow_redirects=True)
     assert resp.status_code == 200
 
     with app.app_context():
