@@ -34,9 +34,26 @@ class AdminCreateUserForm(FlaskForm):
     )
     is_active = BooleanField("Active", default=True)
     is_admin = BooleanField("Admin", default=False)
+    # admin may grant a per-user daily reminder allowance (1–5, default 1)
+    daily_nudge_limit = IntegerField(
+        "Daily reminder limit (1-5)", default=1, validators=[Optional()]
+    )
+
+    def validate_daily_nudge_limit(form, field):
+        if field.data in (None, ""):
+            return
+        try:
+            iv = int(field.data)
+        except Exception:
+            raise ValidationError("Must be an integer between 1 and 5")
+        if iv < 1 or iv > 5:
+            raise ValidationError("Limit must be between 1 and 5")
     # quote preferences for new user
     quote_set = SelectField("Initial quote set", choices=[], validators=[Optional()])
     quotes_enabled = BooleanField("Enable rotating quotes", default=True)
+    quote_interval = SelectField(
+        "Quote rotation interval", coerce=int, choices=[], validators=[Optional()]
+    )
     submit = SubmitField("Create / Update User")
 
 
@@ -176,6 +193,18 @@ class StatusOptionForm(FlaskForm):
     screenshot_required = BooleanField(
         "Require screenshot when this status sends back to Dept B", default=False
     )
+    # new control for automated reminder frequency
+    nudge_level = SelectField(
+        "Automated reminder level",
+        choices=[
+            ("0", "None"),
+            ("1", "Hourly (1h)"),
+            ("2", "Every 4h"),
+            ("3", "Once a day"),
+        ],
+        default="0",
+        validators=[Optional()],
+    )
     approval_stages_text = TextAreaField(
         "Approval stages",
         validators=[Optional(), Length(max=4000)],
@@ -193,6 +222,9 @@ class DepartmentEditorForm(FlaskForm):
     can_edit = BooleanField("Can edit selections / form fields", default=True)
     can_view_metrics = BooleanField(
         "Department head: can view department metrics", default=False
+    )
+    can_change_priority = BooleanField(
+        "Department head: can change request priority", default=False
     )
     submit = SubmitField("Save Editor")
 
@@ -282,11 +314,11 @@ class SpecialEmailConfigForm(FlaskForm):
         "Auto-reject requester message",
         validators=[Optional(), Length(max=4000)],
     )
-    nudge_enabled = BooleanField("Enable nudges", default=False)
+    nudge_enabled = BooleanField("Enable reminders", default=False)
     # present a dropdown with a handful of sensible intervals; the stored
     # value is a float representing hours.
     nudge_interval_hours = SelectField(
-        "Nudge interval",
+        "Reminder interval",
         choices=[
             ("0.5", "30 minutes"),
             ("1", "1 hour"),
@@ -299,7 +331,7 @@ class SpecialEmailConfigForm(FlaskForm):
         default="24",
     )
     nudge_min_delay_hours = IntegerField(
-        "Minimum delay before first nudge (hours)", default=4
+        "Minimum delay before first reminder (hours)", default=4
     )
     submit = SubmitField("Save")
 
@@ -488,9 +520,9 @@ class FieldRequirementForm(FlaskForm):
 
 class FeatureFlagsForm(FlaskForm):
     enable_notifications = BooleanField("Enable in-app notifications", default=True)
-    enable_nudges = BooleanField("Enable automated nudges", default=True)
+    enable_nudges = BooleanField("Enable automated reminders", default=True)
     allow_user_nudges = BooleanField(
-        "Allow users to push nudges to others", default=False
+        "Allow users to push reminders to others", default=False
     )
     vibe_enabled = BooleanField("Show Vibe button UI", default=True)
     sso_admin_sync_enabled = BooleanField(

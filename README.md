@@ -31,6 +31,8 @@ Key capabilities:
 - **Dynamic request templates** with sections, verification‑prefill, and
   conditional requirements
 - **Workflow engine** with status transitions, path history and loop protection
+- **Priority and reminder controls** including `highest` priority, automated
+  reminders, user-pushed reminders, and per-user daily reminder limits
 - **Command center** for users, departments, workflows, site config, integrations,
   guest forms, feature flags, and more
 - **Field verification** powered by third‑party tracker integrations
@@ -169,6 +171,18 @@ accept a correctly signed payload for `/integrations/incoming-webhook`.
 Use `python scripts/verify_quote_sets.py` to inspect and normalize stored quote
 sets manually; the command exits non-zero if any quote set still lacks content.
 
+### Reminder and priority controls
+
+- Automated reminders can be enabled from the admin feature flags and special
+  email settings screens.
+- Reminder cadence now supports status-driven escalation: hourly, every 4
+  hours, or once per day.
+- Admins can assign each user a daily reminder allowance from 1 to 5.
+- Signed-in users can push manual reminders when that feature flag is enabled.
+- Requests support four priority tiers: `low`, `medium`, `high`, and `highest`.
+- Admins and department heads with the `can_change_priority` permission can
+  update request priority directly from the request detail workspace.
+
 ### Quote permissions
 Admins can restrict which named quote sets are available per department or on a
 per-user basis. The site config UI exposes two JSON fields:
@@ -225,6 +239,25 @@ and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORIN
   it’s skipped.
 
 ### Live deployment checks (March 8, 2026)
+- Added department-head priority controls in the request workspace, completed
+  the reminder wording pass, and documented the new reminder and `highest`
+  priority flows; the local suite now passes with `161 passed`.
+- Deployed to `process-management-prototype-lingering-bush-6175` with
+  `flyctl deploy -a process-management-prototype-lingering-bush-6175`.
+- Verified Fly release logs showed `schema_fix=user.daily_nudge_limit_added`,
+  `schema_fix=department_editor.can_change_priority_added`,
+  `schema_fix=status_option.nudge_level_added`, `Seeded users:`, `Quote sets:`,
+  `seeded`, and `quote_sets=ok total=11 active=default active_count=5`,
+  confirming `scripts/release_tasks.py` and `seed.py` ran successfully against
+  the production database.
+- Ran deployed smoke checks with `bash scripts/smoke_test.sh`,
+  `python scripts/smoke_deployed_login.py`, `python scripts/admin_smoke.py`,
+  and `python scripts/clear_smoke_remote.py`; seeded user login, admin routes,
+  metrics, and remote cleanup all completed successfully.
+- Checked `https://process-management-prototype-lingering-bush-6175.fly.dev/health`
+  and `https://process-management-prototype-lingering-bush-6175.fly.dev/ready`;
+  both returned `{"status":"ok"}`, and readiness confirmed the database was
+  healthy.
 - Added production monitoring assets: `sentry-sdk` support in dependencies,
   a Prometheus scrape template, a scheduled GitHub Actions monitor, a PagerDuty
   notifier, and a signed webhook smoke script for production-only webhook paths.

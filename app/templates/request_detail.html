@@ -467,10 +467,35 @@
             <span>Department A can close without a submission packet and can reopen within 48 hours if follow-up is needed.</span>
           </div>
         </div>
+        {% if can_change_priority %}
+          <div class="border rounded-3 p-3 mb-3 bg-light-subtle">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+              <div>
+                <div class="fw-semibold">Priority control</div>
+                <div class="small text-muted">Adjust request urgency without leaving the workspace. Department heads and admins can set any level up to Highest.</div>
+              </div>
+              <span class="badge text-bg-light text-dark">Current: {{ req.priority.title() }}</span>
+            </div>
+            <form method="post" action="{{ url_for('requests.change_priority', request_id=req.id) }}" class="row g-2 align-items-end mt-1">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="col-sm-8 col-md-6">
+                <label class="form-label mb-1" for="prioritySelect">Request priority</label>
+                <select class="form-select" id="prioritySelect" name="priority" aria-label="Request priority">
+                  {% for priority_value, priority_label in [('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('highest', 'Highest')] %}
+                    <option value="{{ priority_value }}" {% if req.priority == priority_value %}selected{% endif %}>{{ priority_label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-sm-auto">
+                <button class="btn btn-outline-primary">Update priority</button>
+              </div>
+            </form>
+          </div>
+        {% endif %}
         {% if current_user.is_admin %}
           <div class="mb-2">
-            <button id="adminNudgeBtn" type="button" class="btn btn-sm btn-outline-secondary" data-nudge-url="{{ url_for('requests.admin_nudge', request_id=req.id) }}">Start 30s Nudge</button>
-            <span id="adminNudgeCountdown" class="ms-2 small text-muted"></span>
+            <button id="adminReminderBtn" type="button" class="btn btn-sm btn-outline-secondary" data-reminder-url="{{ url_for('requests.admin_nudge', request_id=req.id) }}">Start 30s Reminder</button>
+            <span id="adminReminderCountdown" class="ms-2 small text-muted"></span>
           </div>
           {% if req.workflow_id %}
           <div class="mb-2">
@@ -482,7 +507,7 @@
           </div>
           {% endif %}
         {% endif %}
-        {% if allow_user_nudges_enabled and not current_user.is_admin %}
+        {% if allow_user_reminders_enabled and not current_user.is_admin %}
           <div class="mb-2">
             <form method="post" action="{{ url_for('requests.push_nudge', request_id=req.id) }}" class="d-inline">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -689,12 +714,12 @@
   </script>
     <script>
       (function(){
-        const btn = document.getElementById('adminNudgeBtn');
-        const countdownEl = document.getElementById('adminNudgeCountdown');
+        const btn = document.getElementById('adminReminderBtn');
+        const countdownEl = document.getElementById('adminReminderCountdown');
         if (!btn) return;
-        const nudgeUrl = btn.dataset.nudgeUrl;
+        const reminderUrl = btn.dataset.reminderUrl;
         btn.addEventListener('click', function(){
-          if (!confirm('Start a 30 second admin nudge for this request?')) return;
+          if (!confirm('Start a 30 second admin reminder for this request?')) return;
           btn.disabled = true;
           let seconds = 30;
           countdownEl.textContent = `Sending in ${seconds}s…`;
@@ -703,7 +728,7 @@
             if (seconds <= 0) {
               clearInterval(iv);
               countdownEl.textContent = 'Sending…';
-              fetch(nudgeUrl, {
+              fetch(reminderUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/x-www-form-urlencoded',
@@ -712,15 +737,15 @@
                 body: new URLSearchParams({csrf_token: '{{ csrf_token() }}'})
               }).then(resp => {
                 if (resp.ok) {
-                  countdownEl.textContent = 'Admin nudge sent';
+                  countdownEl.textContent = 'Admin reminder sent';
                   btn.disabled = false;
                   setTimeout(() => countdownEl.textContent = '', 3000);
                 } else {
-                  countdownEl.textContent = 'Nudge failed';
+                  countdownEl.textContent = 'Reminder failed';
                   btn.disabled = false;
                 }
               }).catch(err => {
-                countdownEl.textContent = 'Nudge failed';
+                countdownEl.textContent = 'Reminder failed';
                 btn.disabled = false;
               });
             } else {

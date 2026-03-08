@@ -520,6 +520,7 @@ def create_status_option():
                 if getattr(form, "screenshot_required", None)
                 else False
             ),
+            nudge_level=int(form.nudge_level.data or 0),
         )
         opt.approval_stages = approval_stages
         db.session.add(opt)
@@ -540,8 +541,12 @@ def edit_status_option(opt_id: int):
 
     opt = get_or_404(StatusOption, opt_id)
     form = StatusOptionForm(obj=opt)
-    if flask_request.method == "GET" and getattr(form, "approval_stages_text", None):
-        form.approval_stages_text.data = _format_approval_stage_lines(opt)
+    if flask_request.method == "GET":
+        if getattr(form, "approval_stages_text", None):
+            form.approval_stages_text.data = _format_approval_stage_lines(opt)
+        # ensure dropdown reflects numeric value as string
+        if getattr(form, "nudge_level", None):
+            form.nudge_level.data = str(getattr(opt, "nudge_level", 0) or 0)
     if form.validate_on_submit():
         opt.code = form.code.data.strip()
         opt.label = form.label.data.strip()
@@ -563,6 +568,7 @@ def edit_status_option(opt_id: int):
             if getattr(form, "screenshot_required", None)
             else False
         )
+        opt.nudge_level = int(form.nudge_level.data or 0)
         opt.approval_stages = _parse_approval_stage_lines(
             getattr(form, "approval_stages_text", None).data
             if getattr(form, "approval_stages_text", None)

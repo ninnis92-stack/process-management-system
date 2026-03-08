@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Example cron entries to run nudge sender and refresh metrics.
+# Example cron entries to run reminder sender and refresh metrics.
 # Adjust PATH and virtualenv activation as needed for your environment.
 
-# Every hour: run nudge sender (will check SpecialEmailConfig.nudge_enabled)
+# Every hour: run reminder sender (will check SpecialEmailConfig.nudge_enabled)
 0 * * * * cd /path/to/process-management-prototype && . .venv/bin/activate && FLASK_APP=app flask notify-nudges >> /var/log/process-mgmt/nudges.log 2>&1
 
 # Every 5 minutes: refresh metrics gauge (owner + overdue counts)

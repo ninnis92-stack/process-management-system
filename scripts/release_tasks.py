@@ -178,12 +178,42 @@ def main():
                             )
                         )
                     print("schema_fix=user.quote_set_added")
+                if "daily_nudge_limit" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN daily_nudge_limit INTEGER NOT NULL DEFAULT 1"
+                            )
+                        )
+                    print("schema_fix=user.daily_nudge_limit_added")
 
                 special_cols = (
                     {c["name"] for c in insp.get_columns("special_email_config")}
                     if "special_email_config" in insp.get_table_names()
                     else set()
                 )
+                # ensure department_editor has change priority flag
+                if "department_editor" in insp.get_table_names():
+                    dept_cols = {c["name"] for c in insp.get_columns("department_editor")}
+                    if "can_change_priority" not in dept_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE department_editor ADD COLUMN can_change_priority BOOLEAN NOT NULL DEFAULT FALSE"
+                                )
+                            )
+                        print("schema_fix=department_editor.can_change_priority_added")
+                # ensure status_option stores nudge level
+                if "status_option" in insp.get_table_names():
+                    so_cols = {c["name"] for c in insp.get_columns("status_option")}
+                    if "nudge_level" not in so_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE status_option ADD COLUMN nudge_level INTEGER NOT NULL DEFAULT 0"
+                                )
+                            )
+                        print("schema_fix=status_option.nudge_level_added")
                 if (
                     "special_email_config" in insp.get_table_names()
                     and "nudge_min_delay_hours" not in special_cols

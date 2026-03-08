@@ -150,11 +150,10 @@ def test_departments_crud_and_site_config(app, client):
             assert isinstance(quotes, list)
             assert len(quotes) == base_len, f"{name} has wrong count"
 
-    # Dashboard should include the banner or the first rolling quote
-    rv = client.get("/dashboard")
-    assert rv.status_code == 200
-    assert b"Acme Flow" in rv.data
-    assert b"Welcome" in rv.data or b"Quote one" in rv.data
+# Dashboard should include the brand name; banner rendering was removed
+        rv = client.get("/dashboard")
+        assert rv.status_code == 200
+        assert b"Acme Flow" in rv.data
 
 
 def test_department_quote_permission(app, client):

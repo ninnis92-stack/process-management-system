@@ -39,7 +39,7 @@
       <label class="form-label">Priority</label>
       <select class="form-select" name="priority">
         <option value="" {% if not priority_filter %}selected{% endif %}>All priorities</option>
-        {% for priority in ['low', 'medium', 'high'] %}
+        {% for priority in ['low', 'medium', 'high', 'highest'] %}
           <option value="{{ priority }}" {% if priority_filter == priority %}selected{% endif %}>{{ priority.title() }}</option>
         {% endfor %}
       </select>

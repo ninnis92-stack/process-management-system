@@ -627,6 +627,13 @@ def site_config():
         if rolling_input is not None:
             # preserve existing quotes when no data submitted
             cfg.rolling_quotes = rolling_input or None
+        # allow admins to set the default advance interval (seconds)
+        if hasattr(form, 'rolling_quote_interval_default'):
+            try:
+                if 'rolling_quote_interval_default' in flask_request.form:
+                    cfg.rolling_quote_interval_default = int(form.rolling_quote_interval_default.data or 0)
+            except Exception:
+                pass
         # save named quote sets if provided (expect JSON map string).  only
         # update the column when the field is actually included in the POST data
         # so that a simple change to another setting (e.g. active_quote_set) does
@@ -1496,13 +1503,13 @@ def special_email():
         if requested < 4:
             requested = 4
             flash(
-                "Minimum nudge delay cannot be less than 4 hours; adjusted to 4.",
+                "Minimum reminder delay cannot be less than 4 hours; adjusted to 4.",
                 "warning",
             )
         cfg.nudge_min_delay_hours = requested
 
         db.session.commit()
-        flash("Nudge / special email settings saved.", "success")
+        flash("Reminder / special email settings saved.", "success")
         return redirect(url_for("admin.special_email"))
 
     return render_template("admin_special_email.html", form=form, cfg=cfg)

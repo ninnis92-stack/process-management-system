@@ -5,8 +5,8 @@
   <section class="page-header">
     <div>
       <div class="page-header__eyebrow">Notification settings</div>
-      <h2 class="page-header__title mb-0">Special Email / Nudge Settings</h2>
-      <p class="page-header__lede mb-0">Configure inbound email generation, autoresponder behavior, validation handling, and nudge automation.</p>
+      <h2 class="page-header__title mb-0">Special Email / Reminder Settings</h2>
+      <p class="page-header__lede mb-0">Configure inbound email generation, autoresponder behavior, validation handling, and reminder automation.</p>
     </div>
   </section>
   <section class="surface-panel">
@@ -74,13 +74,13 @@
     <div class="mb-3">
       {{ form.nudge_interval_hours.label(class_='form-label') }}
       {{ form.nudge_interval_hours(class_='form-control') }}
-      <div class="form-text">Hours between nudges per-request (rate limit).</div>
+      <div class="form-text">Hours between reminders per request (rate limit).</div>
     </div>
 
     <div class="mb-3">
       {{ form.nudge_min_delay_hours.label(class_='form-label') }}
       {{ form.nudge_min_delay_hours(class_='form-control') }}
-      <div class="form-text">Minimum hours after request creation before nudges may start. Minimum enforced is 4 hours.</div>
+      <div class="form-text">Minimum hours after request creation before reminders may start. Minimum enforced is 4 hours.</div>
     </div>
 
     <button class="btn btn-primary">Save</button>

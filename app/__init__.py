@@ -470,7 +470,7 @@ def create_app():
                 pass
 
             # Respect the global feature flag as well (admin toggle).
-            allow_user_nudges_enabled = False
+            allow_user_reminders_enabled = False
             try:
                 ff = FeatureFlags.get()
                 # Respect both the admin rolling-quotes flag and the global
@@ -482,7 +482,7 @@ def create_app():
                 # vibe is independent but when unset should default to True
                 if getattr(ff, "vibe_enabled", True) is False:
                     rolling_quotes_enabled = False
-                allow_user_nudges_enabled = bool(
+                allow_user_reminders_enabled = bool(
                     getattr(ff, "allow_user_nudges", False)
                 )
             except Exception:
@@ -547,7 +547,7 @@ def create_app():
                     if rolling_quotes and rolling_quotes_enabled
                     else (SiteConfig.DEFAULT_QUOTE_SETS.get('default', [None])[0])
                 ),
-                allow_user_nudges_enabled=allow_user_nudges_enabled,
+                allow_user_reminders_enabled=allow_user_reminders_enabled,
                 external_theme_loaded=external_theme_loaded,
                 FeatureFlags=FeatureFlags,
             )
@@ -574,7 +574,7 @@ def create_app():
                 rolling_quotes=[],
                 company_url=None,
                 initial_quote=None,
-                allow_user_nudges_enabled=False,
+                allow_user_reminders_enabled=False,
                 external_theme_loaded=False,
                 FeatureFlags=ff,
             )

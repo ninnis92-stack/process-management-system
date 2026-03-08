@@ -55,7 +55,7 @@ def test_feature_flags_render_correct_action_labels(client, app):
 
     assert 'data-toggle-text-checked="Notifications enabled"' in html
     assert 'Notifications enabled' in html
-    assert 'Automated nudges disabled' in html
+    assert 'Automated reminders disabled' in html
     assert 'Vibe button UI enabled' in html
 
     # simulate saving new values and verify the returned page reflects them
@@ -75,7 +75,7 @@ def test_feature_flags_render_correct_action_labels(client, app):
     )
     assert rv2.status_code == 200
     html2 = rv2.get_data(as_text=True)
-    assert 'Automated nudges enabled' in html2
+    assert 'Automated reminders enabled' in html2
 
 
 def test_feature_flags_post_unchecked_boxes_disable_flags(client, app):

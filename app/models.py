@@ -24,7 +24,8 @@ STATUSES = (
 )
 
 REQUEST_TYPES = ("part_number", "instructions", "both")
-PRIORITIES = ("low", "medium", "high")
+PRIORITIES = ("low", "medium", "high", "highest")  # highest is a special escalation tier above high
+
 PRICEBOOK_LABELS = {
     "in_pricebook": "On the sales list",
     "not_in_pricebook": "Not on the sales list",
@@ -226,6 +227,28 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     quote_set = db.Column(db.String(80), nullable=True)
     # user preference: whether rotating quotes should appear on their dashboard
     quotes_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    # user preference: interval (in seconds) between quote rotations; allowed
+    # values are multiples of 5 between 15 and 60.  We store as integer seconds
+    # so the frontend can easily multiply by 1000.  When absent the default is
+    # 15 seconds (the shortest allowable interval).
+    quote_interval = db.Column(db.Integer, nullable=True, default=None)
+
+    # admin-configurable allowance of manual nudges the user may initiate per
+    # UTC day. Defaults to 1 and capped at 5. Used by the `/push_nudge` route
+    # to throttle excessive reminders.
+    daily_nudge_limit = db.Column(db.Integer, nullable=False, default=1)
+
+    @validates("daily_nudge_limit")
+    def _validate_daily_nudge_limit(self, key, value):
+        if value is None or value == "":
+            return 1
+        try:
+            iv = int(value)
+        except Exception:
+            raise ValueError("daily_nudge_limit must be an integer")
+        if iv < 1 or iv > 5:
+            raise ValueError("daily_nudge_limit must be between 1 and 5")
+        return iv
 
     # Ensure we always store a normalized (lowercase, stripped) key for the
     # quote set.  This protects against manual database edits or historical
@@ -236,6 +259,19 @@ class User(TenantScopedMixin, db.Model, UserMixin):
         if value is None:
             return None
         return str(value).strip().lower()
+
+    @validates("quote_interval")
+    def _validate_quote_interval(self, key, value):
+        if value is None or value == "":
+            return None
+        try:
+            iv = int(value)
+        except Exception:
+            raise ValueError("Quote interval must be an integer number of seconds")
+        # permissible values are 15,20,...,60
+        if iv < 15 or iv > 60 or iv % 5 != 0:
+            raise ValueError("Quote interval must be between 15 and 60 seconds in 5‑second steps")
+        return iv
     # Persist the last department the user was viewing when they logged out
     # or switched contexts. This is used to restore their active department
     # on subsequent logins when they have multiple department assignments.
@@ -280,7 +316,16 @@ class Notification(TenantScopedMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    user = db.relationship("User", backref="notifications")
+    user = db.relationship("User", foreign_keys=[user_id], backref="notifications")
+
+    # optional actor/initiator of the notification (e.g. which user pushed a
+    # reminder); this allows enforcing per-user rate limits on nudges. It is
+    # deliberately nullable so that existing rows are unaffected and other
+    # notification types need not populate it.
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    actor_user = db.relationship(
+        "User", foreign_keys=[actor_user_id], backref="initiated_notifications"
+    )
 
     request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=True)
     request = db.relationship("Request")
@@ -1430,6 +1475,15 @@ class StatusOption(TenantScopedMixin, db.Model):
     request should route (target department) and whether notifications
     should be emitted only when the transition results in a department
     transfer.
+
+    New fields added in 2026-03 allow administrators to tune the automated
+    nudge behaviour per-status.  The `nudge_level` column is an integer
+    where:
+      * 0 – do not participate in automated nudges
+      * 1 – nudge every hour
+      * 2 – nudge every four hours
+      * 3 – nudge once per day
+    The default for existing rows is zero (no nudges).
     """
 
     id = db.Column(db.Integer, primary_key=True)
@@ -1457,6 +1511,9 @@ class StatusOption(TenantScopedMixin, db.Model):
     # the originator (the user who created the request) rather than the
     # entire owner department. Admin toggle exposed in the UI.
     notify_to_originator_only = db.Column(db.Boolean, nullable=False, default=False)
+    # integer value describing how frequently this status should generate
+    # automated nudges; see class docstring for meaning.
+    nudge_level = db.Column(db.Integer, nullable=False, default=0)
     # JSON list of approval stages for this status. Each stage is stored as:
     # {"name": str, "role": str|None, "department": str|None}
     approval_stages_json = db.Column(db.Text, nullable=True)
@@ -1541,7 +1598,12 @@ class Workflow(TenantScopedMixin, db.Model):
 
 
 class DepartmentEditor(TenantScopedMixin, db.Model):
-    """Per-department edit privileges assigned to users by admins."""
+    """Per-department edit privileges assigned to users by admins.
+
+    In addition to existing flags, department editors may now be granted
+    the ability to change priority on requests belonging to their
+    department.  This is represented by ``can_change_priority``.
+    """
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -1549,6 +1611,8 @@ class DepartmentEditor(TenantScopedMixin, db.Model):
     department = db.Column(db.String(2), nullable=False, index=True)
     can_edit = db.Column(db.Boolean, nullable=False, default=True)
     can_view_metrics = db.Column(db.Boolean, nullable=False, default=False)
+    # department head may reassign the priority of requests in this dept
+    can_change_priority = db.Column(db.Boolean, nullable=False, default=False)
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (
         db.UniqueConstraint("user_id", "department", name="uq_user_dept_editor"),

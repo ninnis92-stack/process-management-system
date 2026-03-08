@@ -136,6 +136,29 @@ def main():
             except Exception:
                 db.session.rollback()
 
+        # backfill any missing daily_nudge_limit values (new column may be NULL)
+        try:
+            for u in User.query.all():
+                if getattr(u, "daily_nudge_limit", None) is None:
+                    u.daily_nudge_limit = 1
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        except Exception:
+            # If the DB schema doesn't yet include `is_admin`, attempt to add the column (dev-only)
+            try:
+                db.session.rollback()
+                engine = db.get_engine(app)
+                # Best-effort ALTER TABLE to add is_admin column for SQLite/Postgres
+                engine.execute("ALTER TABLE user ADD COLUMN is_admin BOOLEAN DEFAULT 0")
+            except Exception:
+                pass
+            # Try commit again (users should exist even if is_admin couldn't be set)
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
         cfg = SiteConfig.get()
         normalized_sets = SiteConfig.normalize_quote_sets(getattr(cfg, "rolling_quote_sets", None))
         cfg._rolling_quote_sets = json.dumps(normalized_sets)

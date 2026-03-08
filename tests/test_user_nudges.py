@@ -27,7 +27,7 @@ def test_user_push_nudge_obeys_feature_flag(app, client):
     req = ReqModel(
         title="Reminder test",
         request_type="part_number",
-        description="Testing user nudges",
+        description="Testing user reminders",
         priority="medium",
         owner_department="B",
         status="B_IN_PROGRESS",

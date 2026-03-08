@@ -83,8 +83,11 @@ def create_user():
         cfg = SiteConfig.get()
         sets = list(cfg.rolling_quote_sets.keys()) if cfg and cfg.rolling_quote_sets else list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
         form.quote_set.choices = [("", "(use site default)")] + [(s, s.capitalize()) for s in sets]
+        # pre-fill the interval field with site default
+        form.quote_interval.data = getattr(cfg, 'rolling_quote_interval_default', 8)
     except Exception:
         form.quote_set.choices = [("", "(use site default)")]
+        form.quote_interval.data = None
 
     if form.validate_on_submit():
         email = form.email.data.strip().lower()
@@ -113,6 +116,11 @@ def create_user():
                 existing.quote_set = form.quote_set.data or None
             if hasattr(form, 'quotes_enabled'):
                 existing.quotes_enabled = bool(form.quotes_enabled.data)
+            if hasattr(form, 'daily_nudge_limit'):
+                try:
+                    existing.daily_nudge_limit = int(form.daily_nudge_limit.data or 1)
+                except Exception:
+                    existing.daily_nudge_limit = 1
             db.session.commit()
             ensure_user_tenant_membership(existing)
             flash(f"Updated user {email}.", "success")
@@ -127,6 +135,11 @@ def create_user():
             is_active=is_active,
             is_admin=is_admin,
         )
+        if hasattr(form, 'daily_nudge_limit'):
+            try:
+                u.daily_nudge_limit = int(form.daily_nudge_limit.data or 1)
+            except Exception:
+                u.daily_nudge_limit = 1
         if hasattr(form, 'quote_set'):
             u.quote_set = form.quote_set.data or None
         if hasattr(form, 'quotes_enabled'):
@@ -181,6 +194,11 @@ def edit_user(user_id: int):
             u.quote_set = form.quote_set.data or None
         if hasattr(form, 'quotes_enabled'):
             u.quotes_enabled = bool(form.quotes_enabled.data)
+        if hasattr(form, 'daily_nudge_limit'):
+            try:
+                u.daily_nudge_limit = int(form.daily_nudge_limit.data or 1)
+            except Exception:
+                u.daily_nudge_limit = 1
         db.session.commit()
         flash(f"Updated user {u.email}.", "success")
         return redirect(url_for("admin.list_users"))

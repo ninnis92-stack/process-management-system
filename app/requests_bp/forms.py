@@ -67,6 +67,7 @@ class NewRequestForm(FlaskForm):
             ("low", "Low"),
             ("medium", "Medium"),
             ("high", "High"),
+            ("highest", "Highest"),
         ],
         validators=[DataRequired()],
     )

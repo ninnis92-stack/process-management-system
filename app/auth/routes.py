@@ -308,6 +308,21 @@ def settings():
     form.quote_set.choices = [("", "(use site default)")] + [
         (s, s.capitalize()) for s in sets
     ]
+
+    # prepare interval options (15‑60 seconds in 5‑second increments)
+    iv_choices = [(i, f"{i} seconds") for i in range(15, 61, 5)]
+    form.quote_interval.choices = [("", "(use default)")] + iv_choices
+    # quote interval choices already defined on the form; preselect user's
+    # current value if available or fall back to site default
+    try:
+        if hasattr(current_user, 'quote_interval') and current_user.quote_interval:
+            form.quote_interval.data = current_user.quote_interval
+        else:
+            # use site config default
+            cfg = SiteConfig.get()
+            form.quote_interval.data = getattr(cfg, 'rolling_quote_interval_default', 8)
+    except Exception:
+        form.quote_interval.data = None
     if form.validate_on_submit():
         try:
             u = db.session.get(User, current_user.id)
@@ -339,6 +354,20 @@ def settings():
                         if 'quotes_enabled_present' in request.form or 'quotes_enabled' in request.form:
                             submitted = (request.form.get('quotes_enabled') or '').strip().lower()
                             u.quotes_enabled = submitted not in ('', '0', 'false', 'off', 'no')
+                    except Exception:
+                        pass
+                if hasattr(form, 'quote_interval'):
+                    # only persist if present and the user is allowed to choose
+                    try:
+                        if 'quote_interval' in request.form:
+                            raw = request.form.get('quote_interval') or ''
+                            u.quote_interval = int(raw) if raw.strip() else None
+                    except Exception:
+                        pass
+                if hasattr(form, 'quote_interval'):
+                    try:
+                        if 'quote_interval' in request.form:
+                            u.quote_interval = int(form.quote_interval.data or 0)
                     except Exception:
                         pass
                 db.session.add(u)

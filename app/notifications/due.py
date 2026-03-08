@@ -61,10 +61,17 @@ def send_due_soon_notifications(app, hours=24, commit: bool = False):
 def send_high_priority_nudges(app, commit: bool = False):
     """Send nudges for high-priority open requests according to admin config.
 
-    This function will create an in-app `Notification` for the responsible
-    user (assigned user if present, otherwise department users) and also
-    fire an email for the same recipient. Nudges are rate-limited per-user
-    per-request based on `SpecialEmailConfig.nudge_interval_hours`.
+    Nudges are created for requests of priority "high" or "highest".  The
+    interval between nudges is determined by the order of the current status
+    in the workflow (a simple level the admin can reorder); level 0 maps to
+    hourly, level 1 to every 4 hours, and level >=2 to once per day.  If a
+    status has no associated bucket entry or an error occurs, the global
+    ``cfg.nudge_interval_hours`` value is used instead.
+
+    Regardless of interval, users are capped to a fixed number of nudges per
+    UTC day.  By default this limit is one; admins can assign up to five via
+    the ``User.daily_nudge_limit`` column.  The cap is enforced *before*
+    per-request interval checks to ensure users are not flooded.
     """
     try:
         cfg = SpecialEmailConfig.get()
@@ -83,34 +90,55 @@ def send_high_priority_nudges(app, commit: bool = False):
     if flags and not getattr(flags, "enable_nudges", True):
         return
 
-    # allow fractional-hour intervals (e.g. 0.5 for 30 minutes)
-    try:
-        interval = float(cfg.nudge_interval_hours or 24)
-    except Exception:
-        interval = 24.0
-    now = datetime.utcnow()
-    cutoff = now - timedelta(hours=interval)
-    # Respect administrative minimum delay: do not nudge requests created
-    # within `nudge_min_delay_hours` of their creation. Default is 4 hours.
+    # helper for computing interval based on workflow status order
+    def interval_for_status(status_code: str) -> float:
+        try:
+            from ..models import BucketStatus
+
+            rec = BucketStatus.query.filter_by(status_code=status_code).first()
+            if rec is not None:
+                lvl = getattr(rec, "order", 0) or 0
+                if lvl <= 0:
+                    return 1.0
+                elif lvl == 1:
+                    return 4.0
+                else:
+                    return 24.0
+        except Exception:
+            pass
+        try:
+            return float(cfg.nudge_interval_hours or 24)
+        except Exception:
+            return 24.0
+
+    # administrative minimum delay for new requests
     try:
         raw_min_delay = getattr(cfg, "nudge_min_delay_hours", None)
         min_delay = 4 if raw_min_delay is None else float(raw_min_delay)
     except Exception:
         min_delay = 4.0
+
+    now = datetime.utcnow()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # target both high and highest priorities
     reqs = (
-        ReqModel.query.filter(ReqModel.priority == "high")
+        ReqModel.query.filter(ReqModel.priority.in_(["high", "highest"]))
         .filter(ReqModel.status != "CLOSED")
         .all()
     )
+
     for req in reqs:
-        # determine targets: prefer explicit assignee
+        interval = interval_for_status(req.status)
+        cutoff = now - timedelta(hours=interval)
+
+        # determine targets for this request
         targets = []
         if req.assigned_to_user_id:
             u = db.session.get(User, req.assigned_to_user_id)
             if u and u.is_active:
                 targets.append(u)
         else:
-            # fallback: all active users in owner department
             targets = User.query.filter_by(
                 department=req.owner_department, is_active=True
             ).all()
@@ -118,7 +146,20 @@ def send_high_priority_nudges(app, commit: bool = False):
         link = url_for("requests.request_detail", request_id=req.id, _external=False)
 
         for u in {t.id: t for t in targets}.values():
-            # skip if we've sent a nudge within the interval
+            # enforce daily per-user cap
+            try:
+                limit = getattr(u, "daily_nudge_limit", 1) or 1
+                sent_today = (
+                    Notification.query.filter_by(user_id=u.id, type="nudge")
+                    .filter(Notification.created_at >= today_start)
+                    .count()
+                )
+                if sent_today >= limit:
+                    continue
+            except Exception:
+                pass
+
+            # skip if we've sent a nudge for *this* request recently
             recent = (
                 Notification.query.filter_by(
                     user_id=u.id, dedupe_key=f"nudge:req_{req.id}"
@@ -133,15 +174,12 @@ def send_high_priority_nudges(app, commit: bool = False):
             try:
                 if req.created_at:
                     age_seconds = (now - req.created_at).total_seconds()
-                    # only enforce the min-delay for positive ages; if created_at
-                    # is unexpectedly in the future, allow the nudge path.
                     if age_seconds >= 0 and age_seconds < (min_delay * 3600):
                         continue
             except Exception:
-                # on any problem reading created_at, be conservative and skip
                 continue
 
-            # create in-app notification
+            # create notification
             db.session.add(
                 Notification(
                     user_id=u.id,

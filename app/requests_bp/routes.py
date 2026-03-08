@@ -2248,6 +2248,7 @@ def request_detail(request_id: int):
         reject_button_label=reject_button_label,
         reject_message=reject_message,
         status_options_map=status_options_map,
+        can_change_priority=_user_can_change_priority(current_user, req),
     )
 
 
@@ -2508,6 +2509,27 @@ def _collect_nudge_targets(req, exclude_user_id=None):
     return list(deduped.values())
 
 
+def _user_can_change_priority(user, req) -> bool:
+    """Return True if ``user`` may adjust the priority of ``req``.
+
+    Admin users always may; department editors require the `can_change_priority`
+    flag for the request's owner department.
+    """
+    if getattr(user, "is_admin", False):
+        return True
+    try:
+        de = (
+            DepartmentEditor.query.filter_by(
+                user_id=user.id, department=req.owner_department
+            ).first()
+        )
+        if de and getattr(de, "can_change_priority", False):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def _dispatch_nudge_notifications(
     req,
     targets,
@@ -2518,6 +2540,7 @@ def _dispatch_nudge_notifications(
     email_subject=None,
     email_body=None,
     link=None,
+    actor_user_id=None,
 ):
     if not targets:
         return
@@ -2538,6 +2561,7 @@ def _dispatch_nudge_notifications(
                     body=body,
                     url=link,
                     dedupe_key=dedupe_key,
+                    actor_user_id=actor_user_id,
                 )
             )
             if email_subject and email_body and getattr(u, "email", None):
@@ -2574,7 +2598,7 @@ def _dispatch_nudge_notifications(
 @requests_bp.route("/requests/<int:request_id>/admin_nudge", methods=["POST"])
 @login_required
 def admin_nudge(request_id: int):
-    """Admin-only debug endpoint: trigger a 30s admin nudge for a request.
+    """Admin-only debug endpoint: trigger a 30s admin reminder for a request.
 
     This creates in-app `Notification` rows for the assignee (or all users in
     the owner department) and attempts to send email notifications in the
@@ -2591,10 +2615,10 @@ def admin_nudge(request_id: int):
     if not targets:
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return (
-                jsonify({"ok": False, "message": "No recipients found for nudge."}),
+                jsonify({"ok": False, "message": "No recipients found for reminder."}),
                 400,
             )
-        flash("No recipients found for nudge.", "warning")
+        flash("No recipients found for reminder.", "warning")
         return redirect(url_for("requests.request_detail", request_id=req.id))
 
     link = url_for("requests.request_detail", request_id=req.id, _external=False)
@@ -2610,8 +2634,8 @@ def admin_nudge(request_id: int):
     )
 
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return jsonify({"ok": True, "message": "Admin nudge sent."}), 200
-    flash("Admin nudge sent.", "success")
+        return jsonify({"ok": True, "message": "Admin reminder sent."}), 200
+    flash("Admin reminder sent.", "success")
     return redirect(url_for("requests.request_detail", request_id=req.id))
 
 
@@ -2621,6 +2645,20 @@ def push_nudge(request_id: int):
     flags = FeatureFlags.get()
     if not getattr(flags, "allow_user_nudges", False):
         abort(403)
+
+    # enforce per-day sending limit for the current user
+    if getattr(current_user, "daily_nudge_limit", 1):
+        from datetime import datetime, timedelta
+
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        sent_today = (
+            Notification.query.filter_by(actor_user_id=current_user.id, type="nudge")
+            .filter(Notification.created_at >= today_start)
+            .count()
+        )
+        if sent_today >= current_user.daily_nudge_limit:
+            flash("You have reached your daily reminder limit.", "warning")
+            return redirect(url_for("requests.request_detail", request_id=request_id))
 
     req = get_or_404(ReqModel, request_id)
     if not can_view_request(req):
@@ -2645,9 +2683,31 @@ def push_nudge(request_id: int):
         email_subject=title,
         email_body=text_body,
         link=link,
+        actor_user_id=getattr(current_user, "id", None),
     )
 
     flash("Reminder sent to the current owner(s).", "success")
+    return redirect(url_for("requests.request_detail", request_id=req.id))
+
+
+@requests_bp.route("/requests/<int:request_id>/change_priority", methods=["POST"])
+@login_required
+def change_priority(request_id: int):
+    req = get_or_404(ReqModel, request_id)
+    if not can_view_request(req):
+        abort(403)
+    if not _user_can_change_priority(current_user, req):
+        abort(403)
+    new_priority = (request.form.get("priority") or "").strip().lower()
+    if new_priority not in {"low", "medium", "high", "highest"}:
+        flash("Invalid priority.", "warning")
+        return redirect(url_for("requests.request_detail", request_id=req.id))
+    if req.priority != new_priority:
+        old = req.priority
+        req.priority = new_priority
+        _log(req, "priority_change", note=f"{current_user.email or current_user.name} changed priority from {old} to {new_priority}")
+        db.session.commit()
+        flash("Priority updated.", "success")
     return redirect(url_for("requests.request_detail", request_id=req.id))
 
 

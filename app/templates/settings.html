@@ -18,6 +18,7 @@
             {{ form.dark_mode(class_='form-check-input') }}
             <label class="form-check-label" for="dark_mode" id="darkModeLabel">{{ 'Dark mode enabled' if dark_mode_enabled else 'Dark mode disabled' }}</label>
           </div>
+
           {{ toggle_checkbox(form.quotes_enabled, 'Rotating quotes enabled', 'Rotating quotes disabled') }}
 
         {% set external_theme = external_theme_loaded %}
@@ -44,7 +45,17 @@
             <div class="form-text">Select which set of rolling quotes you'd like to see; leave blank to follow the site default.</div>
           </div>
         {% endif %}
-
+        {% if form.quote_interval %}
+          <div class="mb-3">
+            <label for="quote_interval" class="form-label">Quote rotation interval</label>
+            <select class="form-select" id="quote_interval" name="quote_interval">
+              {% for val, label in form.quote_interval.choices %}
+                <option value="{{ val }}" {% if (current_user.quote_interval is not none and current_user.quote_interval == val) or (form.quote_interval.data is not none and form.quote_interval.data == val) %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">How often quotes should advance. Choose between 15 and 60 seconds in 5‑second steps.</div>
+          </div>
+        {% endif %}
         <button class="btn btn-primary" type="submit" id="darkModeSubmitBtn">Save settings</button>
       </form>
     </div>

@@ -50,7 +50,7 @@ def main():
 
     desired = {
         "code": "30",
-        "label": "Nudge Test 30",
+        "label": "Reminder Test 30",
         "target_department": "B",
         "notify_on_transfer_only": 0,
         "notify_enabled": 1,
