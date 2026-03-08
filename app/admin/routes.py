@@ -114,7 +114,10 @@ def create_guest_form():
             name=form.name.data.strip(),
             slug=slug,
             template_id=(form.template_id.data or None) or None,
-            require_sso=bool(form.require_sso.data),
+            require_sso=bool((form.access_policy.data or "public") in {"sso_linked", "approved_sso_domains"}),
+            access_policy=(form.access_policy.data or "public"),
+            allowed_email_domains=(form.allowed_email_domains.data or "").strip() or None,
+            credential_requirements_json=(form.credential_requirements_json.data or "").strip() or None,
             owner_department=form.owner_department.data or "B",
             is_default=bool(form.is_default.data),
             active=bool(form.active.data),
@@ -152,12 +155,19 @@ def edit_guest_form(gf_id: int):
     form.template_id.choices = choices
     form.template_id.data = g.template_id or 0
     form.owner_department.data = g.owner_department or "B"
+    if not form.is_submitted():
+        form.access_policy.data = g.normalized_access_policy
+        form.allowed_email_domains.data = g.allowed_email_domains or ""
+        form.credential_requirements_json.data = g.credential_requirements_pretty_json
 
     if form.validate_on_submit():
         g.name = form.name.data.strip()
         g.slug = form.slug.data.strip()
         g.template_id = (form.template_id.data or None) or None
-        g.require_sso = bool(form.require_sso.data)
+        g.access_policy = form.access_policy.data or "public"
+        g.require_sso = bool(g.access_policy in {"sso_linked", "approved_sso_domains"})
+        g.allowed_email_domains = (form.allowed_email_domains.data or "").strip() or None
+        g.credential_requirements_json = (form.credential_requirements_json.data or "").strip() or None
         g.owner_department = form.owner_department.data or "B"
         g.active = bool(form.active.data)
         if form.is_default.data:

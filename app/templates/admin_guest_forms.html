@@ -3,7 +3,7 @@
 <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
   <div>
     <h3 class="mb-1">Guest Forms</h3>
-    <p class="text-muted mb-0">Manage the external forms available to guest users.</p>
+    <p class="text-muted mb-0">Manage external forms, access policies, approved organizations, and smartphone-friendly submission paths.</p>
   </div>
   <div class="d-flex gap-2">
     <a href="{{ url_for('admin.index') }}" class="btn btn-outline-secondary admin-back-btn">← Admin dashboard</a>
@@ -11,42 +11,47 @@
   </div>
 </div>
 
-<div class="table-responsive">
-  <table class="table table-striped align-middle">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Slug</th>
-        <th>Department</th>
-        <th>Require SSO</th>
-        <th>Default</th>
-        <th>Active</th>
-        <th class="text-end"></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for f in forms %}
-      <tr>
-        <td>{{ f.name }}</td>
-        <td>{{ f.slug }}</td>
-        <td>{{ f.owner_department or 'B' }}</td>
-        <td>{{ 'Yes' if f.require_sso else 'No' }}</td>
-        <td>{{ 'Yes' if f.is_default else 'No' }}</td>
-        <td>{{ 'Yes' if f.active else 'No' }}</td>
-        <td class="text-end">
-          <a href="{{ url_for('admin.edit_guest_form', gf_id=f.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-          <form method="post" action="{{ url_for('admin.delete_guest_form', gf_id=f.id) }}" class="d-inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this guest form?')">Delete</button>
-          </form>
-        </td>
-      </tr>
-      {% else %}
-      <tr>
-        <td colspan="7" class="text-muted">No guest forms configured yet.</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="guest-form-admin-grid">
+  {% for f in forms %}
+    <article class="guest-form-admin-card">
+      <div class="d-flex justify-content-between align-items-start gap-3 mb-3 flex-wrap">
+        <div>
+          <div class="eyebrow-label">{{ f.slug }}</div>
+          <h4 class="h5 mb-1">{{ f.name }}</h4>
+          <p class="text-muted small mb-0">Routes to Dept {{ f.owner_department or 'B' }} · {{ f.access_policy_label }}</p>
+        </div>
+        <div class="guest-form-policy-badges">
+          {% if f.is_default %}<span class="badge text-bg-primary">Default</span>{% endif %}
+          <span class="badge {{ 'text-bg-success' if f.active else 'text-bg-secondary' }}">{{ 'Active' if f.active else 'Inactive' }}</span>
+        </div>
+      </div>
+
+      <p class="text-muted small mb-2">{{ f.access_policy_hint }}</p>
+
+      <div class="guest-form-policy-badges mb-3">
+        <span class="badge text-bg-light border">{{ 'SSO required' if f.normalized_access_policy in ['sso_linked', 'approved_sso_domains'] else 'Open access' }}</span>
+        {% if f.allowed_email_domain_list %}
+          <span class="badge text-bg-light border">{{ f.allowed_email_domain_list|length }} approved domain{{ '' if f.allowed_email_domain_list|length == 1 else 's' }}</span>
+        {% endif %}
+        {% if f.credential_requirements %}
+          <span class="badge text-bg-light border">Credential JSON saved</span>
+        {% endif %}
+      </div>
+
+      {% if f.allowed_email_domain_list %}
+        <div class="small text-muted mb-3">Approved organizations: {{ f.allowed_email_domain_list|join(', ') }}</div>
+      {% endif %}
+
+      <div class="d-flex gap-2 flex-wrap justify-content-end">
+        <a href="{{ url_for('admin.edit_guest_form', gf_id=f.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+        <form method="post" action="{{ url_for('admin.delete_guest_form', gf_id=f.id) }}" class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this guest form?')">Delete</button>
+        </form>
+      </div>
+    </article>
+  {% else %}
+    <div class="alert alert-light border text-muted">No guest forms configured yet.</div>
+  {% endfor %}
 </div>
 {% endblock %}

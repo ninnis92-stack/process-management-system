@@ -607,6 +607,24 @@ def main():
                     # Don't fail the whole release if this ALTER can't be run;
                     # downstream steps will surface the error and be logged.
                     pass
+                if "guest_form" in insp.get_table_names():
+                    guest_form_cols = {c["name"] for c in insp.get_columns("guest_form")}
+                    if "access_policy" not in guest_form_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE guest_form ADD COLUMN access_policy VARCHAR(40) DEFAULT 'public'"))
+                            try:
+                                conn.execute(text("UPDATE guest_form SET access_policy='sso_linked' WHERE require_sso = TRUE"))
+                            except Exception:
+                                conn.execute(text("UPDATE guest_form SET access_policy='sso_linked' WHERE require_sso = 1"))
+                        print("schema_fix=guest_form.access_policy_added")
+                    if "allowed_email_domains" not in guest_form_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE guest_form ADD COLUMN allowed_email_domains TEXT"))
+                        print("schema_fix=guest_form.allowed_email_domains_added")
+                    if "credential_requirements_json" not in guest_form_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE guest_form ADD COLUMN credential_requirements_json TEXT"))
+                        print("schema_fix=guest_form.credential_requirements_json_added")
                 # Ensure request.is_denied exists when the model expects it
                 if "request" in insp.get_table_names():
                     req_cols = {c["name"] for c in insp.get_columns("request")}

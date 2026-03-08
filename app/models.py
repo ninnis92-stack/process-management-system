@@ -58,6 +58,13 @@ TENANT_ROLES = (
     "viewer",
 )
 
+GUEST_FORM_ACCESS_POLICIES = (
+    ("public", "Anyone with the form link"),
+    ("sso_linked", "Any SSO-linked account"),
+    ("approved_sso_domains", "Approved SSO organizations only"),
+    ("unaffiliated_only", "Unaffiliated accounts only"),
+)
+
 
 class TenantScopedMixin:
     """Mixin for records that belong to a single tenant."""
@@ -548,6 +555,8 @@ class GuestForm(TenantScopedMixin, db.Model):
     """Admin-manageable guest form instance used for public/guest submissions.
 
     Allows per-form toggles such as requiring an SSO-linked account to submit.
+    More advanced access policies can target approved SSO organizations by
+    email domain or reserve a form for unaffiliated submitters.
     """
 
     id = db.Column(db.Integer, primary_key=True)
@@ -556,10 +565,119 @@ class GuestForm(TenantScopedMixin, db.Model):
     template_id = db.Column(db.Integer, db.ForeignKey("form_template.id"), nullable=True)
     template = db.relationship("FormTemplate", backref="guest_forms")
     require_sso = db.Column(db.Boolean, nullable=False, default=False)
+    access_policy = db.Column(db.String(40), nullable=True, default="public")
+    allowed_email_domains = db.Column(db.Text, nullable=True)
+    credential_requirements_json = db.Column(db.Text, nullable=True)
     owner_department = db.Column(db.String(2), nullable=False, default="B")
     is_default = db.Column(db.Boolean, nullable=False, default=False)
     active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @classmethod
+    def access_policy_choices(cls):
+        return list(GUEST_FORM_ACCESS_POLICIES)
+
+    @property
+    def normalized_access_policy(self):
+        valid = {choice[0] for choice in GUEST_FORM_ACCESS_POLICIES}
+        raw = (self.access_policy or "").strip().lower()
+        if raw in valid:
+            return raw
+        return "sso_linked" if bool(self.require_sso) else "public"
+
+    @property
+    def access_policy_label(self):
+        mapping = dict(GUEST_FORM_ACCESS_POLICIES)
+        return mapping.get(self.normalized_access_policy, mapping["public"])
+
+    @property
+    def access_policy_hint(self):
+        hints = {
+            "public": "Anyone with the link can submit this form.",
+            "sso_linked": "Submitters must already be linked to an SSO-backed user account.",
+            "approved_sso_domains": "Submitters must be SSO-linked and their email domain must match an approved organization.",
+            "unaffiliated_only": "This form is reserved for non-SSO submitters outside the approved organization list.",
+        }
+        return hints.get(self.normalized_access_policy, hints["public"])
+
+    @property
+    def allowed_email_domain_list(self):
+        raw = self.allowed_email_domains or ""
+        items = []
+        for part in str(raw).replace("\n", ",").split(","):
+            domain = str(part or "").strip().lower().lstrip("@")
+            if domain and domain not in items:
+                items.append(domain)
+        return items
+
+    @property
+    def credential_requirements(self):
+        raw = (self.credential_requirements_json or "").strip()
+        if not raw:
+            return {}
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+
+    @credential_requirements.setter
+    def credential_requirements(self, value):
+        if not value:
+            self.credential_requirements_json = None
+            return
+        if isinstance(value, str):
+            raw = value.strip()
+            self.credential_requirements_json = raw or None
+            return
+        self.credential_requirements_json = json.dumps(value)
+
+    @property
+    def credential_requirements_pretty_json(self):
+        data = self.credential_requirements
+        if not data:
+            return ""
+        try:
+            return json.dumps(data, indent=2, sort_keys=True)
+        except Exception:
+            return self.credential_requirements_json or ""
+
+    def evaluate_submitter_access(self, email: str, user=None):
+        email_n = (email or "").strip().lower()
+        domain = email_n.split("@", 1)[1] if "@" in email_n else ""
+        policy = self.normalized_access_policy
+        approved_domains = set(self.allowed_email_domain_list)
+        has_sso = bool(user and getattr(user, "sso_sub", None))
+        in_approved_domain = bool(domain and domain in approved_domains)
+
+        allowed = True
+        message = ""
+
+        if policy == "sso_linked":
+            allowed = has_sso
+            if not allowed:
+                message = "This form requires an SSO-linked account."
+        elif policy == "approved_sso_domains":
+            allowed = has_sso and in_approved_domain
+            if not allowed:
+                if not has_sso:
+                    message = "This form requires an SSO-linked account from an approved organization."
+                else:
+                    message = "This form is limited to approved SSO organizations."
+        elif policy == "unaffiliated_only":
+            allowed = (not has_sso) and (not approved_domains or not in_approved_domain)
+            if not allowed:
+                message = "This form is reserved for unaffiliated submitters."
+
+        return {
+            "allowed": allowed,
+            "policy": policy,
+            "message": message,
+            "email_domain": domain,
+            "has_sso": has_sso,
+            "approved_domain": in_approved_domain,
+            "credential_requirements": self.credential_requirements,
+        }
 
 
 class FormField(db.Model):

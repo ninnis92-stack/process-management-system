@@ -35,12 +35,15 @@ Key capabilities:
   guest forms, feature flags, and more
 - **Field verification** powered by third‑party tracker integrations
 - **Guest submission and lookup** via external blueprints
+- **Per-form guest access policies** for public, SSO-linked, approved-organization,
+  and unaffiliated-only intake paths
 - **SSO/OIDC support** with optional admin sync
 - **Theme/vibe system**, dark mode (now integrated with vibe accents) and per‑user preferences
 
 Everything is covered by a comprehensive test suite and deploys automatically
 using a release script that migrates the database, creates missing columns,
-and seeds baseline accounts.
+seeds baseline accounts, and backfills recent guest-form schema additions when
+needed.
 
 ---
 
@@ -130,6 +133,9 @@ and seeds baseline accounts.
   development schemas aligned.
 - A second release‑time task creates missing columns safely and can seed the
   database on every deploy (controlled by `RUN_SEED_ON_RELEASE` env var).
+- The same release path now also repairs legacy `guest_form` installs by adding
+  `access_policy`, `allowed_email_domains`, and
+  `credential_requirements_json` when those fields are missing.
 - Release-time quote validation auto-fills missing built-in quote sets, resets an
   invalid active quote set back to `default`, and fails the release if any set
   would still be empty.
@@ -254,6 +260,31 @@ and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORIN
 ---
 
 ## Feature notes
+
+### Guest forms and external intake
+
+Guest forms can now be configured per form from the admin UI with clearer,
+mobile-friendly routing and access summaries on both the admin and submitter
+screens.
+
+Supported submitter access policies:
+
+- `public` — anyone with the form link can submit
+- `sso_linked` — the submitter email must belong to an existing SSO-linked user
+- `approved_sso_domains` — the submitter must be SSO-linked and their email
+  domain must match an approved organization domain configured on the form
+- `unaffiliated_only` — blocks known affiliated/SSO-linked organization members
+  so the form can be reserved for unaffiliated submitters
+
+Additional notes:
+
+- Approved organization domains are stored as a newline- or comma-separated list
+  and normalized to lowercase.
+- Each guest form also stores `credential_requirements_json`, which is not yet
+  enforced at runtime but is reserved for future SSO claim / credential
+  requirement integrations.
+- Legacy installs that only used `require_sso` remain compatible: forms without
+  an explicit `access_policy` fall back to the old behavior automatically.
 
 ### Request templates
 

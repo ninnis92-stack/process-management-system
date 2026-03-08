@@ -35,6 +35,45 @@ from ..security import rate_limit
 external_bp = Blueprint("external", __name__, url_prefix="/external")
 
 
+def _resolve_guest_form_selection(guest_forms):
+    slug = (request.args.get("guest_form") or request.form.get("guest_form") or "").strip()
+    selected = None
+    if slug:
+        selected = next((gf for gf in guest_forms if gf.slug == slug), None)
+    if not selected:
+        selected = next((gf for gf in guest_forms if gf.is_default), None)
+    return selected
+
+
+def _fallback_guest_form_policy():
+    require_sso = bool(current_app.config.get("REQUIRE_SSO_FOR_GUEST", False))
+    has_policy = "sso_linked" if require_sso else "public"
+    return SimpleNamespace(
+        slug="",
+        name="Default guest form",
+        owner_department="B",
+        normalized_access_policy=has_policy,
+        access_policy_label=("Any SSO-linked account" if require_sso else "Anyone with the form link"),
+        access_policy_hint=(
+            "Submitters must already be linked to an SSO-backed user account."
+            if require_sso
+            else "Anyone with the link can submit this form."
+        ),
+        allowed_email_domain_list=[],
+        credential_requirements_pretty_json="",
+        credential_requirements={},
+        evaluate_submitter_access=lambda email, user=None: {
+            "allowed": bool(user and getattr(user, "sso_sub", None)) if require_sso else True,
+            "policy": has_policy,
+            "message": "Guest email must be an SSO-linked account for this form." if require_sso else "",
+            "email_domain": ((email or "").split("@", 1)[1].lower() if "@" in (email or "") else ""),
+            "has_sso": bool(user and getattr(user, "sso_sub", None)),
+            "approved_domain": False,
+            "credential_requirements": {},
+        },
+    )
+
+
 def _log(
     req,
     action_type,
@@ -103,32 +142,26 @@ def external_new():
     # Expose active guest forms to the template so the public UI can allow
     # submitters to pick a specific GuestForm (by slug).
     guest_forms = GuestForm.query.filter_by(active=True).order_by(GuestForm.name.asc()).all()
+    selected_guest_form = _resolve_guest_form_selection(guest_forms)
+    effective_guest_form = selected_guest_form or _fallback_guest_form_policy()
+    if request.method == "GET" and getattr(effective_guest_form, "owner_department", None):
+        form.owner_department.data = effective_guest_form.owner_department
+
     if form.validate_on_submit():
         desc = (form.description.data or "").strip()
         # Normalize guest email early for checks
         guest_email = (form.guest_email.data or "").strip().lower()
-
-        # Determine whether this particular guest form requires SSO.
-        # Prefer an explicit GuestForm selected by slug (query param `guest_form`),
-        # otherwise use the active default GuestForm, then fall back to the
-        # global `REQUIRE_SSO_FOR_GUEST` config flag.
-        require_sso = False
-        guest_form = None
-        slug = request.args.get("guest_form") or request.form.get("guest_form")
-        if slug:
-            guest_form = GuestForm.query.filter_by(slug=slug, active=True).first()
-        if not guest_form:
-            guest_form = GuestForm.query.filter_by(active=True, is_default=True).first()
-        if guest_form:
-            require_sso = bool(guest_form.require_sso)
-        else:
-            require_sso = bool(current_app.config.get("REQUIRE_SSO_FOR_GUEST", False))
-
-        if require_sso:
-            u = User.query.filter_by(email=guest_email).first()
-            if not u or not u.sso_sub:
-                flash("Guest email must be an SSO-linked account for this form.", "warning")
-                return render_template("external_new.html", form=form, guest_forms=guest_forms)
+        guest_form = selected_guest_form
+        matched_user = User.query.filter_by(email=guest_email).first()
+        access_result = effective_guest_form.evaluate_submitter_access(guest_email, matched_user)
+        if not access_result.get("allowed"):
+            flash(access_result.get("message") or "You do not have access to submit this guest form.", "warning")
+            return render_template(
+                "external_new.html",
+                form=form,
+                guest_forms=guest_forms,
+                selected_guest_form=effective_guest_form,
+            )
 
         # Determine owner department precedence:
         # 1. GuestForm.owner_department (if a specific guest_form was selected)
@@ -332,6 +365,7 @@ def external_new():
         guest_email=(created_req.guest_email if created_req else None),
         tracking_link=tracking_link,
         guest_forms=guest_forms,
+        selected_guest_form=effective_guest_form,
     )
 
 

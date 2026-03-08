@@ -1,3 +1,5 @@
+import json
+
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField,
@@ -523,6 +525,59 @@ class GuestFormAdminForm(FlaskForm):
     name = StringField("Guest form name", validators=[DataRequired(), Length(max=200)])
     slug = StringField("Slug (unique)", validators=[DataRequired(), Length(max=200)])
     template_id = SelectField("Template (optional)", coerce=int, validators=[Optional()])
+    require_sso = BooleanField("Require SSO-linked account to submit", default=False)
+    access_policy = SelectField(
+        "Submitter access policy",
+        choices=[
+            ("public", "Anyone with the form link"),
+            ("sso_linked", "Any SSO-linked account"),
+            ("approved_sso_domains", "Approved SSO organizations only"),
+            ("unaffiliated_only", "Unaffiliated accounts only"),
+        ],
+        default="public",
+        validators=[DataRequired(), AnyOf(["public", "sso_linked", "approved_sso_domains", "unaffiliated_only"])],
+    )
+    allowed_email_domains = TextAreaField(
+        "Approved organization email domains",
+        validators=[Optional(), Length(max=4000)],
+    )
+    credential_requirements_json = TextAreaField(
+        "Credential requirements (JSON, reserved for future SSO integrations)",
+        validators=[Optional(), Length(max=4000)],
+    )
+    owner_department = SelectField(
+        "Owner department",
+        choices=[("A", "A"), ("B", "B"), ("C", "C")],
+        default="B",
+        validators=[DataRequired()],
+    )
+    is_default = BooleanField("Set as default guest form", default=False)
+    active = BooleanField("Active", default=True)
+    submit = SubmitField("Save Guest Form")
+
+    def validate_credential_requirements_json(self, field):
+        raw = (field.data or "").strip()
+        if not raw:
+            return
+        try:
+            parsed = json.loads(raw)
+        except Exception as exc:
+            raise ValidationError("Credential requirements must be valid JSON.") from exc
+        if not isinstance(parsed, dict):
+            raise ValidationError("Credential requirements JSON must be an object.")
+
+    def validate(self, extra_validators=None):
+        ok = super().validate(extra_validators=extra_validators)
+        if not ok:
+            return False
+        policy = (self.access_policy.data or "public").strip().lower()
+        domains = (self.allowed_email_domains.data or "").strip()
+        if policy == "approved_sso_domains" and not domains:
+            self.allowed_email_domains.errors.append(
+                "Add at least one approved organization email domain for this policy."
+            )
+            return False
+        return True
 
 
 # Tenant- and membership‑related forms for SaaS foundation
@@ -548,16 +603,6 @@ class TenantMembershipForm(FlaskForm):
     )
     is_active = BooleanField("Active", default=True)
     submit = SubmitField("Save Membership")
-    require_sso = BooleanField("Require SSO-linked account to submit", default=False)
-    owner_department = SelectField(
-        "Owner department",
-        choices=[("A", "A"), ("B", "B"), ("C", "C")],
-        default="B",
-        validators=[DataRequired()],
-    )
-    is_default = BooleanField("Set as default guest form", default=False)
-    active = BooleanField("Active", default=True)
-    submit = SubmitField("Save Guest Form")
 
 
 class RejectRequestConfigForm(FlaskForm):

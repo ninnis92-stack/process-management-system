@@ -46,13 +46,48 @@
       <div class="row">
         <div class="col-12 mb-3">
           <label class="form-label">Guest Form (optional)</label>
-          <select name="guest_form" class="form-select">
-            <option value="">-- Default form --</option>
+          <select name="guest_form" id="guestFormSelect" class="form-select"
+                  data-default-name="{{ selected_guest_form.name if selected_guest_form else 'Default guest form' }}"
+                  data-default-policy-label="{{ selected_guest_form.access_policy_label if selected_guest_form else 'Anyone with the form link' }}"
+                  data-default-policy-hint="{{ selected_guest_form.access_policy_hint if selected_guest_form else 'Anyone with the link can submit this form.' }}"
+                  data-default-owner-department="{{ selected_guest_form.owner_department if selected_guest_form and selected_guest_form.slug else '' }}"
+                  data-default-domains="{{ (selected_guest_form.allowed_email_domain_list|join(', ')) if selected_guest_form else '' }}"
+                  data-default-credential-json="{{ selected_guest_form.credential_requirements_pretty_json if selected_guest_form else '' }}"
+          >
+            <option value="">-- Use default form --</option>
             {% for gf in (guest_forms or []) %}
-              <option value="{{ gf.slug }}" {% if request.args.get('guest_form') == gf.slug %}selected{% endif %}>{{ gf.name }}</option>
+              <option value="{{ gf.slug }}"
+                      data-name="{{ gf.name }}"
+                      data-policy-label="{{ gf.access_policy_label }}"
+                      data-policy-hint="{{ gf.access_policy_hint }}"
+                      data-owner-department="{{ gf.owner_department or 'B' }}"
+                      data-domains="{{ gf.allowed_email_domain_list|join(', ') }}"
+                      data-credential-json="{{ gf.credential_requirements_pretty_json }}"
+                      {% if (request.form.get('guest_form') or request.args.get('guest_form')) == gf.slug %}selected{% endif %}>{{ gf.name }}</option>
             {% endfor %}
           </select>
-          <div class="form-text">Select a specific guest form if you have a link or want to target a particular workflow.</div>
+          <div class="form-text" id="guestFormRouteHint">Select a specific guest form if you have a link or want to target a particular workflow.</div>
+        </div>
+      </div>
+
+      <div class="guest-form-access-summary mb-4" id="guestFormSummary" aria-live="polite">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <div class="eyebrow-label">Access summary</div>
+            <h4 class="h6 mb-1" id="guestFormSummaryName">{{ selected_guest_form.name if selected_guest_form else 'Default guest form' }}</h4>
+            <p class="text-muted small mb-2" id="guestFormSummaryHint">{{ selected_guest_form.access_policy_hint if selected_guest_form else 'Anyone with the link can submit this form.' }}</p>
+          </div>
+          <div class="guest-form-policy-badges" id="guestFormSummaryBadges">
+            <span class="badge text-bg-light border" id="guestFormSummaryPolicy">{{ selected_guest_form.access_policy_label if selected_guest_form else 'Anyone with the form link' }}</span>
+            <span class="badge text-bg-light border" id="guestFormSummaryDept">Routes to Dept {{ selected_guest_form.owner_department if selected_guest_form and selected_guest_form.slug else 'selected below' }}</span>
+          </div>
+        </div>
+        <div class="small text-muted" id="guestFormSummaryDomains">
+          {% if selected_guest_form and selected_guest_form.allowed_email_domain_list %}
+            Approved organizations: {{ selected_guest_form.allowed_email_domain_list|join(', ') }}
+          {% else %}
+            No organization domain filter is currently applied.
+          {% endif %}
         </div>
       </div>
 
@@ -126,7 +161,39 @@
 document.addEventListener("DOMContentLoaded", function () {
   const form = document.querySelector("form");
   const btn = document.getElementById("submitBtn");
+  const guestFormSelect = document.getElementById("guestFormSelect");
+  const summaryName = document.getElementById("guestFormSummaryName");
+  const summaryHint = document.getElementById("guestFormSummaryHint");
+  const summaryPolicy = document.getElementById("guestFormSummaryPolicy");
+  const summaryDept = document.getElementById("guestFormSummaryDept");
+  const summaryDomains = document.getElementById("guestFormSummaryDomains");
+  const routeHint = document.getElementById("guestFormRouteHint");
+
+  const updateGuestFormSummary = () => {
+    if (!guestFormSelect) return;
+    const selectedOption = guestFormSelect.options[guestFormSelect.selectedIndex];
+    const usingExplicitForm = !!(selectedOption && selectedOption.value);
+    const source = usingExplicitForm ? selectedOption.dataset : guestFormSelect.dataset;
+    const name = source.name || source.defaultName || guestFormSelect.dataset.defaultName || 'Default guest form';
+    const policyLabel = source.policyLabel || guestFormSelect.dataset.defaultPolicyLabel || 'Anyone with the form link';
+    const policyHint = source.policyHint || guestFormSelect.dataset.defaultPolicyHint || 'Anyone with the link can submit this form.';
+    const ownerDepartment = source.ownerDepartment || guestFormSelect.dataset.defaultOwnerDepartment || '';
+    const domains = source.domains || guestFormSelect.dataset.defaultDomains || '';
+
+    if (summaryName) summaryName.textContent = name;
+    if (summaryHint) summaryHint.textContent = policyHint;
+    if (summaryPolicy) summaryPolicy.textContent = policyLabel;
+    if (summaryDept) summaryDept.textContent = ownerDepartment ? `Routes to Dept ${ownerDepartment}` : 'Routing follows the department selected below';
+    if (summaryDomains) summaryDomains.textContent = domains ? `Approved organizations: ${domains}` : 'No organization domain filter is currently applied.';
+    if (routeHint) routeHint.textContent = ownerDepartment ? `This form routes submissions to Dept ${ownerDepartment}.` : 'Select a specific guest form if you have a link or want to target a particular workflow.';
+  };
+
   if (!form || !btn) return;
+
+  updateGuestFormSummary();
+  if (guestFormSelect) {
+    guestFormSelect.addEventListener('change', updateGuestFormSummary);
+  }
 
   form.addEventListener("submit", function () {
     btn.disabled = true;

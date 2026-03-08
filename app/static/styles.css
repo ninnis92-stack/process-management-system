@@ -59,6 +59,60 @@
   color: #b45309;
 }
 
+.guest-form-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.guest-form-policy-card,
+.guest-form-admin-card,
+.guest-form-access-summary {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.05);
+}
+
+.guest-form-policy-card {
+  padding: 1rem 1.05rem;
+}
+
+.guest-form-policy-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.guest-form-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.guest-form-admin-card {
+  padding: 1rem 1.05rem;
+}
+
+.guest-form-access-summary {
+  padding: 1rem 1.05rem;
+  background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(243,246,255,0.94));
+}
+
+@media (max-width: 576px) {
+  .guest-form-policy-card,
+  .guest-form-admin-card,
+  .guest-form-access-summary {
+    padding: 0.9rem;
+    border-radius: 0.85rem;
+  }
+
+  .guest-form-policy-badges .badge {
+    white-space: normal;
+    text-align: left;
+  }
+}
+
 .admin-template-settings {
   display: flex;
   justify-content: space-between;

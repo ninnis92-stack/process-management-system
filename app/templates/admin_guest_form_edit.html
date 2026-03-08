@@ -3,35 +3,80 @@
 <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
   <div>
     <h3 class="mb-1">{{ 'Edit' if edit else 'New' }} Guest Form</h3>
-    <p class="text-muted mb-0">Configure the form guests use when submitting requests externally.</p>
+    <p class="text-muted mb-0">Configure who can submit this form, how it routes, and future-ready SSO credential requirements.</p>
   </div>
   <a href="{{ url_for('admin.list_guest_forms') }}" class="btn btn-outline-secondary admin-back-btn">← Back to guest forms</a>
 </div>
 
-<form method="post" class="card shadow-sm">
+<form method="post" class="card shadow-sm guest-form-admin-shell">
   <div class="card-body">
     {{ form.hidden_tag() }}
-    <div class="mb-3">
-      {{ form.name.label(class='form-label') }}
-      {{ form.name(class='form-control') }}
+    <div class="guest-form-config-grid">
+      <section class="guest-form-policy-card">
+        <div class="eyebrow-label">Identity & audience</div>
+        <h4 class="h6 mb-2">Who can submit this form?</h4>
+        <p class="text-muted small mb-3">Choose a broad audience first, then optionally narrow approved organizations by email domain.</p>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            {{ form.name.label(class='form-label') }}
+            {{ form.name(class='form-control', placeholder='Partner intake form') }}
+          </div>
+          <div class="col-md-6">
+            {{ form.slug.label(class='form-label') }}
+            {{ form.slug(class='form-control', placeholder='partner-intake') }}
+          </div>
+          <div class="col-md-6">
+            {{ form.template_id.label(class='form-label') }}
+            {{ form.template_id(class='form-select') }}
+          </div>
+          <div class="col-md-6">
+            {{ form.owner_department.label(class='form-label') }}
+            {{ form.owner_department(class='form-select') }}
+            <div class="form-text">Requests created through this form route here first.</div>
+          </div>
+          <div class="col-12">
+            {{ form.access_policy.label(class='form-label') }}
+            {{ form.access_policy(class='form-select', id='guestFormAccessPolicy') }}
+            <div class="form-text">Use approved organizations for partner SSO access, or reserve a form for unaffiliated requesters.</div>
+          </div>
+          <div class="col-12">
+            {{ form.allowed_email_domains.label(class='form-label') }}
+            {{ form.allowed_email_domains(class='form-control', rows='4', placeholder='partner.com\nsubsidiary.org') }}
+            <div class="form-text">One domain per line or comma-separated. Used for approved SSO organizations and to distinguish affiliated vs unaffiliated accounts.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="guest-form-policy-card">
+        <div class="eyebrow-label">Future-ready credentials</div>
+        <h4 class="h6 mb-2">Credential customization</h4>
+        <p class="text-muted small mb-3">Store provider-specific credential requirements now so future SSO integrations can enforce claim-based access without redesigning the form.</p>
+
+        <div class="mb-3">
+          {{ form.credential_requirements_json.label(class='form-label') }}
+          {{ form.credential_requirements_json(class='form-control font-monospace', rows='8', placeholder='{"claim_path": "organization", "allowed_values": ["partner-org"]}') }}
+          <div class="form-text">JSON is stored for future integrations. Current enforcement uses the access policy and approved email domains.</div>
+        </div>
+
+        <div class="guest-form-policy-badges mb-3">
+          <span class="badge text-bg-light border">Mobile friendly</span>
+          <span class="badge text-bg-light border">Admin managed</span>
+          <span class="badge text-bg-light border">SSO extensible</span>
+        </div>
+
+        <div class="form-check mb-2">{{ form.is_default(class='form-check-input') }} {{ form.is_default.label(class='form-check-label') }}</div>
+        <div class="form-check mb-3">{{ form.active(class='form-check-input') }} {{ form.active.label(class='form-check-label') }}</div>
+      </section>
     </div>
-    <div class="mb-3">
-      {{ form.slug.label(class='form-label') }}
-      {{ form.slug(class='form-control') }}
+
+    <div class="form-actions-bar mt-4">
+      <div class="small text-muted">Keep policies simple for end users: pick one audience, explain approved domains clearly, and save credential JSON for future provider integrations.</div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-primary">Save</button>
+        <a href="{{ url_for('admin.list_guest_forms') }}" class="btn btn-link">Cancel</a>
+      </div>
     </div>
-    <div class="mb-3">
-      {{ form.template_id.label(class='form-label') }}
-      {{ form.template_id(class='form-select') }}
-    </div>
-    <div class="mb-3">
-      {{ form.owner_department.label(class='form-label') }}
-      {{ form.owner_department(class='form-select') }}
-    </div>
-    <div class="form-check mb-2">{{ form.require_sso(class='form-check-input') }} {{ form.require_sso.label(class='form-check-label') }}</div>
-    <div class="form-check mb-2">{{ form.is_default(class='form-check-input') }} {{ form.is_default.label(class='form-check-label') }}</div>
-    <div class="form-check mb-3">{{ form.active(class='form-check-input') }} {{ form.active.label(class='form-check-label') }}</div>
-    <button class="btn btn-primary">Save</button>
-    <a href="{{ url_for('admin.list_guest_forms') }}" class="btn btn-link">Cancel</a>
   </div>
 </form>
 {% endblock %}
