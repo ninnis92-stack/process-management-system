@@ -50,6 +50,8 @@
                 <option value="textarea" {% if f.field_type=='textarea' %}selected{% endif %}>Textarea</option>
                 <option value="select" {% if f.field_type=='select' %}selected{% endif %}>Select</option>
                 <option value="file" {% if f.field_type=='file' %}selected{% endif %}>File upload</option>
+                <option value="photo" {% if f.field_type=='photo' %}selected{% endif %}>Photo capture</option>
+                <option value="video" {% if f.field_type=='video' %}selected{% endif %}>Video capture</option>
               </select>
             </td>
             <td><input type="checkbox" name="field_{{ f.id }}_required" value="1" {% if f.required %}checked{% endif %}></td>

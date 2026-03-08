@@ -354,7 +354,14 @@ class FormFieldInlineForm(FlaskForm):
     section_name = StringField("Section", validators=[Optional(), Length(max=200)])
     field_type = SelectField(
         "Type",
-        choices=[("text", "Text"), ("textarea", "Textarea"), ("select", "Select")],
+        choices=[
+            ("text", "Text"),
+            ("textarea", "Textarea"),
+            ("select", "Select"),
+            ("file", "File upload"),
+            ("photo", "Photo capture"),
+            ("video", "Video capture"),
+        ],
         default="text",
     )
     required = BooleanField("Required", default=False)

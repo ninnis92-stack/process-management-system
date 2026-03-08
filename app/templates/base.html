@@ -29,6 +29,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <!-- bump version after latest CSS changes to force clients to fetch new stylesheet -->
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260308b') }}">
+  <!-- bundled frontend assets (built by Vite/ES modules) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='dist/style.css', v='20260308c') }}">
   {% if active_theme_css %}
     <script id="active-theme-css-data" type="application/json">{{ active_theme_css|tojson }}</script>
     <script>
@@ -233,6 +235,45 @@
     {% endif %}
 
           <div class="page-shell{% if ep.startswith('admin') %} page-shell-admin{% endif %}">
+            {% set highlight_endpoints = ['requests.dashboard', 'admin.index', 'external.external_dashboard'] %}
+            {% if ep in highlight_endpoints %}
+              <section class="hero-callouts" aria-label="Workflow guidance">
+                <div class="hero-callouts__intro">
+                  <p class="hero-callouts__tag">Workflow signal</p>
+                  <h3>Stay synced across teams, guests, and the admin desk</h3>
+                  <p class="hero-callouts__lede">
+                    Dashboards now float over a subtle gradient, so you see where work needs attention, which guest form stays open, and what the next action should be.
+                  </p>
+                  <div class="hero-callouts__hint" role="status" aria-live="polite">
+                    Not sure where to start? Follow the storyboards above: admin approvals on the left, guest handoffs on the right.
+                  </div>
+                </div>
+                <div class="hero-callouts__grid">
+                  <article class="hero-callout-card hero-callout-card--admin">
+                    <div class="hero-callout-card__badge">Admin console</div>
+                    <h4 class="hero-callout-card__title">Coordinate cross-department work</h4>
+                    <p class="hero-callout-card__body">Use the expanded metrics canvas, follow next-action chips, and keep every attachment or verification in the same room.</p>
+                    <ul class="hero-callout-card__list">
+                      <li>Monitor dashboards for overdue tiers and approvals.</li>
+                      <li>Review guest forms and assignment queues in one place.</li>
+                      <li>Share metrics or start a workflow directly from this view.</li>
+                    </ul>
+                    <a class="hero-callout-card__link btn btn-sm btn-primary" href="{{ url_for('admin.index') }}">Open admin console</a>
+                  </article>
+                  <article class="hero-callout-card hero-callout-card--user">
+                    <div class="hero-callout-card__badge">Guest & staff experience</div>
+                    <h4 class="hero-callout-card__title">Guide every request</h4>
+                    <p class="hero-callout-card__body">Keep guests informed with transparent tracking, while staff see clear next steps and onboarding nudges.</p>
+                    <ul class="hero-callout-card__list">
+                      <li>Launch new requests with consistent rules and smart helpers.</li>
+                      <li>Post attachments, watch OCR text populate, and keep status updates honest.</li>
+                      <li>Share tracking links or notifications straight from this canvas.</li>
+                    </ul>
+                    <a class="hero-callout-card__link btn btn-sm btn-outline-primary" href="{{ url_for('requests.dashboard') }}">Open staff dashboard</a>
+                  </article>
+                </div>
+              </section>
+            {% endif %}
 
           {% if site_banner_html %}
               <div class="mb-3">
@@ -328,7 +369,7 @@
   {% if rolling_quotes %}
   <script id="rolling-quotes-data" type="application/json" defer>{{ rolling_quotes|tojson }}</script>
   {% endif %}
-  <script src="{{ url_for('static', filename='app.js', v='20260308b') }}" defer></script>
+  <script type="module" src="{{ url_for('static', filename='dist/app.js', v='20260308c') }}" defer></script>
   <script>
     (function(){
       try{

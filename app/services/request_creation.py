@@ -146,7 +146,7 @@ def collect_template_submission_data(template_fields, skip_required_fields=None)
     submission_data = {}
     missing_field = None
     for field in template_fields:
-        if getattr(field, "field_type", "") == "file":
+        if getattr(field, "field_type", "") in ("file", "photo", "video"):
             value = request.files.get(field.name)
         else:
             value = request.form.get(field.name)
@@ -158,7 +158,7 @@ def collect_template_submission_data(template_fields, skip_required_fields=None)
             missing_field = getattr(field, "label", field.name)
             break
 
-        if getattr(field, "field_type", "") == "file":
+        if getattr(field, "field_type", "") in ("file", "photo", "video"):
             submission_data[field.name] = getattr(value, "filename", None) if value else None
         else:
             submission_data[field.name] = value
@@ -272,8 +272,9 @@ def create_form_submission(template, req, submission_data: dict, current_user_id
 
 
 def save_template_file_attachments(form_submission, template_fields, current_user_id: int):
+    # support generic file uploads as well as dedicated photo/video fields
     for field in template_fields:
-        if field.field_type != "file":
+        if field.field_type not in ("file", "photo", "video"):
             continue
         upload = request.files.get(field.name)
         if not (upload and upload.filename):

@@ -129,6 +129,21 @@ class Config:
     # For serverless environments, allow overriding the upload folder to a writable location
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads"))
 
+    # Redis settings used by background workers and OCR queuing.
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+    # OCR providers and ordering. Admins may iterate through these until one succeeds.
+    OCR_PROVIDER_ORDER = os.getenv("OCR_PROVIDER_ORDER", "tesseract,google_vision,aws_textract").split(",")
+    OCR_GOOGLE_VISION_CONFIG = {
+        "project_id": os.getenv("OCR_GOOGLE_PROJECT_ID"),
+        "credentials": os.getenv("OCR_GOOGLE_CREDENTIALS"),
+    }
+    OCR_AWS_TEXTRACT_CONFIG = {
+        "region": os.getenv("OCR_AWS_REGION"),
+        "access_key": os.getenv("OCR_AWS_ACCESS_KEY_ID"),
+        "secret_key": os.getenv("OCR_AWS_SECRET_ACCESS_KEY"),
+    }
+
     # Part number validation (future integration)
     PART_API_ENABLED = os.getenv("PART_API_ENABLED", "False") == "True"
     PART_API_URL = os.getenv(

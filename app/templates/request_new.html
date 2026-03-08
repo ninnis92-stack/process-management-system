@@ -13,10 +13,17 @@
   {{ helper_card('Start with the request goal', 'Use a clear title and description so downstream teams can understand the work without extra follow-up.', '📝') }}
   {{ helper_card('Part details can be completed in stages', 'Target part numbers may be updated later when the workflow allows it, but donor context helps immediately.', '🧩') }}
   {{ helper_card('Choose a realistic due date', 'Set enough lead time for reviews and cross-department handoffs, especially when Dept C review may be required.', '⏰') }}
+  <div class="helper-card" style="cursor:pointer;" data-bs-toggle="offcanvas" data-bs-target="#onboardingHelp" aria-controls="onboardingHelp">
+    <div class="helper-card__icon" aria-hidden="true">❓</div>
+    <div>
+      <div class="helper-card__title">Need help?</div>
+      <div class="helper-card__text">Quick walkthrough for writing a good request.</div>
+    </div>
+  </div>
 </section>
 
 <section class="surface-panel">
-  <form method="post" {% if template_spec %}enctype="multipart/form-data"{% endif %}{% if template and template.verification_prefill_enabled %} data-template-prefill-endpoint="{{ url_for('requests.template_field_prefill') }}"{% endif %}>
+  <form method="post" data-controller="onboarding field-focus" {% if template_spec %}enctype="multipart/form-data"{% endif %}{% if template and template.verification_prefill_enabled %} data-template-prefill-endpoint="{{ url_for('requests.template_field_prefill') }}"{% endif %}>
       {{ form.hidden_tag() }}
 
       {% if form.errors %}
@@ -147,6 +154,12 @@
                 </select>
               {% elif field.field_type == 'file' %}
                 <input class="form-control" type="file" id="dynamic-field-{{ field.name }}" name="{{ field.name }}">
+              {% elif field.field_type == 'photo' %}
+                <input class="form-control" type="file" accept="image/*" capture="environment" id="dynamic-field-{{ field.name }}" name="{{ field.name }}">
+                <div class="form-text small text-muted">On mobile you can take a photo directly.</div>
+              {% elif field.field_type == 'video' %}
+                <input class="form-control" type="file" accept="video/*" capture="camcorder" id="dynamic-field-{{ field.name }}" name="{{ field.name }}">
+                <div class="form-text small text-muted">On mobile you can record a video directly.</div>
               {% else %}
                 <input class="form-control js-template-field" type="text" id="dynamic-field-{{ field.name }}" name="{{ field.name }}" value="{{ request.form.get(field.name, '') }}">
               {% endif %}
@@ -211,4 +224,24 @@
         })();
       </script>
     {% endif %}
+
+  <!-- onboarding help offcanvas -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="onboardingHelp" aria-labelledby="onboardingHelpLabel">
+    <div class="offcanvas-header">
+      <h5 id="onboardingHelpLabel">Writing a great request</h5>
+      <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close" id="dismissHelpBtn"></button>
+    </div>
+    <div class="offcanvas-body">
+      <p>Follow these simple steps to make sure your request moves smoothly:</p>
+      <ol>
+        <li><strong>Start with context.</strong> Provide a concise title and a detailed description of the goal, background, and any blockers.</li>
+        <li><strong>Part information first.</strong> Enter donor and target part numbers so the system routes and verifies correctly; you can update later if unsure.</li>
+        <li><strong>Pick a realistic due date.</strong> Give enough lead time for reviews or collaboration with other departments.</li>
+        <li><strong>Use helper hints.</strong> Look at the cards at the top while filling out the form – they contain the most common tips.</li>
+        <li><strong>Attach files or photos.</strong> When dynamic fields are configured, you can upload images or documents directly; OCR will attempt to extract text automatically.</li>
+      </ol>
+      <p>Close this panel and the system will remember for next time.</p>
+    </div>
+  </div>
+
 {% endblock %}

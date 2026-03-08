@@ -1,6 +1,19 @@
 # Process Management Prototype
 
-A lightweight, Flask‑based request tracking application designed for cross‑department workflows.
+This repository contains a **Flask-based process management system** built as a prototype for handling
+structured intake forms, multi‑step workflows, and departmental collaboration.  It is intended to
+serve as the reference implementation for a larger process‑management platform, with a focus on:
+
+- rapid configuration via templated request forms
+- flexible verification and pre‑fill integrations (ERP, part lookup, etc.)
+- rich admin tooling with feature flags, themes, and impersonation
+- guest submission and tracking without requiring an account
+- pluggable OCR and background job support
+- simple deployment on Postgres/Redis-hosting platforms such as Fly.io or Docker Compose
+
+The codebase prioritizes readability and test coverage; it uses Flask for request handling, SQLAlchemy
+for ORM, and RQ for asynchronous workers.  The front end remains mostly server-rendered with
+lightweight Stimulus controllers for interactivity.
 
 ---
 
@@ -41,6 +54,13 @@ and seeds baseline accounts.
    pip install -r requirements.txt
    ```
 
+   The frontend uses npm/Vite for modern JS.  To install dependencies:
+   ```bash
+   cd frontend
+   npm install      # or yarn
+   ```
+   During development run `npm run dev` and to produce a production bundle use `npm run build` (assets output to `app/static/dist`).
+
 2. **Configure**
    Set environment variables or edit `config.py`.  Required:
    - `DATABASE_URL` (Postgres)
@@ -59,13 +79,35 @@ and seeds baseline accounts.
    The release script will also seed demo users and an admin account by
    default unless `RUN_SEED_ON_RELEASE=0`.
 
-4. **Run the app**
+6. **Run the app (local deployment)**
    ```bash
    export FLASK_APP=run.py
    flask run
    ```
-   or use Docker Compose (`docker-compose up web`) to start Postgres/Redis
-   alongside the web service.
+   By default it binds to `127.0.0.1:5000`.  To simulate a production environment you can
+   use Docker Compose:
+   ```bash
+   docker-compose up --build
+   ```
+   which brings up Postgres, Redis, and the web container.  The same `Fly.toml` configuration
+   in the repo can be used to deploy to Fly.io with `fly deploy`.
+
+7. **Smoke testing**
+   Once the server is running, verify the basics:
+   - navigate to `/auth/login` and sign in with the seeded admin (`admin@example.com`/`password123`)
+   - create a new request via the dashboard and confirm you can view/track it
+   - upload an attachment and watch OCR text appear (requires Tesseract installed locally)
+   - visit `/admin` and toggle a feature flag or create a quick guest form
+
+   You may also run the automated suite:
+   ```bash
+   make test            # or `PYTHONPATH=. pytest` as shown earlier
+   ```
+
+8. **Clearing state**
+   - In dev, simply delete the SQLite file under `instance/app.db` or remove Docker volumes.
+   - For production, use `flask db downgrade base` or `python scripts/clear_db.py` (not included) to
+     reset.  The `flask clear-open-requests` CLI command can close all active work items.
 
 5. **Tests**
    ```bash

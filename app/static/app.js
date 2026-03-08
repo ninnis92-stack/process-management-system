@@ -907,6 +907,55 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 })();
 
+// Inline media preview for photo/video fields on request forms
+(function initMediaFieldPreviews(){
+  document.addEventListener('DOMContentLoaded', function(){
+    // image preview
+    document.querySelectorAll('input[type=file][accept^="image/"]').forEach(function(input){
+      input.addEventListener('change', function(){
+        const previewId = input.id + '-preview';
+        let preview = document.getElementById(previewId);
+        if(!preview){
+          preview = document.createElement('div');
+          preview.id = previewId;
+          input.parentNode.appendChild(preview);
+        }
+        preview.innerHTML = '';
+        const file = input.files && input.files[0];
+        if(file){
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(file);
+          img.style.maxWidth = '100%';
+          img.style.marginTop = '4px';
+          preview.appendChild(img);
+        }
+      });
+    });
+    // video preview
+    document.querySelectorAll('input[type=file][accept^="video/"]').forEach(function(input){
+      input.addEventListener('change', function(){
+        const previewId = input.id + '-preview';
+        let preview = document.getElementById(previewId);
+        if(!preview){
+          preview = document.createElement('div');
+          preview.id = previewId;
+          input.parentNode.appendChild(preview);
+        }
+        preview.innerHTML = '';
+        const file = input.files && input.files[0];
+        if(file){
+          const vid = document.createElement('video');
+          vid.controls = true;
+          vid.style.maxWidth = '100%';
+          vid.style.marginTop = '4px';
+          vid.src = URL.createObjectURL(file);
+          preview.appendChild(vid);
+        }
+      });
+    });
+  });
+})();
+
 // Initialize the friendly conditional requirement rule builder on admin pages
 (function initRequirementBuilder(){
   document.addEventListener('DOMContentLoaded', function(){

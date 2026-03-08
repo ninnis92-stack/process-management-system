@@ -254,3 +254,72 @@ def test_conditional_section_requirement_can_require_upload_section(app, client)
         follow_redirects=True,
     )
     assert rv.status_code in (200, 302)
+
+
+def test_photo_and_video_fields_can_be_added_and_submitted(app, client):
+    # basic smoke for mobile-friendly capture inputs
+    u = User(
+        email="mediaguy@example.com",
+        name="Media User",
+        department="A",
+        is_active=True,
+        password_hash=generate_password_hash("password"),
+    )
+    from app.extensions import db
+
+    db.session.add(u)
+    db.session.commit()
+
+    rv = client.post(
+        "/auth/login",
+        data={"email": "mediaguy@example.com", "password": "password"},
+        follow_redirects=True,
+    )
+    assert rv.status_code in (200, 302)
+
+    t = FormTemplate(name="Media Template", description="photo/video test")
+    db.session.add(t)
+    db.session.commit()
+
+    photo_field = FormField(
+        template_id=t.id,
+        name="user_photo",
+        label="User Photo",
+        field_type="photo",
+        required=False,
+        section_name="Media",
+    )
+    video_field = FormField(
+        template_id=t.id,
+        name="user_video",
+        label="User Video",
+        field_type="video",
+        required=False,
+        section_name="Media",
+    )
+    db.session.add_all([photo_field, video_field])
+    db.session.commit()
+
+    db.session.add(DepartmentFormAssignment(template_id=t.id, department_name="A"))
+    db.session.commit()
+
+    rv = client.get("/requests/new")
+    assert rv.status_code == 200
+    # photo input should accept images and hint at capture
+    assert b'accept="image/*"' in rv.data
+    assert b'capture="environment"' in rv.data
+    # video input should accept video
+    assert b'accept="video/*"' in rv.data
+    assert b'capture="camcorder"' in rv.data
+
+    rv = client.post(
+        "/requests/new",
+        data={
+            "user_photo": (io.BytesIO(b"JPEGDATA"), "snapshot.jpg"),
+            "user_video": (io.BytesIO(b"VIDEODATA"), "clip.mp4"),
+            "due_at": "2030-01-01",
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert rv.status_code in (200, 302)

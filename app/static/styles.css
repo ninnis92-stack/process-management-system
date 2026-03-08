@@ -409,7 +409,146 @@ a:hover { color: var(--accent-2); }
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 28px;
+  padding: 1.5rem;
+  border: 1px solid rgba(11, 23, 38, 0.08);
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(16px);
 }
+
+.hero-callouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  border-radius: 24px;
+  padding: 1.25rem;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(121, 192, 255, 0.2), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(167, 139, 250, 0.18), transparent 40%),
+    linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.9));
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+}
+
+.hero-callouts__intro {
+  flex: 1 1 280px;
+  min-width: 240px;
+}
+
+.hero-callouts__tag {
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.hero-callouts__lede {
+  margin: 0.35rem 0;
+  color: var(--muted);
+  max-width: 60ch;
+}
+
+.hero-callouts__hint {
+  margin-top: 0.45rem;
+  font-size: 0.88rem;
+  color: #0b1726;
+  font-weight: 600;
+}
+
+.hero-callouts__grid {
+  flex: 1.5 1 360px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.hero-callout-card {
+  padding: 1.25rem;
+  border-radius: 22px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(243, 244, 255, 0.8));
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.hero-callout-card--admin {
+  background:
+    linear-gradient(145deg, rgba(120, 157, 255, 0.15), rgba(255, 255, 255, 0.9)),
+    linear-gradient(215deg, rgba(45, 61, 255, 0.08), transparent 70%);
+}
+
+.hero-callout-card--user {
+  background:
+    linear-gradient(135deg, rgba(129, 199, 132, 0.2), rgba(255, 255, 255, 0.9)),
+    linear-gradient(215deg, rgba(249, 115, 22, 0.08), transparent 70%);
+}
+
+.hero-callout-card__badge {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.hero-callout-card__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--body-text);
+}
+
+.hero-callout-card__body {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.hero-callout-card__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--body-text);
+  font-size: 0.92rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.hero-callout-card__link {
+  margin-top: auto;
+  align-self: flex-start;
+  transition: transform 0.18s ease;
+}
+
+.hero-callout-card__link:hover,
+.hero-callout-card__link:focus-visible {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .hero-callouts__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-callouts__hint {
+    font-size: 0.84rem;
+  }
+}
+
+/* highlight focused form field group */
+.field-focused {
+  border-left: 4px solid var(--accent);
+  padding-left: calc(1rem - 4px);
+  transition: border-color 0.2s;
+}
+
+/* offcanvas help content adjustments */
+.offcanvas-body { font-size: 0.94rem; line-height: 1.4; }
 
 .page-header {
   display: flex;

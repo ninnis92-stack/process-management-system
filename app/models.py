@@ -585,6 +585,7 @@ class Attachment(db.Model):
     stored_filename = db.Column(db.String(255), nullable=False, unique=True, index=True)
     content_type = db.Column(db.String(80), nullable=False)
     size_bytes = db.Column(db.Integer, nullable=False)
+    ocr_text = db.Column(db.Text, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
