@@ -163,6 +163,12 @@ admin site config for quick sanity checks against any environment.
 - Redis is optional; if you set `REDIS_URL` Fly health will check it, otherwise
   it’s skipped.
 
+### Live deployment checks (March 8, 2026)
+- Deployed to process-management-prototype-lingering-bush-6175 via `fly deploy --remote-only`; the release command `python scripts/release_tasks.py` completed successfully, running Alembic migrations, `db.create_all()`, and `seed.py` so the Fly Postgres database is up and seeded.
+- Ran `bash scripts/smoke_test.sh https://process-management-prototype-lingering-bush-6175.fly.dev` (home, `/admin/site_config`, `/dashboard`) and confirmed the basic endpoints returned HTTP 200/redirects.
+- Cleaned local state afterward with `make smoke-clean`, which deletes `instance/app.db` so future dev runs start from a fresh SQLite file.
+- Checked readiness with `curl -fsS https://process-management-prototype-lingering-bush-6175.fly.dev/ready`; the response reported `database.status:ok`, showing the Fly health and Postgres connectivity are passing.
+
 ---
 
 ## Feature notes
