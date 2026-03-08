@@ -1,3 +1,4 @@
+import re
 import pytest
 from app.extensions import db
 from app.models import User, Department, SiteConfig
@@ -77,6 +78,13 @@ def test_departments_crud_and_site_config(app, client):
     # Site config GET
     rv = client.get("/admin/site_config")
     assert rv.status_code == 200
+    # page should include the quotes-settings anchor for direct linking
+    assert b'id="quotes-settings"' in rv.data
+
+    # ensure admin index tile links include anchor (no redirect necessary)
+    rv = client.get("/admin/")
+    assert rv.status_code == 200
+    assert b"#quotes-settings" in rv.data
 
     # Save site config with banner and rolling quotes
     post_data = {
@@ -104,3 +112,294 @@ def test_departments_crud_and_site_config(app, client):
     assert rv.status_code == 200
     assert b"Acme Flow" in rv.data
     assert b"Welcome" in rv.data or b"Quote one" in rv.data
+
+
+def test_site_config_handles_db_errors_gracefully(app, client, monkeypatch):
+    """If the database query for SiteConfig throws (e.g. missing columns),
+    the admin page should still render and show a helpful flash message
+    instead of raising a 500.
+    """
+    with app.app_context():
+        # create superuser for login
+        u = User(
+            email="error-admin@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(u)
+        db.session.commit()
+
+    rv = login_admin(client, email="error-admin@example.com")
+    assert rv.status_code == 200
+
+    # monkeypatch SiteConfig.get to raise an exception simulating a broken schema
+    monkeypatch.setattr(SiteConfig, "get", lambda: (_ for _ in ()).throw(Exception("boom")))
+
+    rv = client.get("/admin/site_config", follow_redirects=True)
+    assert rv.status_code == 200
+    assert b"unable to load site configuration" in rv.data.lower()
+
+
+def test_site_config_missing_table(app, client):
+    """Dropping the site_config table should not cause a 500, route must flash
+    an error and render a blank form."""
+    from sqlalchemy import text
+
+    with app.app_context():
+        # ensure table exists then drop it manually
+        db.session.execute(text("DROP TABLE IF EXISTS site_config"))
+        db.session.commit()
+
+        # create an admin user
+        u = User(
+            email="missing-table@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(u)
+        db.session.commit()
+
+    rv = login_admin(client, email="missing-table@example.com")
+    assert rv.status_code == 200
+
+    rv = client.get("/admin/site_config", follow_redirects=True)
+    assert rv.status_code == 200
+    data = rv.data.lower()
+    # flash should warn about unable to load persisted config or schema issue
+    assert b"unable to load site configuration" in data or b"schema" in data
+    # form fields should still be present so admin could create a new table
+    assert b"brand name" in data
+
+
+def test_site_config_post_handles_commit_exception(app, client, monkeypatch):
+    """If the database commit fails during a save, we flash an error but don't 500."""
+    with app.app_context():
+        u = User(
+            email="save-error@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(u)
+        db.session.commit()
+
+    rv = login_admin(client, email="save-error@example.com")
+    assert rv.status_code == 200
+
+    # Cause commit to raise
+    monkeypatch.setattr(db.session, "commit", lambda: (_ for _ in ()).throw(Exception("boom")))
+
+    post_data = {"brand_name": "whatever"}
+    rv = client.post("/admin/site_config", data=post_data, follow_redirects=True)
+    assert rv.status_code == 200
+    assert b"failed to save site configuration" in rv.data.lower()
+
+
+def test_admin_dashboard_cards_navigate(app, client):
+    with app.app_context():
+        admin = User(
+            email="admin-nav@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+    rv = login_admin(client, email="admin-nav@example.com")
+    assert rv.status_code == 200
+
+    rv = client.get("/admin/")
+    assert rv.status_code == 200
+    # ensure all cards are rendered as buttons with data-nav-url
+    assert b"type=\"button\"" in rv.data
+    if b"data-nav-url=\"/admin/list_users\"" not in rv.data:
+        # dump html for debugging
+        print("--- ADMIN INDEX HTML START ---")
+        print(rv.data.decode(errors='replace'))
+        print("--- ADMIN INDEX HTML END ---")
+    assert b"data-nav-url=\"/admin/users\"" in rv.data
+    assert b"data-nav-url=\"/admin/departments\"" in rv.data
+    assert b"data-nav-url=\"/admin/site_config\"" in rv.data
+    assert b"data-nav-url=\"/admin/site_config#quotes-settings\"" in rv.data
+    assert b"data-nav-url=\"/admin/special_email\"" in rv.data
+    assert b"data-nav-url=\"/admin/monitor\"" in rv.data
+    assert b"data-nav-url=\"/admin/status_options\"" in rv.data
+    assert b"data-nav-url=\"/admin/workflows\"" in rv.data
+    assert b"data-nav-url=\"/admin/buckets\"" in rv.data
+    assert b"onclick=\"window.location.assign('/admin/site_config'); return false;\"" in rv.data
+    assert b"onclick=\"window.location.assign('/admin/site_config#quotes-settings'); return false;\"" in rv.data
+    assert b"#quotes-settings" in rv.data
+    assert b"/admin/special_email" in rv.data
+    assert b"/admin/monitor" in rv.data
+    assert b'data-nav-url="/admin/site_config"' in rv.data
+    assert b'data-nav-url="/admin/site_config#quotes-settings"' in rv.data
+    # some utility cards (switch-dept, notifications, etc.) are still
+    # rendered as anchors; that's acceptable.  We already verify their
+    # urls above.
+    # (The previous regression test used to forbid any anchors, but the
+    # dashboard layout intentionally uses a mix of <button> and <a> now.)
+    # ensure no href with javascript scheme anywhere
+    assert b"href=\"javascript:" not in rv.data
+
+    # Smoke-test every rendered admin dashboard card so the test stays in sync
+    # with the actual dashboard markup.
+    html = rv.get_data(as_text=True)
+    urls = re.findall(r'data-nav-url="([^"]+)"', html)
+    assert urls, "Expected admin dashboard cards with data-nav-url"
+    # our new switch-department card should be present
+    assert "/auth/choose_dept" in urls
+    # notifications card should also always exist
+    assert "/admin/notifications_retention" in urls
+    # href attributes should match data-nav-url and begin with '/'
+    hrefs = re.findall(r'href="([^"]+)"', html)
+    for u in urls:
+        assert u.startswith('/'), f"unexpected url {u}"
+        if u not in {"/admin/site_config", "/admin/site_config#quotes-settings"}:
+            assert u in hrefs, f"href for {u} missing"
+
+    for url in urls:
+        # Browser fragments are client-side only; request the route itself.
+        route = url.split("#", 1)[0]
+        resp = client.get(route, follow_redirects=False)
+        assert resp.status_code in (200, 302), route
+
+    # Also check department-specific monitor variants that are not separate
+    # cards but are important admin navigation targets.
+    for route in ("/admin/monitor?dept=B", "/admin/monitor?dept=C"):
+        resp = client.get(route, follow_redirects=False)
+        assert resp.status_code in (200, 302), route
+
+
+def test_base_template_bumps_static_asset_version(client):
+    rv = client.get("/auth/login")
+    assert rv.status_code == 200
+    assert b"/static/styles.css?v=20260307e" in rv.data
+    assert b"/static/app.js?v=20260307e" in rv.data
+
+
+def test_login_next_redirection(client, app):
+    """If an unauthenticated user hits a protected page, the login form
+    should accept a *next* value and redirect back after successful auth.
+    """
+    with app.app_context():
+        u = User(
+            email="admin-next@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(u)
+        db.session.commit()
+
+    # attempt to reach a protected admin route
+    rv = client.get("/admin/site_config", follow_redirects=False)
+    assert rv.status_code == 302
+    login_loc = rv.headers.get("Location")
+    assert login_loc and login_loc.startswith("/auth/login")
+    # ensure next parameter is included and points at the original path
+    assert "next=%2Fadmin%2Fsite_config" in login_loc
+
+    # fetch login page to ensure hidden field is rendered
+    rv2 = client.get(login_loc)
+    assert rv2.status_code == 200
+    html = rv2.get_data(as_text=True)
+    assert 'name="next"' in html
+    assert '/admin/site_config' in html
+
+    # perform login using the same URL; admins now honour the `next`
+    # value directly and skip the department picker entirely.
+    rv3 = client.post(login_loc, data={"email": "admin-next@example.com", "password": "secret"}, follow_redirects=True)
+    assert rv3.status_code == 200
+    # we should land on the site config page itself rather than seeing the
+    # department chooser; confirm by path and header text
+    assert rv3.request.path == "/admin/site_config"
+    assert b"Site Configuration" in rv3.data
+    assert b"Select Department" not in rv3.data
+
+    # there is no need to simulate a switch_dept call; the next parameter was
+    # handled during login
+
+
+def test_banner_html_is_sanitized_and_does_not_break_navigation(app, client):
+    with app.app_context():
+        admin = User(
+            email="admin-banner@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+    rv = login_admin(client, email="admin-banner@example.com")
+    assert rv.status_code == 200
+
+    malicious_banner = '<a href="/static/app.js?v=20260307d">bad</a><form action="/static/styles.css?v=20260307d"><button>go</button></form><script>alert(1)</script><div>Safe text</div>'
+    rv = client.post(
+        "/admin/site_config",
+        data={
+            "brand_name": "Safe Banner",
+            "theme_preset": "default",
+            "banner_html": malicious_banner,
+        },
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+
+    with app.app_context():
+        cfg = SiteConfig.get()
+        assert cfg.banner_html is not None
+        assert "<script" not in cfg.banner_html
+        assert "/static/app.js" not in cfg.banner_html
+        assert "/static/styles.css" not in cfg.banner_html
+
+    nav_attr_re = re.compile(r'<(?:a|form|button)\b[^>]*(?:href|action|formaction)="([^"]+)"')
+    for route in ("/admin/", "/admin/site_config", "/admin/metrics_config", "/dashboard"):
+        page = client.get(route)
+        assert page.status_code == 200, route
+        html = page.get_data(as_text=True)
+        nav_targets = nav_attr_re.findall(html)
+        assert not any(target.startswith('/static/') for target in nav_targets), route
+
+    # existing unsafe banner content should also be sanitized at render time
+    with app.app_context():
+        cfg = SiteConfig.get()
+        cfg.banner_html = '<a href="/static/app.js?v=20260307d">bad</a><div>still safe</div>'
+        db.session.add(cfg)
+        db.session.commit()
+
+    page = client.get("/admin/")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    nav_targets = nav_attr_re.findall(html)
+    assert not any(target.startswith('/static/') for target in nav_targets)
+
+
+def test_migration_status_warning_uses_specific_class(app, client):
+    with app.app_context():
+        admin = User(
+            email="admin-migration@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+    rv = login_admin(client, email="admin-migration@example.com")
+    assert rv.status_code == 200
+
+    rv = client.get("/admin/migrations/status")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+    assert "migration-status-warning" in html or "No unapplied migrations detected." in html

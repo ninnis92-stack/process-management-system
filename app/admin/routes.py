@@ -570,6 +570,105 @@ def monitor():
             recent_email_issues=recent_email_issues,
         )
 
+    if dept == "B":
+        # Build buckets similar to Dept B dashboard but for monitoring.
+        # Use department-scoped queries so monitoring honors handoffs as well.
+        from ..utils.dept_scope import scope_requests_for_department
+
+        base_b = scope_requests_for_department(ReqModel.query, "B")
+        buckets = {
+            "New from A": base_b.filter(ReqModel.status == "NEW_FROM_A")
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "In progress by Department B": base_b.filter(
+                ReqModel.status == "B_IN_PROGRESS"
+            )
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "Pending review from Department A": base_b.filter(
+                ReqModel.status == "WAITING_ON_A_RESPONSE"
+            )
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "Needs changes": base_b.filter(ReqModel.status == "C_NEEDS_CHANGES")
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "Exec approval required": base_b.filter(ReqModel.status == "EXEC_APPROVAL")
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "Approved by C": base_b.filter(ReqModel.status == "C_APPROVED")
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "Final review": base_b.filter(ReqModel.status == "B_FINAL_REVIEW")
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "Sent to A": base_b.filter(ReqModel.status == "SENT_TO_A")
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "Under review by Department C": base_b.filter(
+                ReqModel.status == "PENDING_C_REVIEW"
+            )
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "Closed": base_b.filter(ReqModel.status == "CLOSED")
+            .order_by(ReqModel.updated_at.desc())
+            .all(),
+            "All (B)": base_b.order_by(ReqModel.updated_at.desc()).all(),
+        }
+
+        status_codes = [
+            "B_IN_PROGRESS",
+            "WAITING_ON_A_RESPONSE",
+            "PENDING_C_REVIEW",
+            "EXEC_APPROVAL",
+            "B_FINAL_REVIEW",
+            "SENT_TO_A",
+            "CLOSED",
+        ]
+        status_counts = {
+            code: base_b.filter(ReqModel.status == code).count()
+            for code in status_codes
+        }
+
+        dashboard_html = render_template(
+            "dashboard.html",
+            mode="B",
+            buckets=buckets,
+            status_counts=status_counts,
+            now=now,
+        )
+        return render_template(
+            "admin_monitor.html",
+            dept=dept,
+            dashboard_html=dashboard_html,
+            total_users=total_users,
+            active_users=active_users,
+            admin_count=admin_count,
+            recent_email_issues=recent_email_issues,
+        )
+
+    if dept == "C":
+        pending = (
+            ReqModel.query.filter_by(status="PENDING_C_REVIEW")
+            .order_by(ReqModel.updated_at.desc())
+            .all()
+        )
+        dashboard_html = render_template(
+            "dashboard.html", mode="C", requests=pending, now=now
+        )
+        return render_template(
+            "admin_monitor.html",
+            dept=dept,
+            dashboard_html=dashboard_html,
+            total_users=total_users,
+            active_users=active_users,
+            admin_count=admin_count,
+            recent_email_issues=recent_email_issues,
+        )
+
+    flash("Unknown department", "warning")
+    return redirect(url_for("admin.monitor", dept="B"))
+
 
 @admin_bp.route("/guest_forms")
 @login_required
@@ -683,106 +782,6 @@ def delete_guest_form(gf_id: int):
             pass
         flash("Failed to delete guest form.", "danger")
     return redirect(url_for("admin.list_guest_forms"))
-
-    if dept == "B":
-        # Build buckets similar to Dept B dashboard but for monitoring
-        # Use department-scoped queries so monitoring honors handoffs as well
-        from ..utils.dept_scope import scope_requests_for_department
-
-        base_b = scope_requests_for_department(ReqModel.query, "B")
-        buckets = {
-            "New from A": base_b.filter(ReqModel.status == "NEW_FROM_A")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "In progress by Department B": base_b.filter(
-                ReqModel.status == "B_IN_PROGRESS"
-            )
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Pending review from Department A": base_b.filter(
-                ReqModel.status == "WAITING_ON_A_RESPONSE"
-            )
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Needs changes": base_b.filter(ReqModel.status == "C_NEEDS_CHANGES")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Exec approval required": base_b.filter(ReqModel.status == "EXEC_APPROVAL")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Approved by C": base_b.filter(ReqModel.status == "C_APPROVED")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Final review": base_b.filter(ReqModel.status == "B_FINAL_REVIEW")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Sent to A": base_b.filter(ReqModel.status == "SENT_TO_A")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Under review by Department C": base_b.filter(
-                ReqModel.status == "PENDING_C_REVIEW"
-            )
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "Closed": base_b.filter(ReqModel.status == "CLOSED")
-            .order_by(ReqModel.updated_at.desc())
-            .all(),
-            "All (B)": base_b.order_by(ReqModel.updated_at.desc()).all(),
-        }
-
-        # status counts for quick badges
-        status_codes = [
-            "B_IN_PROGRESS",
-            "WAITING_ON_A_RESPONSE",
-            "PENDING_C_REVIEW",
-            "EXEC_APPROVAL",
-            "B_FINAL_REVIEW",
-            "SENT_TO_A",
-            "CLOSED",
-        ]
-        status_counts = {
-            code: base_b.filter(ReqModel.status == code).count()
-            for code in status_codes
-        }
-
-        dashboard_html = render_template(
-            "dashboard.html",
-            mode="B",
-            buckets=buckets,
-            status_counts=status_counts,
-            now=now,
-        )
-        return render_template(
-            "admin_monitor.html",
-            dept=dept,
-            dashboard_html=dashboard_html,
-            total_users=total_users,
-            active_users=active_users,
-            admin_count=admin_count,
-            recent_email_issues=recent_email_issues,
-        )
-
-    if dept == "C":
-        pending = (
-            ReqModel.query.filter_by(status="PENDING_C_REVIEW")
-            .order_by(ReqModel.updated_at.desc())
-            .all()
-        )
-        dashboard_html = render_template(
-            "dashboard.html", mode="C", requests=pending, now=now
-        )
-        return render_template(
-            "admin_monitor.html",
-            dept=dept,
-            dashboard_html=dashboard_html,
-            total_users=total_users,
-            active_users=active_users,
-            admin_count=admin_count,
-            recent_email_issues=recent_email_issues,
-        )
-
-    flash("Unknown department", "warning")
-    return redirect(url_for("admin.monitor", dept="B"))
 
 
 @admin_bp.route("/")
@@ -988,7 +987,32 @@ def site_config():
         flash("Access denied.", "danger")
         return redirect(url_for("requests.dashboard"))
 
-    cfg = SiteConfig.query.first()
+    # `SiteConfig.get` has its own defensive error handling; prefer it here so
+    # that a misconfigured or out‑of‑date database won't blow up the admin UI.
+    try:
+        cfg = SiteConfig.get()
+    except Exception as exc:  # pragma: no cover - extremely rare but safe
+        current_app.logger.exception("unable to load site config")
+        flash(
+            "Unable to load site configuration (database error). "
+            "Please ensure migrations have been applied.",
+            "danger",
+        )
+        # fall back to empty object so form rendering still works
+        cfg = None
+    else:
+        # SiteConfig.get will return a fresh object if the query failed due to a
+        # missing table/column.  That object will not have been committed and
+        # therefore its primary key will still be ``None``.  This is worth
+        # warning the admin about so they know something's wrong in the
+        # database even though the page will render.
+        if cfg is not None and getattr(cfg, "id", None) is None:
+            flash(
+                "Site configuration cannot be loaded from the database; "
+                "your schema may be out of date.",
+                "warning",
+            )
+
     form = SiteConfigForm(obj=cfg)
     if flask_request.method == "GET" and cfg:
         form.brand_name.data = getattr(cfg, "brand_name", None)
@@ -1066,7 +1090,7 @@ def site_config():
                 uploaded_logo.save(os.path.join(abs_dir, stored_name))
                 cfg.logo_filename = f"uploads/branding/{stored_name}"
 
-        cfg.banner_html = banner or None
+        cfg.banner_html = _sanitize_banner_html(banner) or None
         cfg.rolling_quotes_enabled = rolling_enabled
         cfg.rolling_quotes = rolling_input or None
         # save named quote sets if provided (expect JSON map string)
@@ -1085,11 +1109,30 @@ def site_config():
             cfg.active_quote_set = form.active_quote_set.data or 'default'
         except Exception:
             cfg.active_quote_set = 'default'
-        db.session.commit()
-        flash("Site configuration saved.", "success")
+        try:
+            db.session.commit()
+            flash("Site configuration saved.", "success")
+        except Exception as exc:  # pragma: no cover - defensive
+            current_app.logger.exception("failed to save site config")
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            flash(
+                "Failed to save site configuration (database error).", "danger"
+            )
         return redirect(url_for("admin.site_config"))
 
     return render_template("admin_site_config.html", form=form, cfg=cfg)
+
+
+@admin_bp.route("/quotes", methods=["GET"])
+@login_required
+def quotes_config():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+    return redirect(url_for("admin.site_config", _anchor="quotes-settings"))
 
 
 @admin_bp.route("/site_config/preview", methods=["POST"])
@@ -1100,10 +1143,13 @@ def site_config_preview():
 
     # Accept multipart form or JSON payload
     raw_sets = None
+    raw_quotes = None
     try:
         raw_sets = flask_request.form.get("rolling_quote_sets") or flask_request.json and flask_request.json.get("rolling_quote_sets")
+        raw_quotes = flask_request.form.get("rolling_csv") or flask_request.form.get("rolling_quotes") or (flask_request.json and flask_request.json.get("rolling_quotes"))
     except Exception:
         raw_sets = None
+        raw_quotes = None
 
     active = flask_request.form.get("active_quote_set") or (flask_request.json and flask_request.json.get("active_quote_set")) or "default"
 
@@ -1114,6 +1160,12 @@ def site_config_preview():
 
     if not isinstance(parsed, dict):
         return jsonify({"error": "invalid_type", "message": "rolling_quote_sets must be a JSON object."}), 400
+
+    if raw_quotes:
+        parsed.setdefault(
+            "default",
+            [line.strip() for line in str(raw_quotes).splitlines() if line.strip()],
+        )
 
     active_list = parsed.get(active) or parsed.get(str(active)) or []
     if not isinstance(active_list, list):
@@ -1182,15 +1234,14 @@ def _sanitize_banner_html(raw: str) -> str:
         allowed_attrs = {
             "a": ["href", "title", "target", "rel"],
             "img": ["src", "alt", "title", "width", "height"],
-            # allow id/class and `style` but sanitize inline CSS via CSSSanitizer
-            "*": ["id", "class", "role", "aria-hidden", "style"],
+            "*": ["id", "class", "role", "aria-hidden"],
         }
 
         # Tight CSS whitelist: only permit a short, safe set of CSS properties
         # for inline `style` usage. This prevents arbitrary CSS from affecting
         # layout or injecting harmful rules.
         try:
-            from bleach.sanitizer import CSSSanitizer
+            from bleach.css_sanitizer import CSSSanitizer
 
             css_whitelist = [
                 "color",
@@ -1202,6 +1253,7 @@ def _sanitize_banner_html(raw: str) -> str:
                 "vertical-align",
             ]
             css_sanitizer = CSSSanitizer(allowed_css_properties=css_whitelist)
+            allowed_attrs["*"] = allowed_attrs["*"] + ["style"]
         except Exception:
             css_sanitizer = None
 
@@ -1212,6 +1264,14 @@ def _sanitize_banner_html(raw: str) -> str:
             protocols=["http", "https", "mailto"],
             strip=True,
             css_sanitizer=css_sanitizer,
+        )
+        # Remove navigation/file targets that point at static assets so banner
+        # markup cannot hijack button clicks or navigate users to JS/CSS files.
+        cleaned = re.sub(
+            r'\s(?:href|src|action|formaction)=(["\'])/static/[^"\']*\1',
+            '',
+            cleaned,
+            flags=re.IGNORECASE,
         )
         # Trim and return
         return (cleaned or "").strip()
@@ -1900,8 +1960,9 @@ def special_email():
             cfg, "request_form_inventory_out_of_stock_message", None
         )
         form.nudge_enabled.data = bool(getattr(cfg, "nudge_enabled", False))
-        form.nudge_interval_hours.data = int(
-            getattr(cfg, "nudge_interval_hours", 24) or 24
+        # convert stored float to string for the select field
+        form.nudge_interval_hours.data = str(
+            float(getattr(cfg, "nudge_interval_hours", 24) or 24)
         )
         form.nudge_min_delay_hours.data = int(
             getattr(cfg, "nudge_min_delay_hours", 4) or 4
@@ -1967,7 +2028,11 @@ def special_email():
         ).strip() or None
 
         cfg.nudge_enabled = bool(form.nudge_enabled.data)
-        cfg.nudge_interval_hours = int(form.nudge_interval_hours.data or 24)
+        # store value as float; the form supplies a string from the select
+        try:
+            cfg.nudge_interval_hours = float(form.nudge_interval_hours.data or 24)
+        except Exception:
+            cfg.nudge_interval_hours = 24.0
         # enforce minimum allowed (4 hours); admin may only extend beyond this
         try:
             requested = int(form.nudge_min_delay_hours.data or 4)
@@ -2203,6 +2268,230 @@ def feature_flags():
     return render_template("admin_feature_flags.html", form=form, flags=flags)
 
 
+@admin_bp.route("/metrics_config", methods=["GET", "POST"])
+@login_required
+def metrics_config():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    from .forms import MetricsConfigForm
+    from ..models import MetricsConfig
+    from ..services.process_metrics import build_process_metrics_summary
+
+    def build_admin_metrics_explorer_context():
+        allowed_depts = ["A", "B", "C"]
+        range_key = (flask_request.args.get("range") or "weekly").lower()
+        selected_dept = (flask_request.args.get("dept") or "").strip().upper()
+        visible_depts = [selected_dept] if selected_dept in allowed_depts else allowed_depts
+        query = (flask_request.args.get("q") or "").strip()
+        user_filters = flask_request.args.getlist("user")
+
+        snapshot = build_process_metrics_summary(
+            range_key=range_key,
+            depts=visible_depts,
+            query=query,
+        )
+
+        if user_filters:
+            snapshot["users"] = [
+                row
+                for row in snapshot.get("users", [])
+                if str(row.get("user_id")) in user_filters
+                or row.get("email") in user_filters
+            ]
+
+        available_users = snapshot.get("users", []) if not user_filters else []
+        if user_filters:
+            unfiltered = build_process_metrics_summary(
+                range_key=range_key,
+                depts=visible_depts,
+                query=query,
+            )
+            available_users = unfiltered.get("users", [])
+
+        dept_buckets = []
+        for dept_metrics in snapshot["by_dept"]:
+            dept_code = dept_metrics["dept"]
+            dept_buckets.append(
+                {
+                    "dept": dept_code,
+                    "metrics": dept_metrics,
+                    "users": [
+                        row
+                        for row in snapshot["users"]
+                        if (row.get("department") or "").strip().upper() == dept_code
+                    ],
+                    "interactions": [
+                        row
+                        for row in snapshot["interactions"]
+                        if row.get("from_department") == dept_code
+                        or row.get("to_department") == dept_code
+                    ],
+                }
+            )
+
+        return {
+            "metrics": snapshot["by_dept"],
+            "dept_buckets": dept_buckets,
+            "users": snapshot["users"],
+            "interactions": snapshot["interactions"],
+            "summary": snapshot["summary"],
+            "now": snapshot["now"],
+            "cutoff": snapshot["cutoff"],
+            "range_label": snapshot["range_label"],
+            "range_key": snapshot["range_key"],
+            "allowed_metric_departments": allowed_depts,
+            "selected_metric_department": selected_dept,
+            "q": query,
+            "user_filters": user_filters,
+            "available_users": available_users,
+        }
+
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
+
+    try:
+        cfg = MetricsConfig.get()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        cfg = MetricsConfig()
+
+    form = MetricsConfigForm()
+    if flask_request.method == "GET":
+        form.enabled.data = bool(getattr(cfg, "enabled", True))
+        form.track_request_created.data = bool(
+            getattr(cfg, "track_request_created", True)
+        )
+        form.track_assignments.data = bool(getattr(cfg, "track_assignments", True))
+        form.track_status_changes.data = bool(
+            getattr(cfg, "track_status_changes", True)
+        )
+        form.lookback_days.data = int(getattr(cfg, "lookback_days", 30) or 30)
+        form.user_metrics_limit.data = int(
+            getattr(cfg, "user_metrics_limit", 15) or 15
+        )
+        form.target_completion_hours.data = int(
+            getattr(cfg, "target_completion_hours", 48) or 48
+        )
+        form.slow_event_threshold_hours.data = int(
+            getattr(cfg, "slow_event_threshold_hours", 8) or 8
+        )
+
+    if form.validate_on_submit():
+        cfg.enabled = bool(form.enabled.data)
+        cfg.track_request_created = bool(form.track_request_created.data)
+        cfg.track_assignments = bool(form.track_assignments.data)
+        cfg.track_status_changes = bool(form.track_status_changes.data)
+        cfg.lookback_days = max(int(form.lookback_days.data or 30), 1)
+        cfg.user_metrics_limit = max(int(form.user_metrics_limit.data or 15), 1)
+        cfg.target_completion_hours = max(
+            int(form.target_completion_hours.data or 48), 1
+        )
+        cfg.slow_event_threshold_hours = max(
+            int(form.slow_event_threshold_hours.data or 8), 1
+        )
+        db.session.add(cfg)
+        db.session.commit()
+        flash("Metrics settings updated.", "success")
+        return redirect(url_for("admin.metrics_config"))
+
+    explorer = build_admin_metrics_explorer_context()
+    return render_template(
+        "admin_metrics_config.html",
+        form=form,
+        cfg=cfg,
+        snapshot=build_process_metrics_summary(range_key="weekly", depts=["A", "B", "C"]),
+        explorer=explorer,
+    )
+
+
+@admin_bp.route("/metrics_overview", methods=["GET"])
+@login_required
+def metrics_overview():
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+
+    from ..services.process_metrics import build_process_metrics_summary
+
+    allowed_depts = ["A", "B", "C"]
+    range_key = (flask_request.args.get("range") or "weekly").lower()
+    selected_dept = (flask_request.args.get("dept") or "").strip().upper()
+    visible_depts = [selected_dept] if selected_dept in allowed_depts else allowed_depts
+    query = (flask_request.args.get("q") or "").strip()
+    user_filters = flask_request.args.getlist("user")
+
+    snapshot = build_process_metrics_summary(
+        range_key=range_key,
+        depts=visible_depts,
+        query=query,
+    )
+
+    if user_filters:
+        snapshot["users"] = [
+            row
+            for row in snapshot.get("users", [])
+            if str(row.get("user_id")) in user_filters
+            or row.get("email") in user_filters
+        ]
+
+    available_users = snapshot.get("users", []) if not user_filters else []
+    if user_filters:
+        unfiltered = build_process_metrics_summary(
+            range_key=range_key,
+            depts=visible_depts,
+            query=query,
+        )
+        available_users = unfiltered.get("users", [])
+
+    dept_buckets = []
+    for dept_metrics in snapshot["by_dept"]:
+        dept_code = dept_metrics["dept"]
+        dept_buckets.append(
+            {
+                "dept": dept_code,
+                "metrics": dept_metrics,
+                "users": [
+                    row
+                    for row in snapshot["users"]
+                    if (row.get("department") or "").strip().upper() == dept_code
+                ],
+                "interactions": [
+                    row
+                    for row in snapshot["interactions"]
+                    if row.get("from_department") == dept_code
+                    or row.get("to_department") == dept_code
+                ],
+            }
+        )
+
+    return render_template(
+        "metrics.html",
+        metrics=snapshot["by_dept"],
+        dept_buckets=dept_buckets,
+        users=snapshot["users"],
+        interactions=snapshot["interactions"],
+        summary=snapshot["summary"],
+        now=snapshot["now"],
+        cutoff=snapshot["cutoff"],
+        range_label=snapshot["range_label"],
+        range_key=snapshot["range_key"],
+        allowed_metric_departments=allowed_depts,
+        selected_metric_department=selected_dept,
+        q=query,
+        user_filters=user_filters,
+        available_users=available_users,
+        admin_metrics_mode=True,
+        metrics_view_endpoint="admin.metrics_overview",
+    )
+
+
 @admin_bp.route("/reject_request_config", methods=["GET", "POST"])
 @login_required
 def reject_request_config():
@@ -2255,6 +2544,11 @@ def list_status_options():
     if not _is_admin_user():
         flash("Access denied.", "danger")
         return redirect(url_for("requests.dashboard"))
+
+    # load existing options, but if none are present try to bootstrap from any
+    # workflows that might exist.  this helps new installs or cases where the
+    # workflow page has been used but the admin never clicked "implement".
+    opts = []
     try:
         opts = StatusOption.query.order_by(StatusOption.code).all()
     except Exception:
@@ -2302,6 +2596,40 @@ def list_status_options():
                 "danger",
             )
             opts = []
+
+    # if the table exists but is currently empty, attempt to derive rows from any
+    # existing workflows so the admin has something visible immediately.
+    if not opts:
+        try:
+            generated = False
+            for wf in Workflow.query.all():
+                spec = _normalize_workflow_spec(wf.spec, wf.name)
+                steps = spec.get("steps") or []
+                for step in steps:
+                    code = None
+                    target_dept = None
+                    if isinstance(step, dict):
+                        code = step.get("status") or step.get("code")
+                        target_dept = step.get("to_dept") or step.get("to")
+                    elif isinstance(step, str):
+                        code = step
+                    if not code:
+                        continue
+                    if not StatusOption.query.filter_by(code=code).first():
+                        label = code.replace("_", " ").title()
+                        opt = StatusOption(code=code, label=label)
+                        if target_dept:
+                            opt.target_department = target_dept or None
+                        db.session.add(opt)
+                        generated = True
+            if generated:
+                db.session.commit()
+                flash("Status options generated from existing workflows.", "info")
+                opts = StatusOption.query.order_by(StatusOption.code).all()
+        except Exception:
+            # if something goes wrong here just log and continue with empty list
+            current_app.logger.exception("Failed to bootstrap status options from workflows")
+
     return render_template("admin_status_options.html", status_options=opts)
 
 
@@ -2881,6 +3209,7 @@ def create_dept_editor():
             user_id=form.user_id.data,
             department=form.department.data,
             can_edit=bool(form.can_edit.data),
+            can_view_metrics=bool(form.can_view_metrics.data),
         )
         db.session.add(de)
         db.session.commit()
