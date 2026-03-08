@@ -4,12 +4,14 @@
 <h2>Integrations</h2>
 <p><a href="{{ url_for('admin.create_integration') }}" class="btn btn-primary">New integration</a></p>
 <table class="table">
-  <thead><tr><th>Department</th><th>Kind</th><th>Enabled</th><th>Config</th><th>Actions</th></tr></thead>
+  <thead><tr><th>Department</th><th>Kind</th><th>Provider</th><th>Version</th><th>Enabled</th><th>Config</th><th>Actions</th></tr></thead>
   <tbody>
   {% for i in integrations %}
     <tr>
       <td>{{ i.department }}</td>
       <td>{{ i.kind }}</td>
+      <td>{{ summaries[i.id].provider }}</td>
+      <td>{{ summaries[i.id].version }}</td>
       <td>{{ 'yes' if i.enabled else 'no' }}</td>
       <td><pre style="max-width:400px; white-space:pre-wrap;">{{ i.config or '' }}</pre></td>
       <td>

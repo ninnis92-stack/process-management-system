@@ -370,6 +370,8 @@ class FormField(db.Model):
     label = db.Column(db.String(200), nullable=False)
     field_type = db.Column(db.String(50), nullable=False)
     required = db.Column(db.Boolean, nullable=False, default=False)
+    order = db.Column(db.Integer, nullable=False, default=0)
+    hint = db.Column(db.String(300), nullable=True)
     verification = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -379,6 +381,8 @@ class FormFieldOption(db.Model):
     field_id = db.Column(db.Integer, db.ForeignKey("form_field.id"), nullable=False)
     field = db.relationship("FormField", backref="options")
     value = db.Column(db.String(400), nullable=False)
+    label = db.Column(db.String(200), nullable=True)
+    order = db.Column(db.Integer, nullable=False, default=0)
 
 
 class DepartmentFormAssignment(db.Model):

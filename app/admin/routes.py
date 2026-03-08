@@ -45,6 +45,12 @@ from ..models import UserDepartment
 from .forms import GuestFormAdminForm
 from ..models import GuestForm
 from ..requests_bp.workflow import owner_for_status
+from ..services.integrations import (
+    INTEGRATION_KIND_SCAFFOLDS,
+    get_integration_scaffold,
+    integration_config_summary,
+    normalize_integration_config,
+)
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -2849,7 +2855,12 @@ def list_integrations():
     ints = IntegrationConfig.query.order_by(
         IntegrationConfig.department, IntegrationConfig.kind
     ).all()
-    return render_template("admin_integrations.html", integrations=ints)
+    summaries = {i.id: integration_config_summary(i.config) for i in ints}
+    return render_template(
+        "admin_integrations.html",
+        integrations=ints,
+        summaries=summaries,
+    )
 
 
 @admin_bp.route("/buckets/import_default", methods=["POST"])
@@ -3143,18 +3154,42 @@ def create_integration():
     from .forms import IntegrationConfigForm
 
     form = IntegrationConfigForm()
+    selected_kind = form.kind.data or (form.kind.choices[0][0] if form.kind.choices else "webhook")
     if form.validate_on_submit():
+        try:
+            normalized = normalize_integration_config(
+                form.kind.data, form.config_json.data
+            )
+        except Exception as exc:
+            flash(str(exc), "danger")
+            scaffold = get_integration_scaffold(form.kind.data)
+            return render_template(
+                "admin_integration_edit.html",
+                form=form,
+                scaffold=scaffold,
+                integration_scaffolds=INTEGRATION_KIND_SCAFFOLDS,
+            )
         ic = IntegrationConfig(
             department=form.department.data,
             kind=form.kind.data,
             enabled=bool(form.enabled.data),
-            config=(form.config_json.data or None),
+            config=json.dumps(normalized, indent=2),
         )
         db.session.add(ic)
         db.session.commit()
         flash("Integration saved.", "success")
         return redirect(url_for("admin.list_integrations"))
-    return render_template("admin_integration_edit.html", form=form)
+    if not form.config_json.data:
+        form.config_json.data = json.dumps(
+            get_integration_scaffold(selected_kind).get("default_config") or {},
+            indent=2,
+        )
+    return render_template(
+        "admin_integration_edit.html",
+        form=form,
+        scaffold=get_integration_scaffold(selected_kind),
+        integration_scaffolds=INTEGRATION_KIND_SCAFFOLDS,
+    )
 
 
 @admin_bp.route("/integrations/<int:int_id>/edit", methods=["GET", "POST"])
@@ -3167,15 +3202,40 @@ def edit_integration(int_id: int):
 
     ic = get_or_404(IntegrationConfig, int_id)
     form = IntegrationConfigForm(obj=ic)
+    if flask_request.method == "GET":
+        try:
+            normalized = normalize_integration_config(ic.kind, ic.config)
+            form.config_json.data = json.dumps(normalized, indent=2)
+        except Exception:
+            form.config_json.data = ic.config or ""
     if form.validate_on_submit():
+        try:
+            normalized = normalize_integration_config(
+                form.kind.data, form.config_json.data
+            )
+        except Exception as exc:
+            flash(str(exc), "danger")
+            return render_template(
+                "admin_integration_edit.html",
+                form=form,
+                integration=ic,
+                scaffold=get_integration_scaffold(form.kind.data),
+                integration_scaffolds=INTEGRATION_KIND_SCAFFOLDS,
+            )
         ic.department = form.department.data
         ic.kind = form.kind.data
         ic.enabled = bool(form.enabled.data)
-        ic.config = form.config_json.data or None
+        ic.config = json.dumps(normalized, indent=2)
         db.session.commit()
         flash("Integration updated.", "success")
         return redirect(url_for("admin.list_integrations"))
-    return render_template("admin_integration_edit.html", form=form, integration=ic)
+    return render_template(
+        "admin_integration_edit.html",
+        form=form,
+        integration=ic,
+        scaffold=get_integration_scaffold(ic.kind),
+        integration_scaffolds=INTEGRATION_KIND_SCAFFOLDS,
+    )
 
 
 @admin_bp.route("/integrations/<int:int_id>/delete", methods=["POST"])
