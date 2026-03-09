@@ -3,7 +3,7 @@
 
 {% block content %}
   <h2>Feature Flags</h2>
-  <form method="post" class="admin-feature-flags">
+  <form method="post" class="admin-feature-flags" data-autosave-endpoint="{{ url_for('admin.feature_flags') }}">
     {{ form.hidden_tag() }}
 
     {{ toggle_checkbox(form.enable_notifications, 'Notifications enabled', 'Notifications disabled') }}
@@ -27,6 +27,9 @@
     {{ toggle_checkbox(form.enable_external_forms, 'External forms enabled', 'External forms disabled') }}
       <div class="form-text">When enabled, admins may mark a Form Template as using an external 3rd-party form; those templates will direct users to the external provider and accept webhook callbacks.</div>
 
-    <button class="btn btn-primary">Save</button>
+    <button class="btn btn-primary" type="submit">Save</button>
+    <noscript>
+      <small class="text-muted ms-2">(changes save automatically when JavaScript is enabled)</small>
+    </noscript>
   </form>
 {% endblock %}

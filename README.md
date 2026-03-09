@@ -42,7 +42,7 @@ Key capabilities:
 - **Per-form guest access policies** for public, SSO-linked, approved-organization,
   and unaffiliated-only intake paths
 - **SSO/OIDC support** with optional admin sync
-- **Theme/vibe system**, dark mode (now integrated with vibe accents) and per‑user preferences
+- **Theme/vibe system**, dark mode (now integrated with vibe accents) and per‑user preferences; settings, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
 
 Everything is covered by a comprehensive test suite and deploys automatically
 using a release script that migrates the database, creates missing columns,
@@ -68,6 +68,8 @@ needed.
    ```
    During development run `npm run dev` and to produce a production bundle use `npm run build` (assets output to `app/static/dist`).
 
+  Preferences and feature flags now autosave as soon as you change them; the page will post JSON to the server and even flush outstanding requests on navigation via the `keepalive` API.  Dropdowns (vibe/theme selector, quote set, etc.) are treated the same way, and the server echoes back the current value so the UI stays in sync.
+
 2. **Configure**
    Set environment variables or edit `config.py`.  Required:
    - `DATABASE_URL` (Postgres)
@@ -84,9 +86,13 @@ needed.
    python scripts/release_tasks.py   # migrations + safe ALTERs + seeds
    ```
    The release script will also seed demo users and an admin account by
-  default unless `RUN_SEED_ON_RELEASE=0`. It now also normalizes and validates
-  quote sets so every built-in set has loadable content before a deploy is
-  considered healthy.
+   default unless `RUN_SEED_ON_RELEASE=0`.  For Fly.io deployments the
+   `release_command` in `fly.toml` invokes the same script, so the remote
+   database is automatically migrated and seeded each time you `fly deploy`.
+   Run `python seed.py` locally if you need to resynchronize a development
+   database or inspect the seeding logic.  The release script now also
+   normalizes and validates quote sets so every built-in set has loadable
+   content before a deploy is considered healthy.
 
 6. **Run the app (local deployment)**
    ```bash
@@ -100,6 +106,11 @@ needed.
    ```
    which brings up Postgres, Redis, and the web container.  The same `Fly.toml` configuration
    in the repo can be used to deploy to Fly.io with `fly deploy`.
+   When you push to Fly, the deploy output will list a URL; once testing shows
+   the root redirecting to `/dashboard` and `/dashboard` redirecting to
+   `/auth/login` the release has succeeded.  A subsequent `fly ssh console` and
+   `python seed.py` may be run if you need to reseed the remote database for
+   diagnostics.
 
 7. **Smoke testing**
    Once the server is running, verify the basics:
@@ -164,7 +175,10 @@ Run `curl -i https://<app>/ready` to verify production readiness; you should
 see JSON indicating `database.status:ok` (and Redis if configured).
 
 Smoke test script (`scripts/smoke_test.sh`) hits the home page, dashboard and
-admin site config for quick sanity checks against any environment.
+admin site config for quick sanity checks against any environment.  You can
+also `curl -i https://<app>/ready` to validate the readiness probe (database
+connection plus optional Redis).  After a Fly deployment the smoke test
+should return a 302 from `/` and a 302 to `/auth/login` from `/dashboard`.
 
 Webhook smoke script (`scripts/webhook_smoke.py`) verifies that production
 webhooks reject unsigned traffic and, when a shared secret is supplied,

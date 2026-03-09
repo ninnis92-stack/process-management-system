@@ -104,6 +104,48 @@ def test_feature_flags_post_unchecked_boxes_disable_flags(client, app):
         assert flags.allow_user_nudges is False
 
 
+def test_feature_flags_autosave_support(client, app):
+    """Page should include autosave endpoint attribute and unload script."""
+    make_admin(app)
+    rv = login_admin(client)
+    assert rv.status_code == 200
+    rv = client.get("/admin/feature_flags")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+    assert 'data-autosave-endpoint="/admin/feature_flags"' in html
+    # verify global JS includes beforeunload handler to flush autosaves
+    # and the new fetch+keepalive logic (not sendBeacon) so JSON posts work
+    # root redirects logged-in users so hit dashboard directly
+    base = client.get("/dashboard")
+    assert b"beforeunload" in base.data
+    assert b"keepalive" in base.data
+
+
+def test_feature_flags_json_autosave_updates(client, app):
+    """POSTing JSON should update flags without redirect and return state."""
+    make_admin(app)
+    with app.app_context():
+        flags = FeatureFlags.get()
+        flags.vibe_enabled = False
+        db.session.commit()
+
+    rv = login_admin(client)
+    assert rv.status_code == 200
+    rv = client.post(
+        "/admin/feature_flags",
+        json={"vibe_enabled": True, "enable_nudges": False},
+    )
+    assert rv.status_code == 200
+    payload = rv.get_json()
+    assert payload["ok"] is True
+    assert payload["flags"]["vibe_enabled"] is True
+    assert payload["flags"]["enable_nudges"] is False
+    with app.app_context():
+        flags = FeatureFlags.get()
+        assert flags.vibe_enabled is True
+        assert flags.enable_nudges is False
+
+
 def test_reject_request_config_label_describes_state(client, app):
     make_admin(app)
     with app.app_context():

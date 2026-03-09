@@ -626,27 +626,35 @@
     );
 
     if (darkMode) {
-      root.style.setProperty("--nav-bg", mixHex(p.accent, "#202124", 0.18));
+      root.style.setProperty("--nav-bg", mixHex(p.accent, "#0b1220", 0.16));
       // tint the nav text slightly with the accent so the interface feels
       // cohesive when the vibe is active
-      root.style.setProperty("--nav-text", mixHex("#e8eaed", p.accent, 0.15));
+      root.style.setProperty("--nav-text", mixHex("#e8f0fb", p.accent, 0.08));
       // body text can get a subtle hint as well
-      root.style.setProperty("--body-text", mixHex("#e8eaed", p.accent, 0.05));
-      root.style.setProperty("--surface", mixHex(p.accent, "#1e1e1e", 0.10));
-      root.style.setProperty("--border", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.22)`);
-      root.style.setProperty("--focus", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.28)`);
+      root.style.setProperty("--body-text", mixHex("#e5eef8", p.accent, 0.06));
+      root.style.setProperty("--surface", mixHex(p.accent, "#111c2d", 0.08));
+      root.style.setProperty("--surface-2", mixHex(p.accent, "#18263b", 0.06));
+      root.style.setProperty("--border", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.20)`);
+      root.style.setProperty("--focus", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.26)`);
       root.style.setProperty(
         "--page-bg",
-        `radial-gradient(circle at 20% 20%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18), transparent 30%), radial-gradient(circle at 80% 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12), transparent 28%), #121212`
+        `radial-gradient(circle at 18% 18%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.14), transparent 30%), radial-gradient(circle at 82% 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.10), transparent 28%), linear-gradient(180deg, #08111f 0%, #0d1728 100%)`
       );
     } else {
-      root.style.setProperty("--nav-bg", darkenHex(p.accent, 0.56));
+      root.style.setProperty("--nav-bg", mixHex(p.accent, "#162033", 0.20));
+      // default nav text should stay bright because the navbar remains dark
+      // even in regular mode.
+      root.style.setProperty("--nav-text", mixHex("#f8fbff", p.accent, 0.06));
+      // body text should remain a dark tone on light pages so content
+      // stays legible.
+      root.style.setProperty("--body-text", mixHex("#132033", p.accent, 0.04));
       root.style.setProperty("--surface", "#ffffff");
-      root.style.setProperty("--border", "#e6e9ee");
+      root.style.setProperty("--surface-2", mixHex("#f4f7fb", p.accent, 0.05));
+      root.style.setProperty("--border", "rgba(15, 23, 42, 0.10)");
       root.style.setProperty("--focus", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.16)`);
       root.style.setProperty(
         "--page-bg",
-        `radial-gradient(circle at 20% 20%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.10), transparent 30%), radial-gradient(circle at 80% 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.06), transparent 28%), #fbfcfe`
+        `radial-gradient(circle at 18% 18%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.10), transparent 28%), radial-gradient(circle at 82% 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08), transparent 26%), linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%)`
       );
     }
 

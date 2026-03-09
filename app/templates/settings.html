@@ -9,7 +9,7 @@
     <div class="card-body">
       {% set dark_mode_enabled = form.dark_mode.data if form.dark_mode.data is not none else current_user.dark_mode %}
         {% set quotes_enabled = form.quotes_enabled.data if form.quotes_enabled.data is not none else current_user.quotes_enabled %}
-        <form method="post" action="{{ url_for('auth.settings') }}">
+        <form method="post" action="{{ url_for('auth.settings') }}" id="userSettingsForm" data-autosave-endpoint="{{ url_for('auth.set_preferences') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="dark_mode_present" value="1">
           <input type="hidden" name="quotes_enabled_present" value="1">
@@ -56,25 +56,39 @@
             <div class="form-text">How often quotes should advance. Choose between 15 and 60 seconds in 5‑second steps.</div>
           </div>
         {% endif %}
-        <button class="btn btn-primary" type="submit" id="darkModeSubmitBtn">Save settings</button>
+
+        <div id="settingsAutoSaveStatus" class="form-text" aria-live="polite">Changes save automatically.</div>
+        <noscript>
+          <button class="btn btn-primary mt-3" type="submit">Save settings</button>
+        </noscript>
       </form>
     </div>
   </div>
 
   <script>
+    // Only settings page needs the live preview logic for dark mode / labels
     (function () {
       const checkbox = document.getElementById('dark_mode');
       const label = document.getElementById('darkModeLabel');
-      const submitBtn = document.getElementById('darkModeSubmitBtn');
-      if (!checkbox || !label || !submitBtn) return;
+      const statusEl = document.getElementById('settingsAutoSaveStatus');
+      if (!checkbox || !label || !statusEl) return;
 
       const syncDarkModeText = () => {
         label.textContent = checkbox.checked ? 'Dark mode enabled' : 'Dark mode disabled';
-        submitBtn.textContent = 'Save settings';
+      };
+      const syncBodyClass = () => {
+        document.body.classList.toggle('dark-mode', checkbox.checked);
+        document.body.setAttribute('data-user-dark-mode', checkbox.checked ? '1' : '0');
       };
 
-      checkbox.addEventListener('change', syncDarkModeText);
+      checkbox.addEventListener('change', () => {
+        syncDarkModeText();
+        syncBodyClass();
+      });
+
+      // initial state
       syncDarkModeText();
+      syncBodyClass();
     })();
   </script>
 

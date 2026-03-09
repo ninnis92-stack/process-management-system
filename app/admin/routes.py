@@ -863,9 +863,21 @@ def _sanitize_banner_html(raw: str) -> str:
         # Trim and return
         return (cleaned or "").strip()
     except Exception:
-        # If bleach isn't available for some reason, fall back to the lighter
-        # regex-based cleanup we used previously (best-effort).
-        return s.strip()
+        # If bleach isn't available for some reason, fall back to a minimal
+        # regex-based cleanup.  We still want to remove dangerous tags and
+        # static asset targets even if the full sanitizer fails.
+        import re
+
+        # strip script blocks
+        s2 = re.sub(r'<script[\s\S]*?</script>', '', s, flags=re.IGNORECASE)
+        # remove links/forms pointing at /static/ resources
+        s2 = re.sub(
+            r'\s(?:href|src|action|formaction)=(["\"])\/static\/[^"\']*\1',
+            '',
+            s2,
+            flags=re.IGNORECASE,
+        )
+        return (s2 or "").strip()
 
 
 @admin_bp.route('/site_config/clean_banner', methods=['POST'])
@@ -1696,6 +1708,49 @@ def feature_flags():
             pass
         flags = FeatureFlags()
     form = FeatureFlagsForm()
+
+    # support JSON autosave calls in addition to regular form POST
+    if flask_request.is_json:
+        data = flask_request.get_json(silent=True) or {}
+        # update only the flags provided in the payload
+        for field in (
+            "enable_notifications",
+            "enable_nudges",
+            "allow_user_nudges",
+            "vibe_enabled",
+            "sso_admin_sync_enabled",
+            "sso_department_sync_enabled",
+            "enable_external_forms",
+            "rolling_quotes_enabled",
+        ):
+            if field in data:
+                try:
+                    setattr(flags, field, bool(data[field]))
+                except Exception:
+                    pass
+        try:
+            db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "save_failed"}), 500
+        # echo back current state
+        return jsonify({
+            "ok": True,
+            "flags": {f: bool(getattr(flags, f, False)) for f in (
+                "enable_notifications",
+                "enable_nudges",
+                "allow_user_nudges",
+                "vibe_enabled",
+                "sso_admin_sync_enabled",
+                "sso_department_sync_enabled",
+                "enable_external_forms",
+                "rolling_quotes_enabled",
+            )},
+        })
+
     if flask_request.method == "GET":
         form.enable_notifications.data = bool(
             getattr(flags, "enable_notifications", True)
