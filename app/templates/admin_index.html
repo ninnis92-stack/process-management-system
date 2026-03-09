@@ -9,8 +9,10 @@
       <div class="admin-hero__actions">
         <a class="btn btn-sm btn-primary" href="{{ url_for('admin.metrics_config') }}">Open metrics suite</a>
         <a class="btn btn-sm btn-outline-light" href="{{ url_for('admin.feature_flags') }}">Explore feature flags</a>
-        {% if FeatureFlags.get().vibe_enabled %}
+        {% if FeatureFlags.get().vibe_enabled and not current_user.dark_mode %}
           <button id="vibeBtnAdmin" data-vibe-trigger="admin" type="button" class="btn btn-sm btn-outline-light">Vibe · <span class="vibeLabel">—</span></button>
+        {% elif current_user.dark_mode %}
+          <div class="form-text text-warning mt-1">Vibe controls are disabled while dark mode is active.</div>
         {% endif %}
         <span class="admin-hero__hint">Command center syncs with each department automatically.</span>
       </div>

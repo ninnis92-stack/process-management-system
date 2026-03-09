@@ -647,16 +647,23 @@
     const darkMode = isDarkModeEnabled();
     vibeButtons.forEach((button) => {
       try {
-        button.disabled = false;
-        button.hidden = false;
-        button.setAttribute('aria-hidden', 'false');
+        button.disabled = darkMode;
+        if (darkMode) {
+          button.classList.add('disabled');
+          button.setAttribute('aria-disabled', 'true');
+        } else {
+          button.classList.remove('disabled');
+          button.setAttribute('aria-disabled', 'false');
+        }
       } catch (e) {}
     });
 
     const vibeSelect = document.getElementById('vibe_index');
     if (vibeSelect) {
+      vibeSelect.disabled = darkMode;
       Array.from(vibeSelect.options).forEach((option) => {
-        option.disabled = darkMode && !isDarkModeCompatiblePalette(option.value);
+        // options remain enabled for consistency but select itself is locked
+        option.disabled = false;
       });
     }
 
@@ -705,11 +712,17 @@
   }
 
   function applyTheme(idx) {
+    const darkMode = isDarkModeEnabled();
+    if (darkMode) {
+      // when dark mode is active we ignore vibes entirely and clear any
+      // previously-applied palette overrides so the default dark CSS applies.
+      clearThemeOverrides();
+      return;
+    }
     const effectiveIdx = getEffectivePaletteIndex(idx);
     const p = palettes[effectiveIdx] || palettes[0];
     const root = document.documentElement;
     const rgb = hexToRgb(p.accent);
-    const darkMode = isDarkModeEnabled();
 
     root.style.setProperty("--accent", p.accent);
     root.style.setProperty("--accent-rgb", `${rgb.r}, ${rgb.g}, ${rgb.b}`);
@@ -793,11 +806,8 @@
             } catch (e) {}
 
             if (!response.ok) {
-              if (payload && payload.error === 'dark_mode_requires_compatible_vibe') {
-                const fallback = Number.isFinite(Number(payload.vibe_index)) ? Number(payload.vibe_index) : darkModeCompatiblePaletteIndexes[0];
-                if (fallback !== effectiveIdx) {
-                  applyTheme(fallback);
-                }
+              if (payload && payload.error === 'dark_mode_vibe_disabled') {
+                // dark mode prevents any theme changes; nothing to do here.
                 return;
               }
               showVibeFeedback("Couldn't save your theme change. Please try again.", 'warning');
@@ -848,13 +858,11 @@
 
   // Attach click handlers to whichever vibe buttons are present (global navbar and/or department view)
   function advanceVibe() {
-    const current = getEffectivePaletteIndex(Number(localStorage.getItem("vibeTheme")) || 0);
     if (isDarkModeEnabled()) {
-      const compatibleIndex = darkModeCompatiblePaletteIndexes.indexOf(current);
-      const next = darkModeCompatiblePaletteIndexes[(compatibleIndex + 1 + darkModeCompatiblePaletteIndexes.length) % darkModeCompatiblePaletteIndexes.length];
-      applyTheme(next);
+      // no cycling while dark mode is on
       return;
     }
+    const current = getEffectivePaletteIndex(Number(localStorage.getItem("vibeTheme")) || 0);
     const next = (current + 1) % palettes.length;
     applyTheme(next);
   }

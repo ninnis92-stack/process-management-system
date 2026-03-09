@@ -17,7 +17,7 @@
           <div class="form-check mb-3">
             {{ form.dark_mode(class_='form-check-input') }}
             <label class="form-check-label" for="dark_mode" id="darkModeLabel">{{ 'Dark mode enabled' if dark_mode_enabled else 'Dark mode disabled' }}</label>
-            <div id="darkModeVibeNote" class="form-text mt-1">Dark mode keeps theme support, but limits it to a curated high-contrast vibe subset.</div>
+            <div id="darkModeVibeNote" class="form-text mt-1">Dark mode disables custom themes; vibe controls are inactive.</div>
           </div>
 
           {{ toggle_checkbox(form.quotes_enabled, 'Rotating quotes enabled', 'Rotating quotes disabled') }}
@@ -26,7 +26,7 @@
         {% if not external_theme and form.vibe_index %}
           <div class="mb-3">
             <label for="vibe_index" class="form-label">Theme</label>
-            <select class="form-select" id="vibe_index" name="vibe_index" data-all-choices='{{ all_vibe_choices|tojson }}' data-dark-choices='{{ dark_vibe_choices|tojson }}' data-dark-compatible-vibes='{{ dark_mode_compatible_vibe_indexes|tojson }}'>
+            <select class="form-select" id="vibe_index" name="vibe_index" {% if dark_mode_enabled %}disabled{% endif %} data-all-choices='{{ all_vibe_choices|tojson }}' data-dark-choices='{{ dark_vibe_choices|tojson }}' data-dark-compatible-vibes='{{ dark_mode_compatible_vibe_indexes|tojson }}'>
               {% for val, label in form.vibe_index.choices %}
                 <option value="{{ val }}" {% if (current_user.vibe_index is not none and current_user.vibe_index == val) or (form.vibe_index.data is not none and form.vibe_index.data == val) %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -44,8 +44,8 @@
                 </div>
               </div>
             </div>
-            <div class="form-text">Choose your UI accent theme. Dark mode keeps a smaller curated subset of vibes to preserve contrast. Admin-imported themes override this setting.</div>
-            <div id="vibeDarkModeNote" class="form-text text-warning mt-1" {% if not dark_mode_enabled %}hidden{% endif %}>Only dark-mode-compatible vibes are shown while dark mode is active.</div>
+            <div class="form-text">Choose your UI accent theme. When dark mode is enabled this control is disabled and no accent is applied; admin-imported themes still override this setting.</div>
+            <div id="vibeDarkModeNote" class="form-text text-warning mt-1" {% if not dark_mode_enabled %}hidden{% endif %}>Theme selection is disabled while dark mode is active.</div>
             <div class="theme-compatible-list mt-2" id="darkCompatibleVibeList">
               <span class="theme-compatible-list__label">Dark-mode ready</span>
               {% for val, label in dark_vibe_choices %}

@@ -182,11 +182,12 @@ def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None,
                 pass
         updated["vibe_index"] = getattr(user, "vibe_index", None)
 
+    # if dark mode is active, clear any vibe index so that the theme is
+    # effectively disabled.  this mirrors client-side behavior where the
+    # controls are non-functional and no accenting is applied.
     if bool(getattr(user, "dark_mode", False)):
-        normalized_vibe = _normalize_vibe_index(getattr(user, "vibe_index", None), dark_mode=True)
-        if normalized_vibe != getattr(user, "vibe_index", None):
-            user.vibe_index = normalized_vibe
-        updated["vibe_index"] = getattr(user, "vibe_index", None)
+        user.vibe_index = None
+        updated["vibe_index"] = None
 
     if _setting_present(payload, "quote_set"):
         quote_set = payload.get("quote_set")
@@ -858,9 +859,11 @@ def set_vibe():
         return ("Missing vibe_index", 400)
 
     u = db.session.get(User, current_user.id)
-    if getattr(u, "dark_mode", False) and not _is_dark_mode_compatible_vibe(v):
-        return jsonify({"ok": False, "error": "dark_mode_requires_compatible_vibe", "vibe_index": getattr(u, "vibe_index", None), "allowed_vibes": list(DARK_MODE_COMPATIBLE_VIBE_INDEXES)}), 409
-    u.vibe_index = _normalize_vibe_index(max(0, int(v)), dark_mode=bool(getattr(u, "dark_mode", False)))
+    if getattr(u, "dark_mode", False):
+        # when dark mode is enabled we don't allow changing or storing a custom
+        # vibe; the client side should already have disabled the controls.
+        return jsonify({"ok": False, "error": "dark_mode_vibe_disabled"}), 409
+    u.vibe_index = _normalize_vibe_index(max(0, int(v)), dark_mode=False)
     db.session.commit()
     # Reflect change in current_user proxy for immediate client-side use
     _sync_current_user_preferences(u)

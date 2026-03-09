@@ -46,7 +46,7 @@ def test_dark_mode_class_added_server_side(client, app):
     assert b"dark-mode" in m.group(1)
 
 
-def test_admin_dashboard_keeps_dark_mode_and_shows_vibe_controls(client, app):
+def test_admin_dashboard_keeps_dark_mode_and_hides_vibe_controls(client, app):
     make_user(app, dark_mode=True)
     rv = login(client)
     assert rv.status_code == 200
@@ -56,8 +56,9 @@ def test_admin_dashboard_keeps_dark_mode_and_shows_vibe_controls(client, app):
     m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
     assert m, "no body tag?"
     assert b"dark-mode" in m.group(1)
-    assert b'id="vibeBtn"' in rv.data
-    assert b'id="vibeBtnAdmin"' in rv.data
+    # vibe buttons should not be rendered when dark mode is active
+    assert b'id="vibeBtn"' not in rv.data
+    assert b'id="vibeBtnAdmin"' not in rv.data
 
 
 def test_dark_mode_not_added_by_default(client, app):
@@ -122,10 +123,10 @@ def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):
     assert rv.status_code == 200
     # the dark mode label should reflect the preference
     assert b'id="darkModeLabel">Dark mode enabled<' in rv.data
-    assert b'Dark mode keeps theme support, but limits it to a curated high-contrast vibe subset.' in rv.data
+    assert b'Dark mode disables custom themes; vibe controls are inactive.' in rv.data
     assert b'id="vibeDarkModeNote"' in rv.data
-    assert b'id="vibe_index" name="vibe_index" disabled' not in rv.data
-    assert b'Only dark-mode-compatible vibes are shown while dark mode is active.' in rv.data
+    assert b'id="vibe_index" name="vibe_index" disabled' in rv.data
+    assert b'Theme selection is disabled while dark mode is active.' in rv.data
     assert b'data-vibe-preview-badge' in rv.data
     assert b'data-vibe-compatible-chip=' in rv.data
     assert b"Changes save automatically." in rv.data
@@ -180,7 +181,8 @@ def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
     assert payload["preferences"]["quotes_enabled"] is False
     assert payload["preferences"]["quote_set"] == "engineering"
     assert payload["preferences"]["quote_interval"] == 30
-    assert payload["preferences"]["vibe_index"] == 5
+    # vibe index should be cleared when dark mode is active
+    assert payload["preferences"]["vibe_index"] is None
     rv = client.get("/dashboard")
     m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
     assert m and b"dark-mode" in m.group(1)
@@ -189,13 +191,13 @@ def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
         user = User.query.filter_by(email="admin@example.com").first()
         assert user is not None
         assert user.dark_mode is True
-        assert user.vibe_index == 5
+        assert user.vibe_index is None
         assert user.quotes_enabled is False
         assert user.quote_set == "engineering"
         assert user.quote_interval == 30
 
 
-def test_vibe_endpoint_rejects_incompatible_updates_when_dark_mode_enabled(client, app):
+def test_vibe_endpoint_rejects_updates_while_dark_mode_enabled(client, app):
     make_user(app, dark_mode=True)
     rv = login(client)
     assert rv.status_code == 200
@@ -207,11 +209,10 @@ def test_vibe_endpoint_rejects_incompatible_updates_when_dark_mode_enabled(clien
     assert rv.status_code == 409
     payload = rv.get_json()
     assert payload["ok"] is False
-    assert payload["error"] == "dark_mode_requires_compatible_vibe"
-    assert payload["allowed_vibes"] == [0, 4, 5, 7, 14, 18, 23, 24]
+    assert payload["error"] == "dark_mode_vibe_disabled"
 
 
-def test_vibe_endpoint_accepts_compatible_updates_when_dark_mode_enabled(client, app):
+def test_vibe_endpoint_rejects_any_updates_when_dark_mode_enabled(client, app):
     make_user(app, dark_mode=True)
     rv = login(client)
     assert rv.status_code == 200
@@ -220,10 +221,10 @@ def test_vibe_endpoint_accepts_compatible_updates_when_dark_mode_enabled(client,
         "/auth/vibe",
         json={"vibe_index": 5},
     )
-    assert rv.status_code == 200
+    assert rv.status_code == 409
     payload = rv.get_json()
-    assert payload["ok"] is True
-    assert payload["vibe_index"] == 5
+    assert payload["ok"] is False
+    assert payload["error"] == "dark_mode_vibe_disabled"
 
 
 def test_dark_mode_dashboard_bootstraps_selected_vibe(client, app):
@@ -240,7 +241,8 @@ def test_dark_mode_dashboard_bootstraps_selected_vibe(client, app):
     assert rv.status_code == 200
     assert b'data-user-dark-mode="1"' in rv.data
     assert b'data-user-vibe="5"' in rv.data
-    assert b'id="vibeBtn"' in rv.data
+    # the navbar no longer renders a vibe button when dark mode is active
+    assert b'id="vibeBtn"' not in rv.data
 
 
 def test_vibe_endpoint_persists_and_settings_reflect(client, app):
@@ -314,6 +316,8 @@ def test_settings_post_checked_dark_mode_enables_preference(client, app):
         user = User.query.filter_by(email="admin@example.com").first()
         assert user is not None
         assert user.dark_mode is True
+        # enabling dark mode should clear any existing vibe index
+        assert user.vibe_index is None
 
 
 def test_dark_mode_preference_endpoint_enables_account_wide_setting(client, app):
