@@ -1,35 +1,118 @@
 {% extends "base.html" %}
-{% from 'admin/_macros.html' import toggle_checkbox %}
+{% from 'admin/_macros.html' import page_header %}
 
 {% block content %}
-  <h2>Feature Flags</h2>
-  <form method="post" class="admin-feature-flags" data-autosave-endpoint="{{ url_for('admin.feature_flags') }}">
-    {{ form.hidden_tag() }}
+  {{ page_header('Feature Flags', eyebrow='Administration', lede='Control the navbar experience, reminders, and integration gates from one dark-mode-friendly control panel.') }}
 
-    {{ toggle_checkbox(form.enable_notifications, 'Notifications enabled', 'Notifications disabled') }}
+  <section class="surface-panel admin-feature-flags-panel">
+    <div class="admin-feature-flags__intro">
+      <article class="helper-card admin-feature-flags__intro-card">
+        <div class="helper-card__icon" aria-hidden="true">🎛️</div>
+        <div>
+          <div class="helper-card__title">Experience switches</div>
+          <div class="helper-card__text">Use these toggles for the navbar banner, rotating quotes, and reminder behavior that users see across their account pages.</div>
+        </div>
+      </article>
+      <article class="helper-card admin-feature-flags__intro-card">
+        <div class="helper-card__icon" aria-hidden="true">🔐</div>
+        <div>
+          <div class="helper-card__title">Integration switches</div>
+          <div class="helper-card__text">Keep SSO sync and external request-form controls separate so admin identity rules do not get mixed into day-to-day UI tweaks.</div>
+        </div>
+      </article>
+    </div>
 
-    {{ toggle_checkbox(form.enable_nudges, 'Automated reminders enabled', 'Automated reminders disabled') }}
+    <form method="post" class="admin-feature-flags" data-autosave-endpoint="{{ url_for('admin.feature_flags') }}">
+      {{ form.hidden_tag() }}
 
-    {{ toggle_checkbox(form.allow_user_nudges, 'User reminders enabled', 'User reminders disabled') }}
-      <div class="form-text">When enabled, users may push reminders to other users (not recommended).</div>
+      <section class="admin-feature-flags__section">
+        <div class="admin-feature-flags__section-header">
+          <h3 class="section-heading__title mb-1">Experience</h3>
+          <p class="section-heading__subtitle mb-0">Controls for the banner, notifications, and reminder flows shown on signed-in pages.</p>
+        </div>
 
-    {{ toggle_checkbox(form.vibe_enabled, 'Vibe button UI enabled', 'Vibe button UI disabled') }}
+        <div class="admin-feature-flags__options">
+          <div class="admin-toggle-card admin-feature-flags__option{% if form.vibe_enabled.data %} active{% endif %}">
+            <div class="form-check mb-0">
+              {{ form.vibe_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Vibe button UI enabled', 'data-toggle-text-unchecked': 'Vibe button UI disabled'}) }}
+              <label class="form-check-label" for="{{ form.vibe_enabled.id }}">{{ 'Vibe button UI enabled' if form.vibe_enabled.data else 'Vibe button UI disabled' }}</label>
+            </div>
+            <div class="admin-feature-flags__option-copy">Keeps the navbar `vibe` button available so users can change accent palettes from the banner area.</div>
+          </div>
 
-    {{ toggle_checkbox(form.rolling_quotes_enabled, 'Rolling quotes enabled', 'Rolling quotes disabled') }}
-      <div class="form-text">When disabled, rolling quotes will not be shown anywhere in the UI.</div>
+          <div class="admin-toggle-card admin-feature-flags__option{% if form.rolling_quotes_enabled.data %} active{% endif %}">
+            <div class="form-check mb-0">
+              {{ form.rolling_quotes_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Rolling quotes enabled', 'data-toggle-text-unchecked': 'Rolling quotes disabled'}) }}
+              <label class="form-check-label" for="{{ form.rolling_quotes_enabled.id }}">{{ 'Rolling quotes enabled' if form.rolling_quotes_enabled.data else 'Rolling quotes disabled' }}</label>
+            </div>
+            <div class="admin-feature-flags__option-copy">When disabled, rotating quotes are removed from the navbar banner throughout the app.</div>
+          </div>
 
-    {{ toggle_checkbox(form.sso_admin_sync_enabled, 'SSO admin sync enabled', 'SSO admin sync disabled') }}
-      <div class="form-text">When enabled, users can be allocated admin access from organization-managed SSO claims or APIs. Manual admin assignment in the app still works either way.</div>
+          <div class="admin-toggle-card admin-feature-flags__option{% if form.enable_notifications.data %} active{% endif %}">
+            <div class="form-check mb-0">
+              {{ form.enable_notifications(class_='form-check-input', **{'data-toggle-text-checked': 'Notifications enabled', 'data-toggle-text-unchecked': 'Notifications disabled'}) }}
+              <label class="form-check-label" for="{{ form.enable_notifications.id }}">{{ 'Notifications enabled' if form.enable_notifications.data else 'Notifications disabled' }}</label>
+            </div>
+            <div class="admin-feature-flags__option-copy">Shows notification affordances and inbox interactions in the main app shell.</div>
+          </div>
 
-    {{ toggle_checkbox(form.sso_department_sync_enabled, 'SSO department sync enabled', 'SSO department sync disabled') }}
-      <div class="form-text">When enabled, SSO-linked users whose primary department is not marked as admin-managed will have it reassigned from the configured SSO department claim on login.</div>
+          <div class="admin-toggle-card admin-feature-flags__option{% if form.enable_nudges.data %} active{% endif %}">
+            <div class="form-check mb-0">
+              {{ form.enable_nudges(class_='form-check-input', **{'data-toggle-text-checked': 'Automated reminders enabled', 'data-toggle-text-unchecked': 'Automated reminders disabled'}) }}
+              <label class="form-check-label" for="{{ form.enable_nudges.id }}">{{ 'Automated reminders enabled' if form.enable_nudges.data else 'Automated reminders disabled' }}</label>
+            </div>
+            <div class="admin-feature-flags__option-copy">Controls scheduled reminders and automated follow-up nudges.</div>
+          </div>
 
-    {{ toggle_checkbox(form.enable_external_forms, 'External forms enabled', 'External forms disabled') }}
-      <div class="form-text">When enabled, admins may mark a Form Template as using an external 3rd-party form; those templates will direct users to the external provider and accept webhook callbacks.</div>
+          <div class="admin-toggle-card admin-feature-flags__option{% if form.allow_user_nudges.data %} active{% endif %}">
+            <div class="form-check mb-0">
+              {{ form.allow_user_nudges(class_='form-check-input', **{'data-toggle-text-checked': 'User reminders enabled', 'data-toggle-text-unchecked': 'User reminders disabled'}) }}
+              <label class="form-check-label" for="{{ form.allow_user_nudges.id }}">{{ 'User reminders enabled' if form.allow_user_nudges.data else 'User reminders disabled' }}</label>
+            </div>
+            <div class="admin-feature-flags__option-copy">Lets users send reminders to each other. Leave off if reminder nudges should stay admin-controlled.</div>
+          </div>
+        </div>
+      </section>
 
-    <button class="btn btn-primary" type="submit">Save</button>
-    <noscript>
-      <small class="text-muted ms-2">(changes save automatically when JavaScript is enabled)</small>
-    </noscript>
-  </form>
+      <section class="admin-feature-flags__section">
+        <div class="admin-feature-flags__section-header">
+          <h3 class="section-heading__title mb-1">Identity & integrations</h3>
+          <p class="section-heading__subtitle mb-0">Controls for SSO role sync and external intake integrations.</p>
+        </div>
+
+        <div class="admin-feature-flags__options">
+          <div class="admin-toggle-card admin-feature-flags__option{% if form.sso_admin_sync_enabled.data %} active{% endif %}">
+            <div class="form-check mb-0">
+              {{ form.sso_admin_sync_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'SSO admin sync enabled', 'data-toggle-text-unchecked': 'SSO admin sync disabled'}) }}
+              <label class="form-check-label" for="{{ form.sso_admin_sync_enabled.id }}">{{ 'SSO admin sync enabled' if form.sso_admin_sync_enabled.data else 'SSO admin sync disabled' }}</label>
+            </div>
+            <div class="admin-feature-flags__option-copy">Allows organization-managed SSO claims or APIs to grant admin access. Manual assignment still works either way.</div>
+          </div>
+
+          <div class="admin-toggle-card admin-feature-flags__option{% if form.sso_department_sync_enabled.data %} active{% endif %}">
+            <div class="form-check mb-0">
+              {{ form.sso_department_sync_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'SSO department sync enabled', 'data-toggle-text-unchecked': 'SSO department sync disabled'}) }}
+              <label class="form-check-label" for="{{ form.sso_department_sync_enabled.id }}">{{ 'SSO department sync enabled' if form.sso_department_sync_enabled.data else 'SSO department sync disabled' }}</label>
+            </div>
+            <div class="admin-feature-flags__option-copy">Reassigns SSO-linked users from the configured department claim when their primary department is not admin-managed.</div>
+          </div>
+
+          <div class="admin-toggle-card admin-feature-flags__option{% if form.enable_external_forms.data %} active{% endif %}">
+            <div class="form-check mb-0">
+              {{ form.enable_external_forms(class_='form-check-input', **{'data-toggle-text-checked': 'External forms enabled', 'data-toggle-text-unchecked': 'External forms disabled'}) }}
+              <label class="form-check-label" for="{{ form.enable_external_forms.id }}">{{ 'External forms enabled' if form.enable_external_forms.data else 'External forms disabled' }}</label>
+            </div>
+            <div class="admin-feature-flags__option-copy">Enables external request-form templates that redirect to third-party providers and accept webhook callbacks.</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="form-actions-bar">
+        <button class="btn btn-primary" type="submit">Save</button>
+        <noscript>
+          <small class="text-muted">(changes save automatically when JavaScript is enabled)</small>
+        </noscript>
+      </div>
+    </form>
+  </section>
 {% endblock %}

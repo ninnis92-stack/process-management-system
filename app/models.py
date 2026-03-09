@@ -942,6 +942,24 @@ class FeatureFlags(TenantScopedMixin, db.Model):
     rolling_quotes_enabled = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    DEFAULTS = {
+        "enable_notifications": True,
+        "enable_nudges": True,
+        "allow_user_nudges": False,
+        "vibe_enabled": True,
+        "sso_admin_sync_enabled": True,
+        "sso_department_sync_enabled": False,
+        "enable_external_forms": False,
+        "rolling_quotes_enabled": True,
+    }
+
+    @classmethod
+    def default_instance(cls):
+        flags = cls()
+        for attr, default in cls.DEFAULTS.items():
+            setattr(flags, attr, default)
+        return flags
+
     @classmethod
     def get(cls):
         from sqlalchemy import text
@@ -963,14 +981,14 @@ class FeatureFlags(TenantScopedMixin, db.Model):
                 db.session.rollback()
             except Exception:
                 pass
-            return cls()
+            return cls.default_instance()
 
         # If table exists but probe returned no rows, return or create a row.
         if not row:
             try:
                 # Try to create a new DB-backed row; if this fails due to schema
                 # issues, fall back to an in-memory default.
-                f = cls()
+                f = cls.default_instance()
                 db.session.add(f)
                 db.session.commit()
                 return f
@@ -979,7 +997,7 @@ class FeatureFlags(TenantScopedMixin, db.Model):
                     db.session.rollback()
                 except Exception:
                     pass
-                return cls()
+                return cls.default_instance()
 
         # If an id exists, attempt to load the ORM object but tolerate failures.
         try:
@@ -987,16 +1005,7 @@ class FeatureFlags(TenantScopedMixin, db.Model):
             f = db.session.get(cls, row[0])
             if f:
                 # ensure no None values linger; treat them as defaults
-                for attr, default in (
-                    ("enable_notifications", True),
-                    ("enable_nudges", True),
-                    ("allow_user_nudges", False),
-                    ("vibe_enabled", True),
-                    ("sso_admin_sync_enabled", True),
-                    ("sso_department_sync_enabled", False),
-                    ("enable_external_forms", False),
-                    ("rolling_quotes_enabled", True),
-                ):
+                for attr, default in cls.DEFAULTS.items():
                     if getattr(f, attr, None) is None:
                         try:
                             setattr(f, attr, default)
@@ -1008,8 +1017,8 @@ class FeatureFlags(TenantScopedMixin, db.Model):
                 db.session.rollback()
             except Exception:
                 pass
-            return cls()
-        return cls()
+            return cls.default_instance()
+        return cls.default_instance()
 
 
 class RejectRequestConfig(TenantScopedMixin, db.Model):

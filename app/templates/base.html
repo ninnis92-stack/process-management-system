@@ -54,6 +54,7 @@
  </head>
  {% set ep = request.endpoint or '' %}
  {% set global_no_vibe = (not FeatureFlags.get().vibe_enabled) %}
+ {% set vibe_ui_enabled = current_user.is_authenticated and FeatureFlags.get().vibe_enabled %}
  <body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if current_user.is_authenticated and current_user.dark_mode %} dark-mode{% endif %}{% if global_no_vibe %} no-vibe{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-endpoint="{{ ep }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if (current_user.is_authenticated and (current_user.dark_mode or False)) else '0' }}" data-user-is-admin="{{ '1' if current_user.is_authenticated and current_user.is_admin else '0' }}">
   <a href="#content" class="skip-link">Skip to content</a>
 
@@ -65,18 +66,25 @@
     {% endif %}
     <div class="container-fluid">
       {% set brand_href = company_url if company_url else url_for('requests.dashboard') %}
-      <a class="navbar-brand d-flex align-items-center brand-stack" href="{{ brand_href }}"
-         {% if company_url and (company_url.startswith('http://') or company_url.startswith('https://')) %}target="_blank" rel="noopener noreferrer"{% endif %}>
-        {% if theme_logo_url %}
-          <img src="{{ theme_logo_url }}" alt="{{ site_brand_name or 'FreshProcess' }} logo" class="brand-logo-img" style="height:40px; margin-right:10px;" />
-        {% else %}
-          <div class="logo-fallback" style="width:40px;height:40px; font-size:0.9rem; margin-right:10px;" aria-hidden="true"></div>
+      <div class="brand-cluster">
+        <a class="navbar-brand d-flex align-items-center brand-stack" href="{{ brand_href }}"
+           {% if company_url and (company_url.startswith('http://') or company_url.startswith('https://')) %}target="_blank" rel="noopener noreferrer"{% endif %}>
+          {% if theme_logo_url %}
+            <img src="{{ theme_logo_url }}" alt="{{ site_brand_name or 'FreshProcess' }} logo" class="brand-logo-img" style="height:40px; margin-right:10px;" />
+          {% else %}
+            <div class="logo-fallback" style="width:40px;height:40px; font-size:0.9rem; margin-right:10px;" aria-hidden="true"></div>
+          {% endif %}
+          <div class="brand-copy">
+            <div class="brand-title">{{ site_brand_name or 'FreshProcess' }}</div>
+            <div class="brand-banner-row">
+              <div id="motivation" class="brand-quote" aria-live="polite">{{ initial_quote or 'Loading inspiration…' }}</div>
+            </div>
+          </div>
+        </a>
+        {% if vibe_ui_enabled %}
+          <button id="vibeBtn" data-vibe-trigger="navbar" type="button" class="btn btn-outline-light btn-sm brand-vibe-btn">Vibe · <span class="vibeLabel">—</span></button>
         {% endif %}
-        <div>
-          <div class="brand-title">{{ site_brand_name or 'FreshProcess' }}</div>
-          <div id="motivation" class="brand-quote" aria-live="polite">{{ initial_quote or 'Loading inspiration…' }}</div>
-        </div>
-      </a>
+      </div>
 
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -114,9 +122,6 @@
             {% endif %}
             {% if current_user.is_admin %}
               <button id="toggleNotifBtn" type="button" class="btn btn-outline-light btn-sm ms-2" title="Toggle notifications icon">🔕</button>
-            {% endif %}
-            {% if FeatureFlags.get().vibe_enabled %}
-              <button id="vibeBtn" type="button" class="btn btn-outline-light btn-sm">Vibe · <span id="vibeLabel">—</span></button>
             {% endif %}
             {% if current_user.is_admin or user_has_multiple_departments(current_user) %}
               {# unified department switcher for admins and other multi-department users;

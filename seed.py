@@ -1,7 +1,7 @@
 from werkzeug.security import generate_password_hash
 from app import create_app
 from app.extensions import db
-from app.models import SiteConfig, User
+from app.models import FeatureFlags, SiteConfig, User
 from sqlalchemy import inspect, text
 import json
 
@@ -188,6 +188,21 @@ def main():
             except Exception:
                 db.session.rollback()
 
+        flags = FeatureFlags.get()
+        for attr, default in (
+            ("enable_notifications", True),
+            ("enable_nudges", True),
+            ("allow_user_nudges", False),
+            ("vibe_enabled", True),
+            ("sso_admin_sync_enabled", True),
+            ("sso_department_sync_enabled", False),
+            ("enable_external_forms", False),
+            ("rolling_quotes_enabled", True),
+        ):
+            if getattr(flags, attr, None) is None:
+                setattr(flags, attr, default)
+        db.session.add(flags)
+
         cfg = SiteConfig.get()
         normalized_sets = SiteConfig.normalize_quote_sets(getattr(cfg, "rolling_quote_sets", None))
         # ensure each set has at least 30 entries so the rolling quote feature
@@ -225,6 +240,8 @@ def main():
         print("Admin account(s):")
         for e in admin_emails:
             print(f"{e} / admin123")
+        print("Feature flags:")
+        print(f"vibe_enabled: {bool(getattr(flags, 'vibe_enabled', True))}")
         print("Quote sets:")
         for name, quotes in normalized_sets.items():
             print(f"{name}: {len(quotes)} quote(s)")

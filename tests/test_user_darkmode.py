@@ -71,6 +71,21 @@ def test_dark_mode_not_added_by_default(client, app):
     assert b"dark-mode" not in m.group(1)
 
 
+def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
+    make_user(app, dark_mode=False)
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/dashboard")
+    assert rv.status_code == 200
+    cluster = rv.data.split(b'class="brand-cluster"', 1)[1].split(b'<button class="navbar-toggler"', 1)[0]
+    assert b'class="brand-banner-row"' in rv.data
+    assert b'id="motivation"' in rv.data
+    assert b'id="vibeBtn"' in rv.data
+    assert rv.data.index(b'id="motivation"') < rv.data.index(b'id="vibeBtn"')
+    assert cluster.index(b'</a>') < cluster.index(b'id="vibeBtn"')
+
+
 def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):
     make_user(app, dark_mode=True)
     rv = login(client)

@@ -57,6 +57,9 @@ def test_feature_flags_render_correct_action_labels(client, app):
     assert 'Notifications enabled' in html
     assert 'Automated reminders disabled' in html
     assert 'Vibe button UI enabled' in html
+    assert 'surface-panel admin-feature-flags-panel' in html
+    assert 'admin-feature-flags__section' in html
+    assert 'admin-toggle-card admin-feature-flags__option' in html
 
     # simulate saving new values and verify the returned page reflects them
     rv2 = client.post(
@@ -144,6 +147,28 @@ def test_feature_flags_json_autosave_updates(client, app):
         flags = FeatureFlags.get()
         assert flags.vibe_enabled is True
         assert flags.enable_nudges is False
+
+
+def test_feature_flags_fallback_defaults_keep_vibe_enabled(app, monkeypatch):
+    with app.app_context():
+        class _ExecuteResult:
+            def fetchone(self):
+                return (1,)
+
+        def fake_execute(*args, **kwargs):
+            return _ExecuteResult()
+
+        def fake_get(*args, **kwargs):
+            raise RuntimeError("schema drift")
+
+        monkeypatch.setattr(db.session, "execute", fake_execute)
+        monkeypatch.setattr(db.session, "get", fake_get)
+
+        flags = FeatureFlags.get()
+
+        assert flags.vibe_enabled is True
+        assert flags.enable_notifications is True
+        assert flags.enable_nudges is True
 
 
 def test_reject_request_config_label_describes_state(client, app):
