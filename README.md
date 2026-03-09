@@ -19,7 +19,7 @@ lightweight Stimulus controllers for interactivity.
 
 ## Overview
 
-*Note: recent updates changed dark-mode behavior such that enabling dark mode disables all vibe/theme controls. The navbar vibe button is removed and the theme selector is greyed out with a warning. No accent colors are applied while dark mode is active. The navbar banner now keeps quotes in their own panel, with the vibe button rendered inside its own solid control shell so it stays visually separate and can disappear cleanly when disabled. If the global vibe feature toggle is turned off, the shell is removed while the quote banner remains in a quote-only layout. Shared action-shell styling is now used across the navbar, command center, and monitor views so controls can appear or disappear without breaking alignment. The old dark-mode-compatible subset preview UI was also removed so dark mode has a single, consistent presentation, and the broader dashboard/admin/login surfaces now use a cleaner solid-panel visual system instead of the older glassy treatment.*
+*Note: recent updates changed dark-mode behavior such that enabling dark mode disables personal vibe/theme controls. The navbar vibe button is removed and the theme selector is greyed out with a warning, but adopted brand presets now carry their accent palette into the app's native dark mode automatically. The navbar banner now keeps quotes in their own panel, with the vibe button rendered inside its own solid control shell so it stays visually separate and can disappear cleanly when disabled. If the global vibe feature toggle is turned off, the shell is removed while the quote banner remains in a quote-only layout. Shared action-shell styling is now used across the navbar, command center, and monitor views so controls can appear or disappear without breaking alignment. The old dark-mode-compatible subset preview UI was also removed so dark mode has a single, consistent presentation, and the broader dashboard/admin/login surfaces now use a cleaner solid-panel visual system instead of the older glassy treatment.*
 
 This prototype supports structured intake forms, multi‑step process flows, and an
 extensible admin interface.  Admins can build custom request templates,
@@ -44,7 +44,7 @@ Key capabilities:
 - **Per-form guest access policies** for public, SSO-linked, approved-organization,
   and unaffiliated-only intake paths
 - **SSO/OIDC support** with optional admin sync
-- **Theme/vibe system**, dark mode (now integrated with vibe accents). Dark mode entirely disables custom themes. When dark mode is active the vibe button is hidden and the theme dropdown is locked, with explanatory text shown to the user. The navbar quote area and vibe control are separated so quotes stay visible even when the vibe button is absent, the vibe button itself now sits inside a distinct solid control shell instead of blending into the banner, disabling the global vibe feature leaves the banner in a quote-only state rather than removing it outright, shared action bars and control shells keep admin and monitor layouts uniform when controls are added or removed, the old dark-mode compatibility chips/previews are gone, and recent UI polish replaced the older glassy treatment with a more solid shared surface system across login, dashboard, settings, and admin pages. Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
+- **Theme/vibe system**, dark mode (now integrated with vibe accents). Dark mode disables personal vibe overrides and hides the vibe button, while adopted brand presets continue to tint the native dark palette so branded imports still feel consistent. The theme dropdown is locked with explanatory text shown to the user. The navbar quote area and vibe control are separated so quotes stay visible even when the vibe button is absent, the vibe button itself now sits inside a distinct solid control shell instead of blending into the banner, disabling the global vibe feature leaves the banner in a quote-only state rather than removing it outright, shared action bars and control shells keep admin and monitor layouts uniform when controls are added or removed, the old dark-mode compatibility chips/previews are gone, and recent UI polish replaced the older glassy treatment with a more solid shared surface system across login, dashboard, settings, and admin pages. Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
 
 Everything is covered by a comprehensive test suite and deploys automatically
 using a release script that migrates the database, creates missing columns,
@@ -487,7 +487,7 @@ page displays the last few steps and suggests next actions to the user.
 - Stored per-user preferences are normalized to lowercase/trimmed values on
   save and during seed/release tasks, protecting against case mismatches or
   legacy entries that could otherwise disappear after an upgrade.
-- **User settings**: dark mode (tints with the chosen vibe), theme/vibe selection, quote set, rotating
+- **User settings**: dark mode (keeps adopted brand presets blended into the native dark palette while disabling personal vibes), theme/vibe selection, quote set, rotating
   quotes.
 - **Templates & requirements**: rich form editing with grouped fields, hints,
   and other metadata.
@@ -503,8 +503,9 @@ folder.
 All notable changes are tracked in git history; refer to commit messages for
 more detail.  Recent updates include schema fixes, health checks, seeding
 behavior, admin‑template/requirement engine, and a redesign of dark mode:
-when vibe/theming is active the dark UI now inherits accent colors, while
-external/imported themes will revert to a basic, compatible dark palette.
+personal vibe accents are suppressed in dark mode, adopted brand presets now
+flow through the native dark palette, and raw external CSS themes still revert
+to a basic compatible dark treatment.
 
 
 ---

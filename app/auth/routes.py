@@ -9,6 +9,7 @@ from flask import (
     request,
     jsonify,
 )
+from urllib.parse import urlparse
 from werkzeug.security import check_password_hash
 
 try:
@@ -102,6 +103,23 @@ def _sync_current_user_preferences(user):
         pass
 
 
+def _safe_login_redirect_target():
+    next_url = request.args.get("next") or request.form.get("next")
+    if not next_url:
+        return None
+    parsed = urlparse(next_url)
+    if parsed.path and parsed.path.startswith("/") and not parsed.path.startswith("//"):
+        if not parsed.path.startswith("/static/"):
+            return next_url
+    return None
+
+
+def _authenticated_user_home_url(user):
+    if getattr(user, "is_admin", False):
+        return url_for("admin.index")
+    return url_for("requests.dashboard")
+
+
 VIBE_PALETTE_CHOICES = [
     (0, "Soft Coral · Cozy Coral"),
     (1, "Warm Sand · Warm Morning"),
@@ -183,9 +201,9 @@ def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None,
                 pass
         updated["vibe_index"] = getattr(user, "vibe_index", None)
 
-    # if dark mode is active, clear any vibe index so that the theme is
-    # effectively disabled.  this mirrors client-side behavior where the
-    # controls are non-functional and no accenting is applied.
+    # if dark mode is active, clear any personal vibe index so that user-level
+    # accent overrides are disabled. site-level adopted brand presets still
+    # flow through the native dark palette via shared CSS tokens.
     if bool(getattr(user, "dark_mode", False)):
         user.vibe_index = None
         updated["vibe_index"] = None
@@ -579,6 +597,9 @@ def switch_department():
 @auth_bp.route("/login", methods=["GET", "POST"])
 @rate_limit("login", config_key="LOGIN_RATE_LIMIT", default="5/300")
 def login():
+    if current_user.is_authenticated and request.method == "GET":
+        return redirect(_safe_login_redirect_target() or _authenticated_user_home_url(current_user))
+
     form = LoginForm()
     # Clear any pre-filled email when rendering the login page via GET so
     # refreshing the page doesn't leave the previous email visible in the form.
@@ -650,14 +671,9 @@ def login():
                 set_active_tenant(tenant)
             # redirect admins immediately to the command center; skip department flow
             if getattr(user, "is_admin", False):
-                next_url = request.args.get('next') or request.form.get('next')
+                next_url = _safe_login_redirect_target()
                 if next_url:
-                    from urllib.parse import urlparse
-
-                    parsed = urlparse(next_url)
-                    if parsed.path and parsed.path.startswith('/') and not parsed.path.startswith('//'):
-                        if not parsed.path.startswith('/static/'):
-                            return redirect(next_url)
+                    return redirect(next_url)
                 return redirect(url_for("admin.index"))
         except Exception:
             try:
@@ -697,17 +713,11 @@ def login():
             pass
         # Respect a `next` parameter when redirecting after login.  Only
         # allow internal paths to avoid open-redirect attacks.
-        next_url = request.args.get('next') or request.form.get('next')
+        next_url = _safe_login_redirect_target()
         # ignore attempts to redirect to static assets (common when a CSS/JS
         # file is fetched while session has expired and login_required kicks in).
         if next_url:
-            from urllib.parse import urlparse
-
-            parsed = urlparse(next_url)
-            # only allow same-host/internal paths
-            if parsed.path and parsed.path.startswith('/') and not parsed.path.startswith('//'):
-                if not parsed.path.startswith('/static/'):
-                    return redirect(next_url)
+            return redirect(next_url)
         return redirect(url_for("requests.dashboard"))
 
     return render_template("login.html", form=form)

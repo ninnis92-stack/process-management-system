@@ -142,6 +142,28 @@ def test_local_test_config_uses_non_secure_session_cookie(app):
     assert app.config["SESSION_COOKIE_SECURE"] is False
 
 
+def test_logged_in_user_is_redirected_away_from_login_page(app, client):
+    _create_user(app, email="already-in@example.com", department="B")
+
+    rv = _login(client, "already-in@example.com")
+    assert rv.status_code == 200
+
+    response = client.get("/auth/login", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/dashboard")
+
+
+def test_logged_in_admin_is_redirected_away_from_login_page(app, client):
+    _create_user(app, email="already-admin@example.com", is_admin=True)
+
+    rv = _login(client, "already-admin@example.com")
+    assert rv.status_code == 200
+
+    response = client.get("/auth/login", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/admin/")
+
+
 def test_department_a_navigation_links_resolve(app, client):
     _create_user(app, email="dept-a@example.com", department="A")
 

@@ -536,6 +536,50 @@ html {
   color: var(--nav-bg) !important;
 }
 
+body.theme-preset-ocean.dark-mode {
+  --nav-bg: #081a28;
+  --accent: #3ec1d3;
+  --accent-2: #7ad7f0;
+  --accent-rgb: 62, 193, 211;
+  --focus: rgba(62, 193, 211, 0.22);
+  --banner-bg: #122738;
+  --banner-border: rgba(62, 193, 211, 0.24);
+  --surface-accent: #143247;
+}
+
+body.theme-preset-forest.dark-mode {
+  --nav-bg: #14251d;
+  --accent: #7bc96f;
+  --accent-2: #b6d7a8;
+  --accent-rgb: 123, 201, 111;
+  --focus: rgba(123, 201, 111, 0.22);
+  --banner-bg: #1a2d23;
+  --banner-border: rgba(123, 201, 111, 0.24);
+  --surface-accent: #213728;
+}
+
+body.theme-preset-sunset.dark-mode {
+  --nav-bg: #25141a;
+  --accent: #ff8a5b;
+  --accent-2: #ffb26b;
+  --accent-rgb: 255, 138, 91;
+  --focus: rgba(255, 138, 91, 0.24);
+  --banner-bg: #311b22;
+  --banner-border: rgba(255, 138, 91, 0.24);
+  --surface-accent: #392128;
+}
+
+body.theme-preset-midnight.dark-mode {
+  --nav-bg: #050913;
+  --accent: #8ea7ff;
+  --accent-2: #7a5cff;
+  --accent-rgb: 142, 167, 255;
+  --focus: rgba(142, 167, 255, 0.24);
+  --banner-bg: #131a2d;
+  --banner-border: rgba(142, 167, 255, 0.24);
+  --surface-accent: #1a2340;
+}
+
 /* When an external/imported theme is active we should not let the
    dark-mode overrides change the navbar/banner/logo visuals. The
    `external-theme` body class is added when `active_theme_css` is present. */

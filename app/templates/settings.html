@@ -31,8 +31,12 @@
         <div class="form-check mb-3">
           {{ form.dark_mode(class_='form-check-input') }}
           <label class="form-check-label" for="dark_mode" id="darkModeLabel">{{ 'Dark mode enabled' if dark_mode_enabled else 'Dark mode disabled' }}</label>
-          <div id="darkModeVibeNote" class="form-text mt-1">Dark mode disables custom themes; vibe controls are inactive.</div>
+          <div id="darkModeVibeNote" class="form-text mt-1">Dark mode disables personal vibe controls, while adopted brand themes stay blended into the native dark palette.</div>
         </div>
+
+        {% if external_theme %}
+          <div class="form-text mt-2">This workspace is using an adopted brand theme. Native dark mode keeps the imported brand palette active automatically while personal vibe controls stay locked.</div>
+        {% endif %}
 
         {% if not external_theme and form.vibe_index %}
           <div class="mb-0">
@@ -54,7 +58,7 @@
                 </div>
               </div>
             </div>
-            <div class="form-text">Choose your UI accent theme. When dark mode is enabled this control is disabled and no accent is applied; admin-imported themes still override this setting.</div>
+            <div class="form-text">Choose your UI accent theme. When dark mode is enabled this control is disabled; adopted brand themes now carry their accent palette into native dark mode automatically.</div>
             <div id="vibeDarkModeNote" class="form-text text-warning mt-1" {% if not dark_mode_enabled %}hidden{% endif %}>Theme selection is disabled while dark mode is active.</div>
             <div id="vibeFeatureNote" class="form-text text-warning mt-1" {% if vibe_feature_enabled %}hidden{% endif %}>Theme selection is disabled while the global vibe feature is turned off.</div>
           </div>

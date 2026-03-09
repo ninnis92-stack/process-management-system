@@ -132,7 +132,7 @@ def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):
     assert rv.status_code == 200
     # the dark mode label should reflect the preference
     assert b'id="darkModeLabel">Dark mode enabled<' in rv.data
-    assert b'Dark mode disables custom themes; vibe controls are inactive.' in rv.data
+    assert b'Dark mode disables personal vibe controls, while adopted brand themes stay blended into the native dark palette.' in rv.data
     assert b'id="vibeDarkModeNote"' in rv.data
     assert b'id="vibe_index" name="vibe_index" disabled' in rv.data
     assert b'Theme selection is disabled while dark mode is active.' in rv.data
@@ -320,6 +320,34 @@ def test_dark_mode_dashboard_bootstraps_selected_vibe(client, app):
     assert b'data-user-vibe="5"' in rv.data
     # the navbar no longer renders a vibe button when dark mode is active
     assert b'id="vibeBtn"' not in rv.data
+
+
+def test_brand_adoption_keeps_native_dark_mode_with_brand_preset(client, app):
+    make_user(app, dark_mode=True)
+    with app.app_context():
+        from app.models import SiteConfig
+
+        cfg = SiteConfig.get()
+        cfg.theme_preset = "forest"
+        cfg.logo_filename = "uploads/branding/mock-logo.png"
+        db.session.commit()
+
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/dashboard")
+    assert rv.status_code == 200
+    m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
+    assert m, "no body tag?"
+    classes = m.group(1)
+    assert b"dark-mode" in classes
+    assert b"theme-preset-forest" in classes
+    assert b'id="vibeBtn"' not in rv.data
+
+    settings_page = client.get("/auth/settings")
+    assert settings_page.status_code == 200
+    assert b'This workspace is using an adopted brand theme. Native dark mode keeps the imported brand palette active automatically while personal vibe controls stay locked.' in settings_page.data
+    assert b'<label for="vibe_index" class="form-label">Theme</label>' not in settings_page.data
 
 
 def test_vibe_endpoint_persists_and_settings_reflect(client, app):
