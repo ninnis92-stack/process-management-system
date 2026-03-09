@@ -546,7 +546,6 @@
 
 (function initTheme() {
   const vibeButtons = Array.from(document.querySelectorAll('#vibeBtn, #vibeBtnDept, #vibeBtnAdmin, [data-vibe-trigger]'));
-  const darkModeCompatiblePaletteIndexes = [0, 4, 5, 7, 14, 18, 23, 24];
   const themeManagedProps = [
     '--accent', '--accent-rgb', '--accent-2', '--nav-bg', '--nav-text', '--body-text',
     '--surface', '--surface-2', '--surface-3', '--border', '--focus', '--banner-bg',
@@ -582,8 +581,6 @@
     { name: "Aurora", theme: "Aurora", accent: "#0F766E", accent2: "#E6FAF8" }
   ];
   window.VIBE_PALETTES = palettes;
-  window.DARK_MODE_COMPATIBLE_VIBES = darkModeCompatiblePaletteIndexes;
-
   function hexToRgb(hex) {
     const normalized = hex.replace('#', '');
     const bigint = parseInt(normalized.length === 3
@@ -618,21 +615,6 @@
   // toggle this class, they merely apply their own CSS rules.
   function isDarkModeEnabled() {
     return document.body.classList.contains('dark-mode');
-  }
-
-  function isDarkModeCompatiblePalette(idx) {
-    return darkModeCompatiblePaletteIndexes.includes(Number(idx));
-  }
-
-  function getEffectivePaletteIndex(idx) {
-    const requested = Number(idx);
-    if (!isDarkModeEnabled()) {
-      return Number.isFinite(requested) ? requested : 0;
-    }
-    if (isDarkModeCompatiblePalette(requested)) {
-      return requested;
-    }
-    return darkModeCompatiblePaletteIndexes[0];
   }
 
   function clearThemeOverrides() {
@@ -719,7 +701,8 @@
       clearThemeOverrides();
       return;
     }
-    const effectiveIdx = getEffectivePaletteIndex(idx);
+    const requestedIdx = Number(idx);
+    const effectiveIdx = Number.isFinite(requestedIdx) ? requestedIdx : 0;
     const p = palettes[effectiveIdx] || palettes[0];
     const root = document.documentElement;
     const rgb = hexToRgb(p.accent);
@@ -779,19 +762,11 @@
     document.querySelectorAll('[data-vibe-preview-name]').forEach(el => {
       try { el.textContent = p.theme || p.name; } catch (e) {}
     });
-    document.querySelectorAll('[data-vibe-preview-badge]').forEach(el => {
-      try { el.hidden = !isDarkModeCompatiblePalette(effectiveIdx); } catch (e) {}
-    });
     document.querySelectorAll('[data-vibe-preview-accent]').forEach(el => {
       try { el.style.background = p.accent; } catch (e) {}
     });
     document.querySelectorAll('[data-vibe-preview-accent2]').forEach(el => {
       try { el.style.background = p.accent2 || p.accent; } catch (e) {}
-    });
-    document.querySelectorAll('[data-vibe-compatible-chip]').forEach(el => {
-      try {
-        el.classList.toggle('is-active', String(el.dataset.vibeCompatibleChip) === String(effectiveIdx));
-      } catch (e) {}
     });
     localStorage.setItem("vibeTheme", String(effectiveIdx));
     syncVibeControlAvailability();
@@ -862,7 +837,7 @@
       // no cycling while dark mode is on
       return;
     }
-    const current = getEffectivePaletteIndex(Number(localStorage.getItem("vibeTheme")) || 0);
+    const current = Number(localStorage.getItem("vibeTheme")) || 0;
     const next = (current + 1) % palettes.length;
     applyTheme(next);
   }

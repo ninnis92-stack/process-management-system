@@ -82,6 +82,8 @@ def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
     assert rv.status_code == 200
     cluster = rv.data.split(b'class="brand-cluster"', 1)[1].split(b'<button class="navbar-toggler"', 1)[0]
     assert b'class="brand-banner-row"' in rv.data
+    assert b'class="brand-banner-row__quote-panel"' in rv.data
+    assert b'class="brand-banner-row__control-panel"' in rv.data
     assert b'data-theme-banner' in rv.data
     assert b'id="motivation"' in rv.data
     assert b'id="vibeBtn"' in rv.data
@@ -127,8 +129,8 @@ def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):
     assert b'id="vibeDarkModeNote"' in rv.data
     assert b'id="vibe_index" name="vibe_index" disabled' in rv.data
     assert b'Theme selection is disabled while dark mode is active.' in rv.data
-    assert b'data-vibe-preview-badge' in rv.data
-    assert b'data-vibe-compatible-chip=' in rv.data
+    assert b'data-vibe-preview-badge' not in rv.data
+    assert b'data-vibe-compatible-chip=' not in rv.data
     assert b"Changes save automatically." in rv.data
     assert b'id="darkModeSubmitBtn"' not in rv.data
     # the checkbox input should be checked so the client script can

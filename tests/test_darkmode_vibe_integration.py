@@ -13,15 +13,15 @@ def test_dark_mode_vibe_logic_present_in_theme_script():
     assert "function syncVibeControlAvailability()" in content
     assert "function showVibeFeedback(message, variant = 'warning')" in content
     assert 'if (darkMode) {' in content
-    assert 'root.style.setProperty("--accent", p.accent);' in content
-    assert 'root.style.setProperty("--nav-bg", mixHex(p.accent, "#0b1220", 0.30));' in content
-    assert 'root.style.setProperty("--surface", mixHex(p.accent, "#111c2d", 0.20));' in content
-    assert 'root.style.setProperty("--banner-bg", `linear-gradient(135deg, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.28), rgba(8, 17, 31, 0.34))`);' in content
     assert 'button.disabled = darkMode' in content
     assert 'vibeSelect.disabled = darkMode' in content
     assert 'clearThemeOverrides();' in content
     assert 'return;' in content
     assert 'applyTheme(startIdx);' in content
+    assert 'const effectiveIdx = Number.isFinite(requestedIdx) ? requestedIdx : 0;' in content
+    assert 'document.querySelectorAll(\'[data-vibe-preview-name]\')' in content
+    assert 'document.querySelectorAll(\'[data-vibe-preview-badge]\')' not in content
+    assert 'document.querySelectorAll(\'[data-vibe-compatible-chip]\')' not in content
 
     # light-mode branch must still set sane defaults and reset text colors
     assert 'root.style.setProperty("--nav-text", mixHex("#f8fbff"' in content

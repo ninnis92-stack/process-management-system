@@ -454,8 +454,6 @@ def settings():
         "settings.html",
         form=form,
         all_vibe_choices=all_palettes,
-        dark_vibe_choices=dark_mode_palettes,
-        dark_mode_compatible_vibe_indexes=list(DARK_MODE_COMPATIBLE_VIBE_INDEXES),
     )
 
 

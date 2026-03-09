@@ -156,13 +156,13 @@
                 <img src="{{ avatar_url_for(current_user, size=34) }}" alt="Account avatar" class="avatar avatar-sm me-2" />
                 <span class="visually-hidden">Account</span>
               </button>
-              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountMenuBtn">
+              <ul class="dropdown-menu dropdown-menu-end account-dropdown-menu" aria-labelledby="accountMenuBtn">
                 <li class="px-3 py-2">
                   <div class="small text-muted">{{ department_labels.get(current_user.department, 'Dept ' ~ current_user.department) }}</div>
                   <div class="fw-bold">{{ current_user.email }}</div>
                 </li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item" href="{{ url_for('auth.settings') }}">Settings</a></li>
+                <li><a class="dropdown-item account-dropdown-item" href="{{ url_for('auth.settings') }}">Settings</a></li>
                 {# switch dept link previously appeared here for all users with
                    multiple departments.  now we offer a navbar dropdown, so the
                    modal link is no longer needed and is removed to reduce
@@ -174,7 +174,7 @@
                                 <li>
                   <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="dropdown-item">Logout</button>
+                    <button type="submit" class="dropdown-item account-dropdown-item">Logout</button>
                   </form>
                 </li>
               </ul>
