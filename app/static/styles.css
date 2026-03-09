@@ -672,7 +672,7 @@ body.theme-preset-midnight:not(.dark-mode) {
   justify-content: center;
 }
 
-.brand-stack { flex-direction: row !important; align-items: center !important; gap: 10px !important; }
+.brand-stack { flex-direction: row !important; align-items: center !important; gap: 10px !important; position: relative; z-index: 2; }
 .brand-copy {
   display: flex;
   flex-direction: column;
@@ -707,6 +707,9 @@ body.theme-preset-midnight:not(.dark-mode) {
   border: 1px solid var(--banner-border);
   box-shadow: var(--banner-shadow);
   min-height: 50px;
+  margin-left: 0.5rem; /* keep a bit of space from brand title */
+  position: relative;
+  z-index: 1; /* sit behind brand-stack so kicker/logo remain visible */
 }
 .brand-banner-row__content {
   min-width: 0;

@@ -88,6 +88,12 @@ def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
     assert cluster.index(b'</a>') < cluster.index(b'id="vibeBtn"')
     assert b'Current vibe' in rv.data
 
+    # new CSS rules should make brand-stack sit above the banner and add spacing
+    with open('app/static/styles.css', 'r') as f:
+        css = f.read()
+    assert '.brand-stack' in css and 'z-index: 2' in css
+    assert '.brand-banner-row' in css and 'margin-left: 0.5rem' in css
+
 
 def test_dashboard_brand_banner_renders_without_vibe_button_when_feature_disabled(client, app):
     make_user(app, dark_mode=False)
