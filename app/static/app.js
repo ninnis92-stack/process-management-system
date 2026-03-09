@@ -323,14 +323,10 @@
     const root = document.documentElement;
     root.style.setProperty("--accent", p.accent);
     root.style.setProperty("--accent-2", p.accent2 || p.accent);
-    // gentle nav background derived from the accent (muted for pastel palettes)
-    root.style.setProperty("--nav-bg", darkenHex(p.accent, 0.56));
     const rgb = hexToRgb(p.accent);
     root.style.setProperty("--focus", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.16)`);
-    root.style.setProperty(
-      "--page-bg",
-      `radial-gradient(circle at 20% 20%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.10), transparent 30%), radial-gradient(circle at 80% 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.06), transparent 28%), #fbfcfe`
-    );
+    // Use a solid, neutral background — no gradients or transparency
+    root.style.setProperty("--page-bg", "#f5f7fa");
     // Update any visible vibe labels (global and department-facing)
     const vibeLabels = document.querySelectorAll('.vibeLabel, #vibeLabel');
     vibeLabels.forEach(el => { try { el.textContent = (p.theme || p.name); } catch(e){} });

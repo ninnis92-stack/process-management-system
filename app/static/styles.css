@@ -1,16 +1,16 @@
 :root {
-  --nav-bg: #151a22;
+  --nav-bg: #1c2030;
   --max-page-width: 1200px;
   --container-padding: 1rem;
-  --nav-text: #eef2f7;
-  --accent: #2f5f9c;
-  --accent-2: #254d80;
-  --page-bg: #f4f5f7;
-  --body-text: #0b1220;
-  --muted: #525f6b;
-  --border: #e6e9ee;
+  --nav-text: #e8edf4;
+  --accent: #2563eb;
+  --accent-2: #1d4ed8;
+  --page-bg: #f5f7fa;
+  --body-text: #111827;
+  --muted: #4b5563;
+  --border: #e2e6ec;
   --surface: #ffffff;
-  --focus: rgba(11,97,238,0.14);
+  --focus: rgba(37,99,235,0.14);
 }
 
 *,
@@ -28,7 +28,7 @@
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  line-height: 1.36;
+  line-height: 1.5;
 }
 
 /* Constrain page content width for readability and center it */
@@ -42,8 +42,8 @@
 
 .theme-nav {
   background-color: var(--nav-bg) !important;
-  border-bottom: 1px solid #2a313d;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
   position: relative; /* allow nudging the navbar down so it doesn't overlap banner */
   top: 8px; /* lower the navbar slightly */
   z-index: 1000; /* keep above page content but below dropdowns that use higher z-index */
@@ -188,7 +188,7 @@ a:hover { color: var(--accent-2); }
 .notif-dropdown .notif-item strong { color: #000000; font-weight:700; }
 .notif-dropdown .notif-item .small, .notif-dropdown .notif-item small { color: rgba(0,0,0,0.7); }
 
-.card { background: #ffffff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 6px 16px rgba(15,23,42,0.06); }
+.card { background: #ffffff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 1px 4px rgba(15,23,42,0.07); }
 .card { border-top: 1px solid var(--border); }
 /* Slightly more compact card spacing for small screens */
 .card { padding: 1rem; }
