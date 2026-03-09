@@ -10,7 +10,9 @@
     <a class="btn btn-sm btn-outline-primary" href="?dept=A">View Dept A</a>
     <a class="btn btn-sm btn-outline-primary" href="?dept=B">View Dept B</a>
     <a class="btn btn-sm btn-outline-primary" href="?dept=C">View Dept C</a>
-    <button id="vibeBtnDept" class="btn btn-sm btn-outline-secondary">Vibe · <span class="vibeLabel">—</span></button>
+    {% if FeatureFlags.get().vibe_enabled and not current_user.dark_mode %}
+      <button id="vibeBtnDept" class="btn btn-sm btn-outline-secondary">Vibe · <span class="vibeLabel">—</span></button>
+    {% endif %}
   </div>
 </section>
 

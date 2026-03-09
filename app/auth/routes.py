@@ -119,7 +119,7 @@ def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None,
         user.quotes_enabled = _coerce_checkbox_value(payload.get("quotes_enabled"))
         updated["quotes_enabled"] = bool(user.quotes_enabled)
 
-    if not external_theme_loaded and _setting_present(payload, "vibe_index"):
+    if not external_theme_loaded and (not bool(getattr(user, "dark_mode", False))) and _setting_present(payload, "vibe_index"):
         raw_vibe = payload.get("vibe_index")
         if raw_vibe in (None, ""):
             user.vibe_index = None
@@ -128,6 +128,8 @@ def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None,
                 user.vibe_index = int(raw_vibe)
             except Exception:
                 pass
+        updated["vibe_index"] = getattr(user, "vibe_index", None)
+    elif _setting_present(payload, "vibe_index"):
         updated["vibe_index"] = getattr(user, "vibe_index", None)
 
     if _setting_present(payload, "quote_set"):
@@ -816,6 +818,8 @@ def set_vibe():
         return ("Missing vibe_index", 400)
 
     u = db.session.get(User, current_user.id)
+    if getattr(u, "dark_mode", False):
+        return jsonify({"ok": False, "error": "dark_mode_disables_vibe", "vibe_index": getattr(u, "vibe_index", None)}), 409
     u.vibe_index = max(0, int(v))
     db.session.commit()
     # Reflect change in current_user proxy for immediate client-side use

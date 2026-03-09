@@ -17,6 +17,7 @@
           <div class="form-check mb-3">
             {{ form.dark_mode(class_='form-check-input') }}
             <label class="form-check-label" for="dark_mode" id="darkModeLabel">{{ 'Dark mode enabled' if dark_mode_enabled else 'Dark mode disabled' }}</label>
+            <div id="darkModeVibeNote" class="form-text mt-1">Turning on dark mode disables the vibe button and theme selection.</div>
           </div>
 
           {{ toggle_checkbox(form.quotes_enabled, 'Rotating quotes enabled', 'Rotating quotes disabled') }}
@@ -25,7 +26,7 @@
         {% if not external_theme and form.vibe_index %}
           <div class="mb-3">
             <label for="vibe_index" class="form-label">Theme</label>
-            <select class="form-select" id="vibe_index" name="vibe_index">
+            <select class="form-select" id="vibe_index" name="vibe_index" {% if dark_mode_enabled %}disabled{% endif %} data-locked="{{ '1' if dark_mode_enabled else '0' }}">
               {% for val, label in form.vibe_index.choices %}
                 <option value="{{ val }}" {% if (current_user.vibe_index is not none and current_user.vibe_index == val) or (form.vibe_index.data is not none and form.vibe_index.data == val) %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -40,7 +41,8 @@
                 <div class="theme-preview-card__name" data-vibe-preview-name>Theme preview</div>
               </div>
             </div>
-            <div class="form-text">Choose your UI accent theme. In dark mode, the selected vibe now tints the dark surfaces, nav, and background. Admin-imported themes override this setting.</div>
+            <div class="form-text">Choose your UI accent theme. When dark mode is enabled this control is disabled and the default dark palette is used. Admin-imported themes override this setting.</div>
+            <div id="vibeDarkModeNote" class="form-text text-warning mt-1" {% if not dark_mode_enabled %}hidden{% endif %}>Theme selection is unavailable while dark mode is active.</div>
           </div>
         {% endif %}
 
@@ -82,6 +84,8 @@
       const label = document.getElementById('darkModeLabel');
       const statusEl = document.getElementById('settingsAutoSaveStatus');
       const vibeSelect = document.getElementById('vibe_index');
+      const vibeDarkModeNote = document.getElementById('vibeDarkModeNote');
+      const themePreviewCard = document.getElementById('userThemePreview');
       if (!checkbox || !label || !statusEl) return;
 
       const syncDarkModeText = () => {
@@ -91,10 +95,25 @@
         document.body.classList.toggle('dark-mode', checkbox.checked);
         document.body.setAttribute('data-user-dark-mode', checkbox.checked ? '1' : '0');
       };
+      const syncVibeControlState = () => {
+        if (!vibeSelect) return;
+        vibeSelect.disabled = checkbox.checked;
+        vibeSelect.dataset.locked = checkbox.checked ? '1' : '0';
+        if (vibeDarkModeNote) {
+          vibeDarkModeNote.hidden = !checkbox.checked;
+        }
+        if (themePreviewCard) {
+          themePreviewCard.classList.toggle('opacity-50', checkbox.checked);
+        }
+        if (window.syncVibeThemeState) {
+          window.syncVibeThemeState();
+        }
+      };
 
       checkbox.addEventListener('change', () => {
         syncDarkModeText();
         syncBodyClass();
+        syncVibeControlState();
         const selected = Number(vibeSelect && vibeSelect.value);
         if (window.applyVibeTheme && Number.isFinite(selected)) {
           window.applyVibeTheme(selected);
@@ -113,6 +132,7 @@
       // initial state
       syncDarkModeText();
       syncBodyClass();
+      syncVibeControlState();
       if (vibeSelect) {
         const selected = Number(vibeSelect.value);
         if (window.applyVibeTheme && Number.isFinite(selected)) {

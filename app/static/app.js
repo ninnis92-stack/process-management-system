@@ -546,6 +546,11 @@
 
 (function initTheme() {
   const vibeButtons = Array.from(document.querySelectorAll('#vibeBtn, #vibeBtnDept, #vibeBtnAdmin, [data-vibe-trigger]'));
+  const themeManagedProps = [
+    '--accent', '--accent-rgb', '--accent-2', '--nav-bg', '--nav-text', '--body-text',
+    '--surface', '--surface-2', '--surface-3', '--border', '--focus', '--banner-bg',
+    '--banner-border', '--banner-shadow', '--page-bg'
+  ];
 
   // 24 pastel / muted palettes that are easy on the eyes (accent = primary, accent2 = softer shade)
   const palettes = [
@@ -613,6 +618,36 @@
     return document.body.classList.contains('dark-mode');
   }
 
+  function clearThemeOverrides() {
+    themeManagedProps.forEach((prop) => {
+      try {
+        document.documentElement.style.removeProperty(prop);
+      } catch (e) {}
+    });
+  }
+
+  function syncVibeControlAvailability() {
+    const darkMode = isDarkModeEnabled();
+    vibeButtons.forEach((button) => {
+      try {
+        button.disabled = darkMode;
+        button.hidden = darkMode;
+        button.setAttribute('aria-hidden', darkMode ? 'true' : 'false');
+      } catch (e) {}
+    });
+
+    const vibeSelect = document.getElementById('vibe_index');
+    if (vibeSelect) {
+      const lockedByTemplate = vibeSelect.dataset.locked === '1';
+      vibeSelect.disabled = darkMode || lockedByTemplate;
+    }
+
+    const vibeDarkModeNote = document.getElementById('vibeDarkModeNote');
+    if (vibeDarkModeNote) {
+      vibeDarkModeNote.hidden = !darkMode;
+    }
+  }
+
   function applyTheme(idx) {
     const p = palettes[idx] || palettes[0];
     const root = document.documentElement;
@@ -627,29 +662,10 @@
     );
 
     if (darkMode) {
-      // make the accent much more visible in dark mode; users were
-      // reporting that clicking Vibe produced almost no perceptible change
-      // because the previous mixing weights were extremely light.
-      root.style.setProperty("--nav-bg", mixHex(p.accent, "#0b1220", 0.30));
-      // tint the nav text aggressively so the accent shows up against the
-      // already-dark background
-      root.style.setProperty("--nav-text", mixHex("#e8f0fb", p.accent, 0.15));
-      // body text should still be legible, but with a noticeable hue
-      root.style.setProperty("--body-text", mixHex("#e5eef8", p.accent, 0.12));
-      // surfaces get a stronger wash of color so cards and panels clearly
-      // change when the vibe cycles
-      root.style.setProperty("--surface", mixHex(p.accent, "#111c2d", 0.20));
-      root.style.setProperty("--surface-2", mixHex(p.accent, "#18263b", 0.15));
-      root.style.setProperty("--surface-3", mixHex(p.accent, "#21344e", 0.20));
-      root.style.setProperty("--border", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.20)`);
-      root.style.setProperty("--focus", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.26)`);
-      root.style.setProperty("--banner-bg", `linear-gradient(135deg, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.28), rgba(8, 17, 31, 0.34))`);
-      root.style.setProperty("--banner-border", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.38)`);
-      root.style.setProperty("--banner-shadow", `0 14px 30px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.16)`);
-      root.style.setProperty(
-        "--page-bg",
-        `radial-gradient(circle at 18% 18%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.14), transparent 30%), radial-gradient(circle at 82% 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.10), transparent 28%), linear-gradient(180deg, #08111f 0%, #0d1728 100%)`
-      );
+      clearThemeOverrides();
+      syncVibeControlAvailability();
+      localStorage.setItem("vibeTheme", String(idx));
+      return;
     } else {
       root.style.setProperty("--nav-bg", mixHex(p.accent, "#162033", 0.20));
       // default nav text should stay bright because the navbar remains dark
@@ -689,9 +705,10 @@
       try { el.style.background = p.accent2 || p.accent; } catch (e) {}
     });
     localStorage.setItem("vibeTheme", String(idx));
+    syncVibeControlAvailability();
     // If user is logged in, persist preference server-side
     try{
-      if(isUserLoggedIn()){
+      if(isUserLoggedIn() && !darkMode){
         fetch('/auth/vibe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ vibe_index: idx }) }).catch(()=>{});
       }
     }catch(e){}
@@ -718,6 +735,7 @@
   const dailySeed = (new Date()).getUTCDate() + (new Date()).getUTCMonth() * 31;
   const startIdx = Number.isFinite(stored) ? stored % palettes.length : (dailySeed % palettes.length);
   window.applyVibeTheme = applyTheme;
+  window.syncVibeThemeState = syncVibeControlAvailability;
   applyTheme(startIdx);
 
   // Attach click handlers to whichever vibe buttons are present (global navbar and/or department view)
@@ -728,6 +746,10 @@
 
   vibeButtons.forEach((button) => {
     button.addEventListener('click', (e) => {
+      if (isDarkModeEnabled()) {
+        e.preventDefault();
+        return;
+      }
       if (button.tagName === 'A') {
         e.preventDefault();
       }
