@@ -7,10 +7,12 @@ This application supports optional integration with third-party form providers (
 How it works
 
 - Admins enable the feature flag `Enable external form integrations` on the Feature Flags page.
-- Admins create a Form Template and optionally toggle "Use external form" and provide the external provider name and the external form URL/id.
+- Admins create a Form Template and optionally toggle "Use external form" and provide the external provider name and the external form URL/id.  When creating or editing a template you can also choose a layout (standard/compact/spacious) which will be returned by the API and can be used by your third‑party form generator to match the app’s styling.
+- Connected templates expose a generated schema at `/integrations/templates/<template_id>/external-schema` so external builders can fetch the live layout, sections, and field definitions directly from the app.
 - When a department is assigned this template, users visiting the New Request page will be redirected or shown a link to the external form instead of the internal form.
 - The external provider must be configured to POST form responses to the webhook endpoint in this app: `/integrations/external-form-callback`.
 - The webhook uses an HMAC signature in the `X-Webhook-Signature` header (SHA256 hex) which is validated against the shared secret in `WEBHOOK_SHARED_SECRET` app config or environment variable.
+- The connected template can also be exported as generated JSON from `/api/templates/<template_id>/external-schema`, including its layout, grouped sections, and field spec so a third-party builder can render a matching UI.
 
 Recommended webhook payload
 
@@ -33,7 +35,7 @@ Payload example:
   }
 }
 
-The webhook will map common fields into the created `Request` and store the raw payload in a `Submission` row.
+The webhook will map common fields into the created `Request` and store the translated payload in a `Submission` row. Where labels or provider-specific keys differ from the native template field names, the app translates them back into the connected internal keys before saving.
 
 HMAC signing example (Python)
 

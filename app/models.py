@@ -576,6 +576,16 @@ class Submission(db.Model):
     data = db.Column(db.JSON, nullable=True)
 
 
+# layout options for form templates, similar to guest forms.  This allows
+# an external service or client to request the visual arrangement when
+# generating their own copy of the form for submission.
+FORM_TEMPLATE_LAYOUT_CHOICES = [
+    ("standard", "Standard"),
+    ("compact", "Compact"),
+    ("spacious", "Spacious"),
+]
+
+
 class FormTemplate(TenantScopedMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
@@ -595,6 +605,25 @@ class FormTemplate(TenantScopedMixin, db.Model):
     # Optional external provider form id / token
     external_form_id = db.Column(db.String(255), nullable=True)
 
+    @property
+    def layout_label(self):
+        mapping = dict(FORM_TEMPLATE_LAYOUT_CHOICES)
+        return mapping.get(self.layout, mapping.get("standard"))
+    # layout of the template for externally generated forms; used by third
+    # party clients to mirror the same spacing/width choices that the app
+    # would render.  Defaults to 'standard'.
+    layout = db.Column(db.String(20), nullable=False, default="standard")
+
+
+# layout options that determine the visual presentation of the public
+# guest intake form.  Admins can choose one of these when they create/edit
+# a guest form and the frontend will apply a corresponding CSS class.
+GUEST_FORM_LAYOUT_CHOICES = [
+    ("standard", "Standard"),
+    ("compact", "Compact"),
+    ("spacious", "Spacious"),
+]
+
 
 class GuestForm(TenantScopedMixin, db.Model):
     """Admin-manageable guest form instance used for public/guest submissions.
@@ -602,6 +631,11 @@ class GuestForm(TenantScopedMixin, db.Model):
     Allows per-form toggles such as requiring an SSO-linked account to submit.
     More advanced access policies can target approved SSO organizations by
     email domain or reserve a form for unaffiliated submitters.
+
+    A new ``layout`` column holds a simple identifier that drives the HTML/CSS
+    class applied to the external intake page so that different forms can have
+    distinct visual arrangements (for example, a more compact or spacious
+    layout).
     """
 
     id = db.Column(db.Integer, primary_key=True)
@@ -614,6 +648,7 @@ class GuestForm(TenantScopedMixin, db.Model):
     allowed_email_domains = db.Column(db.Text, nullable=True)
     credential_requirements_json = db.Column(db.Text, nullable=True)
     owner_department = db.Column(db.String(2), nullable=False, default="B")
+    layout = db.Column(db.String(20), nullable=False, default="standard")
     is_default = db.Column(db.Boolean, nullable=False, default=False)
     active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -654,6 +689,11 @@ class GuestForm(TenantScopedMixin, db.Model):
             if domain and domain not in items:
                 items.append(domain)
         return items
+
+    @property
+    def layout_label(self):
+        mapping = dict(GUEST_FORM_LAYOUT_CHOICES)
+        return mapping.get(self.layout, mapping.get("standard"))
 
     @property
     def credential_requirements(self):

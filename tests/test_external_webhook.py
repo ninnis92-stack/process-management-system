@@ -8,6 +8,7 @@ import pytest
 from app.extensions import db
 from app.models import (
     FormTemplate,
+    FormField,
     DepartmentFormAssignment,
     Submission,
     Request as ReqModel,
@@ -30,9 +31,19 @@ def test_external_form_callback_creates_request(client, app, monkeypatch):
             external_enabled=True,
             external_form_id="msf-1",
             external_provider="microsoft_forms",
+            layout="spacious",
         )
         db.session.add(t)
         db.session.commit()
+        db.session.add(
+            FormField(
+                template_id=t.id,
+                name="business_justification",
+                label="Business Justification",
+                field_type="text",
+                required=False,
+            )
+        )
         assign = DepartmentFormAssignment(template_id=t.id, department_name="A")
         db.session.add(assign)
         db.session.commit()
@@ -46,6 +57,7 @@ def test_external_form_callback_creates_request(client, app, monkeypatch):
             "request_type": "part_number",
             "donor_part_number": "D-1",
             "target_part_number": "T-2",
+            "Business Justification": "Needed for launch",
             "due_at": "2026-03-10T12:00:00Z",
         },
     }
@@ -68,6 +80,10 @@ def test_external_form_callback_creates_request(client, app, monkeypatch):
         assert r is not None
         subs = Submission.query.filter_by(request_id=rid).all()
         assert len(subs) == 1
+        assert subs[0].data["business_justification"] == "Needed for launch"
+        assert subs[0].data["_mapped"] is True
+        assert subs[0].data["_native_translation"]["template_id"] == t.id
+        assert subs[0].data["_native_translation"]["layout"] == "spacious"
 
 
 def test_external_form_callback_invalid_signature(client, app, monkeypatch):
@@ -108,3 +124,36 @@ def test_external_form_callback_template_not_external(client, app, monkeypatch):
     assert resp.status_code == 400
     j = resp.get_json()
     assert j.get("error") == "template_not_external"
+
+
+def test_external_form_schema_route_exposes_connected_layout(client, app):
+    with app.app_context():
+        t = FormTemplate(
+            name="Schema Route Form",
+            description="schema route",
+            external_enabled=True,
+            external_form_id="schema-route-1",
+            external_provider="microsoft_forms",
+            layout="compact",
+        )
+        db.session.add(t)
+        db.session.commit()
+        db.session.add(
+            FormField(
+                template_id=t.id,
+                name="requested_by",
+                label="Requested By",
+                section_name="Contact",
+                field_type="text",
+                required=True,
+            )
+        )
+        db.session.commit()
+        template_id = t.id
+
+    resp = client.get(f"/integrations/templates/{template_id}/external-schema")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True
+    assert body["template"]["layout"] == "compact"
+    assert body["template"]["sections"][0]["name"] == "Contact"

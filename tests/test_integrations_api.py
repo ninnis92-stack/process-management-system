@@ -8,9 +8,14 @@ from app.services.integrations import get_integration_scaffold, normalize_integr
 
 
 def test_requests_api_and_webhook_subscription(client, app):
-    from api.index import app as api_app
+    import importlib
+    import api.index as api_index
+
+    api_index = importlib.reload(api_index)
+    api_app = api_index.app
 
     with api_app.app_context():
+        db.create_all()
         admin = User(
             email="api-admin@example.com",
             password_hash=generate_password_hash("secret"),
@@ -41,6 +46,15 @@ def test_requests_api_and_webhook_subscription(client, app):
     rv = api.get("/api/requests", headers=headers)
     assert rv.status_code == 200
     assert b"Exportable Request" in rv.data
+
+    # ensure template listings include layout field
+    rv2 = api.get("/api/templates", headers=headers)
+    assert rv2.status_code == 200
+    data = rv2.get_json()
+    assert data.get("ok") is True
+    # default templates list may be empty but fields should include layout keys
+    if data.get("templates"):
+        assert "layout" in data["templates"][0]
 
     rv = api.post(
         "/api/integrations/webhook-subscriptions",
@@ -171,3 +185,48 @@ def test_api_template_verify_uses_tracker_integration(client, app, monkeypatch):
     body = rv.get_json()
     assert body["results"]["badge_id"]["ok"] is True
     assert body["results"]["badge_id"]["details"]["badge"] == "B-100"
+    # verify layout key is returned (default standard)
+    assert body.get("layout") == "standard"
+
+
+def test_api_template_external_schema_exposes_layout_and_sections(client, app):
+    import importlib
+    import api.index as api_index
+
+    api_index = importlib.reload(api_index)
+    api_app = api_index.app
+
+    with api_app.app_context():
+        db.create_all()
+        template = FormTemplate(
+            name="External Schema Template",
+            description="Schema export",
+            layout="compact",
+            external_enabled=True,
+            external_provider="microsoft_forms",
+            external_form_id="schema-1",
+        )
+        db.session.add(template)
+        db.session.commit()
+        db.session.add(
+            FormField(
+                template_id=template.id,
+                name="request_reason",
+                label="Request reason",
+                section_name="Details",
+                field_type="textarea",
+                required=True,
+            )
+        )
+        db.session.commit()
+        template_id = template.id
+
+    api = api_app.test_client()
+    headers = {"X-Api-Key": "test-key"}
+    rv = api.get(f"/api/templates/{template_id}/external-schema", headers=headers)
+    assert rv.status_code == 200
+    body = rv.get_json()
+    assert body["ok"] is True
+    assert body["template"]["layout"] == "compact"
+    assert body["template"]["fields"][0]["name"] == "request_reason"
+    assert body["template"]["sections"][0]["name"] == "Details"

@@ -386,6 +386,12 @@ class FormTemplateAdminForm(FlaskForm):
     external_form_id = StringField(
         "External form id", validators=[Optional(), Length(max=255)]
     )
+    layout = SelectField(
+        "Form layout",
+        choices=[("standard", "Standard"), ("compact", "Compact"), ("spacious", "Spacious")],
+        default="standard",
+        validators=[DataRequired(), AnyOf(["standard", "compact", "spacious"])],
+    )
     submit = SubmitField("Create Template")
 
 
@@ -558,6 +564,12 @@ class GuestFormAdminForm(FlaskForm):
     slug = StringField("Slug (unique)", validators=[DataRequired(), Length(max=200)])
     template_id = SelectField("Template (optional)", coerce=int, validators=[Optional()])
     require_sso = BooleanField("Require SSO-linked account to submit", default=False)
+    layout = SelectField(
+        "Form layout",
+        choices=[("standard", "Standard"), ("compact", "Compact"), ("spacious", "Spacious")],
+        default="standard",
+        validators=[DataRequired(), AnyOf(["standard", "compact", "spacious"])],
+    )
     access_policy = SelectField(
         "Submitter access policy",
         choices=[

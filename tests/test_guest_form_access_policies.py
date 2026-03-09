@@ -64,6 +64,7 @@ def test_admin_guest_form_can_store_access_policy_fields(app, client):
             "credential_requirements_json": json.dumps(
                 {"claim_path": "organization", "allowed_values": ["partner-org"]}
             ),
+            "layout": "compact",
             "is_default": "y",
             "active": "y",
         },
@@ -82,6 +83,31 @@ def test_admin_guest_form_can_store_access_policy_fields(app, client):
             "claim_path": "organization",
             "allowed_values": ["partner-org"],
         }
+        # layout value persisted
+        assert form.layout == "compact"
+
+
+def test_guest_form_layout_applied_to_ui(app, client, monkeypatch):
+    # create a guest form with a non-standard layout and verify the class appears
+    with app.app_context():
+        gf = GuestForm(
+            name="Layout Test",
+            slug="layout-test",
+            owner_department="B",
+            active=True,
+            layout="spacious",
+        )
+        db.session.add(gf)
+        db.session.commit()
+
+    rv = client.get("/external/new?guest_form=layout-test")
+    html = rv.get_data(as_text=True)
+    assert "guest-form-shell" in html
+    assert "layout-spacious" in html
+    # verify fallback without query parameter uses standard layout
+    rv2 = client.get("/external/new")
+    html2 = rv2.get_data(as_text=True)
+    assert "layout-standard" in html2
 
 
 def test_approved_sso_domains_policy_enforced(app, client, monkeypatch):

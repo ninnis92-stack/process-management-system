@@ -565,6 +565,17 @@ def main():
                             )
                         )
                     print("schema_fix=form_template.external_form_id_added")
+                if (
+                    "form_template" in insp.get_table_names()
+                    and "layout" not in form_template_cols
+                ):
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE form_template ADD COLUMN layout VARCHAR(20) DEFAULT 'standard'"
+                            )
+                        )
+                    print("schema_fix=form_template.layout_added")
 
                 form_field_cols = (
                     {c["name"] for c in insp.get_columns("form_field")}
@@ -655,7 +666,12 @@ def main():
                         with engine.begin() as conn:
                             conn.execute(text("ALTER TABLE guest_form ADD COLUMN credential_requirements_json TEXT"))
                         print("schema_fix=guest_form.credential_requirements_json_added")
-                # Ensure request.is_denied exists when the model expects it
+                    if "layout" not in guest_form_cols:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE guest_form ADD COLUMN layout VARCHAR(20) DEFAULT 'standard'"))
+                        print("schema_fix=guest_form.layout_added")
+                # Ensure request table has expected columns from recent releases.
+                req_cols = set()
                 if "request" in insp.get_table_names():
                     req_cols = {c["name"] for c in insp.get_columns("request")}
                     if "is_denied" not in req_cols:
@@ -666,6 +682,16 @@ def main():
                                 )
                             )
                         print("schema_fix=request.is_denied_added")
+                        req_cols.add("is_denied")
+                    if "workflow_id" not in req_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE request ADD COLUMN workflow_id INTEGER"
+                                )
+                            )
+                        print("schema_fix=request.workflow_id_added")
+                        req_cols.add("workflow_id")
 
                 if "integration_event" in insp.get_table_names():
                     event_cols = {c["name"] for c in insp.get_columns("integration_event")}
@@ -689,16 +715,6 @@ def main():
                         with engine.begin() as conn:
                             conn.execute(text("ALTER TABLE integration_event ADD COLUMN next_retry_at TIMESTAMP"))
                         print("schema_fix=integration_event.next_retry_at_added")
-
-                    # Ensure workflow_id exists when the model expects it
-                    if "workflow_id" not in req_cols:
-                        with engine.begin() as conn:
-                            conn.execute(
-                                text(
-                                    "ALTER TABLE request ADD COLUMN workflow_id INTEGER"
-                                )
-                            )
-                        print("schema_fix=request.workflow_id_added")
                 # Ensure status_bucket.workflow_id exists when the model expects it
                 if "status_bucket" in insp.get_table_names():
                     sb_cols = {c["name"] for c in insp.get_columns("status_bucket")}

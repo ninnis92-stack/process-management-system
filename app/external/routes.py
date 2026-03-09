@@ -52,6 +52,7 @@ def _fallback_guest_form_policy():
         slug="",
         name="Default guest form",
         owner_department="B",
+        layout="standard",
         normalized_access_policy=has_policy,
         access_policy_label=("Any SSO-linked account" if require_sso else "Anyone with the form link"),
         access_policy_hint=(

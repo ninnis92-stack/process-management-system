@@ -1,13 +1,42 @@
 {% extends "base.html" %}
+{% from 'admin/_macros.html' import helper_card, meta_badge %}
 {% block content %}
-<h3>External Form: {{ template.name }}</h3>
-<p class="text-muted">This request form is hosted by an external provider ({{ template.external_provider or 'external' }}). To submit a request, please open the external form and complete it there.</p>
-<div class="mb-3">
-  {% if template.external_form_url %}
-    <a class="btn btn-primary" href="{{ template.external_form_url }}" target="_blank" rel="noopener">Open external form</a>
-  {% else %}
-    <div class="alert alert-warning">No external form URL configured.</div>
-  {% endif %}
-</div>
-<div class="small text-muted">After submitting the external form, you may return here. If you need automatic integration, configure a webhook in the external provider to post back to this application.</div>
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">External intake</div>
+    <h3 class="page-header__title mb-0">External Form: {{ template.name }}</h3>
+    <p class="page-header__lede mb-0">Use the connected provider while keeping the same layout contract and native request translation rules used inside the app.</p>
+  </div>
+</section>
+
+<section class="helper-grid mb-3">
+  {{ helper_card('Mirror the app layout', 'The generated schema exposes the connected layout and grouped sections so a third-party form can render the same structure.', '🧱') }}
+  {{ helper_card('Translate back natively', 'Webhook callbacks are mapped into the connected template fields so submissions land like native in-app entries.', '🔁') }}
+  {{ helper_card('Keep providers interchangeable', 'The provider can change while the connected template and request-processing contract stay stable.', '🔌') }}
+</section>
+
+<section class="surface-panel template-layout-{{ template.layout or 'standard' }}">
+  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+    <div>
+      <div class="eyebrow-label">Connected template</div>
+      <h4 class="mb-1">{{ template.name }}</h4>
+      <p class="text-muted mb-0">Hosted by {{ template.external_provider or 'external provider' }}.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      {{ meta_badge(template.layout_label or 'Standard') }}
+      {% if template.external_enabled %}{{ meta_badge('External enabled', 'primary') }}{% endif %}
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 flex-wrap mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="/integrations/templates/{{ template.id }}/external-schema">Open generated schema</a>
+      <a class="btn btn-primary" href="{{ template.external_form_url }}" target="_blank" rel="noopener">Open external form</a>
+    {% else %}
+      <div class="alert alert-warning mb-0">No external form URL configured.</div>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="/api/templates/{{ template.id }}/external-schema">Open generated schema</a>
+  </div>
+
+  <div class="small text-muted">After submission, the callback can translate provider field labels back into the connected template keys and store the request as a native submission linked to this form.</div>
+</section>
 {% endblock %}

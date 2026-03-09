@@ -119,6 +119,7 @@ def create_guest_form():
             allowed_email_domains=(form.allowed_email_domains.data or "").strip() or None,
             credential_requirements_json=(form.credential_requirements_json.data or "").strip() or None,
             owner_department=form.owner_department.data or "B",
+            layout=(form.layout.data if getattr(form, 'layout', None) else 'standard'),
             is_default=bool(form.is_default.data),
             active=bool(form.active.data),
         )
@@ -159,6 +160,7 @@ def edit_guest_form(gf_id: int):
         form.access_policy.data = g.normalized_access_policy
         form.allowed_email_domains.data = g.allowed_email_domains or ""
         form.credential_requirements_json.data = g.credential_requirements_pretty_json
+        form.layout.data = g.layout or "standard"
 
     if form.validate_on_submit():
         g.name = form.name.data.strip()
@@ -169,6 +171,7 @@ def edit_guest_form(gf_id: int):
         g.allowed_email_domains = (form.allowed_email_domains.data or "").strip() or None
         g.credential_requirements_json = (form.credential_requirements_json.data or "").strip() or None
         g.owner_department = form.owner_department.data or "B"
+        g.layout = form.layout.data or "standard"
         g.active = bool(form.active.data)
         if form.is_default.data:
             try:
@@ -1029,6 +1032,7 @@ def create_template():
                 getattr(form, "verification_prefill_enabled", None)
                 and form.verification_prefill_enabled.data
             ),
+            layout=(getattr(form, "layout", None) and form.layout.data) or "standard",
             external_enabled=bool(
                 getattr(form, "external_enabled", None) and form.external_enabled.data
             ),

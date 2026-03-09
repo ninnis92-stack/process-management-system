@@ -13,7 +13,7 @@
   {{ helper_card('Choose the owning department carefully', 'This determines which team sees the request first and how it enters the queue.', '🧭') }}
   {{ helper_card('A tracking link is shown after submission', 'Save the confirmation link or request number so you can check status later.', '✅') }}
 </section>
-<section class="surface-panel guest-form-shell">
+<section class="surface-panel guest-form-shell {{ 'layout-' + selected_guest_form.layout if selected_guest_form and selected_guest_form.layout else '' }}" id="externalFormShell">
     <form method="post">
       {{ form.hidden_tag() }}
       {% if form.errors %}
@@ -53,6 +53,7 @@
                   data-default-owner-department="{{ selected_guest_form.owner_department if selected_guest_form and selected_guest_form.slug else '' }}"
                   data-default-domains="{{ (selected_guest_form.allowed_email_domain_list|join(', ')) if selected_guest_form else '' }}"
                   data-default-credential-json="{{ selected_guest_form.credential_requirements_pretty_json if selected_guest_form else '' }}"
+                  data-default-layout="{{ selected_guest_form.layout if selected_guest_form else 'standard' }}"
           >
             <option value="">-- Use default form --</option>
             {% for gf in (guest_forms or []) %}
@@ -63,6 +64,7 @@
                       data-owner-department="{{ gf.owner_department or 'B' }}"
                       data-domains="{{ gf.allowed_email_domain_list|join(', ') }}"
                       data-credential-json="{{ gf.credential_requirements_pretty_json }}"
+                      data-layout="{{ gf.layout or 'standard' }}"
                       {% if (request.form.get('guest_form') or request.args.get('guest_form')) == gf.slug %}selected{% endif %}>{{ gf.name }}</option>
             {% endfor %}
           </select>
@@ -179,6 +181,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const policyHint = source.policyHint || guestFormSelect.dataset.defaultPolicyHint || 'Anyone with the link can submit this form.';
     const ownerDepartment = source.ownerDepartment || guestFormSelect.dataset.defaultOwnerDepartment || '';
     const domains = source.domains || guestFormSelect.dataset.defaultDomains || '';
+    const layout = source.layout || guestFormSelect.dataset.defaultLayout || 'standard';
 
     if (summaryName) summaryName.textContent = name;
     if (summaryHint) summaryHint.textContent = policyHint;
@@ -186,6 +189,14 @@ document.addEventListener("DOMContentLoaded", function () {
     if (summaryDept) summaryDept.textContent = ownerDepartment ? `Routes to Dept ${ownerDepartment}` : 'Routing follows the department selected below';
     if (summaryDomains) summaryDomains.textContent = domains ? `Approved organizations: ${domains}` : 'No organization domain filter is currently applied.';
     if (routeHint) routeHint.textContent = ownerDepartment ? `This form routes submissions to Dept ${ownerDepartment}.` : 'Select a specific guest form if you have a link or want to target a particular workflow.';
+
+    // adjust layout class on surrounding shell
+    const shell = document.getElementById('externalFormShell');
+    if (shell) {
+      shell.classList.remove('layout-standard','layout-compact','layout-spacious');
+      shell.classList.add('layout-' + layout);
+    }
+
   };
 
   if (!form || !btn) return;

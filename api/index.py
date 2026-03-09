@@ -1,3 +1,6 @@
+import os
+from sqlalchemy import inspect as sa_inspect
+
 from app import create_app
 from app import csrf
 from flask import jsonify, request
@@ -12,8 +15,30 @@ from app.extensions import db, get_or_404
 from datetime import datetime
 from app.services.integrations import fetch_external_data, serialize_request
 from app.services.request_creation import run_template_field_verifications
+from app.services.request_creation import build_template_spec, group_template_spec_by_section
 
 app = create_app()
+
+
+def _ensure_api_schema_ready():
+    """Best-effort schema bootstrap for standalone API usage.
+
+    The API module is imported directly in tests and in lightweight integration
+    scenarios. When the target database is empty, ensure tables exist so the
+    API can still operate without relying on a separate app bootstrap step.
+    """
+    try:
+        with app.app_context():
+            inspector = sa_inspect(db.engine)
+            if not inspector.has_table("user"):
+                db.create_all()
+    except Exception:
+        # Do not block import-time startup; normal request handling or release
+        # tasks will still surface operational problems.
+        pass
+
+
+_ensure_api_schema_ready()
 
 
 def _check_api_key(req):
@@ -39,10 +64,11 @@ def api_templates():
     out = []
     for t in templates:
         tfields = []
-        for f in t.fields.order_by(FormField.order.asc()).all():
+        # fields relationship returns a plain list; sort by order attribute if present
+        for f in sorted(list(getattr(t, "fields", [])), key=lambda fld: getattr(fld, "order", 0)):
             opts = [
                 dict(value=o.value, label=o.label)
-                for o in f.options.order_by(FormFieldOption.order.asc()).all()
+                for o in sorted(list(getattr(f, "options", [])), key=lambda o: getattr(o, "order", 0))
             ]
             tfields.append(
                 dict(
@@ -55,7 +81,7 @@ def api_templates():
                 )
             )
         out.append(
-            dict(id=t.id, name=t.name, description=t.description, fields=tfields)
+            dict(id=t.id, name=t.name, description=t.description, layout=getattr(t, "layout", "standard"), fields=tfields)
         )
     return jsonify({"ok": True, "templates": out})
 
@@ -71,7 +97,8 @@ def api_template_verify(template_id: int):
     t = get_or_404(FormTemplate, template_id)
     data = request.get_json() or {}
     try:
-        fields = list(t.fields.order_by(FormField.order.asc()).all())
+        # attempt to use ORM ordering if available
+        fields = sorted(list(t.fields), key=lambda field: getattr(field, "order", 0))
     except Exception:
         fields = sorted(list(t.fields or []), key=lambda field: getattr(field, "order", 0))
     verification_results = run_template_field_verifications(fields, data)
@@ -81,7 +108,39 @@ def api_template_verify(template_id: int):
         results[f.name] = verification_results.get(f.name) or {"ok": True, "value": val}
         results[f.name].setdefault("value", val)
 
-    return jsonify({"ok": True, "template_id": t.id, "results": results})
+    return jsonify({"ok": True, "template_id": t.id, "layout": getattr(t, "layout", "standard"), "results": results})
+
+
+@app.route("/api/templates/<int:template_id>/external-schema", methods=["GET"])
+def api_template_external_schema(template_id: int):
+    ik = _check_api_key(request)
+    if not ik:
+        return jsonify({"ok": False, "error": "auth_required"}), 401
+
+    t = get_or_404(FormTemplate, template_id)
+    fields = sorted(list(getattr(t, "fields", []) or []), key=lambda field: getattr(field, "order", 0))
+    spec = build_template_spec(
+        fields,
+        verification_prefill_enabled=bool(getattr(t, "verification_prefill_enabled", False)),
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "template": {
+                "id": t.id,
+                "name": t.name,
+                "description": t.description,
+                "layout": getattr(t, "layout", "standard"),
+                "layout_label": getattr(t, "layout_label", "Standard"),
+                "external_enabled": bool(getattr(t, "external_enabled", False)),
+                "external_provider": getattr(t, "external_provider", None),
+                "external_form_id": getattr(t, "external_form_id", None),
+                "external_form_url": getattr(t, "external_form_url", None),
+                "fields": spec,
+                "sections": group_template_spec_by_section(spec),
+            },
+        }
+    )
 
 
 @app.route("/api/requests", methods=["GET"])

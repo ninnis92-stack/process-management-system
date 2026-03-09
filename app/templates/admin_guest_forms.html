@@ -17,7 +17,7 @@
       <div class="d-flex justify-content-between align-items-start gap-3 mb-3 flex-wrap">
         <div>
           <div class="eyebrow-label">{{ f.slug }}</div>
-          <h4 class="h5 mb-1">{{ f.name }}</h4>
+          <h4 class="h5 mb-1">{{ f.name }}{% if f.layout %} <span class="badge text-bg-light ms-1">{{ f.layout_label }}</span>{% endif %}</h4>
           <p class="text-muted small mb-0">Routes to Dept {{ f.owner_department or 'B' }} · {{ f.access_policy_label }}</p>
         </div>
         <div class="guest-form-policy-badges">

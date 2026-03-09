@@ -1600,6 +1600,26 @@ button.admin-tile {
   width: min(100%, 720px);
 }
 
+/* layout modifiers chosen by admin when configuring a guest form */
+.guest-form-shell.layout-compact {
+  width: min(100%, 600px);
+}
+.guest-form-shell.layout-spacious {
+  width: min(100%, 900px);
+}
+
+/* template-driven forms honor the same layout choices for consistency */
+.template-layout-compact {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.template-layout-spacious {
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .guest-dashboard-form {
   width: min(100%, 480px);
 }

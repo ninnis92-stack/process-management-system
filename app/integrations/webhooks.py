@@ -23,6 +23,13 @@ from ..models import (
 )
 from .. import notifcations as notifications
 from ..services.inventory import InventoryService
+from ..services.request_creation import (
+    apply_submission_data_to_request,
+    build_initial_artifact,
+    build_template_spec,
+    create_form_submission,
+    group_template_spec_by_section,
+)
 from ..security import rate_limit, verify_webhook_request
 
 integrations_bp = Blueprint("integrations_bp", __name__, url_prefix="/integrations")
@@ -57,6 +64,38 @@ def valid_hmac(payload: bytes, signature: str, secret: str) -> bool:
         timestamp=request.headers.get("X-Webhook-Timestamp"),
     )
     return ok
+
+
+@integrations_bp.route("/templates/<int:template_id>/external-schema", methods=["GET"])
+@rate_limit("external_schema", config_key="WEBHOOK_RATE_LIMIT", default="60/60")
+def external_form_schema(template_id: int):
+    """Expose a generated schema for connected third-party form builders."""
+    template = db.session.get(FormTemplate, template_id)
+    if not template or not getattr(template, "external_enabled", False):
+        return jsonify({"ok": False, "error": "template_not_external"}), 404
+
+    fields = sorted(list(getattr(template, "fields", []) or []), key=lambda field: getattr(field, "order", 0))
+    spec = build_template_spec(
+        fields,
+        verification_prefill_enabled=bool(getattr(template, "verification_prefill_enabled", False)),
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "template": {
+                "id": template.id,
+                "name": template.name,
+                "description": template.description,
+                "layout": getattr(template, "layout", "standard"),
+                "layout_label": getattr(template, "layout_label", "Standard"),
+                "external_provider": getattr(template, "external_provider", None),
+                "external_form_id": getattr(template, "external_form_id", None),
+                "external_form_url": getattr(template, "external_form_url", None),
+                "fields": spec,
+                "sections": group_template_spec_by_section(spec),
+            },
+        }
+    )
 
 
 @integrations_bp.route("/incoming-webhook", methods=["POST"])
@@ -211,8 +250,9 @@ def external_form_callback():
     provider = getattr(template, "external_provider", None)
     form_data = _normalize_provider_payload(provider, form_data or {})
 
-    # Map common fields into a Request when possible
-    # Attempt to map incoming form keys to template `FormField`s when possible.
+    # Attempt to map incoming form keys to template `FormField`s so external
+    # submissions can be translated into the same field names used by the
+    # native in-app form.
     def _attempt_field_mapping(template, payload):
         """Return (mapped_values, mapped_keys) where mapped_values maps
         field.id -> value and mapped_keys maps field.id -> payload key used.
@@ -275,19 +315,38 @@ def external_form_callback():
 
         return mapped_values, mapped_keys
 
-    # Try mapping before creating request so artifacts can be derived from mapped fields
-    mapped_values, mapped_keys = _attempt_field_mapping(template, form_data or {})
-    if mapped_values:
-        try:
-            fd = dict(form_data or {})
-            fd["_field_map"] = {
-                str(k): {"payload_key": v, "value": mapped_values.get(int(k))}
-                for k, v in mapped_keys.items()
+    def _normalize_native_submission_data(template, payload):
+        """Translate third-party payloads into native template field names."""
+        translated = dict(payload or {})
+        mapped_values, mapped_keys = _attempt_field_mapping(template, payload or {})
+        translated["_native_translation"] = {
+            "template_id": getattr(template, "id", None),
+            "template_name": getattr(template, "name", None),
+            "layout": getattr(template, "layout", "standard"),
+            "external_provider": getattr(template, "external_provider", None),
+        }
+        if not mapped_values:
+            return translated
+
+        translated_field_map = {}
+        for field in getattr(template, "fields", []) or []:
+            if field.id not in mapped_values:
+                continue
+            target_name = (getattr(field, "name", None) or "").strip()
+            if not target_name:
+                continue
+            translated[target_name] = mapped_values[field.id]
+            translated_field_map[target_name] = {
+                "field_id": field.id,
+                "payload_key": mapped_keys.get(field.id),
+                "value": mapped_values[field.id],
             }
-            fd["_mapped"] = True
-            form_data = fd
-        except Exception:
-            current_app.logger.exception("Failed annotating mapped form_data")
+        if translated_field_map:
+            translated["_field_map"] = translated_field_map
+            translated["_mapped"] = True
+        return translated
+
+    form_data = _normalize_native_submission_data(template, form_data or {})
 
     title = (
         form_data.get("title")
@@ -347,76 +406,35 @@ def external_form_callback():
         db.session.add(req)
         db.session.flush()
 
-        # Create artifacts from common form fields when present so the
-        # Request view can show structured form-derived artifacts (part numbers
-        # or instructions) immediately on the dashboard.
+        # Reuse the native request population logic so external callbacks behave
+        # like the internal dynamic form whenever compatible fields are present.
+        apply_submission_data_to_request(req, form_data)
+
         try:
-            donor = (
-                (
-                    form_data.get("donor_part_number") or form_data.get("donor") or ""
-                ).strip()
-                if isinstance(form_data, dict)
-                else None
+            artifact = build_initial_artifact(req, None, form_data, None)
+            artifact.created_by_department = owner_dept or "B"
+            artifact.created_by_guest_email = (
+                form_data.get("guest_email") if isinstance(form_data, dict) else None
             )
-            target = (
-                (
-                    form_data.get("target_part_number") or form_data.get("target") or ""
-                ).strip()
-                if isinstance(form_data, dict)
-                else None
+            has_artifact_payload = bool(
+                artifact.instructions_url
+                or artifact.donor_part_number
+                or artifact.target_part_number
+                or artifact.no_donor_reason
             )
-            instr_url = (
-                (
-                    form_data.get("instructions_url")
-                    or form_data.get("method_url")
-                    or ""
-                ).strip()
-                if isinstance(form_data, dict)
-                else None
-            )
-            if donor or target:
-                art = Artifact(
-                    request_id=req.id,
-                    artifact_type="part_number",
-                    donor_part_number=(donor or None),
-                    target_part_number=(target or None),
-                    created_by_department=owner_dept or "B",
-                    created_by_guest_email=(
-                        form_data.get("guest_email")
-                        if isinstance(form_data, dict)
-                        else None
-                    ),
-                )
-                db.session.add(art)
-            if instr_url:
-                art2 = Artifact(
-                    request_id=req.id,
-                    artifact_type="instructions",
-                    instructions_url=instr_url,
-                    created_by_department=owner_dept or "B",
-                    created_by_guest_email=(
-                        form_data.get("guest_email")
-                        if isinstance(form_data, dict)
-                        else None
-                    ),
-                )
-                db.session.add(art2)
+            if has_artifact_payload:
+                db.session.add(artifact)
         except Exception:
             current_app.logger.exception(
                 "Failed creating artifacts from external form data"
             )
 
-        # persist submission record linking to the created request
-        sub = Submission(
-            request_id=req.id,
-            from_department=None,
-            to_department=owner_dept,
-            summary=form_data.get("summary") or None,
-            details=description,
-            template_id=template.id,
-            data=form_data,
-        )
-        db.session.add(sub)
+        form_submission = create_form_submission(template, req, form_data, None)
+        form_submission.from_department = None
+        form_submission.to_department = owner_dept
+        form_submission.summary = form_data.get("summary") or form_data.get("title") or None
+        form_submission.details = description
+        form_submission.created_by_guest_email = form_data.get("guest_email") if isinstance(form_data, dict) else None
         db.session.commit()
         created_request_id = req.id
     except Exception:

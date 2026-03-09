@@ -81,3 +81,52 @@ def test_admin_requirement_builder_ui_and_save(app, client):
     dep = db.session.get(FormField, dependent.id)
     assert dep.requirement_rules and dep.requirement_rules.get('enabled')
     assert dep.requirement_rules.get('rules')[0]['operator'] == 'populated'
+
+
+def test_template_layout_persistence_and_api(app, client):
+    import importlib
+    import api.index as api_index
+
+    # create admin user
+    u = User(
+        email="templatelayout@example.com",
+        name="Layout Admin",
+        department="A",
+        is_active=True,
+        is_admin=True,
+        password_hash=generate_password_hash("password"),
+    )
+    from app.extensions import db
+
+    db.session.add(u)
+    db.session.commit()
+    client.post(
+        "/auth/login",
+        data={"email": "templatelayout@example.com", "password": "password"},
+        follow_redirects=True,
+    )
+    # create a template with non-default layout
+    t = FormTemplate(name="LayoutTemplate", description="Layout test", layout="spacious")
+    db.session.add(t)
+    db.session.commit()
+    with app.test_client() as api_client:
+        api_index = importlib.reload(api_index)
+        api_app = api_index.app
+        with api_app.app_context():
+            db.create_all()
+        api = api_app.test_client()
+        headers = {"X-Api-Key": "test-key"}
+        rv = api.get("/api/templates", headers=headers)
+        data = rv.get_json()
+        # find our template
+        found = next((x for x in data.get("templates", []) if x.get("id") == t.id), None)
+        assert found is not None
+        assert found.get("layout") == "spacious"
+
+    # visit the request_new page with this template assigned to Dept A
+    with app.app_context():
+        db.session.add(DepartmentFormAssignment(template_id=t.id, department_name="A"))
+        db.session.commit()
+    rv2 = client.get("/requests/new")
+    html2 = rv2.get_data(as_text=True)
+    assert "template-layout-spacious" in html2

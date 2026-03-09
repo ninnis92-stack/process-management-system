@@ -22,6 +22,15 @@
         <span class="small text-muted">Verified source fields can populate linked fields on this template only.</span>
       </span>
     </label>
+    <div class="mt-2">
+      <label class="form-label">Form layout</label>
+      <select class="form-select" name="layout">
+        <option value="standard" {% if template.layout=='standard' %}selected{% endif %}>Standard</option>
+        <option value="compact" {% if template.layout=='compact' %}selected{% endif %}>Compact</option>
+        <option value="spacious" {% if template.layout=='spacious' %}selected{% endif %}>Spacious</option>
+      </select>
+      <div class="form-text">Hint for clients generating copies of this form.</div>
+    </div>
   </div>
   <div class="admin-field-groups">
     {% for group in grouped_fields %}

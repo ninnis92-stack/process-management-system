@@ -30,6 +30,9 @@ def update_template_field_settings(template, form_data, db_session):
     template.verification_prefill_enabled = bool(
         form_data.get("verification_prefill_enabled")
     )
+    # layout may be supplied when editing metadata; fall back to existing value
+    if "layout" in form_data:
+        template.layout = (form_data.get("layout") or "standard").strip() or "standard"
     template.external_enabled = bool(form_data.get("external_enabled"))
     template.external_provider = (form_data.get("external_provider") or "").strip() or None
     template.external_form_url = (form_data.get("external_form_url") or "").strip() or None

@@ -330,6 +330,28 @@ Supported submitter access policies:
 - `unaffiliated_only` — blocks known affiliated/SSO-linked organization members
   so the form can be reserved for unaffiliated submitters
 
+Each guest form (and any internally managed template) now allows an
+**administrable layout** choice (`Standard`, `Compact`, or `Spacious`).
+This setting drives a CSS class applied to the intake page and is also
+returned by the `/api/templates` endpoint so third‑party clients can
+mirror the same spacing and width when rendering external copies of a
+form.  The layout is preserved when submissions from external providers
+are mapped back into the application.
+
+For connected third‑party forms, the app now also exposes a generated
+schema endpoint at `/integrations/templates/<template_id>/external-schema`
+(and the standalone API mirror at `/api/templates/<template_id>/external-schema`). That
+response includes the connected template layout, section grouping, and
+field specification so an external form builder can render a matching
+experience. When the provider posts back to
+`/integrations/external-form-callback`, payload fields are translated into
+the connected template’s native field names before the request and
+submission are created, so the data lands as if it had been entered in the
+app itself. The in-app external form screen also links directly to the
+generated schema so admins and integrators can verify the live contract and
+confirm the visual layout (`Standard`, `Compact`, or `Spacious`) that the
+third-party form should mirror.
+
 **Notes on rolling quotes:** the quotes shown in the navbar are now randomized
 once per day using a deterministic seed; the server picks the initial quote using
 the same algorithm so the page loads with the correct text.  The separate

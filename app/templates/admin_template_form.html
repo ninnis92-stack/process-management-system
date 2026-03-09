@@ -28,6 +28,11 @@
     <label class="form-check-label" for="{{ form.verification_prefill_enabled.id }}">{{ form.verification_prefill_enabled.label.text }}</label>
     <div class="form-text">When enabled, admins can connect verification-backed fields to related fields so successful lookups can prefill the rest of the form.</div>
   </div>
+  <div class="mb-3">
+    <label class="form-label">Form layout</label>
+    {{ form.layout(class="form-select") }}
+    <div class="form-text">This layout hint is used by the app and third-party clients that mirror this form.</div>
+  </div>
   <hr/>
   <h5>External Integration (optional)</h5>
   <div class="mb-3 form-check">

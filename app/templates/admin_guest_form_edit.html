@@ -27,6 +27,11 @@
             {{ form.slug(class='form-control', placeholder='partner-intake') }}
           </div>
           <div class="col-md-6">
+            {{ form.layout.label(class='form-label') }}
+            {{ form.layout(class='form-select') }}
+            <div class="form-text">Controls the visual spacing/width of the public intake page for this form.</div>
+          </div>
+          <div class="col-md-6">
             {{ form.template_id.label(class='form-label') }}
             {{ form.template_id(class='form-select') }}
           </div>

@@ -22,7 +22,7 @@
   </div>
 </section>
 
-<section class="surface-panel">
+<section class="surface-panel{% if template and template.layout %} template-layout-{{ template.layout }}{% endif %}">
   <form method="post" data-controller="onboarding field-focus" {% if template_spec %}enctype="multipart/form-data"{% endif %}{% if template and template.verification_prefill_enabled %} data-template-prefill-endpoint="{{ url_for('requests.template_field_prefill') }}"{% endif %}>
       {{ form.hidden_tag() }}
 
