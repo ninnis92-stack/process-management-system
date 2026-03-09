@@ -680,10 +680,9 @@
     const vibeFeatureEnabled = isVibeFeatureEnabled();
     vibeButtons.forEach((button) => {
       try {
-        const unavailable = darkMode || !vibeFeatureEnabled;
         button.hidden = !vibeFeatureEnabled;
-        button.disabled = unavailable;
-        if (unavailable) {
+        button.disabled = darkMode;
+        if (darkMode) {
           button.classList.add('disabled');
           button.setAttribute('aria-disabled', 'true');
         } else {
