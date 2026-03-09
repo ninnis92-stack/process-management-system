@@ -46,7 +46,7 @@ def test_dark_mode_class_added_server_side(client, app):
     assert b"dark-mode" in m.group(1)
 
 
-def test_admin_dashboard_keeps_dark_mode_and_hides_vibe_controls(client, app):
+def test_admin_dashboard_keeps_dark_mode_and_shows_vibe_controls(client, app):
     make_user(app, dark_mode=True)
     rv = login(client)
     assert rv.status_code == 200
@@ -56,8 +56,8 @@ def test_admin_dashboard_keeps_dark_mode_and_hides_vibe_controls(client, app):
     m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
     assert m, "no body tag?"
     assert b"dark-mode" in m.group(1)
-    assert b'id="vibeBtn"' not in rv.data
-    assert b'id="vibeBtnAdmin"' not in rv.data
+    assert b'id="vibeBtn"' in rv.data
+    assert b'id="vibeBtnAdmin"' in rv.data
 
 
 def test_dark_mode_not_added_by_default(client, app):
@@ -122,9 +122,10 @@ def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):
     assert rv.status_code == 200
     # the dark mode label should reflect the preference
     assert b'id="darkModeLabel">Dark mode enabled<' in rv.data
-    assert b'Turning on dark mode disables the vibe button and theme selection.' in rv.data
+    assert b'Dark mode keeps theme support, but limits it to a curated high-contrast vibe subset.' in rv.data
     assert b'id="vibeDarkModeNote"' in rv.data
-    assert b'id="vibe_index" name="vibe_index" disabled' in rv.data
+    assert b'id="vibe_index" name="vibe_index" disabled' not in rv.data
+    assert b'Only dark-mode-compatible vibes are shown while dark mode is active.' in rv.data
     assert b"Changes save automatically." in rv.data
     assert b'id="darkModeSubmitBtn"' not in rv.data
     # the checkbox input should be checked so the client script can
@@ -146,7 +147,7 @@ def test_settings_page_shows_enable_text_when_dark_mode_disabled(client, app):
     rv = client.get("/auth/settings")
     assert rv.status_code == 200
     assert b'id="darkModeLabel">Dark mode disabled<' in rv.data
-    assert b'id="vibe_index" name="vibe_index" disabled' not in rv.data
+    assert b'data-all-choices=' in rv.data
     assert b"Changes save automatically." in rv.data
     assert b'id="darkModeSubmitBtn"' not in rv.data
 
@@ -177,7 +178,7 @@ def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
     assert payload["preferences"]["quotes_enabled"] is False
     assert payload["preferences"]["quote_set"] == "engineering"
     assert payload["preferences"]["quote_interval"] == 30
-    assert payload["preferences"]["vibe_index"] == 2
+    assert payload["preferences"]["vibe_index"] == 5
     rv = client.get("/dashboard")
     m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
     assert m and b"dark-mode" in m.group(1)
@@ -186,13 +187,28 @@ def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
         user = User.query.filter_by(email="admin@example.com").first()
         assert user is not None
         assert user.dark_mode is True
-        assert user.vibe_index == 2
+        assert user.vibe_index == 5
         assert user.quotes_enabled is False
         assert user.quote_set == "engineering"
         assert user.quote_interval == 30
 
 
-def test_vibe_endpoint_rejects_updates_when_dark_mode_enabled(client, app):
+def test_vibe_endpoint_rejects_incompatible_updates_when_dark_mode_enabled(client, app):
+    make_user(app, dark_mode=True)
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.post(
+        "/auth/vibe",
+        json={"vibe_index": 1},
+    )
+    assert rv.status_code == 409
+    payload = rv.get_json()
+    assert payload["ok"] is False
+    assert payload["error"] == "dark_mode_requires_compatible_vibe"
+
+
+def test_vibe_endpoint_accepts_compatible_updates_when_dark_mode_enabled(client, app):
     make_user(app, dark_mode=True)
     rv = login(client)
     assert rv.status_code == 200
@@ -201,10 +217,10 @@ def test_vibe_endpoint_rejects_updates_when_dark_mode_enabled(client, app):
         "/auth/vibe",
         json={"vibe_index": 5},
     )
-    assert rv.status_code == 409
+    assert rv.status_code == 200
     payload = rv.get_json()
-    assert payload["ok"] is False
-    assert payload["error"] == "dark_mode_disables_vibe"
+    assert payload["ok"] is True
+    assert payload["vibe_index"] == 5
 
 
 def test_vibe_endpoint_persists_and_settings_reflect(client, app):

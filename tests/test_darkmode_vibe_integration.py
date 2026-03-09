@@ -6,14 +6,16 @@ def test_dark_mode_vibe_logic_present_in_theme_script():
     assert "function isDarkModeEnabled()" in content
     assert "document.body.classList.contains('dark-mode')" in content
 
-    # dark mode now disables vibe colors entirely and falls back to the
-    # stylesheet's default dark palette.
-    assert "function clearThemeOverrides()" in content
+    # dark mode now uses a curated compatible subset rather than disabling
+    # vibe support entirely.
+    assert "const darkModeCompatiblePaletteIndexes = [0, 4, 5, 7, 14, 18, 23, 24];" in content
+    assert "function isDarkModeCompatiblePalette(idx)" in content
+    assert "function getEffectivePaletteIndex(idx)" in content
     assert "function syncVibeControlAvailability()" in content
     assert 'if (darkMode) {' in content
-    assert 'clearThemeOverrides();' in content
-    assert 'button.hidden = darkMode;' in content
-    assert 'vibeSelect.disabled = darkMode || lockedByTemplate;' in content
+    assert 'root.style.setProperty("--nav-bg", mixHex(p.accent, "#0b1220", 0.30));' in content
+    assert 'root.style.setProperty("--surface", mixHex(p.accent, "#111c2d", 0.20));' in content
+    assert 'const next = darkModeCompatiblePaletteIndexes[' in content
 
     # light-mode branch must still set sane defaults and reset text colors
     assert 'root.style.setProperty("--nav-text", mixHex("#f8fbff"' in content

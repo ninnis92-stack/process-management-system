@@ -102,6 +102,58 @@ def _sync_current_user_preferences(user):
         pass
 
 
+VIBE_PALETTE_CHOICES = [
+    (0, "Soft Coral · Cozy Coral"),
+    (1, "Warm Sand · Warm Morning"),
+    (2, "Moss · Quiet Grove"),
+    (3, "Sage · Sage Retreat"),
+    (4, "Muted Teal · Calm Teal"),
+    (5, "Sky · Clear Sky"),
+    (6, "Powder Blue · Soft Powder"),
+    (7, "Lavender · Lavender Dream"),
+    (8, "Lilac · Lilac Haze"),
+    (9, "Muted Pink · Blush"),
+    (10, "Peach · Peach Sunrise"),
+    (11, "Butter · Buttercream"),
+    (12, "Pistachio · Pistachio Grove"),
+    (13, "Mint · Fresh Mint"),
+    (14, "Seafoam · Seafoam Breeze"),
+    (15, "Aqua · Aqua Calm"),
+    (16, "Robin Egg · Robin's Dawn"),
+    (17, "Periwinkle · Periwinkle Morning"),
+    (18, "Dusty Blue · Dusty Blue"),
+    (19, "Slate Rose · Slate Rose"),
+    (20, "Tea · Tea Garden"),
+    (21, "Stone · Stone Whisper"),
+    (22, "Soft Gray · Soft Gray"),
+    (23, "Charcoal Mist · Charcoal Mist"),
+    (24, "Aurora · Aurora"),
+]
+
+DARK_MODE_COMPATIBLE_VIBE_INDEXES = (0, 4, 5, 7, 14, 18, 23, 24)
+
+
+def _is_dark_mode_compatible_vibe(vibe_index):
+    try:
+        return int(vibe_index) in DARK_MODE_COMPATIBLE_VIBE_INDEXES
+    except Exception:
+        return False
+
+
+def _normalize_vibe_index(vibe_index, *, dark_mode=False):
+    try:
+        parsed = int(vibe_index)
+    except Exception:
+        parsed = None
+
+    if not dark_mode:
+        return parsed
+
+    if parsed is None or parsed not in DARK_MODE_COMPATIBLE_VIBE_INDEXES:
+        return DARK_MODE_COMPATIBLE_VIBE_INDEXES[0]
+    return parsed
+
+
 def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None, partial=False):
     if not user or payload is None:
         return {}
@@ -119,17 +171,21 @@ def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None,
         user.quotes_enabled = _coerce_checkbox_value(payload.get("quotes_enabled"))
         updated["quotes_enabled"] = bool(user.quotes_enabled)
 
-    if not external_theme_loaded and (not bool(getattr(user, "dark_mode", False))) and _setting_present(payload, "vibe_index"):
+    if not external_theme_loaded and _setting_present(payload, "vibe_index"):
         raw_vibe = payload.get("vibe_index")
         if raw_vibe in (None, ""):
-            user.vibe_index = None
+            user.vibe_index = None if not bool(getattr(user, "dark_mode", False)) else DARK_MODE_COMPATIBLE_VIBE_INDEXES[0]
         else:
             try:
-                user.vibe_index = int(raw_vibe)
+                user.vibe_index = _normalize_vibe_index(raw_vibe, dark_mode=bool(getattr(user, "dark_mode", False)))
             except Exception:
                 pass
         updated["vibe_index"] = getattr(user, "vibe_index", None)
-    elif _setting_present(payload, "vibe_index"):
+
+    if bool(getattr(user, "dark_mode", False)):
+        normalized_vibe = _normalize_vibe_index(getattr(user, "vibe_index", None), dark_mode=True)
+        if normalized_vibe != getattr(user, "vibe_index", None):
+            user.vibe_index = normalized_vibe
         updated["vibe_index"] = getattr(user, "vibe_index", None)
 
     if _setting_present(payload, "quote_set"):
@@ -333,35 +389,13 @@ def choose_dept():
 def settings():
     """Per-user settings page (theme/preferences)."""
     form = SettingsForm(obj=current_user)
-    # Palette options mirror the client-side `palettes` defined in app/static/app.js
-    palettes = [
-        (0, "Soft Coral · Cozy Coral"),
-        (1, "Warm Sand · Warm Morning"),
-        (2, "Moss · Quiet Grove"),
-        (3, "Sage · Sage Retreat"),
-        (4, "Muted Teal · Calm Teal"),
-        (5, "Sky · Clear Sky"),
-        (6, "Powder Blue · Soft Powder"),
-        (7, "Lavender · Lavender Dream"),
-        (8, "Lilac · Lilac Haze"),
-        (9, "Muted Pink · Blush"),
-        (10, "Peach · Peach Sunrise"),
-        (11, "Butter · Buttercream"),
-        (12, "Pistachio · Pistachio Grove"),
-        (13, "Mint · Fresh Mint"),
-        (14, "Seafoam · Seafoam Breeze"),
-        (15, "Aqua · Aqua Calm"),
-        (16, "Robin Egg · Robin's Dawn"),
-        (17, "Periwinkle · Periwinkle Morning"),
-        (18, "Dusty Blue · Dusty Blue"),
-        (19, "Slate Rose · Slate Rose"),
-        (20, "Tea · Tea Garden"),
-        (21, "Stone · Stone Whisper"),
-        (22, "Soft Gray · Soft Gray"),
-        (23, "Charcoal Mist · Charcoal Mist"),
-        (24, "Aurora · Aurora")
-    ]
-    form.vibe_index.choices = palettes
+    all_palettes = list(VIBE_PALETTE_CHOICES)
+    dark_mode_palettes = [choice for choice in all_palettes if choice[0] in DARK_MODE_COMPATIBLE_VIBE_INDEXES]
+    form.vibe_index.choices = dark_mode_palettes if bool(getattr(current_user, "dark_mode", False)) else all_palettes
+    form.vibe_index.data = _normalize_vibe_index(
+        getattr(current_user, "vibe_index", None),
+        dark_mode=bool(getattr(current_user, "dark_mode", False)),
+    )
     # populate quote-set choices from site config defaults
     try:
         from ..models import SiteConfig
@@ -415,7 +449,13 @@ def settings():
             flash("Failed to save settings.", "danger")
         return redirect(url_for("requests.dashboard"))
 
-    return render_template("settings.html", form=form)
+    return render_template(
+        "settings.html",
+        form=form,
+        all_vibe_choices=all_palettes,
+        dark_vibe_choices=dark_mode_palettes,
+        dark_mode_compatible_vibe_indexes=list(DARK_MODE_COMPATIBLE_VIBE_INDEXES),
+    )
 
 
 @auth_bp.route("/preferences", methods=["POST"])
@@ -818,10 +858,10 @@ def set_vibe():
         return ("Missing vibe_index", 400)
 
     u = db.session.get(User, current_user.id)
-    if getattr(u, "dark_mode", False):
-        return jsonify({"ok": False, "error": "dark_mode_disables_vibe", "vibe_index": getattr(u, "vibe_index", None)}), 409
-    u.vibe_index = max(0, int(v))
+    if getattr(u, "dark_mode", False) and not _is_dark_mode_compatible_vibe(v):
+        return jsonify({"ok": False, "error": "dark_mode_requires_compatible_vibe", "vibe_index": getattr(u, "vibe_index", None), "allowed_vibes": list(DARK_MODE_COMPATIBLE_VIBE_INDEXES)}), 409
+    u.vibe_index = _normalize_vibe_index(max(0, int(v)), dark_mode=bool(getattr(u, "dark_mode", False)))
     db.session.commit()
     # Reflect change in current_user proxy for immediate client-side use
     _sync_current_user_preferences(u)
-    return ({"ok": True}, 200)
+    return ({"ok": True, "vibe_index": u.vibe_index}, 200)
