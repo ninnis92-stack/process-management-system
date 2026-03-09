@@ -180,6 +180,18 @@ also `curl -i https://<app>/ready` to validate the readiness probe (database
 connection plus optional Redis).  After a Fly deployment the smoke test
 should return a 302 from `/` and a 302 to `/auth/login` from `/dashboard`.
 
+If you ever need to reseed or inspect the remote database, use SSH to run
+the same `seed.py` script that the release command executes:
+
+```bash
+fly ssh console --command "python seed.py"
+```
+
+The output will confirm which demo users and quote sets exist, and the
+script will automatically apply any missing columns before creating data.  
+This is handy for debugging or bringing a recently created app up to speed
+with the local development schema.
+
 Webhook smoke script (`scripts/webhook_smoke.py`) verifies that production
 webhooks reject unsigned traffic and, when a shared secret is supplied,
 accept a correctly signed payload for `/integrations/incoming-webhook`.
