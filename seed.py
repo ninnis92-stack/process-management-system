@@ -189,16 +189,7 @@ def main():
                 db.session.rollback()
 
         flags = FeatureFlags.get()
-        for attr, default in (
-            ("enable_notifications", True),
-            ("enable_nudges", True),
-            ("allow_user_nudges", False),
-            ("vibe_enabled", True),
-            ("sso_admin_sync_enabled", True),
-            ("sso_department_sync_enabled", False),
-            ("enable_external_forms", False),
-            ("rolling_quotes_enabled", True),
-        ):
+        for attr, default in FeatureFlags.DEFAULTS.items():
             if getattr(flags, attr, None) is None:
                 setattr(flags, attr, default)
         db.session.add(flags)

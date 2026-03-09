@@ -56,6 +56,7 @@ def test_admin_dashboard_keeps_dark_mode_and_shows_admin_vibe_button(client, app
     m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
     assert m, "no body tag?"
     assert b"dark-mode" in m.group(1)
+    assert b'id="vibeBtn"' in rv.data
     assert b'id="vibeBtnAdmin"' in rv.data
 
 
@@ -80,10 +81,30 @@ def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
     assert rv.status_code == 200
     cluster = rv.data.split(b'class="brand-cluster"', 1)[1].split(b'<button class="navbar-toggler"', 1)[0]
     assert b'class="brand-banner-row"' in rv.data
+    assert b'data-theme-banner' in rv.data
     assert b'id="motivation"' in rv.data
     assert b'id="vibeBtn"' in rv.data
     assert rv.data.index(b'id="motivation"') < rv.data.index(b'id="vibeBtn"')
     assert cluster.index(b'</a>') < cluster.index(b'id="vibeBtn"')
+    assert b'Current vibe' in rv.data
+
+
+def test_dashboard_brand_banner_renders_without_vibe_button_when_feature_disabled(client, app):
+    make_user(app, dark_mode=False)
+    with app.app_context():
+        from app.models import FeatureFlags
+
+        flags = FeatureFlags.get()
+        flags.vibe_enabled = False
+        db.session.commit()
+
+    rv = login(client)
+    assert rv.status_code == 200
+    rv = client.get("/dashboard")
+    assert rv.status_code == 200
+    assert b'class="brand-banner-row"' not in rv.data
+    assert b'id="motivation"' not in rv.data
+    assert b'id="vibeBtn"' not in rv.data
 
 
 def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):

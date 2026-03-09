@@ -14,3 +14,5 @@ def test_dark_mode_vibe_logic_present_in_theme_script():
     assert 'root.style.setProperty("--body-text"' in content
     # the light-mode branch of applyTheme should also reset nav/body text
     assert 'root.style.setProperty("--nav-text", mixHex("#f8fbff"' in content
+    assert 'root.style.setProperty("--banner-bg"' in content
+    assert 'root.style.setProperty("--surface-3"' in content
