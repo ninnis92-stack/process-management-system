@@ -130,36 +130,37 @@ VIBE_PALETTE_CHOICES = [
     (24, "Aurora · Aurora"),
 ]
 
-DARK_MODE_COMPATIBLE_VIBE_INDEXES = (0, 4, 5, 7, 14, 18, 23, 24)
-
-
-def _is_dark_mode_compatible_vibe(vibe_index):
-    try:
-        return int(vibe_index) in DARK_MODE_COMPATIBLE_VIBE_INDEXES
-    except Exception:
-        return False
-
-
-def _normalize_vibe_index(vibe_index, *, dark_mode=False):
+def _normalize_vibe_index(vibe_index):
     try:
         parsed = int(vibe_index)
     except Exception:
         parsed = None
 
-    if not dark_mode:
-        return parsed
+    if parsed is None:
+        return None
 
-    if parsed is None or parsed not in DARK_MODE_COMPATIBLE_VIBE_INDEXES:
-        return DARK_MODE_COMPATIBLE_VIBE_INDEXES[0]
+    valid_indexes = {choice[0] for choice in VIBE_PALETTE_CHOICES}
+    if parsed not in valid_indexes:
+        return VIBE_PALETTE_CHOICES[0][0]
     return parsed
 
 
-def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None, partial=False):
+def _is_vibe_feature_enabled():
+    try:
+        flags = FeatureFlags.get()
+        return bool(getattr(flags, "vibe_enabled", True))
+    except Exception:
+        return True
+
+
+def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None, vibe_feature_enabled=None, partial=False):
     if not user or payload is None:
         return {}
 
     if external_theme_loaded is None:
         external_theme_loaded = is_external_theme_active()
+    if vibe_feature_enabled is None:
+        vibe_feature_enabled = _is_vibe_feature_enabled()
 
     updated = {}
 
@@ -171,13 +172,13 @@ def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None,
         user.quotes_enabled = _coerce_checkbox_value(payload.get("quotes_enabled"))
         updated["quotes_enabled"] = bool(user.quotes_enabled)
 
-    if not external_theme_loaded and _setting_present(payload, "vibe_index"):
+    if not external_theme_loaded and vibe_feature_enabled and _setting_present(payload, "vibe_index"):
         raw_vibe = payload.get("vibe_index")
         if raw_vibe in (None, ""):
-            user.vibe_index = None if not bool(getattr(user, "dark_mode", False)) else DARK_MODE_COMPATIBLE_VIBE_INDEXES[0]
+            user.vibe_index = None
         else:
             try:
-                user.vibe_index = _normalize_vibe_index(raw_vibe, dark_mode=bool(getattr(user, "dark_mode", False)))
+                user.vibe_index = _normalize_vibe_index(raw_vibe)
             except Exception:
                 pass
         updated["vibe_index"] = getattr(user, "vibe_index", None)
@@ -391,12 +392,9 @@ def settings():
     """Per-user settings page (theme/preferences)."""
     form = SettingsForm(obj=current_user)
     all_palettes = list(VIBE_PALETTE_CHOICES)
-    dark_mode_palettes = [choice for choice in all_palettes if choice[0] in DARK_MODE_COMPATIBLE_VIBE_INDEXES]
-    form.vibe_index.choices = dark_mode_palettes if bool(getattr(current_user, "dark_mode", False)) else all_palettes
-    form.vibe_index.data = _normalize_vibe_index(
-        getattr(current_user, "vibe_index", None),
-        dark_mode=bool(getattr(current_user, "dark_mode", False)),
-    )
+    vibe_feature_enabled = _is_vibe_feature_enabled()
+    form.vibe_index.choices = all_palettes
+    form.vibe_index.data = _normalize_vibe_index(getattr(current_user, "vibe_index", None))
     # populate quote-set choices from site config defaults
     try:
         from ..models import SiteConfig
@@ -436,6 +434,7 @@ def settings():
                     u,
                     request.form,
                     external_theme_loaded=is_external_theme_active(),
+                    vibe_feature_enabled=vibe_feature_enabled,
                     partial=False,
                 )
                 db.session.add(u)
@@ -454,6 +453,7 @@ def settings():
         "settings.html",
         form=form,
         all_vibe_choices=all_palettes,
+        vibe_feature_enabled=vibe_feature_enabled,
     )
 
 
@@ -471,6 +471,7 @@ def set_preferences():
             u,
             payload,
             external_theme_loaded=is_external_theme_active(),
+            vibe_feature_enabled=_is_vibe_feature_enabled(),
             partial=True,
         )
         db.session.add(u)
@@ -861,7 +862,9 @@ def set_vibe():
         # when dark mode is enabled we don't allow changing or storing a custom
         # vibe; the client side should already have disabled the controls.
         return jsonify({"ok": False, "error": "dark_mode_vibe_disabled"}), 409
-    u.vibe_index = _normalize_vibe_index(max(0, int(v)), dark_mode=False)
+    if not _is_vibe_feature_enabled() or is_external_theme_active():
+        return jsonify({"ok": False, "error": "vibe_disabled"}), 409
+    u.vibe_index = _normalize_vibe_index(max(0, int(v)))
     db.session.commit()
     # Reflect change in current_user proxy for immediate client-side use
     _sync_current_user_preferences(u)

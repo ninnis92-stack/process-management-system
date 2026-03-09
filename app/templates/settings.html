@@ -26,7 +26,7 @@
         {% if not external_theme and form.vibe_index %}
           <div class="mb-3">
             <label for="vibe_index" class="form-label">Theme</label>
-            <select class="form-select" id="vibe_index" name="vibe_index" {% if dark_mode_enabled %}disabled{% endif %} data-all-choices='{{ all_vibe_choices|tojson }}'>
+            <select class="form-select" id="vibe_index" name="vibe_index" {% if dark_mode_enabled or not vibe_feature_enabled %}disabled{% endif %} data-all-choices='{{ all_vibe_choices|tojson }}'>
               {% for val, label in form.vibe_index.choices %}
                 <option value="{{ val }}" {% if (current_user.vibe_index is not none and current_user.vibe_index == val) or (form.vibe_index.data is not none and form.vibe_index.data == val) %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -45,6 +45,7 @@
             </div>
             <div class="form-text">Choose your UI accent theme. When dark mode is enabled this control is disabled and no accent is applied; admin-imported themes still override this setting.</div>
             <div id="vibeDarkModeNote" class="form-text text-warning mt-1" {% if not dark_mode_enabled %}hidden{% endif %}>Theme selection is disabled while dark mode is active.</div>
+            <div id="vibeFeatureNote" class="form-text text-warning mt-1" {% if vibe_feature_enabled %}hidden{% endif %}>Theme selection is disabled while the global vibe feature is turned off.</div>
           </div>
         {% endif %}
 
@@ -87,6 +88,7 @@
       const statusEl = document.getElementById('settingsAutoSaveStatus');
       const vibeSelect = document.getElementById('vibe_index');
       const vibeDarkModeNote = document.getElementById('vibeDarkModeNote');
+      const vibeFeatureNote = document.getElementById('vibeFeatureNote');
       const themePreviewCard = document.getElementById('userThemePreview');
       if (!checkbox || !label || !statusEl) return;
 
@@ -114,12 +116,17 @@
       };
       const syncVibeControlState = () => {
         if (!vibeSelect) return;
+        const vibeFeatureEnabled = !document.body.classList.contains('no-vibe');
         rebuildVibeOptions();
+        vibeSelect.disabled = checkbox.checked || !vibeFeatureEnabled;
         if (vibeDarkModeNote) {
           vibeDarkModeNote.hidden = !checkbox.checked;
         }
+        if (vibeFeatureNote) {
+          vibeFeatureNote.hidden = vibeFeatureEnabled;
+        }
         if (themePreviewCard) {
-          themePreviewCard.classList.remove('opacity-50');
+          themePreviewCard.classList.toggle('opacity-50', checkbox.checked || !vibeFeatureEnabled);
         }
         if (window.syncVibeThemeState) {
           window.syncVibeThemeState();

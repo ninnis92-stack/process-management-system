@@ -620,8 +620,12 @@
     return document.body.classList.contains('dark-mode');
   }
 
+  function isExternalThemeEnabled() {
+    return document.body.classList.contains('external-theme');
+  }
+
   function isVibeFeatureEnabled() {
-    return !document.body.classList.contains('no-vibe');
+    return !document.body.classList.contains('no-vibe') && !isExternalThemeEnabled();
   }
 
   function clearThemeOverrides() {
@@ -786,6 +790,11 @@
 
   function applyTheme(idx) {
     const darkMode = isDarkModeEnabled();
+    if (!isVibeFeatureEnabled()) {
+      clearThemeOverrides();
+      syncVibeControlAvailability();
+      return;
+    }
     if (darkMode) {
       // when dark mode is active we ignore vibes entirely and clear any
       // previously-applied palette overrides so the default dark CSS applies.
@@ -872,7 +881,7 @@
             } catch (e) {}
 
             if (!response.ok) {
-              if (payload && payload.error === 'dark_mode_vibe_disabled') {
+              if (payload && (payload.error === 'dark_mode_vibe_disabled' || payload.error === 'vibe_disabled')) {
                 // dark mode prevents any theme changes; nothing to do here.
                 return;
               }
@@ -901,11 +910,6 @@
   // `no-vibe` class; in that case we should leave the CSS alone and not
   // override the accent colors or dark-mode colors.  this keeps branding
   // intact when a site-specific stylesheet is loaded.
-  if(document.body.classList.contains('no-vibe')) {
-    syncVibeControlAvailability();
-    return;
-  }
-
   function isUserLoggedIn() {
     if (typeof window.USER_LOGGED_IN !== 'undefined') return !!window.USER_LOGGED_IN;
     return document.body.dataset.userLoggedIn === '1';
@@ -923,6 +927,11 @@
   const startIdx = Number.isFinite(stored) ? stored % palettes.length : (dailySeed % palettes.length);
   window.applyVibeTheme = applyTheme;
   window.syncVibeThemeState = syncVibeControlAvailability;
+  if(!isVibeFeatureEnabled()) {
+    syncVibeControlAvailability();
+    clearThemeOverrides();
+    return;
+  }
   applyTheme(startIdx);
 
   // Attach click handlers to whichever vibe buttons are present (global navbar and/or department view)

@@ -164,6 +164,23 @@ def test_settings_page_shows_enable_text_when_dark_mode_disabled(client, app):
     assert b'id="darkModeSubmitBtn"' not in rv.data
 
 
+def test_settings_page_disables_theme_when_vibe_feature_is_off(client, app):
+    make_user(app, dark_mode=False)
+    with app.app_context():
+        from app.models import FeatureFlags
+
+        flags = FeatureFlags.get()
+        flags.vibe_enabled = False
+        db.session.commit()
+
+    rv = login(client)
+    assert rv.status_code == 200
+    rv = client.get("/auth/settings")
+    assert rv.status_code == 200
+    assert b'id="vibe_index" name="vibe_index" disabled' in rv.data
+    assert b'Theme selection is disabled while the global vibe feature is turned off.' in rv.data
+
+
 def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
     make_user(app, dark_mode=False)
     with app.app_context():
@@ -206,6 +223,35 @@ def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
         assert user.quote_interval == 30
 
 
+def test_preferences_endpoint_does_not_change_vibe_when_feature_disabled(client, app):
+    make_user(app, dark_mode=False)
+    with app.app_context():
+        from app.models import FeatureFlags
+
+        user = User.query.filter_by(email="admin@example.com").first()
+        user.vibe_index = 2
+        flags = FeatureFlags.get()
+        flags.vibe_enabled = False
+        db.session.commit()
+
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.post(
+        "/auth/preferences",
+        json={"vibe_index": 5, "quotes_enabled": True},
+    )
+    assert rv.status_code == 200
+    payload = rv.get_json()
+    assert payload["ok"] is True
+    assert "vibe_index" not in payload["preferences"]
+
+    with app.app_context():
+        user = User.query.filter_by(email="admin@example.com").first()
+        assert user is not None
+        assert user.vibe_index == 2
+
+
 def test_vibe_endpoint_rejects_updates_while_dark_mode_enabled(client, app):
     make_user(app, dark_mode=True)
     rv = login(client)
@@ -234,6 +280,28 @@ def test_vibe_endpoint_rejects_any_updates_when_dark_mode_enabled(client, app):
     payload = rv.get_json()
     assert payload["ok"] is False
     assert payload["error"] == "dark_mode_vibe_disabled"
+
+
+def test_vibe_endpoint_rejects_updates_when_feature_disabled(client, app):
+    make_user(app, dark_mode=False)
+    with app.app_context():
+        from app.models import FeatureFlags
+
+        flags = FeatureFlags.get()
+        flags.vibe_enabled = False
+        db.session.commit()
+
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.post(
+        "/auth/vibe",
+        json={"vibe_index": 5},
+    )
+    assert rv.status_code == 409
+    payload = rv.get_json()
+    assert payload["ok"] is False
+    assert payload["error"] == "vibe_disabled"
 
 
 def test_dark_mode_dashboard_bootstraps_selected_vibe(client, app):
