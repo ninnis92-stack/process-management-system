@@ -65,6 +65,16 @@
               </form>
               <span class="badge text-bg-secondary">{{ current_user.email }}</span>
             {% else %}
+              {% if (current_user.available_departments or [current_user.department])|length > 1 %}
+                <form method="post" action="{{ url_for('auth.switch_department') }}" class="m-0 d-inline" id="user-dept-switch-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <select name="department" onchange="this.form.submit()" class="form-select form-select-sm text-dark" style="display:inline-block; width:auto; margin-right:8px;">
+                    {% for dept in (current_user.available_departments or [current_user.department]) %}
+                      <option value="{{ dept }}" {% if current_user.department == dept %}selected{% endif %}>Dept {{ dept }}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+              {% endif %}
               <span class="badge text-bg-secondary">Dept {{ current_user.department }} · {{ current_user.email }}</span>
             {% endif %}
             <a href="{{ url_for('requests.metrics_ui') }}" class="btn btn-outline-light btn-sm ms-2">Metrics</a>

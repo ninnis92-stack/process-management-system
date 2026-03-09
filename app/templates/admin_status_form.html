@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">{{ 'Edit Status' if edit else 'New Status' }}</h3>
+<form method="post" class="card p-3" style="max-width: 760px;">
+  {{ form.hidden_tag() }}
+
+  <div class="mb-3">
+    <label class="form-label">Status Code</label>
+    {{ form.code(class='form-control', placeholder='e.g. PENDING_LEGAL_REVIEW') }}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Display Label</label>
+    {{ form.label(class='form-control', placeholder='e.g. Pending legal review') }}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Description</label>
+    {{ form.description(class='form-control') }}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Behavior</label>
+    {{ form.behavior(class='form-select') }}
+    <div class="form-text">Choose whether moving to this status should only update status, or also transfer ownership to another department.</div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Transfer To Department</label>
+    {{ form.transfer_to_department(class='form-select') }}
+    <div class="form-text">Required when behavior is set to transfer.</div>
+  </div>
+
+  <div class="form-check mb-3">
+    {{ form.is_active(class='form-check-input') }}
+    <label class="form-check-label ms-2">Active</label>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Save Status</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_statuses') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -47,6 +47,7 @@ class NewRequestForm(FlaskForm):
         ("medium", "Medium"),
         ("high", "High"),
     ], validators=[DataRequired()])
+    flow_group_id = SelectField("Process Flow Group", choices=[("", "Default")], validators=[Optional()])
     def validate_due_at(self, field):
         min_due = datetime.utcnow() + timedelta(hours=48)
         if field.data < min_due:

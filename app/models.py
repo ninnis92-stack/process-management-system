@@ -20,6 +20,11 @@ STATUSES = (
     "CLOSED",
 )
 
+STATUS_BEHAVIORS = (
+    "status_only",
+    "transfer",
+)
+
 REQUEST_TYPES = ("part_number", "instructions", "both")
 PRIORITIES = ("low", "medium", "high")
 PRICEBOOK_LABELS = {
@@ -62,6 +67,42 @@ class User(db.Model, UserMixin):
     # Optional per-user vibe/theme preference (index into palettes)
     vibe_index = db.Column(db.Integer, nullable=True, default=0)
 
+    department_memberships = db.relationship(
+        "UserDepartmentMembership",
+        backref="user",
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
+
+    def member_departments(self) -> tuple[str, ...]:
+        """Return all departments this user can act as, including primary."""
+        ordered = []
+        seen = set()
+        candidates = [self.department]
+        candidates.extend(m.department for m in (self.department_memberships or []))
+        for dept in DEPARTMENTS:
+            if dept in candidates and dept not in seen:
+                seen.add(dept)
+                ordered.append(dept)
+        return tuple(ordered)
+
+    def has_department_access(self, dept: str) -> bool:
+        """Whether user can operate as a given department code."""
+        target = (dept or "").upper()
+        return target in self.member_departments()
+
+
+class UserDepartmentMembership(db.Model):
+    """Additional departments a user can operate as."""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    department = db.Column(db.String(1), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "department", name="uq_user_department_membership"),
+    )
+
 class Notification(db.Model):
     """In-app notification with optional deep link and dedupe key."""
     id = db.Column(db.Integer, primary_key=True)
@@ -100,6 +141,9 @@ class Request(db.Model):
 
     assigned_to_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     assigned_to_user = db.relationship("User", foreign_keys=[assigned_to_user_id])
+
+    flow_group_id = db.Column(db.Integer, db.ForeignKey("process_flow_group.id"), nullable=True)
+    flow_group = db.relationship("ProcessFlowGroup", foreign_keys=[flow_group_id])
 
     submitter_type = db.Column(db.String(20), nullable=False, default="user")  # user/guest
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
@@ -238,3 +282,70 @@ class AuditLog(db.Model):
 
     # explicit event timestamp for audit events (useful for indexing and queries)
     event_ts = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ProcessFlowGroup(db.Model):
+    """Admin-managed workflow group for request transitions."""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    description = db.Column(db.Text, nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    is_default = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    steps = db.relationship(
+        "ProcessFlowStep",
+        backref="flow_group",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="ProcessFlowStep.sort_order.asc()",
+    )
+
+    @staticmethod
+    def default_group():
+        """Return the active default group if one exists."""
+        return ProcessFlowGroup.query.filter_by(is_default=True, is_active=True).first()
+
+
+class ProcessFlowStep(db.Model):
+    """A single status transition step scoped to a department within a group."""
+    id = db.Column(db.Integer, primary_key=True)
+    flow_group_id = db.Column(db.Integer, db.ForeignKey("process_flow_group.id"), nullable=False, index=True)
+
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    name = db.Column(db.String(120), nullable=True)
+
+    actor_department = db.Column(db.String(1), nullable=False)  # Which dept can execute this transition
+    from_status = db.Column(db.String(40), nullable=False)
+    to_status = db.Column(db.String(40), nullable=False)
+
+    from_department = db.Column(db.String(1), nullable=True)
+    to_department = db.Column(db.String(1), nullable=True)
+
+    requires_submission = db.Column(db.Boolean, nullable=False, default=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class ProcessStatus(db.Model):
+    """Admin-managed status definitions and transition behavior."""
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(40), nullable=False, unique=True, index=True)
+    label = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+
+    # status_only: keep current owner; transfer: move owner to transfer_to_department.
+    behavior = db.Column(db.String(20), nullable=False, default="status_only")
+    transfer_to_department = db.Column(db.String(1), nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    @staticmethod
+    def by_code(code: str):
+        if not code:
+            return None
+        return ProcessStatus.query.filter_by(code=code).first()

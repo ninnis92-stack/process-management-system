@@ -123,6 +123,13 @@ def create_app():
 
         imp_admin = None
         from flask import session as _session
+
+        # Expose effective department options for templates and route checks.
+        try:
+            current_user.available_departments = list(current_user.member_departments())
+        except Exception:
+            current_user.available_departments = [getattr(current_user, "department", "A")]
+
         imp_admin = _session.get('impersonate_admin_id')
         imp_dept = _session.get('impersonate_dept')
         if imp_admin and imp_dept and int(imp_admin) == int(getattr(current_user, 'id', -1)):
@@ -133,6 +140,22 @@ def create_app():
                 current_user.act_as_label = f"Acting as Dept {imp_dept}"
             except Exception:
                 pass
+            return
+
+        # For non-impersonation sessions, allow users with multi-dept access to select
+        # their active department for the current session.
+        active = (_session.get("active_department") or "").upper().strip()
+        if active and getattr(current_user, "has_department_access", None):
+            if current_user.has_department_access(active):
+                current_user.department = active
+            else:
+                _session.pop("active_department", None)
+
+        if not _session.get("active_department"):
+            _session["active_department"] = getattr(current_user, "department", "A")
+
+        current_user.is_acting_as = False
+        current_user.act_as_label = None
         return
 
     from .auth.routes import auth_bp

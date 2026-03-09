@@ -9,7 +9,7 @@ Keep the send path idempotent and non-blocking from request handlers.
 """
 
 from .extensions import db
-from .models import Notification, User
+from .models import Notification, User, UserDepartmentMembership
 from flask import current_app
 from threading import Thread
 
@@ -39,7 +39,21 @@ except Exception:  # pragma: no cover - tasks module may be unavailable to stati
 
 
 def users_in_department(dept: str):
-    return User.query.filter_by(department=dept, is_active=True).all()
+    target = (dept or "").upper()
+    if target not in ("A", "B", "C"):
+        return []
+
+    rows = (
+        User.query
+        .outerjoin(UserDepartmentMembership, UserDepartmentMembership.user_id == User.id)
+        .filter(
+            User.is_active.is_(True),
+            (User.department == target) | (UserDepartmentMembership.department == target),
+        )
+        .distinct()
+        .all()
+    )
+    return rows
 
 
 def _send_emails_async(recipients_map, subject, body, html=None, request_id=None):

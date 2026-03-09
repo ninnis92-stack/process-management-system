@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Admin - Department Process Flows</h3>
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a class="btn btn-primary" href="{{ url_for('admin.create_flow_group') }}">New Flow Group</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('admin.list_statuses') }}">Manage Statuses</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_users') }}">Back to Users</a>
+</div>
+
+{% for g in groups %}
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <div>
+        <strong>{{ g.name }}</strong>
+        {% if g.is_default %}<span class="badge text-bg-success ms-2">Default</span>{% endif %}
+        {% if not g.is_active %}<span class="badge text-bg-secondary ms-2">Inactive</span>{% endif %}
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.flow_group_detail', group_id=g.id) }}">Manage Group</a>
+        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.flow_group_detail', group_id=g.id, dept='A') }}">Dept A</a>
+        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.flow_group_detail', group_id=g.id, dept='B') }}">Dept B</a>
+        <a class="btn btn-sm btn-outline-dark" href="{{ url_for('admin.flow_group_detail', group_id=g.id, dept='C') }}">Dept C</a>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.create_flow_step', group_id=g.id) }}">Add Step</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.edit_flow_group', group_id=g.id) }}">Edit Group</a>
+        {% if not g.is_default %}
+          <form method="post" action="{{ url_for('admin.make_flow_group_default', group_id=g.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-success">Make Default</button>
+          </form>
+        {% endif %}
+        {% if not g.is_default %}
+          <form method="post" action="{{ url_for('admin.delete_flow_group', group_id=g.id) }}" class="d-inline" onsubmit="return confirm('Delete flow group {{ g.name }}?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger">Delete</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="small text-muted mb-2">{{ g.description or 'No description' }}</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Label</th>
+              <th>Actor Dept</th>
+              <th>Transition</th>
+              <th>Route Dept</th>
+              <th>Submission Required</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for step in g.steps %}
+              <tr>
+                <td>{{ step.sort_order }}</td>
+                <td>{{ step.name or '-' }}</td>
+                <td>{{ step.actor_department }}</td>
+                <td><code>{{ step.from_status }}</code> -> <code>{{ step.to_status }}</code></td>
+                <td>{{ step.from_department or 'Auto' }} -> {{ step.to_department or 'Auto' }}</td>
+                <td>{{ 'Yes' if step.requires_submission else 'No' }}</td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.edit_flow_step', step_id=step.id) }}">Edit</a>
+                  <form method="post" action="{{ url_for('admin.delete_flow_step', step_id=step.id) }}" class="d-inline" onsubmit="return confirm('Delete this step?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-danger">Delete</button>
+                  </form>
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="7" class="text-muted">No steps configured yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="alert alert-info">No process flow groups configured yet.</div>
+{% endfor %}
+{% endblock %}

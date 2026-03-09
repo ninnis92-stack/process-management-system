@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">{{ 'Edit Flow Group' if edit else 'New Flow Group' }}</h3>
+<form method="post" class="card p-3" style="max-width: 760px;">
+  {{ form.hidden_tag() }}
+
+  <div class="mb-3">
+    <label class="form-label">Group Name</label>
+    {{ form.name(class="form-control") }}
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Description</label>
+    {{ form.description(class="form-control") }}
+  </div>
+
+  <div class="form-check mb-2">
+    {{ form.is_active(class="form-check-input") }}
+    <label class="form-check-label ms-2">Active</label>
+  </div>
+
+  <div class="form-check mb-3">
+    {{ form.is_default(class="form-check-input") }}
+    <label class="form-check-label ms-2">Default group for new requests</label>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Save Group</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_flows') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

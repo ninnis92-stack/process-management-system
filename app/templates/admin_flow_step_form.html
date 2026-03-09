@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">{{ 'Edit Step' if edit else 'New Step' }} - {{ group.name }}</h3>
+<form method="post" class="card p-3" style="max-width: 880px;">
+  {{ form.hidden_tag() }}
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label">Step Label</label>
+      {{ form.name(class="form-control") }}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Order</label>
+      {{ form.sort_order(class="form-control") }}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Actor Department</label>
+      {{ form.actor_department(class="form-select") }}
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-md-6">
+      <label class="form-label">From Status</label>
+      {{ form.from_status(class="form-control", list="statusOptions") }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">To Status</label>
+      {{ form.to_status(class="form-control", list="statusOptions") }}
+    </div>
+  </div>
+
+  <datalist id="statusOptions">
+    {% for s in status_options %}
+      <option value="{{ s }}"></option>
+    {% endfor %}
+  </datalist>
+
+  <div class="row g-3 mt-1">
+    <div class="col-md-6">
+      <label class="form-label">From Department</label>
+      {{ form.from_department(class="form-select") }}
+      <div class="form-text">Use Auto unless this transition explicitly hands off from another department.</div>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">To Department</label>
+      {{ form.to_department(class="form-select") }}
+      <div class="form-text">Use Auto to derive owner from status mapping; set a department to override owner routing.</div>
+    </div>
+  </div>
+
+  <div class="form-check mt-3 mb-3">
+    {{ form.requires_submission(class="form-check-input") }}
+    <label class="form-check-label ms-2">Require submission summary/details for this step</label>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Save Step</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_flows') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

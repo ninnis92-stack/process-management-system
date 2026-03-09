@@ -413,7 +413,7 @@ pip install prometheus_client
 
 ## Presentation / Deployment Notes
 
-- Fix applied: password hashing now uses a compatible method (`pbkdf2:sha256`) to avoid runtime failures on platforms missing `hashlib.scrypt`.
+- Fix applied: password hashing now uses a compatible method (`pbkydf2:sha256`) to avoid runtime failures on platforms missing `hashlib.scrypt`.
 - Remote helper: `scripts/remote_create_tables.py` can be run inside a deployed container to create DB tables when using SQLite (example: `flyctl ssh console -a <app> --command "python3 /app/scripts/remote_create_tables.py"`).
 - Seeding: the demo data is seeded with `seed.py`. For the live demo the following accounts were created:
   - `a@example.com` / `password123` (Dept A)
@@ -431,3 +431,4 @@ Note: For production use a managed Postgres instance and run migrations via Alem
 - Policy change (assignment): Department A users may no longer self-assign a request until Department B has processed it and explicitly sent it back to Department A. This enforces the demo workflow where Dept B handles initial review/work and returns the request to Dept A before A can claim it.
  - Startup safety: the container entrypoint now ensures DB tables exist on boot by running `scripts/remote_create_tables.py` unless `AUTO_CREATE_DB=0` is set. This prevents early requests (login, dashboard) from triggering a 500 when the SQLite DB file exists but tables are not yet created. You can still opt out by setting `AUTO_CREATE_DB=0` in your deployment environment.
  - Form behavior: when submitting a request with `Request Type = Both`, the `Target Part Number` field is now optional on both the guest request form and the Dept A/internal request form. The `Target` is still required when `Request Type = Method` (`instructions`).
+curl -L https://fly.io/install.sh | sh

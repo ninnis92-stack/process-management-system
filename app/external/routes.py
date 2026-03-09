@@ -5,7 +5,7 @@ from sqlalchemy import func
 
 from ..extensions import db
 from sqlalchemy.exc import OperationalError
-from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Notification
+from ..models import Artifact, Request as ReqModel, Comment, AuditLog, Submission, User, Notification, ProcessFlowGroup
 from ..notifcations import notify_users, users_in_department
 from types import SimpleNamespace
 from werkzeug.routing import BuildError
@@ -61,6 +61,7 @@ def _send_guest_email(to_email: str, subject: str, body: str) -> None:
 def external_new():
     form = ExternalNewRequestForm()
     if form.validate_on_submit():
+        default_flow_group = ProcessFlowGroup.default_group()
         desc = (form.description.data or "").strip()
         # Normalize guest email early for checks
         guest_email = (form.guest_email.data or "").strip().lower()
@@ -87,6 +88,7 @@ def external_new():
             guest_name=form.guest_name.data.strip() if form.guest_name.data else None,
             pricebook_status=form.pricebook_status.data,
             due_at=form.due_at.data,
+            flow_group_id=default_flow_group.id if default_flow_group else None,
         )
         req.ensure_guest_token()
         db.session.add(req)

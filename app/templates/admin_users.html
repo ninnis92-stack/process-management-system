@@ -3,6 +3,8 @@
 <h3 class="mb-3">Admin — Users</h3>
 <div class="d-flex gap-2 mb-3">
   <a class="btn btn-primary" href="{{ url_for('admin.create_user') }}">Create / Update User</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('admin.list_flows') }}">Process Flows</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('admin.list_statuses') }}">Statuses</a>
   <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=A">Monitor A</a>
   <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=B">Monitor B</a>
   <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=C">Monitor C</a>
@@ -14,6 +16,7 @@
         <th>Email</th>
         <th>Name</th>
         <th>Department</th>
+        <th>Dept Access</th>
         <th>Active</th>
         <th>Created</th>
         <th></th>
@@ -25,6 +28,7 @@
           <td>{{ u.email }}</td>
           <td>{{ u.name or '' }}</td>
           <td>{{ u.department }}</td>
+          <td>{{ u.member_departments()|join(', ') }}</td>
           <td>{{ 'Yes' if u.is_active else 'No' }}</td>
           <td>{{ u.created_at }}</td>
           <td class="text-end">
@@ -44,7 +48,7 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="5" class="text-muted">No users.</td></tr>
+        <tr><td colspan="7" class="text-muted">No users.</td></tr>
       {% endfor %}
     </tbody>
   </table>

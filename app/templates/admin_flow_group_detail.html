@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-2">Flow Group - {{ group.name }}</h3>
+<div class="small text-muted mb-3">{{ group.description or 'No description' }}</div>
+
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_flows') }}">Back to Flow Groups</a>
+  <a class="btn btn-primary" href="{{ url_for('admin.create_flow_step', group_id=group.id) }}">Add Step</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('admin.create_flow_step', group_id=group.id, dept='A') }}">Add Dept A Step</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('admin.create_flow_step', group_id=group.id, dept='B') }}">Add Dept B Step</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('admin.create_flow_step', group_id=group.id, dept='C') }}">Add Dept C Step</a>
+</div>
+
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a class="btn btn-sm {{ 'btn-dark' if not focus_dept else 'btn-outline-dark' }}" href="{{ url_for('admin.flow_group_detail', group_id=group.id) }}">All Departments</a>
+  <a class="btn btn-sm {{ 'btn-dark' if focus_dept == 'A' else 'btn-outline-dark' }}" href="{{ url_for('admin.flow_group_detail', group_id=group.id, dept='A') }}">Dept A</a>
+  <a class="btn btn-sm {{ 'btn-dark' if focus_dept == 'B' else 'btn-outline-dark' }}" href="{{ url_for('admin.flow_group_detail', group_id=group.id, dept='B') }}">Dept B</a>
+  <a class="btn btn-sm {{ 'btn-dark' if focus_dept == 'C' else 'btn-outline-dark' }}" href="{{ url_for('admin.flow_group_detail', group_id=group.id, dept='C') }}">Dept C</a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Department</th>
+            <th>Label</th>
+            <th>From Status</th>
+            <th>To Status</th>
+            <th>From Dept</th>
+            <th>To Dept</th>
+            <th>Submission Required</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for step in steps %}
+            <tr>
+              <td>{{ step.sort_order }}</td>
+              <td><span class="badge text-bg-secondary">{{ step.actor_department }}</span></td>
+              <td>{{ step.name or '-' }}</td>
+              <td><code>{{ step.from_status }}</code></td>
+              <td><code>{{ step.to_status }}</code></td>
+              <td>{{ step.from_department or 'Auto' }}</td>
+              <td>{{ step.to_department or 'Auto' }}</td>
+              <td>{{ 'Yes' if step.requires_submission else 'No' }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.edit_flow_step', step_id=step.id) }}">Edit</a>
+                <form method="post" action="{{ url_for('admin.delete_flow_step', step_id=step.id) }}" class="d-inline" onsubmit="return confirm('Delete this step?');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="9" class="text-muted">No steps found for this view.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

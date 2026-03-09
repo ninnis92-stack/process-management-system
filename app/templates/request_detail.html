@@ -20,6 +20,9 @@
   }.get(req.status, '•') %}
   <span class="badge text-bg-secondary">{{ icon }} {{ 'Requires executive approval' if req.status == 'EXEC_APPROVAL' else req.status }}</span>
   <span class="badge text-bg-info">Owner Dept: {{ req.owner_department }}</span>
+  {% if req.flow_group %}
+    <span class="badge text-bg-dark">Flow: {{ req.flow_group.name }}</span>
+  {% endif %}
   <span class="badge text-bg-light text-dark">Priority: {{ req.priority }}</span>
   <span class="badge text-bg-warning">C Review: {{ "Required" if req.requires_c_review else "Not required" }}</span>
   {% if req.due_at %}

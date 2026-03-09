@@ -85,6 +85,7 @@ def sso_callback():
         session.pop('sso_mfa', None)
 
     login_user(user)
+    session['active_department'] = user.department
     return redirect(url_for("requests.dashboard"))
 
 
@@ -112,6 +113,7 @@ def login():
                 return redirect(url_for('auth.totp_verify'))
 
         login_user(user)
+        session['active_department'] = user.department
         return redirect(url_for("requests.dashboard"))
 
     return render_template("login.html", form=form)
@@ -224,3 +226,25 @@ def set_vibe():
     u.vibe_index = max(0, int(v))
     db.session.commit()
     return ({'ok': True}, 200)
+
+
+@auth_bp.route('/switch-department', methods=['POST'])
+@login_required
+def switch_department():
+    """Switch the active department for users with multi-department access."""
+    if session.get('impersonate_admin_id'):
+        flash('Stop impersonation before switching departments.', 'warning')
+        return redirect(url_for('requests.dashboard'))
+
+    target = (flask_request.form.get('department') or '').upper().strip()
+    if target not in ('A', 'B', 'C'):
+        flash('Invalid department.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    if not current_user.has_department_access(target):
+        flash('You do not have access to that department.', 'danger')
+        return redirect(url_for('requests.dashboard'))
+
+    session['active_department'] = target
+    flash(f'Switched to Dept {target}.', 'success')
+    return redirect(url_for('requests.dashboard'))

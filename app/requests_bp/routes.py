@@ -29,7 +29,10 @@ from ..models import (
     Submission,
     Attachment,
     User,
+    UserDepartmentMembership,
     Notification,
+    ProcessFlowGroup,
+    ProcessStatus,
 )
 from .forms import (
     NewRequestForm,
@@ -46,7 +49,13 @@ from .permissions import (
     visible_comment_scopes_for_user,
     allowed_comment_scopes_for_user,
 )
-from .workflow import transition_allowed, owner_for_status, handoff_for_transition
+from .workflow import (
+    transition_allowed_for_request,
+    transition_options_for_request,
+    handoff_for_request,
+    owner_for_request_transition,
+    requires_submission_for_request,
+)
 from ..services.verification import VerificationService
 from ..notifcations import notify_users, users_in_department
 from .. import metrics as metrics_module
@@ -116,7 +125,26 @@ def _log(req: ReqModel, action_type: str, note: Optional[str] = None,
 
 
 def _users_in_dept(dept: str) -> List[User]:
-    return User.query.filter_by(department=dept, is_active=True).all()
+    target = (dept or "").upper()
+    if target not in ("A", "B", "C"):
+        return []
+    return (
+        User.query
+        .outerjoin(UserDepartmentMembership, UserDepartmentMembership.user_id == User.id)
+        .filter(
+            User.is_active.is_(True),
+            (User.department == target) | (UserDepartmentMembership.department == target),
+        )
+        .distinct()
+        .all()
+    )
+
+
+def _status_label(status_code: str) -> str:
+    s = ProcessStatus.by_code(status_code)
+    if s and s.label:
+        return s.label
+    return status_code.replace("_", " ").title()
 
 
 def _assignment_choices(dept: str):
@@ -205,7 +233,7 @@ def _closed_within_hours(req: ReqModel, hours: int = 48) -> bool:
 
 
 def is_transition_valid_for_request(req: ReqModel, dept: str, from_status: str, to_status: str) -> bool:
-    if not transition_allowed(dept, from_status, to_status):
+    if not transition_allowed_for_request(req, dept, from_status, to_status):
         return False
 
     # If C review is required: block bypass to final review
@@ -353,50 +381,54 @@ def dashboard():
             label = STATUS_LABELS.get(status_filter, status_filter)
             buckets = {label: items}
         else:
-            buckets = {
-            "New from A": base_b.filter(
-                ReqModel.status == "NEW_FROM_A",
-            ).order_by(ReqModel.updated_at.desc()).all(),
+            # Default bucket population is dynamic so receiving departments see
+            # request buckets that match the latest status updates.
+            ordered = base_b.order_by(ReqModel.updated_at.desc()).all()
+            status_groups = {}
+            for r in ordered:
+                # Keep historical closed items out of default buckets.
+                if r.status == "CLOSED" and r.updated_at < closed_cutoff:
+                    continue
+                status_groups.setdefault(r.status, []).append(r)
 
-            "In progress by Department B": base_b.filter(
-                ReqModel.status == "B_IN_PROGRESS",
-            ).order_by(ReqModel.updated_at.desc()).all(),
+            bucket_order = [
+                "NEW_FROM_A",
+                "B_IN_PROGRESS",
+                "WAITING_ON_A_RESPONSE",
+                "PENDING_C_REVIEW",
+                "C_NEEDS_CHANGES",
+                "C_APPROVED",
+                "B_FINAL_REVIEW",
+                "EXEC_APPROVAL",
+                "SENT_TO_A",
+                "CLOSED",
+            ]
 
-            "Pending review from Department A": base_b.filter(
-                ReqModel.status == "WAITING_ON_A_RESPONSE",
-            ).order_by(ReqModel.updated_at.desc()).all(),
+            label_by_status = {
+                "NEW_FROM_A": "New from A",
+                "B_IN_PROGRESS": "In progress by Department B",
+                "WAITING_ON_A_RESPONSE": "Pending review from Department A",
+                "PENDING_C_REVIEW": "Under review by Department C",
+                "C_NEEDS_CHANGES": "Needs changes",
+                "C_APPROVED": "Approved by C",
+                "B_FINAL_REVIEW": "Final review",
+                "EXEC_APPROVAL": "Exec approval required",
+                "SENT_TO_A": "Sent to A",
+                "CLOSED": "Closed this week",
+            }
 
-            "Needs changes": base_b.filter(
-                ReqModel.status == "C_NEEDS_CHANGES",
-            ).order_by(ReqModel.updated_at.desc()).all(),
+            buckets = {}
+            for status_code in bucket_order:
+                items = status_groups.pop(status_code, [])
+                if items:
+                    buckets[label_by_status.get(status_code, _status_label(status_code))] = items
 
-            "Exec approval required": base_b.filter(
-                ReqModel.status == "EXEC_APPROVAL",
-            ).order_by(ReqModel.updated_at.desc()).all(),
+            # Include any additional/custom statuses from configured flow groups.
+            for status_code, items in status_groups.items():
+                pretty = _status_label(status_code)
+                buckets[pretty] = items
 
-            "Approved by C": base_b.filter(
-                ReqModel.status == "C_APPROVED",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-
-            "Final review": base_b.filter(
-                ReqModel.status == "B_FINAL_REVIEW",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-
-            "Sent to A": base_b.filter(
-                ReqModel.status == "SENT_TO_A",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-
-            "Under review by Department C": base_b.filter(
-                ReqModel.status == "PENDING_C_REVIEW",
-            ).order_by(ReqModel.updated_at.desc()).all(),
-
-            "Closed this week": base_b.filter(
-                ReqModel.status == "CLOSED",
-                ReqModel.updated_at >= closed_cutoff,
-            ).order_by(ReqModel.updated_at.desc()).all(),
-
-            "All (B)": base_b.order_by(ReqModel.updated_at.desc()).all(),
-        }
+            buckets["All (B)"] = ordered
         # Annotate each request with the last status set by the current owner dept
         for name, reqs in buckets.items():
             for r in reqs:
@@ -584,12 +616,25 @@ def metrics_json():
 def request_new():
     form = NewRequestForm()
 
-    if request.method == "POST":
-        ok = form.validate_on_submit()
-        print("VALID:", ok)
-        print("ERRORS:", form.errors)
+    active_groups = ProcessFlowGroup.query.filter_by(is_active=True).order_by(ProcessFlowGroup.name.asc()).all()
+    default_group = ProcessFlowGroup.default_group()
+    flow_choices = [("", "Default flow")]
+    for g in active_groups:
+        suffix = " (default)" if default_group and default_group.id == g.id else ""
+        flow_choices.append((str(g.id), f"{g.name}{suffix}"))
+    form.flow_group_id.choices = flow_choices
 
     if form.validate_on_submit():
+        selected_group_id = (form.flow_group_id.data or "").strip()
+        selected_group = None
+        if selected_group_id:
+            selected_group = ProcessFlowGroup.query.filter_by(id=int(selected_group_id), is_active=True).first()
+            if not selected_group:
+                flash("Selected process flow group is no longer active.", "danger")
+                return render_template("request_new.html", form=form)
+        elif default_group:
+            selected_group = default_group
+
         req = ReqModel(
             title=form.title.data.strip(),
             request_type=form.request_type.data,
@@ -602,6 +647,7 @@ def request_new():
             submitter_type="user",
             created_by_user_id=current_user.id,
             due_at=form.due_at.data,
+            flow_group_id=selected_group.id if selected_group else None,
         )
 
         db.session.add(req)
@@ -710,45 +756,38 @@ def request_detail(request_id: int):
 
     transition_form = TransitionForm()
     dept = current_user.department
-    # Build status choices per department: A only sees reopen/close, B sees all B-facing states (validation on submit), C stays constrained.
-    if dept == "A":
-        possible = []
-        label_map = {
-            "B_IN_PROGRESS": "Request review from Department B",
-            "CLOSED": "Close ticket",
-        }
-        if req.status == "SENT_TO_A":
-            for to in ("B_IN_PROGRESS", "CLOSED"):
-                if is_transition_valid_for_request(req, dept, req.status, to):
-                    possible.append((to, label_map[to]))
-        elif req.status == "CLOSED":
-            # Allow Dept A to reopen only within 48 hours of closure.
-            if _closed_within_hours(req, hours=48) and is_transition_valid_for_request(req, dept, req.status, "B_IN_PROGRESS"):
-                possible.append(("B_IN_PROGRESS", label_map["B_IN_PROGRESS"]))
-        transition_form.to_status.choices = possible
-    elif dept == "B":
-        possible = []
-        for to in ("B_IN_PROGRESS", "WAITING_ON_A_RESPONSE", "PENDING_C_REVIEW", "C_APPROVED", "C_NEEDS_CHANGES",
-                   "B_FINAL_REVIEW", "EXEC_APPROVAL", "SENT_TO_A", "CLOSED"):
-            if to == "WAITING_ON_A_RESPONSE":
-                label = "Pending review from Department A"
-            elif to == "B_IN_PROGRESS":
-                label = "In progress by Department B"
-            elif to == "PENDING_C_REVIEW":
-                label = "Under review by Department C"
-            elif to == "EXEC_APPROVAL":
-                label = "Requires executive approval"
-            else:
-                label = to.replace("_", " ").title()
-            possible.append((to, label))
-        transition_form.to_status.choices = possible
+    possible = []
+    status_label_map = {
+        "WAITING_ON_A_RESPONSE": "Pending review from Department A",
+        "B_IN_PROGRESS": "In progress by Department B",
+        "PENDING_C_REVIEW": "Under review by Department C",
+        "EXEC_APPROVAL": "Requires executive approval",
+        "CLOSED": "Close ticket",
+    }
+
+    candidate_statuses = transition_options_for_request(req, dept, req.status)
+    if not candidate_statuses:
+        # Preserve existing behavior for routes that still depend on static transitions.
+        if dept == "A":
+            candidate_statuses = ["B_IN_PROGRESS", "CLOSED"]
+        elif dept == "B":
+            candidate_statuses = [
+                "B_IN_PROGRESS", "WAITING_ON_A_RESPONSE", "PENDING_C_REVIEW", "C_APPROVED",
+                "C_NEEDS_CHANGES", "B_FINAL_REVIEW", "EXEC_APPROVAL", "SENT_TO_A", "CLOSED",
+            ]
+        elif dept == "C":
+            candidate_statuses = ["C_APPROVED", "C_NEEDS_CHANGES"]
+
+    for to in candidate_statuses:
+        # Keep the existing Dept A 48-hour reopen guardrail.
+        if dept == "A" and req.status == "CLOSED" and to == "B_IN_PROGRESS" and not _closed_within_hours(req, hours=48):
+            continue
+        if is_transition_valid_for_request(req, dept, req.status, to):
+            possible.append((to, status_label_map.get(to, _status_label(to))))
+
+    transition_form.to_status.choices = possible
+    if dept == "B":
         transition_form.requires_c_review.data = req.requires_c_review
-    else:
-        possible = []
-        for to in ("C_APPROVED", "C_NEEDS_CHANGES"):
-            if is_transition_valid_for_request(req, dept, req.status, to):
-                possible.append((to, to.replace("_", " ").title()))
-        transition_form.to_status.choices = possible
 
     toggle_form = ToggleCReviewForm()
     request_edit_form = RequestArtifactEditForm()
@@ -797,7 +836,7 @@ def request_detail(request_id: int):
         next_hint=next_hint,
         now=now,
         assigned_user=req.assigned_to_user,
-        handoff_targets=[t for t, _ in possible if handoff_for_transition(req.status, t)],
+        handoff_targets=[t for t, _ in possible if handoff_for_request(req, dept, req.status, t)],
     )
 
 
@@ -1316,29 +1355,28 @@ def do_transition(request_id: int):
     dept = current_user.department
 
     possible = []
-    if dept == "A":
-        # Dept A: only reopen or close
-        for to in ("B_IN_PROGRESS", "CLOSED"):
-            if is_transition_valid_for_request(req, dept, req.status, to):
-                possible.append((to, to))
-    elif dept == "B":
-        # Dept B: expose all B-facing destinations; actual guardrails enforced after submit
-        for to in ("B_IN_PROGRESS", "WAITING_ON_A_RESPONSE", "PENDING_C_REVIEW", "C_APPROVED", "C_NEEDS_CHANGES",
-                   "B_FINAL_REVIEW", "SENT_TO_A", "CLOSED"):
-            if to == "WAITING_ON_A_RESPONSE":
-                label = "Pending review from Department A"
-            elif to == "B_IN_PROGRESS":
-                label = "In progress by Department B"
-            elif to == "PENDING_C_REVIEW":
-                label = "Under review by Department C"
-            else:
-                label = to
-            possible.append((to, label))
-    else:
-        # Dept C: only approve or request changes
-        for to in ("C_APPROVED", "C_NEEDS_CHANGES"):
-            if is_transition_valid_for_request(req, dept, req.status, to):
-                possible.append((to, to))
+    label_map = {
+        "WAITING_ON_A_RESPONSE": "Pending review from Department A",
+        "B_IN_PROGRESS": "In progress by Department B",
+        "PENDING_C_REVIEW": "Under review by Department C",
+    }
+    candidate_statuses = transition_options_for_request(req, dept, req.status)
+    if not candidate_statuses:
+        if dept == "A":
+            candidate_statuses = ["B_IN_PROGRESS", "CLOSED"]
+        elif dept == "B":
+            candidate_statuses = [
+                "B_IN_PROGRESS", "WAITING_ON_A_RESPONSE", "PENDING_C_REVIEW", "C_APPROVED",
+                "C_NEEDS_CHANGES", "B_FINAL_REVIEW", "SENT_TO_A", "CLOSED",
+            ]
+        else:
+            candidate_statuses = ["C_APPROVED", "C_NEEDS_CHANGES"]
+
+    for to in candidate_statuses:
+        if dept == "A" and req.status == "CLOSED" and to == "B_IN_PROGRESS" and not _closed_within_hours(req, hours=48):
+            continue
+        if is_transition_valid_for_request(req, dept, req.status, to):
+            possible.append((to, label_map.get(to, _status_label(to))))
     form.to_status.choices = possible
 
     if not form.validate_on_submit():
@@ -1371,12 +1409,12 @@ def do_transition(request_id: int):
     # Determine whether we should create a submission record. Create one when
     # this is a handoff (cross-department transfer) OR when the actor provided
     # a summary/details or attachments for this status update.
-    handoff = handoff_for_transition(req.status, to_status)
+    handoff = handoff_for_request(req, dept, req.status, to_status)
     # If no explicit handoff rule exists but the owner department implied by the
     # target status differs from the current owner, treat this as a transfer
     # handoff (e.g., selecting a status that names a different department).
     if not handoff:
-        target_owner = owner_for_status(to_status)
+        target_owner = owner_for_request_transition(req, dept, req.status, to_status)
         if target_owner and target_owner != req.owner_department:
             handoff = (req.owner_department, target_owner)
 
@@ -1389,7 +1427,7 @@ def do_transition(request_id: int):
         create_submission = True
     else:
         # If owner would change, treat as implicit handoff
-        target_owner = owner_for_status(to_status)
+        target_owner = owner_for_request_transition(req, dept, req.status, to_status)
         if target_owner and target_owner != req.owner_department:
             from_dept = req.owner_department
             to_dept = target_owner
@@ -1401,12 +1439,12 @@ def do_transition(request_id: int):
             has_files = bool(form.files.data and any(f and f.filename for f in form.files.data))
             if has_summary or has_details or has_files:
                 from_dept = req.owner_department
-                to_dept = owner_for_status(to_status) or req.owner_department
+                to_dept = owner_for_request_transition(req, dept, req.status, to_status) or req.owner_department
                 create_submission = True
 
     if create_submission:
-        # Require submission content only when the handoff crosses departments
-        require_submission = (from_dept != to_dept)
+        # Require submission content when flow step requires it or when crossing departments.
+        require_submission = requires_submission_for_request(req, dept, req.status, to_status) or (from_dept != to_dept)
 
         # Allow Dept A to close without providing a submission packet.
         if require_submission:
@@ -1458,7 +1496,7 @@ def do_transition(request_id: int):
         # If this was an explicit handoff, set the request status/owner before notifying recipients
         if handoff:
             req.status = to_status
-            req.owner_department = owner_for_status(to_status)
+            req.owner_department = owner_for_request_transition(req, dept, from_status, to_status)
 
         # Notify receiving dept only for explicit handoffs
         if handoff:
@@ -1474,7 +1512,7 @@ def do_transition(request_id: int):
 
     # Update request status and owner
     req.status = to_status
-    req.owner_department = owner_for_status(to_status)
+    req.owner_department = owner_for_request_transition(req, dept, from_status, to_status)
     _log(req, "status_change", note=f"Status changed by Dept {dept}.", from_status=from_status, to_status=to_status)
 
     # Prometheus: record transition

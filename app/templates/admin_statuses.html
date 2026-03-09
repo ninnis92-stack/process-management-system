@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Admin - Status Behaviors</h3>
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a class="btn btn-primary" href="{{ url_for('admin.create_status') }}">New Status</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_flows') }}">Flow Groups</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_users') }}">Users</a>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Label</th>
+        <th>Behavior</th>
+        <th>Transfer Department</th>
+        <th>Active</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in statuses %}
+      <tr>
+        <td><code>{{ s.code }}</code></td>
+        <td>
+          <div>{{ s.label }}</div>
+          {% if s.description %}<div class="small text-muted">{{ s.description }}</div>{% endif %}
+        </td>
+        <td>{{ 'Update and transfer' if s.behavior == 'transfer' else 'Update only' }}</td>
+        <td>{{ s.transfer_to_department or '-' }}</td>
+        <td>{{ 'Yes' if s.is_active else 'No' }}</td>
+        <td class="text-end">
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.edit_status', status_id=s.id) }}">Edit</a>
+          <form method="post" action="{{ url_for('admin.delete_status', status_id=s.id) }}" class="d-inline" onsubmit="return confirm('Delete status {{ s.code }}?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-muted">No statuses configured.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
