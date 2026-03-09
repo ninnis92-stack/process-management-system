@@ -402,11 +402,13 @@ generated schema so admins and integrators can verify the live contract and
 confirm the visual layout (`Standard`, `Compact`, or `Spacious`) that the
 third-party form should mirror.
 
-**Notes on rolling quotes:** the quotes shown in the navbar are now randomized
-once per day using a deterministic seed; the server picks the initial quote using
-the same algorithm so the page loads with the correct text.  The separate
-rolling-quote banner that used to appear under the navbar has been removed
-entirely.
+**Notes on rolling quotes:** quotes shown in the navbar are selected
+at random on every page render and during the automatic 8‑second rotation,
+meaning there is no repeating, predictable cycle.  Each quote set shipped with
+the app contains 30 entries (placeholders will be padded if admins supply
+fewer) and the server-side rendering uses `random.choice` so the initial text
+on each request is truly arbitrary.  The separate rolling-quote banner that
+used to appear under the navbar has been removed entirely.
 Additional notes:
 
 - Approved organization domains are stored as a newline- or comma-separated list

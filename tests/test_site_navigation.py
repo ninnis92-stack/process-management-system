@@ -287,6 +287,23 @@ def test_initial_quote_on_dashboard(app, client):
     assert any(q and q in html for q in quotes), "no rolling quote rendered in dashboard"
 
 
+def test_initial_quote_uses_random_choice(app, client, monkeypatch):
+    # patch random.choice to record that it's used when constructing the page
+    import random
+    calls = []
+    def fake_choice(seq):
+        calls.append(tuple(seq))
+        return seq[0] if seq else None
+    monkeypatch.setattr(random, 'choice', fake_choice)
+
+    _create_user(app, email="random-test@example.com", department="A")
+    _login(client, "random-test@example.com")
+    client.get("/dashboard")
+    # ensure our fake_choice was called with a nonempty list of quotes
+    assert calls, "random.choice was never invoked"
+    assert all(isinstance(c, tuple) and c for c in calls)
+
+
 def test_quote_css_allows_full_quote(client):
     # the navbar styles should not artificially clamp or hide long quotes
     resp = client.get("/static/styles.css")

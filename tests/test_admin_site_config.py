@@ -141,14 +141,13 @@ def test_departments_crud_and_site_config(app, client):
         assert recent.actor_type == "user"
         assert recent.actor_label == "admin@example.com"
 
-        # DEFAULT_QUOTE_SETS now ships with two extra themes and a laundry riddles
-        # set; each should have the same number of entries as the default list.
+        # DEFAULT_QUOTE_SETS uses a uniform length of 30 quotes for every
+        # built-in set.  This makes the UI predictable and ensures sufficient
+        # rotation while giving admins freedom to replace values.
         defaults = SiteConfig.DEFAULT_QUOTE_SETS
-        base_len = len(defaults.get("default", []))
-        assert base_len == 5
         for name, quotes in defaults.items():
             assert isinstance(quotes, list)
-            assert len(quotes) == base_len, f"{name} has wrong count"
+            assert len(quotes) == 30, f"{name} should have exactly 30 quotes"
 
 # Dashboard should include the brand name; banner rendering was removed
         rv = client.get("/dashboard")
@@ -307,7 +306,10 @@ def test_site_config_fills_missing_or_empty_quote_sets(app):
 
         assert quote_sets["default"] == SiteConfig.DEFAULT_QUOTE_SETS["default"]
         assert quote_sets["motivational"] == SiteConfig.DEFAULT_QUOTE_SETS["motivational"]
-        assert quote_sets["engineering"] == ["Ship it."]
+        # engineering was explicitly provided but should have been padded to 30
+        eng = quote_sets["engineering"]
+        assert eng[0] == "Ship it."
+        assert len(eng) == 30
         assert refreshed.rolling_quotes == SiteConfig.DEFAULT_QUOTE_SETS["motivational"]
 
 

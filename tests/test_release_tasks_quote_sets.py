@@ -27,9 +27,14 @@ def test_release_task_normalizes_quote_sets_and_repairs_active_set(app):
 
         refreshed = SiteConfig.get()
         assert refreshed.active_quote_set == "default"
+        # each built-in set should still be populated and at target length
         for name in SiteConfig.DEFAULT_QUOTE_SETS:
             assert refreshed.rolling_quote_sets[name]
-        assert refreshed.rolling_quote_sets["engineering"] == ["Ship it."]
+            assert len(refreshed.rolling_quote_sets[name]) == 30, "set {name} length"
+        # the engineering set should contain the original quote and have been padded
+        eng = refreshed.rolling_quote_sets["engineering"]
+        assert eng[0] == "Ship it."
+        assert len(eng) == 30
 
 
 def test_release_task_keeps_custom_quote_sets_with_content(app):
@@ -45,8 +50,13 @@ def test_release_task_keeps_custom_quote_sets_with_content(app):
 
         refreshed = SiteConfig.get()
         assert refreshed.active_quote_set == "custom"
-        assert refreshed.rolling_quote_sets["custom"] == ["Own the day."]
-        assert refreshed.rolling_quote_sets["default"] == ["Custom default."]
+        custom = refreshed.rolling_quote_sets["custom"]
+        assert custom[0] == "Own the day."
+        assert len(custom) == 30
+        # default should also be padded to 30 while preserving the original
+        default = refreshed.rolling_quote_sets["default"]
+        assert default[0] == "Custom default."
+        assert len(default) == 30
 
 def test_release_task_adds_company_url_column(app):
     # simulate legacy schema missing the company_url column and run main()

@@ -72,19 +72,8 @@
       "Folded clothes, elevated mood."
     ];
   }
-  // Stable per-day seed (days since epoch) so the order changes each day.
-  const daySeed = Math.floor(Date.now() / 86400000);
-  function mulberry32(a) {
-    return function () {
-      a |= 0; a = a + 0x6D2B79F5 | 0;
-      let t = Math.imul(a ^ a >>> 15, 1 | a);
-      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-  }
-
-  const rand = mulberry32(daySeed);
-  const order = lines.map(v => ({ v, r: rand() })).sort((a, b) => a.r - b.r).map(o => o.v);
+  // start with a shallow copy of lines; no fixed shuffle order is needed
+  const order = lines.slice();
   let idx = 0;
 
   // show text with optional animation
@@ -116,7 +105,11 @@
   slot.style.cursor = 'pointer';
 
   function advance() {
-    const nextIdx = (idx + 1) % order.length;
+    // pick a random next index (avoid repeating the same quote twice in a row)
+    let nextIdx = Math.floor(Math.random() * order.length);
+    if (nextIdx === idx) {
+      nextIdx = (idx + 1) % order.length;
+    }
     if (!prefersReduced && slot.animate) {
       // animate out
       const out = slot.animate([

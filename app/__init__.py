@@ -538,16 +538,12 @@ def create_app():
                 # ensures that when JS fails or loads slowly the placeholder is
                 # replaced with something meaningful.
                 initial_quote=(
-                    # pick a deterministic random quote per day rather than always
-                    # the first item.  Use a simple seeded RNG based on days since
-                    # epoch so the order changes daily while remaining stable
-                    # across server and client expectations.  If anything goes
-                    # wrong fall back to the first element.
-                    (lambda quotes, enabled: (
-                        (quotes and enabled and __import__('random').Random(
-                            __import__('time').time()//86400
-                        ).shuffle(quotes) or quotes) and quotes[0]
-                    ))(rolling_quotes[:] if rolling_quotes else [], rolling_quotes_enabled)
+                    # select a fresh random entry each time instead of using a
+                    # day‑based deterministic shuffle; this keeps the sequence
+                    # unpredictable even within the same day.
+                    (lambda quotes, enabled:
+                        __import__('random').choice(quotes) if quotes and enabled else None
+                    )(rolling_quotes[:] if rolling_quotes else [], rolling_quotes_enabled)
                     if rolling_quotes and rolling_quotes_enabled
                     else (SiteConfig.DEFAULT_QUOTE_SETS.get('default', [None])[0])
                 ),

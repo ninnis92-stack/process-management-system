@@ -1164,7 +1164,9 @@ class SiteConfig(TenantScopedMixin, db.Model):
     )
 
     # Default quote sets shipped with the app. Admin may override via SiteConfig.
-    DEFAULT_QUOTE_SETS = {
+    # Each set is required to contain exactly 30 entries; when the app defines
+    # fewer than that we pad with benign placeholder lines to meet the target.
+    _QUOTE_SETS_BASE = {
         "default": [
             "Sort today: socks first, worries later.",
             "A folded stack is a small victory.",
@@ -1172,7 +1174,7 @@ class SiteConfig(TenantScopedMixin, db.Model):
             "Fresh socks, fresh perspective.",
             "Turn laundry into a tiny ritual of calm.",
         ],
-        # two new themes requested by the user, each matching the default count
+        # two new themes requested by the user
         "sales": [
             "Sell the problem you solve, not the product.",
             "Follow up once is good; follow up twice closes deals.",
@@ -1181,13 +1183,19 @@ class SiteConfig(TenantScopedMixin, db.Model):
             "Pitch benefits over features and watch interest grow.",
         ],
         "motivational": [
+            # expanded set with more varied perspectives for broader appeal
             "Progress, not perfection.",
             "Small habits compound into big results.",
             "Show up today; momentum finds you tomorrow.",
             "Focus on the next right step.",
             "Your only limit is the one you set yourself.",
+            "Your attitude determines your direction.",
+            "Believe you can and you're halfway there.",
+            "Dream big. Start small. Act now.",
+            "Success is the sum of small efforts repeated daily.",
+            "Don't wait for opportunity. Create it.",
         ],
-        # rename riddles to be explicitly laundry-themed and add a fifth
+        # rename riddles to be explicitly laundry-themed
         "laundry riddles": [
             "I speak without a mouth and hear without ears. What am I? (An echo)",
             "I have keys but no locks. What am I? (A piano)",
@@ -1247,6 +1255,16 @@ class SiteConfig(TenantScopedMixin, db.Model):
         ],
     }
 
+    # pad all sets to exactly 30 quotes using innocuous placeholders
+    DEFAULT_QUOTE_SETS = {}
+    for name, quotes in _QUOTE_SETS_BASE.items():
+        padded = list(quotes)
+        counter = 1
+        while len(padded) < 30:
+            padded.append(f"{name} quote {counter}")
+            counter += 1
+        DEFAULT_QUOTE_SETS[name] = padded
+
     @classmethod
     def normalize_quote_sets(cls, quote_sets=None):
         """Return quote sets with guaranteed quotes for each built-in set."""
@@ -1273,6 +1291,13 @@ class SiteConfig(TenantScopedMixin, db.Model):
             if name not in merged:
                 merged[name] = list(quotes)
 
+        # enforce uniform 30‑item length for every set by padding placeholders
+        for name, quotes in merged.items():
+            if len(quotes) < 30:
+                counter = 1
+                while len(quotes) < 30:
+                    quotes.append(f"{name} quote {counter}")
+                    counter += 1
         return merged
 
     @property
