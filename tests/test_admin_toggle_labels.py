@@ -81,6 +81,21 @@ def test_feature_flags_render_correct_action_labels(client, app):
     assert 'Automated reminders enabled' in html2
 
 
+def test_admin_dashboard_uses_shared_action_shells(client, app):
+    make_admin(app)
+    rv = login_admin(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/admin/")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+
+    assert 'admin-hero__actions ui-action-bar' in html
+    assert 'ui-action-group' in html
+    assert 'ui-action-note' in html
+    assert 'data-vibe-shell' in html
+
+
 def test_feature_flags_post_unchecked_boxes_disable_flags(client, app):
     make_admin(app)
     with app.app_context():

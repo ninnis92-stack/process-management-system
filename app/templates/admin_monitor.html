@@ -6,14 +6,19 @@
     <h3 class="page-header__title mb-0">Admin Monitor — Dept {{ dept }}</h3>
     <p class="page-header__lede mb-0">Observe department activity, review recent issues, and open a live mini-view for debugging.</p>
   </div>
-  <div class="page-header__actions">
-    <a class="btn btn-sm btn-outline-primary" href="?dept=A">View Dept A</a>
-    <a class="btn btn-sm btn-outline-primary" href="?dept=B">View Dept B</a>
-    <a class="btn btn-sm btn-outline-primary" href="?dept=C">View Dept C</a>
-    {% if FeatureFlags.get().vibe_enabled and not current_user.dark_mode %}
-      <button id="vibeBtnDept" data-vibe-trigger="dept-monitor" class="btn btn-sm btn-outline-secondary">Vibe · <span class="vibeLabel">—</span></button>
-    {% elif current_user.dark_mode %}
-      <div class="form-text text-warning mt-1">Vibe controls disabled in dark mode.</div>
+  <div class="page-header__actions ui-action-bar">
+    <div class="ui-action-group">
+      <a class="btn btn-sm btn-outline-primary" href="?dept=A">View Dept A</a>
+      <a class="btn btn-sm btn-outline-primary" href="?dept=B">View Dept B</a>
+      <a class="btn btn-sm btn-outline-primary" href="?dept=C">View Dept C</a>
+      {% if FeatureFlags.get().vibe_enabled and not current_user.dark_mode %}
+        <div class="ui-control-shell ui-control-shell--compact" data-vibe-shell>
+          <button id="vibeBtnDept" data-vibe-trigger="dept-monitor" class="btn btn-sm btn-outline-secondary">Vibe · <span class="vibeLabel">—</span></button>
+        </div>
+      {% endif %}
+    </div>
+    {% if current_user.dark_mode %}
+      <div class="ui-action-note ui-action-note--warning">Vibe controls disabled in dark mode.</div>
     {% endif %}
   </div>
 </section>

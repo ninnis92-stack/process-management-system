@@ -546,6 +546,7 @@
 
 (function initTheme() {
   const vibeButtons = Array.from(document.querySelectorAll('#vibeBtn, #vibeBtnDept, #vibeBtnAdmin, [data-vibe-trigger]'));
+  const vibeShells = Array.from(document.querySelectorAll('[data-vibe-shell]'));
   const vibeControlPanels = Array.from(document.querySelectorAll('[data-vibe-control-panel]'));
   const themeBanners = Array.from(document.querySelectorAll('[data-theme-banner]'));
   const themeManagedProps = [
@@ -653,6 +654,13 @@
       } catch (e) {}
     });
 
+    vibeShells.forEach((shell) => {
+      try {
+        shell.hidden = !vibeEnabled;
+        shell.setAttribute('aria-hidden', !vibeEnabled ? 'true' : 'false');
+      } catch (e) {}
+    });
+
     vibeButtons.forEach((button) => {
       try {
         button.hidden = !vibeEnabled;
@@ -689,6 +697,13 @@
       try {
         panel.hidden = !vibeFeatureEnabled;
         panel.setAttribute('aria-hidden', !vibeFeatureEnabled ? 'true' : 'false');
+      } catch (e) {}
+    });
+
+    vibeShells.forEach((shell) => {
+      try {
+        shell.hidden = !vibeFeatureEnabled;
+        shell.setAttribute('aria-hidden', !vibeFeatureEnabled ? 'true' : 'false');
       } catch (e) {}
     });
 

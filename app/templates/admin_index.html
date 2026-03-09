@@ -6,15 +6,22 @@
       <p class="eyebrow-label">Command center</p>
       <h1 class="admin-hero__title">Operate every process flow, request form, and department from one command center.</h1>
       <p class="admin-hero__lede">Track guest intake, dashboards, and core configuration with fast insights, quick actions, and clearer terminology.</p>
-      <div class="admin-hero__actions">
-        <a class="btn btn-sm btn-primary" href="{{ url_for('admin.metrics_config') }}">Open metrics suite</a>
-        <a class="btn btn-sm btn-outline-light" href="{{ url_for('admin.feature_flags') }}">Explore feature flags</a>
-        {% if FeatureFlags.get().vibe_enabled and not current_user.dark_mode %}
-          <button id="vibeBtnAdmin" data-vibe-trigger="admin" type="button" class="btn btn-sm btn-outline-light">Vibe · <span class="vibeLabel">—</span></button>
-        {% elif current_user.dark_mode %}
-          <div class="form-text text-warning mt-1">Vibe controls are disabled while dark mode is active.</div>
-        {% endif %}
-        <span class="admin-hero__hint">Command center syncs with each department automatically.</span>
+      <div class="admin-hero__actions ui-action-bar">
+        <div class="ui-action-group">
+          <a class="btn btn-sm btn-primary" href="{{ url_for('admin.metrics_config') }}">Open metrics suite</a>
+          <a class="btn btn-sm btn-outline-light" href="{{ url_for('admin.feature_flags') }}">Explore feature flags</a>
+          {% if FeatureFlags.get().vibe_enabled and not current_user.dark_mode %}
+            <div class="ui-control-shell ui-control-shell--compact" data-vibe-shell>
+              <button id="vibeBtnAdmin" data-vibe-trigger="admin" type="button" class="btn btn-sm btn-outline-light">Vibe · <span class="vibeLabel">—</span></button>
+            </div>
+          {% endif %}
+        </div>
+        <div class="ui-action-group ui-action-group--meta">
+          {% if current_user.dark_mode %}
+            <div class="ui-action-note ui-action-note--warning">Vibe controls are disabled while dark mode is active.</div>
+          {% endif %}
+          <span class="ui-action-note admin-hero__hint">Command center syncs with each department automatically.</span>
+        </div>
       </div>
     </div>
     <div class="admin-hero__stats">

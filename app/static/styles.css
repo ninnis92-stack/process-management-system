@@ -749,10 +749,6 @@ body.theme-preset-midnight:not(.dark-mode) {
   gap: 0.28rem;
   padding: 0.52rem 0.58rem;
   min-width: 148px;
-  border-radius: 14px;
-  background: rgba(10, 18, 34, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 12px 24px rgba(5, 10, 20, 0.28);
 }
 .brand-banner-row__control-label {
   font-size: 0.61rem;
@@ -1211,6 +1207,69 @@ a:hover { color: var(--accent-2); }
   gap: 0.75rem;
   flex-wrap: wrap;
 }
+.ui-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.ui-action-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.ui-action-group--meta {
+  gap: 0.55rem;
+}
+.ui-action-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.3rem;
+  padding: 0.48rem 0.78rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+.ui-action-note--warning {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(217, 119, 6, 0.22);
+  color: #b45309;
+}
+.ui-control-shell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.34rem;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(244,247,251,0.86));
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+.ui-control-shell--compact {
+  padding: 0.26rem;
+  border-radius: 999px;
+}
+.ui-control-shell--banner {
+  background: rgba(10, 18, 34, 0.92);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 12px 24px rgba(5, 10, 20, 0.28);
+}
+.ui-control-shell .btn {
+  margin: 0;
+}
+
+.ui-control-shell[hidden] {
+  display: none !important;
+}
 
 .page-header__actions > *,
 .page-toolbar > * {
@@ -1239,13 +1298,13 @@ a:hover { color: var(--accent-2); }
   grid-template-columns: minmax(0, 1fr) minmax(200px, 320px);
   gap: 1.5rem;
   align-items: stretch;
-  overflow: hidden;
-  min-height: 240px;
+  padding: 1.2rem 1.3rem;
+  border-radius: 18px;
   background: radial-gradient(circle at top left, rgba(var(--accent-rgb, 121, 192, 255), 0.18), transparent 45%),
               var(--surface);
   padding: 1.5rem;
   max-width: 1200px;
-  margin: 0 auto;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.10);
 }
 
 
@@ -1283,11 +1342,11 @@ a:hover { color: var(--accent-2); }
 }
 
 .admin-hero__hint {
-  font-size: 0.9rem;
+  font-size: 0.78rem;
   color: var(--muted);
   white-space: normal;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   max-width: 100%;
   overflow-wrap: anywhere;
   line-height: 1.2;
@@ -1810,9 +1869,22 @@ a:hover { color: var(--accent-2); }
     justify-content: flex-start;
     align-items: stretch;
   }
-  .admin-hero__actions .btn {
+  .admin-hero__actions .ui-action-group,
+  .admin-hero__actions .ui-action-group--meta,
+  .page-header__actions .ui-action-group,
+  .ui-action-bar {
+    width: 100%;
+    align-items: stretch;
+  }
+  .admin-hero__actions .btn,
+  .admin-hero__actions .ui-control-shell,
+  .admin-hero__actions .ui-action-note {
     flex: 1 1 100%;
     min-width: 0;
+  }
+  .page-header__actions .ui-control-shell,
+  .page-header__actions .ui-action-note {
+    width: 100%;
   }
   .admin-section-panel {
     padding: 1.1rem;
@@ -2507,6 +2579,24 @@ pre {
 .dark-mode .admin-sidebar .nav-heading,
 .dark-mode .table-shell thead th {
   color: var(--muted);
+}
+
+.dark-mode .ui-control-shell {
+  background: rgba(19, 28, 44, 0.92);
+  border-color: rgba(148, 163, 184, 0.22);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.28);
+}
+
+.dark-mode .ui-action-note {
+  background: rgba(19, 28, 44, 0.88);
+  border-color: rgba(148, 163, 184, 0.22);
+  color: var(--muted);
+}
+
+.dark-mode .ui-action-note--warning {
+  background: rgba(180, 83, 9, 0.16);
+  border-color: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
 }
 
 .dark-mode .dashboard-stat-card,
