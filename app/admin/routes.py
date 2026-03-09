@@ -49,6 +49,7 @@ from ..services.integrations import (
     normalize_integration_config,
 )
 from ..services.field_verification import apply_bulk_verification_params
+from ..services.branding_importer import BrandingImportError, import_branding_from_url
 from ..services.template_admin import (
     build_grouped_template_fields,
     build_requirement_editor_context,
@@ -401,6 +402,7 @@ def site_config():
         form.active_quote_set.choices = [('default', 'Default')]
 
     if flask_request.method == "GET" and cfg:
+        form.import_url.data = getattr(cfg, "company_url", None)
         form.brand_name.data = getattr(cfg, "brand_name", None)
         form.company_url.data = getattr(cfg, "company_url", None)
         form.theme_preset.data = getattr(cfg, "theme_preset", "default") or "default"
@@ -451,6 +453,61 @@ def site_config():
         form.show_banner.data = bool(
             getattr(cfg, "rolling_quotes_enabled", getattr(cfg, "show_banner", False))
         )
+
+    if flask_request.method == "POST" and flask_request.form.get("import_branding"):
+        if not cfg:
+            cfg = SiteConfig()
+            db.session.add(cfg)
+        if not form.import_url.data:
+            flash("Enter a website URL to import branding.", "warning")
+        elif not form.import_url.validate(form):
+            for err in form.import_url.errors:
+                flash(err, "danger")
+        else:
+            try:
+                imported = import_branding_from_url(
+                    form.import_url.data,
+                    static_folder=current_app.static_folder
+                    or os.path.join(current_app.root_path, "static"),
+                )
+                if imported.brand_name:
+                    cfg.brand_name = imported.brand_name
+                cfg.company_url = imported.company_url
+                if imported.theme_preset:
+                    cfg.theme_preset = imported.theme_preset
+                if imported.logo_filename:
+                    cfg.logo_filename = imported.logo_filename
+                db.session.commit()
+                try:
+                    entry = AuditLog(
+                        actor_type="user",
+                        actor_label=getattr(current_user, "email", "admin"),
+                        action_type="site_config_import",
+                        target_type="site_config",
+                        target_id=str(getattr(cfg, "id", "")),
+                        metadata_json=json.dumps(
+                            {
+                                "source_url": imported.source_url,
+                                "brand_name": imported.brand_name,
+                                "company_url": imported.company_url,
+                                "theme_preset": imported.theme_preset,
+                                "logo_imported": bool(imported.logo_filename),
+                            }
+                        ),
+                    )
+                    db.session.add(entry)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+                flash("Branding imported safely from the website.", "success")
+                return redirect(url_for("admin.site_config"))
+            except BrandingImportError as exc:
+                db.session.rollback()
+                flash(str(exc), "danger")
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception("branding import failed")
+                flash("Branding import failed. The site configuration was not changed.", "danger")
 
     if form.validate_on_submit():
         if not cfg:
@@ -579,6 +636,11 @@ def site_config():
                 "Failed to save site configuration (database error).", "danger"
             )
         return redirect(url_for("admin.site_config"))
+
+    if flask_request.method == "POST" and form.errors:
+        for field_errors in form.errors.values():
+            for error in field_errors:
+                flash(error, "danger")
 
     return render_template("admin_site_config.html", form=form, cfg=cfg)
 

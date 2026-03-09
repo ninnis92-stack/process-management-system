@@ -58,6 +58,11 @@ class AdminCreateUserForm(FlaskForm):
 
 
 class SiteConfigForm(FlaskForm):
+    QUOTE_MAX_LENGTH = 160
+    import_url = StringField(
+        "Import branding from website",
+        validators=[Optional(), Length(max=255), URL(message="Must be a valid website URL")],
+    )
     brand_name = StringField("Brand name", validators=[Optional(), Length(max=120)])
     theme_preset = SelectField(
         "Theme preset",
@@ -101,6 +106,20 @@ class SiteConfigForm(FlaskForm):
     quote_permissions_user = TextAreaField(
         "Allowed quote sets by user (JSON)", validators=[Optional(), Length(max=4000)]
     )
+
+    def validate_rolling_quotes(form, field):
+        raw = (field.data or "").strip()
+        if not raw:
+            return
+        quotes = [line.strip() for line in raw.splitlines() if line.strip()]
+        if len(quotes) > 30:
+            raise ValidationError("The default quote set can contain at most 30 quotes.")
+        too_long = next((quote for quote in quotes if len(quote) > form.QUOTE_MAX_LENGTH), None)
+        if too_long is not None:
+            raise ValidationError(
+                f"Each quote must be {form.QUOTE_MAX_LENGTH} characters or fewer."
+            )
+
     def validate_rolling_quote_sets(form, field):
         """Validate that `rolling_quote_sets` is a JSON object mapping names to lists of strings."""
         raw = (field.data or "").strip()
@@ -115,8 +134,17 @@ class SiteConfigForm(FlaskForm):
         if not isinstance(parsed, dict):
             raise ValidationError("Rolling quote sets must be a JSON object mapping names to lists.")
         for name, val in parsed.items():
+            if not isinstance(name, str) or not name.strip():
+                raise ValidationError("Each quote set must have a non-empty name.")
             if not isinstance(val, list):
                 raise ValidationError(f"Set '{name}' must be a JSON array of strings.")
+            cleaned = [str(item).strip() for item in val if isinstance(item, str) and str(item).strip()]
+            if len(cleaned) > 30:
+                raise ValidationError(f"Set '{name}' can contain at most 30 quotes.")
+            if any(len(item) > form.QUOTE_MAX_LENGTH for item in cleaned):
+                raise ValidationError(
+                    f"Each quote in '{name}' must be {form.QUOTE_MAX_LENGTH} characters or fewer."
+                )
             for item in val:
                 if not isinstance(item, str):
                     raise ValidationError(f"All quotes must be strings (error in set '{name}').")
@@ -149,7 +177,8 @@ class SiteConfigForm(FlaskForm):
     def validate_quote_permissions_user(form, field):
         return form._validate_permissions(field, "User")
 
-    submit = SubmitField("Save Site Config")
+    import_branding = SubmitField("Import branding")
+    submit = SubmitField("Save site configuration")
 
 
 class DepartmentForm(FlaskForm):

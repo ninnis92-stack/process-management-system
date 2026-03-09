@@ -1,6 +1,9 @@
 import re
 import json
 import pytest
+from pathlib import Path
+from io import BytesIO
+from PIL import Image
 from app.extensions import db
 from app.models import User, Department, SiteConfig
 from config import Config
@@ -221,6 +224,100 @@ def test_department_quote_permission(app, client):
     assert b"productivity" in rv.data
 
 
+def test_site_config_imports_safe_branding_from_website(app, client, monkeypatch):
+    with app.app_context():
+        admin = User(
+            email="branding-admin@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+    class DummyResponse:
+        def __init__(self, text="", content=b"", content_type="text/html"):
+            self.text = text
+            self.content = content
+            self.headers = {"Content-Type": content_type}
+
+        def raise_for_status(self):
+            return None
+
+    buffer = BytesIO()
+    Image.new("RGBA", (1, 1), (123, 201, 111, 255)).save(buffer, format="PNG")
+    png_bytes = buffer.getvalue()
+
+    def fake_get(url, timeout=8, headers=None):
+        if url == "https://example.com":
+            return DummyResponse(
+                text="""
+                <html>
+                  <head>
+                    <title>Acme Logistics | Home</title>
+                    <meta property=\"og:site_name\" content=\"Acme Logistics\">
+                    <meta name=\"theme-color\" content=\"#7bc96f\">
+                    <link rel=\"canonical\" href=\"https://example.com/home\">
+                    <link rel=\"icon\" href=\"/static/logo.png\">
+                  </head>
+                  <body><img src=\"/static/logo.png\" alt=\"Acme logo\"></body>
+                </html>
+                """,
+                content_type="text/html; charset=utf-8",
+            )
+        if url == "https://example.com/static/logo.png":
+            return DummyResponse(content=png_bytes, content_type="image/png")
+        raise AssertionError(f"unexpected url {url}")
+
+    import app.services.branding_importer as branding_importer
+
+    monkeypatch.setattr(branding_importer.requests, "get", fake_get)
+
+    rv = login_admin(client, email="branding-admin@example.com")
+    assert rv.status_code == 200
+    rv = client.post(
+        "/admin/site_config",
+        data={"import_url": "https://example.com", "import_branding": "1"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    assert b"Branding imported safely from the website." in rv.data
+
+    with app.app_context():
+        cfg = SiteConfig.get()
+        assert cfg.brand_name == "Acme Logistics"
+        assert cfg.company_url == "https://example.com/home"
+        assert cfg.theme_preset == "forest"
+        assert cfg.logo_filename is not None
+        assert cfg.logo_filename.startswith("uploads/branding/")
+        target = Path(app.static_folder) / cfg.logo_filename
+        assert target.exists()
+
+
+def test_site_config_import_rejects_invalid_website_url(app, client):
+    with app.app_context():
+        admin = User(
+            email="branding-admin-2@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+    rv = login_admin(client, email="branding-admin-2@example.com")
+    assert rv.status_code == 200
+    rv = client.post(
+        "/admin/site_config",
+        data={"import_url": "notaurl", "import_branding": "1"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    assert b"Must be a valid website URL" in rv.data
+
+
 def test_user_quote_permission_overrides_department_and_admin_sees_all_sets(app, client):
     with app.app_context():
         admin = User(
@@ -311,6 +408,54 @@ def test_site_config_fills_missing_or_empty_quote_sets(app):
         assert eng[0] == "Ship it."
         assert len(eng) == 30
         assert refreshed.rolling_quotes == SiteConfig.DEFAULT_QUOTE_SETS["motivational"]
+
+
+def test_site_config_rejects_overlong_default_quote(app, client):
+    with app.app_context():
+        admin = User(
+            email="quote-length-admin@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+    rv = login_admin(client, email="quote-length-admin@example.com")
+    assert rv.status_code == 200
+    too_long = "x" * 161
+    rv = client.post(
+        "/admin/site_config",
+        data={"rolling_quotes": too_long},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    assert b"Each quote must be 160 characters or fewer." in rv.data
+
+
+def test_site_config_rejects_overlong_named_quote(app, client):
+    with app.app_context():
+        admin = User(
+            email="quote-json-admin@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+    rv = login_admin(client, email="quote-json-admin@example.com")
+    assert rv.status_code == 200
+    too_long = "y" * 161
+    rv = client.post(
+        "/admin/site_config",
+        data={"rolling_quote_sets": json.dumps({"custom": [too_long]})},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    assert b"Each quote in &#39;custom&#39; must be 160 characters or fewer." in rv.data
 
 
 def test_admin_default_quote_and_user_override(app, client):

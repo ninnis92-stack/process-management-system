@@ -48,6 +48,22 @@
         </div>
         <div class="card-body">
           <div class="row g-3">
+            <div class="col-12">
+              <div class="p-3 rounded border bg-light-subtle">
+                <div class="fw-semibold mb-1">Import branding safely</div>
+                <div class="small text-muted mb-3">Pull in the homepage URL, detected brand name, nearest built-in theme preset, and a locally stored logo without importing external HTML, CSS, or JavaScript.</div>
+                <div class="row g-2 align-items-end">
+                  <div class="col-lg-8">
+                    {{ form.import_url.label(class_='form-label') }}
+                    {{ form.import_url(class_='form-control', placeholder='https://example.com') }}
+                    <div class="form-text">Only trusted branding fields are imported so app workflows and layouts stay intact.</div>
+                  </div>
+                  <div class="col-lg-4 d-grid">
+                    {{ form.import_branding(class_='btn btn-outline-primary') }}
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="col-md-6">
               {{ form.brand_name.label(class_='form-label') }}
               {{ form.brand_name(class_='form-control', placeholder='Your Company Name') }}
@@ -136,7 +152,7 @@
             <div class="col-lg-7">
               {{ form.rolling_quotes.label(class_='form-label') }}
               {{ form.rolling_quotes(class_='form-control', rows=8, placeholder='Small wins create momentum.&#10;Progress, not perfection.&#10;One request at a time.') }}
-              <div class="form-text">Each line becomes one quote in the default rotation.</div>
+              <div class="form-text">Each line becomes one quote in the default rotation. Use 30 quotes max and keep each quote to 160 characters or fewer.</div>
             </div>
             <div class="col-lg-5 site-config-help">
               <label class="form-label">Quick example</label>
@@ -158,7 +174,7 @@
                   <div class="mb-3">
                     {{ form.rolling_quote_sets.label(class_='form-label') }}
                     {{ form.rolling_quote_sets(class_='form-control', rows=8, placeholder='{"default": ["Small wins create momentum."], "motivational": ["Progress, not perfection.", "Your attitude determines your direction."]}') }}
-                    <div class="form-text">Optional JSON map of quote groups for advanced setups; motivational set can include many entries.</div>
+                    <div class="form-text">Optional JSON map of quote groups for advanced setups. Each set can contain up to 30 quotes and each quote must stay within 160 characters.</div>
                   </div>
                   <div class="mb-3">
                     {{ form.quote_permissions_dept.label(class_='form-label') }}

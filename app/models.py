@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 import json
+import re
 import secrets
 from flask_login import UserMixin
 from sqlalchemy.orm import validates
@@ -1162,6 +1163,7 @@ class SiteConfig(TenantScopedMixin, db.Model):
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+    MAX_QUOTE_LENGTH = 160
 
     # Default quote sets shipped with the app. Admin may override via SiteConfig.
     # Each set is required to contain exactly 30 entries; when the app defines
@@ -1269,7 +1271,7 @@ class SiteConfig(TenantScopedMixin, db.Model):
     def normalize_quote_sets(cls, quote_sets=None):
         """Return quote sets with guaranteed quotes for each built-in set."""
         defaults = {
-            str(name): [str(item).strip() for item in (quotes or []) if str(item).strip()]
+            str(name): [str(item).strip()[: cls.MAX_QUOTE_LENGTH] for item in (quotes or []) if str(item).strip()]
             for name, quotes in cls.DEFAULT_QUOTE_SETS.items()
         }
 
@@ -1279,7 +1281,11 @@ class SiteConfig(TenantScopedMixin, db.Model):
                 name = str(raw_name or "").strip()
                 if not name or not isinstance(raw_quotes, list):
                     continue
-                cleaned = [str(item).strip() for item in raw_quotes if str(item).strip()]
+                cleaned = [
+                    str(item).strip()[: cls.MAX_QUOTE_LENGTH]
+                    for item in raw_quotes
+                    if str(item).strip()
+                ]
                 if cleaned:
                     normalized[name] = cleaned
 
@@ -1291,14 +1297,30 @@ class SiteConfig(TenantScopedMixin, db.Model):
             if name not in merged:
                 merged[name] = list(quotes)
 
-        # enforce uniform 30‑item length for every set by padding placeholders
+        # enforce uniform 30‑item length for every set by trimming extras and
+        # padding placeholders when needed.
         for name, quotes in merged.items():
+            if len(quotes) > 30:
+                del quotes[30:]
             if len(quotes) < 30:
                 counter = 1
                 while len(quotes) < 30:
                     quotes.append(f"{name} quote {counter}")
                     counter += 1
         return merged
+
+    @classmethod
+    def strip_generated_quote_padding(cls, name, quotes):
+        pattern = re.compile(rf"^{re.escape(str(name))} quote \d+$", re.IGNORECASE)
+        cleaned = []
+        for quote in quotes or []:
+            text = str(quote).strip()
+            if not text:
+                continue
+            if pattern.fullmatch(text):
+                continue
+            cleaned.append(text)
+        return cleaned
 
     @property
     def banner_html(self):
@@ -1394,6 +1416,18 @@ class SiteConfig(TenantScopedMixin, db.Model):
         return type(self).normalize_quote_sets()
 
     @property
+    def editable_quote_sets(self):
+        """Return quote sets without auto-generated padding placeholders."""
+        cleaned = {}
+        for name, quotes in (self.rolling_quote_sets or {}).items():
+            stripped = type(self).strip_generated_quote_padding(name, quotes)
+            if stripped:
+                cleaned[name] = stripped
+        for name, quotes in type(self)._QUOTE_SETS_BASE.items():
+            cleaned.setdefault(name, list(quotes))
+        return cleaned
+
+    @property
     def parsed_quote_permissions(self):
         """Return normalized quote permissions for departments and users."""
         empty = {"departments": {}, "users": {}}
@@ -1486,7 +1520,7 @@ class SiteConfig(TenantScopedMixin, db.Model):
             self._rolling_quotes = None
             return
         if isinstance(value, list):
-            cleaned = [str(x).strip() for x in value if str(x).strip()]
+            cleaned = [str(x).strip()[: type(self).MAX_QUOTE_LENGTH] for x in value if str(x).strip()][:30]
             self._rolling_quotes = json.dumps(cleaned)
             return
         if isinstance(value, str):
@@ -1498,12 +1532,16 @@ class SiteConfig(TenantScopedMixin, db.Model):
             try:
                 parsed = json.loads(raw)
                 if isinstance(parsed, list):
-                    cleaned = [str(x).strip() for x in parsed if str(x).strip()]
+                    cleaned = [
+                        str(x).strip()[: type(self).MAX_QUOTE_LENGTH]
+                        for x in parsed
+                        if str(x).strip()
+                    ][:30]
                     self._rolling_quotes = json.dumps(cleaned)
                     return
             except Exception:
                 pass
-            cleaned = [line.strip() for line in raw.splitlines() if line.strip()]
+            cleaned = [line.strip()[: type(self).MAX_QUOTE_LENGTH] for line in raw.splitlines() if line.strip()][:30]
             self._rolling_quotes = json.dumps(cleaned)
             return
         self._rolling_quotes = json.dumps([str(value)])
