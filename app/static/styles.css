@@ -669,6 +669,7 @@ body.theme-preset-midnight:not(.dark-mode) {
   gap: 0.55rem;
   flex: 1 1 420px;
   min-width: 0;
+  justify-content: center;
 }
 
 .brand-stack { flex-direction: row !important; align-items: center !important; gap: 10px !important; }
@@ -695,9 +696,11 @@ body.theme-preset-midnight:not(.dark-mode) {
 .brand-banner-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.65rem;
   min-width: 0;
   flex-wrap: nowrap;
+  flex: 0 1 520px;
   padding: 0.58rem 0.8rem;
   border-radius: 18px;
   background: var(--banner-bg);
@@ -709,6 +712,8 @@ body.theme-preset-midnight:not(.dark-mode) {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: 0.18rem;
   flex: 1 1 auto;
 }
@@ -771,11 +776,26 @@ body.theme-preset-midnight:not(.dark-mode) {
 
 /* Reserve a stable width for the brand area so changing quote length doesn't push navbar items */
 .theme-nav .navbar-brand {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: 420px;
+  max-width: 360px;
   overflow: hidden;
   margin-right: 0;
+}
+
+@media (max-width: 1180px) {
+  .brand-cluster {
+    flex-wrap: wrap;
+  }
+
+  .theme-nav .navbar-brand {
+    justify-content: center;
+    max-width: 100%;
+  }
+
+  .brand-banner-row {
+    width: min(100%, 560px);
+  }
 }
 
 /* Keep action buttons a bit further from the brand so they don't visually collide when quote changes */
