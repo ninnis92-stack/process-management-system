@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 permissions:
   contents: read
@@ -15,17 +15,27 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
-      - name: Install deps
+          python-version: '3.11'
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Run tests
+        env:
+          UPLOAD_FOLDER: ${{ github.workspace }}/uploads
+          AUTO_CREATE_DB: "True"
+          WTF_CSRF_ENABLED: "False"
+          TESTING: "True"
         run: |
+          mkdir -p "$UPLOAD_FOLDER"
           PYTHONPATH=. pytest -q
 
   build_and_publish:
@@ -51,98 +61,3 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/process-management-prototype:latest
             ghcr.io/${{ github.repository_owner }}/process-management-prototype:${{ github.sha }}
-name: CI
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - name: Install dependencies
-        run: |
-          python -m venv .venv
-          . .venv/bin/activate
-          pip install -r requirements.txt
-      - name: Run tests
-        run: |
-          . .venv/bin/activate
-          PYTHONPATH=. .venv/bin/python -m pytest -q
-      - name: Run local smoke check
-        run: |
-          . .venv/bin/activate
-          PYTHONPATH=. .venv/bin/python scripts/ui_smoke_check.py
-name: CI
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.11]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Check migrations
-        run: |
-          bash scripts/check_migrations.sh
-      - name: Run tests
-        run: |
-          pytest -q
-name: CI
-name: CI
-
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run tests
-        env:
-          UPLOAD_FOLDER: ${{ github.workspace }}/uploads
-          AUTO_CREATE_DB: "True"
-          WTF_CSRF_ENABLED: "False"
-          TESTING: "True"
-        run: |
-          mkdir -p "$UPLOAD_FOLDER"
-          PYTHONPATH=. pytest -q
