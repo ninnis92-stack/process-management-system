@@ -710,6 +710,9 @@ body.theme-preset-midnight:not(.dark-mode) {
   position: relative;
   z-index: 1; /* sit behind brand-stack so kicker/logo remain visible */
 }
+.brand-banner-row--quotes-only {
+  justify-content: flex-start;
+}
 .brand-banner-row__quote-panel {
   min-width: 0;
   flex: 1 1 auto;
@@ -717,6 +720,9 @@ body.theme-preset-midnight:not(.dark-mode) {
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.16);
   border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.brand-banner-row--quotes-only .brand-banner-row__quote-panel {
+  flex: 1 1 100%;
 }
 .brand-banner-row__content {
   min-width: 0;
@@ -732,6 +738,9 @@ body.theme-preset-midnight:not(.dark-mode) {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.brand-banner-row__control-panel[hidden] {
+  display: none !important;
 }
 .brand-banner-row__control-shell {
   display: flex;

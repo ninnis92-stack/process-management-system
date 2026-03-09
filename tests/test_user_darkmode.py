@@ -114,9 +114,11 @@ def test_dashboard_brand_banner_renders_without_vibe_button_when_feature_disable
     assert rv.status_code == 200
     rv = client.get("/dashboard")
     assert rv.status_code == 200
-    assert b'class="brand-banner-row"' not in rv.data
-    assert b'id="motivation"' not in rv.data
+    assert b'class="brand-banner-row brand-banner-row--quotes-only"' in rv.data
+    assert b'data-vibe-quote-panel' in rv.data
+    assert b'id="motivation"' in rv.data
     assert b'id="vibeBtn"' not in rv.data
+    assert b'data-vibe-control-panel' not in rv.data
 
 
 def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):

@@ -122,6 +122,7 @@ def test_feature_flags_autosave_support(client, app):
     base = client.get("/dashboard")
     assert b"beforeunload" in base.data
     assert b"keepalive" in base.data
+    assert b"form:autosaved" in base.data
 
 
 def test_feature_flags_json_autosave_updates(client, app):

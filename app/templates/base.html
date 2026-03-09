@@ -82,15 +82,15 @@
           </div>
         </a>
         {% if show_brand_banner %}
-          <div class="brand-banner-row" data-theme-banner>
-            <div class="brand-banner-row__quote-panel">
+          <div class="brand-banner-row{% if not vibe_ui_enabled %} brand-banner-row--quotes-only{% endif %}" data-theme-banner>
+            <div class="brand-banner-row__quote-panel" data-vibe-quote-panel>
               <div class="brand-banner-row__content">
                 <div class="brand-banner-row__eyebrow">{{ 'Dark-mode vibe' if dark_mode_active and vibe_ui_enabled else ('Current vibe' if vibe_ui_enabled else 'Workspace note') }}</div>
                 <div id="motivation" class="brand-quote" aria-live="polite">{{ initial_quote or 'Theme your workspace instantly.' }}</div>
               </div>
             </div>
             {% if vibe_ui_enabled %}
-              <div class="brand-banner-row__control-panel">
+              <div class="brand-banner-row__control-panel" data-vibe-control-panel>
                 <div class="brand-banner-row__control-shell">
                   <div class="brand-banner-row__control-label">Theme control</div>
                   <button id="vibeBtn" data-vibe-trigger="navbar" type="button" class="btn btn-outline-light btn-sm brand-vibe-btn">Vibe · <span class="vibeLabel">—</span></button>
@@ -647,6 +647,21 @@
               headers: {'Content-Type': 'application/json'},
               body: payload,
               keepalive: !!options.keepalive
+            }).then(async (response)=>{
+              let responsePayload = null;
+              try{
+                responsePayload = await response.clone().json();
+              }catch(_){/* ignore non-json autosave responses */}
+              try{
+                window.dispatchEvent(new CustomEvent('form:autosaved', {
+                  detail: {
+                    endpoint: endpoint,
+                    ok: response.ok,
+                    status: response.status,
+                    payload: responsePayload
+                  }
+                }));
+              }catch(_){/* ignore event dispatch issues */}
             }).catch(_=>{});
           } else if(navigator.sendBeacon){
             // fallback for very old browsers (sendBeacon cannot set headers)

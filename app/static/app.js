@@ -546,6 +546,8 @@
 
 (function initTheme() {
   const vibeButtons = Array.from(document.querySelectorAll('#vibeBtn, #vibeBtnDept, #vibeBtnAdmin, [data-vibe-trigger]'));
+  const vibeControlPanels = Array.from(document.querySelectorAll('[data-vibe-control-panel]'));
+  const themeBanners = Array.from(document.querySelectorAll('[data-theme-banner]'));
   const themeManagedProps = [
     '--accent', '--accent-rgb', '--accent-2', '--nav-bg', '--nav-text', '--body-text',
     '--surface', '--surface-2', '--surface-3', '--border', '--focus', '--banner-bg',
@@ -617,6 +619,10 @@
     return document.body.classList.contains('dark-mode');
   }
 
+  function isVibeFeatureEnabled() {
+    return !document.body.classList.contains('no-vibe');
+  }
+
   function clearThemeOverrides() {
     themeManagedProps.forEach((prop) => {
       try {
@@ -625,12 +631,51 @@
     });
   }
 
-  function syncVibeControlAvailability() {
-    const darkMode = isDarkModeEnabled();
+  function syncThemeBannerLayout() {
+    const hasVisibleVibeControl = vibeControlPanels.some((panel) => !panel.hidden);
+    themeBanners.forEach((banner) => {
+      try {
+        banner.classList.toggle('brand-banner-row--quotes-only', !hasVisibleVibeControl);
+      } catch (e) {}
+    });
+  }
+
+  function setVibeFeatureState(enabled) {
+    const vibeEnabled = !!enabled;
+    try {
+      document.body.classList.toggle('no-vibe', !vibeEnabled);
+    } catch (e) {}
+
+    vibeControlPanels.forEach((panel) => {
+      try {
+        panel.hidden = !vibeEnabled;
+        panel.setAttribute('aria-hidden', !vibeEnabled ? 'true' : 'false');
+      } catch (e) {}
+    });
+
     vibeButtons.forEach((button) => {
       try {
-        button.disabled = darkMode;
-        if (darkMode) {
+        button.hidden = !vibeEnabled;
+        button.setAttribute('aria-hidden', !vibeEnabled ? 'true' : 'false');
+      } catch (e) {}
+    });
+
+    if (!vibeEnabled) {
+      clearThemeOverrides();
+    }
+
+    syncThemeBannerLayout();
+  }
+
+  function syncVibeControlAvailability() {
+    const darkMode = isDarkModeEnabled();
+    const vibeFeatureEnabled = isVibeFeatureEnabled();
+    vibeButtons.forEach((button) => {
+      try {
+        const unavailable = darkMode || !vibeFeatureEnabled;
+        button.hidden = !vibeFeatureEnabled;
+        button.disabled = unavailable;
+        if (unavailable) {
           button.classList.add('disabled');
           button.setAttribute('aria-disabled', 'true');
         } else {
@@ -639,6 +684,15 @@
         }
       } catch (e) {}
     });
+
+    vibeControlPanels.forEach((panel) => {
+      try {
+        panel.hidden = !vibeFeatureEnabled;
+        panel.setAttribute('aria-hidden', !vibeFeatureEnabled ? 'true' : 'false');
+      } catch (e) {}
+    });
+
+    syncThemeBannerLayout();
 
     const vibeSelect = document.getElementById('vibe_index');
     if (vibeSelect) {
@@ -654,6 +708,28 @@
       vibeDarkModeNote.hidden = !darkMode;
     }
   }
+
+  window.addEventListener('form:autosaved', (event) => {
+    const detail = event && event.detail ? event.detail : {};
+    const endpoint = String(detail.endpoint || '');
+    const flags = detail.payload && detail.payload.flags ? detail.payload.flags : null;
+    if (!endpoint.endsWith('/admin/feature_flags') || !flags || typeof flags.vibe_enabled === 'undefined') {
+      return;
+    }
+
+    const vibeEnabled = !!flags.vibe_enabled;
+    setVibeFeatureState(vibeEnabled);
+    syncVibeControlAvailability();
+
+    if (vibeEnabled && !isDarkModeEnabled()) {
+      const saved = Number(localStorage.getItem('vibeTheme'));
+      const userVibe = getUserVibeIndex();
+      const nextIdx = Number.isFinite(userVibe) && !Number.isNaN(userVibe)
+        ? userVibe
+        : (Number.isFinite(saved) && !Number.isNaN(saved) ? saved : 0);
+      applyTheme(nextIdx);
+    }
+  });
 
   let vibeFeedbackTimer = null;
 
@@ -810,7 +886,10 @@
   // `no-vibe` class; in that case we should leave the CSS alone and not
   // override the accent colors or dark-mode colors.  this keeps branding
   // intact when a site-specific stylesheet is loaded.
-  if(document.body.classList.contains('no-vibe')) return;
+  if(document.body.classList.contains('no-vibe')) {
+    syncVibeControlAvailability();
+    return;
+  }
 
   function isUserLoggedIn() {
     if (typeof window.USER_LOGGED_IN !== 'undefined') return !!window.USER_LOGGED_IN;

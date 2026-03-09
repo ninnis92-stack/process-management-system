@@ -480,14 +480,11 @@ def create_app():
             allow_user_reminders_enabled = False
             try:
                 ff = FeatureFlags.get()
-                # Respect both the admin rolling-quotes flag and the global
-                # vibe_enabled flag. If the vibe button is disabled we also
-                # suppress rolling quotes to keep the UI consistent.
-                # disable rolling quotes only when flag is explicitly False
+                # Respect the admin rolling-quotes flag independently from
+                # the global vibe button flag. Disabling the vibe control
+                # should hide the button while still allowing quote-only
+                # banner UI to remain visible when rolling quotes are enabled.
                 if getattr(ff, "rolling_quotes_enabled", True) is False:
-                    rolling_quotes_enabled = False
-                # vibe is independent but when unset should default to True
-                if getattr(ff, "vibe_enabled", True) is False:
                     rolling_quotes_enabled = False
                 allow_user_reminders_enabled = bool(
                     getattr(ff, "allow_user_nudges", False)
