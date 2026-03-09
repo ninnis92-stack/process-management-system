@@ -666,6 +666,44 @@
     }
   }
 
+  let vibeFeedbackTimer = null;
+
+  function clearVibeFeedback() {
+    const feedback = document.getElementById('globalVibeFeedback');
+    if (feedback) {
+      feedback.classList.add('d-none');
+      feedback.textContent = '';
+    }
+    if (vibeFeedbackTimer) {
+      clearTimeout(vibeFeedbackTimer);
+      vibeFeedbackTimer = null;
+    }
+  }
+
+  function showVibeFeedback(message, variant = 'warning') {
+    const feedback = document.getElementById('globalVibeFeedback');
+    const settingsStatus = document.getElementById('settingsAutoSaveStatus');
+
+    if (settingsStatus) {
+      settingsStatus.textContent = message;
+    }
+
+    if (!feedback) return;
+    feedback.textContent = message;
+    feedback.className = `alert alert-${variant} vibe-feedback`;
+    feedback.classList.remove('d-none');
+
+    if (vibeFeedbackTimer) {
+      clearTimeout(vibeFeedbackTimer);
+    }
+    vibeFeedbackTimer = setTimeout(() => {
+      clearVibeFeedback();
+      if (settingsStatus) {
+        settingsStatus.textContent = 'Changes save automatically.';
+      }
+    }, 5000);
+  }
+
   function applyTheme(idx) {
     const effectiveIdx = getEffectivePaletteIndex(idx);
     const p = palettes[effectiveIdx] || palettes[0];
@@ -728,18 +766,58 @@
     document.querySelectorAll('[data-vibe-preview-name]').forEach(el => {
       try { el.textContent = p.theme || p.name; } catch (e) {}
     });
+    document.querySelectorAll('[data-vibe-preview-badge]').forEach(el => {
+      try { el.hidden = !isDarkModeCompatiblePalette(effectiveIdx); } catch (e) {}
+    });
     document.querySelectorAll('[data-vibe-preview-accent]').forEach(el => {
       try { el.style.background = p.accent; } catch (e) {}
     });
     document.querySelectorAll('[data-vibe-preview-accent2]').forEach(el => {
       try { el.style.background = p.accent2 || p.accent; } catch (e) {}
     });
+    document.querySelectorAll('[data-vibe-compatible-chip]').forEach(el => {
+      try {
+        el.classList.toggle('is-active', String(el.dataset.vibeCompatibleChip) === String(effectiveIdx));
+      } catch (e) {}
+    });
     localStorage.setItem("vibeTheme", String(effectiveIdx));
     syncVibeControlAvailability();
     // If user is logged in, persist preference server-side
     try{
       if(isUserLoggedIn()){
-        fetch('/auth/vibe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ vibe_index: effectiveIdx }) }).catch(()=>{});
+        fetch('/auth/vibe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ vibe_index: effectiveIdx }) })
+          .then(async (response) => {
+            let payload = null;
+            try {
+              payload = await response.json();
+            } catch (e) {}
+
+            if (!response.ok) {
+              if (payload && payload.error === 'dark_mode_requires_compatible_vibe') {
+                const fallback = Number.isFinite(Number(payload.vibe_index)) ? Number(payload.vibe_index) : darkModeCompatiblePaletteIndexes[0];
+                if (fallback !== effectiveIdx) {
+                  applyTheme(fallback);
+                }
+                return;
+              }
+              showVibeFeedback("Couldn't save your theme change. Please try again.", 'warning');
+              return;
+            }
+
+            if (payload && Number.isFinite(Number(payload.vibe_index)) && Number(payload.vibe_index) !== effectiveIdx) {
+              applyTheme(Number(payload.vibe_index));
+              return;
+            }
+
+            clearVibeFeedback();
+            const settingsStatus = document.getElementById('settingsAutoSaveStatus');
+            if (settingsStatus) {
+              settingsStatus.textContent = 'Changes save automatically.';
+            }
+          })
+          .catch(() => {
+            showVibeFeedback("Couldn't save your theme change. Please try again.", 'warning');
+          });
       }
     }catch(e){}
   }

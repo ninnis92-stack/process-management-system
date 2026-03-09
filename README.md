@@ -19,6 +19,8 @@ lightweight Stimulus controllers for interactivity.
 
 ## Overview
 
+*Note: recent updates added dark-mode-aware theming.  When a user enables dark mode the vibe selector and navbar button only cycle through and present a vetted list of palettes; the dashboard banner and other accents still tint according to the chosen theme.*
+
 This prototype supports structured intake forms, multi‑step process flows, and an
 extensible admin interface.  Admins can build custom request templates,
 configure verification integrations that auto‑fill other fields, and declare
@@ -42,7 +44,7 @@ Key capabilities:
 - **Per-form guest access policies** for public, SSO-linked, approved-organization,
   and unaffiliated-only intake paths
 - **SSO/OIDC support** with optional admin sync
-- **Theme/vibe system**, dark mode (now integrated with vibe accents) and per‑user preferences; settings, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
+- **Theme/vibe system**, dark mode (now integrated with vibe accents).  Dark mode limits palette choices to a curated high‑contrast subset for readability; incompatible themes are filtered from the rotating vibe button and dropdowns, and compatible options are tagged in the settings UI.  Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
 
 Everything is covered by a comprehensive test suite and deploys automatically
 using a release script that migrates the database, creates missing columns,

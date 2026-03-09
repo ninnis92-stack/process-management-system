@@ -4,6 +4,7 @@ def test_dark_mode_vibe_logic_present_in_theme_script():
         content = f.read()
 
     assert "function isDarkModeEnabled()" in content
+    assert "function getUserVibeIndex()" in content
     assert "document.body.classList.contains('dark-mode')" in content
 
     # dark mode now uses a curated compatible subset rather than disabling
@@ -12,10 +13,16 @@ def test_dark_mode_vibe_logic_present_in_theme_script():
     assert "function isDarkModeCompatiblePalette(idx)" in content
     assert "function getEffectivePaletteIndex(idx)" in content
     assert "function syncVibeControlAvailability()" in content
+    assert "function showVibeFeedback(message, variant = 'warning')" in content
     assert 'if (darkMode) {' in content
+    assert 'root.style.setProperty("--accent", p.accent);' in content
     assert 'root.style.setProperty("--nav-bg", mixHex(p.accent, "#0b1220", 0.30));' in content
     assert 'root.style.setProperty("--surface", mixHex(p.accent, "#111c2d", 0.20));' in content
+    assert 'root.style.setProperty("--banner-bg", `linear-gradient(135deg, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.28), rgba(8, 17, 31, 0.34))`);' in content
     assert 'const next = darkModeCompatiblePaletteIndexes[' in content
+    assert 'payload.error === \'dark_mode_requires_compatible_vibe\'' in content
+    assert 'const stored = (userVibe !== null && !Number.isNaN(userVibe)) ? userVibe : Number(localStorage.getItem("vibeTheme"));' in content
+    assert 'applyTheme(startIdx);' in content
 
     # light-mode branch must still set sane defaults and reset text colors
     assert 'root.style.setProperty("--nav-text", mixHex("#f8fbff"' in content

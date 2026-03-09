@@ -315,6 +315,7 @@
 
 
           {% with messages = get_flashed_messages(with_categories=true) %}
+            <div id="globalVibeFeedback" class="alert alert-warning vibe-feedback d-none" role="status" aria-live="polite"></div>
             {% if messages %}
               <div class="flash-stack">
                 {% for category, message in messages %}

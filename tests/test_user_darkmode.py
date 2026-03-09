@@ -126,6 +126,8 @@ def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):
     assert b'id="vibeDarkModeNote"' in rv.data
     assert b'id="vibe_index" name="vibe_index" disabled' not in rv.data
     assert b'Only dark-mode-compatible vibes are shown while dark mode is active.' in rv.data
+    assert b'data-vibe-preview-badge' in rv.data
+    assert b'data-vibe-compatible-chip=' in rv.data
     assert b"Changes save automatically." in rv.data
     assert b'id="darkModeSubmitBtn"' not in rv.data
     # the checkbox input should be checked so the client script can
@@ -206,6 +208,7 @@ def test_vibe_endpoint_rejects_incompatible_updates_when_dark_mode_enabled(clien
     payload = rv.get_json()
     assert payload["ok"] is False
     assert payload["error"] == "dark_mode_requires_compatible_vibe"
+    assert payload["allowed_vibes"] == [0, 4, 5, 7, 14, 18, 23, 24]
 
 
 def test_vibe_endpoint_accepts_compatible_updates_when_dark_mode_enabled(client, app):
@@ -221,6 +224,23 @@ def test_vibe_endpoint_accepts_compatible_updates_when_dark_mode_enabled(client,
     payload = rv.get_json()
     assert payload["ok"] is True
     assert payload["vibe_index"] == 5
+
+
+def test_dark_mode_dashboard_bootstraps_selected_vibe(client, app):
+    make_user(app, dark_mode=True)
+    with app.app_context():
+        user = User.query.filter_by(email="admin@example.com").first()
+        user.vibe_index = 5
+        db.session.commit()
+
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/dashboard")
+    assert rv.status_code == 200
+    assert b'data-user-dark-mode="1"' in rv.data
+    assert b'data-user-vibe="5"' in rv.data
+    assert b'id="vibeBtn"' in rv.data
 
 
 def test_vibe_endpoint_persists_and_settings_reflect(client, app):
