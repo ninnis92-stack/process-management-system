@@ -545,8 +545,7 @@
 })();
 
 (function initTheme() {
-  const btn = document.getElementById("vibeBtn");
-  const deptVibeBtn = document.getElementById('vibeBtnDept');
+  const vibeButtons = Array.from(document.querySelectorAll('#vibeBtn, #vibeBtnDept, #vibeBtnAdmin, [data-vibe-trigger]'));
 
   // 24 pastel / muted palettes that are easy on the eyes (accent = primary, accent2 = softer shade)
   const palettes = [
@@ -576,6 +575,7 @@
     { name: "Charcoal Mist", theme: "Charcoal Mist", accent: "#93A0A8", accent2: "#F1F5F6" },
     { name: "Aurora", theme: "Aurora", accent: "#0F766E", accent2: "#E6FAF8" }
   ];
+  window.VIBE_PALETTES = palettes;
 
   function hexToRgb(hex) {
     const normalized = hex.replace('#', '');
@@ -620,6 +620,7 @@
     const darkMode = isDarkModeEnabled();
 
     root.style.setProperty("--accent", p.accent);
+    root.style.setProperty("--accent-rgb", `${rgb.r}, ${rgb.g}, ${rgb.b}`);
     root.style.setProperty(
       "--accent-2",
       darkMode ? mixHex(p.accent, "#ffffff", 0.35) : (p.accent2 || p.accent)
@@ -661,6 +662,19 @@
     // Update any visible vibe labels (global and department-facing)
     const vibeLabels = document.querySelectorAll('.vibeLabel, #vibeLabel');
     vibeLabels.forEach(el => { try { el.textContent = (p.theme || p.name); } catch(e){} });
+    const vibeSelect = document.getElementById('vibe_index');
+    if (vibeSelect && String(vibeSelect.value) !== String(idx)) {
+      vibeSelect.value = String(idx);
+    }
+    document.querySelectorAll('[data-vibe-preview-name]').forEach(el => {
+      try { el.textContent = p.theme || p.name; } catch (e) {}
+    });
+    document.querySelectorAll('[data-vibe-preview-accent]').forEach(el => {
+      try { el.style.background = p.accent; } catch (e) {}
+    });
+    document.querySelectorAll('[data-vibe-preview-accent2]').forEach(el => {
+      try { el.style.background = p.accent2 || p.accent; } catch (e) {}
+    });
     localStorage.setItem("vibeTheme", String(idx));
     // If user is logged in, persist preference server-side
     try{
@@ -690,6 +704,7 @@
   const stored = (userVibe !== null && !Number.isNaN(userVibe)) ? userVibe : Number(localStorage.getItem("vibeTheme"));
   const dailySeed = (new Date()).getUTCDate() + (new Date()).getUTCMonth() * 31;
   const startIdx = Number.isFinite(stored) ? stored % palettes.length : (dailySeed % palettes.length);
+  window.applyVibeTheme = applyTheme;
   applyTheme(startIdx);
 
   // Attach click handlers to whichever vibe buttons are present (global navbar and/or department view)
@@ -698,8 +713,14 @@
     applyTheme(next);
   }
 
-  if (btn) btn.addEventListener("click", advanceVibe);
-  if (deptVibeBtn) deptVibeBtn.addEventListener('click', (e) => { e.preventDefault(); advanceVibe(); });
+  vibeButtons.forEach((button) => {
+    button.addEventListener('click', (e) => {
+      if (button.tagName === 'A') {
+        e.preventDefault();
+      }
+      advanceVibe();
+    });
+  });
 })();
 
 (function initSearchHelpers() {

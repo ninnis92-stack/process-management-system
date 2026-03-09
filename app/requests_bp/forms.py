@@ -280,6 +280,9 @@ class RequestArtifactEditForm(FlaskForm):
 
 class TransitionForm(FlaskForm):
     to_status = SelectField("Next Status", choices=[], validators=[DataRequired()])
+    target_department = SelectField(
+        "Send to department", choices=[], validators=[Optional()]
+    )
     submission_summary = StringField("Submission Summary", validators=[Length(max=200)])
     submission_details = TextAreaField("Submission Details")
     files = MultipleFileField("Attachments (images only)")

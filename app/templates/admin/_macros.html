@@ -18,7 +18,7 @@
 {% macro toggle_checkbox(field, checked_label, unchecked_label) %}
   <div class="form-check mb-3">
     {{ field(class_='form-check-input', **{'data-toggle-text-checked': checked_label, 'data-toggle-text-unchecked': unchecked_label}) }}
-    <label class="form-check-label">{{ checked_label if field.data else unchecked_label }}</label>
+    <label class="form-check-label" for="{{ field.id }}">{{ checked_label if field.data else unchecked_label }}</label>
   </div>
 {% endmacro %}
 

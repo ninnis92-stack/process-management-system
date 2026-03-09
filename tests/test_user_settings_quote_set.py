@@ -72,6 +72,9 @@ def test_user_can_select_quote_set(app, client):
     assert rv.status_code == 200
     rv = client.get("/dashboard")
     assert b"rolling-quotes-data" not in rv.data
+    rv = client.get("/auth/settings")
+    assert rv.status_code == 200
+    assert b"Rotating quotes disabled" in rv.data
 
 
 def test_quote_set_normalization_and_case_insensitive(app, client):

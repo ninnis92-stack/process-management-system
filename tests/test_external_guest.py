@@ -69,3 +69,12 @@ def test_guest_dashboard_lookup_redirects_on_match(client, app):
 
     assert resp.status_code == 302
     assert req.guest_access_token in resp.headers.get("Location", "")
+
+
+def test_external_new_shows_process_flow_explainer(client):
+    resp = client.get("/external/new")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "Form, process flow, and department are separate choices" in html
+    assert "Process flow preview" in html
+    assert "Optional process flow" in html

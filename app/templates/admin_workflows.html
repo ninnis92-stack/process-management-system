@@ -2,7 +2,7 @@
 {% from 'admin/_macros.html' import page_header %}
 
 {% block content %}
-{{ page_header('Workflows', url_for('admin.create_workflow'), 'New Workflow', 'Workflow control', 'Review active flows, scope them by department, and toggle them without leaving the page.') }}
+{{ page_header('Process Flows', url_for('admin.create_workflow'), 'New Process Flow', 'Workflow control', 'Review active process flows, scope them by department, and toggle them without leaving the page.') }}
 <section class="surface-panel table-shell">
   <div class="table-responsive">
     <table class="table align-middle mb-0 admin-workflows-table admin-data-table">
@@ -24,13 +24,13 @@
             <div class="admin-actions-group">
               <a href="{{ url_for('admin.edit_workflow', wf_id=wf.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
               <form class="admin-inline-form" method="post" action="{{ url_for('admin.delete_workflow', wf_id=wf.id) }}">
-                <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete workflow?')">Delete</button>
+                <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete process flow?')">Delete</button>
               </form>
             </div>
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="4" class="text-muted">No workflows configured.</td></tr>
+        <tr><td colspan="4" class="text-muted">No process flows configured.</td></tr>
       {% endfor %}
       </tbody>
     </table>

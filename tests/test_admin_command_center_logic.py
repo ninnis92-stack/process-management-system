@@ -53,7 +53,7 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
         "Email Forms",
         "Monitor",
         "Status Options",
-        "Workflows",
+        "Process Flows",
         "Buckets",
         "Switch Dept",
         "Notifications",

@@ -801,6 +801,25 @@ class DepartmentFormAssignment(TenantScopedMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class TemplateSwapRule(TenantScopedMixin, db.Model):
+    """Map a trigger (field name + value) on a source template to a target template.
+
+    This allows the frontend to ask the app whether selecting a particular
+    option should swap the active template mid-form and optionally update
+    routing (owner department) for the submission.
+    """
+
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(db.Integer, db.ForeignKey("form_template.id"), nullable=False)
+    # the field name in the current template that triggers the swap
+    trigger_field_name = db.Column(db.String(200), nullable=False)
+    # the exact field value that triggers the swap
+    trigger_value = db.Column(db.String(400), nullable=False)
+    # target template to switch to
+    target_template_id = db.Column(db.Integer, db.ForeignKey("form_template.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class FieldVerification(db.Model):
     """Map a `FormField` to an external verification provider and key.
 

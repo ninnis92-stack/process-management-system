@@ -44,7 +44,7 @@ def test_admin_index_links(client, app):
     assert "/admin/status_options" in html
     assert "/admin/workflows" in html
     assert "Status Options" in html
-    assert "Workflows" in html
+    assert "Process Flows" in html
     # FontAwesome stylesheet
     assert 'font-awesome' in html or 'fa-' in html
     # offcanvas toggle button appears for mobile sidebar
@@ -87,7 +87,7 @@ def test_status_options_auto_generated_from_workflows(client, app):
     # breadcrumb should indicate where we are
     assert "admin" in html.lower()
     assert "status options" in html.lower()
-    # sidebar should be present with a link to Workflows
+    # sidebar should be present with a link to process flows
     assert 'class="admin-sidebar"' in html
     assert '/admin/workflows' in html
     # table should be compact, responsive, and well-structured
@@ -100,3 +100,19 @@ def test_status_options_auto_generated_from_workflows(client, app):
     with app.app_context():
         assert StatusOption.query.filter_by(code="A_STEP").first() is not None
         assert StatusOption.query.filter_by(code="B_STEP").first() is not None
+
+
+def test_workflow_editor_shows_compact_guidance_and_live_preview(client, app):
+    make_admin(app)
+    rv = login_admin(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/admin/workflows/new")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+    assert "Quick guide" in html
+    assert 'id="workflowRoutePreview"' in html
+    assert "Submitters only see the next valid route for their department" in html
+    assert "Progressive setup" in html
+    assert "Terminology guide" in html
+    assert "Process flow" in html

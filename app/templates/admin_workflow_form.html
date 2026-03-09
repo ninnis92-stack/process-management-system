@@ -2,12 +2,49 @@
 {% from 'admin/_macros.html' import page_header, section_heading %}
 
 {% block content %}
-{{ page_header((('Edit' if wf else 'New') ~ ' Workflow'), None, 'New', 'Workflow control', 'Define ordered status steps, department handoffs, and implementation behavior in one editor.') }}
+{{ page_header((('Edit' if wf else 'New') ~ ' Process Flow'), None, 'New', 'Workflow control', 'Build the full process flow in one place: scope, handoffs, status path, and implementation readiness.') }}
 {% set rendered_spec = editor_spec if editor_spec is defined and editor_spec else (wf.spec if wf and wf.spec else none) %}
 <form method="post" class="workflow-editor surface-panel">
   {{ form.hidden_tag() }}
-  <section>
-    {{ section_heading('Workflow details', 'Set the name, scope, and activation state before editing the step path.', compact=True) }}
+  <section class="workflow-editor__overview mb-4">
+    <div class="surface-panel surface-panel-muted workflow-editor__overview-card">
+      <div>
+        <div class="eyebrow-label">Builder stages</div>
+        <h4 class="mb-1">Progressive setup</h4>
+        <p class="text-muted mb-0">Keep terminology distinct: a <strong>process flow</strong> controls statuses and department handoffs, while a <strong>request form</strong> captures the information a submitter enters.</p>
+      </div>
+      <ol class="workflow-editor__stage-list mb-0">
+        {% for section in (editor_sections or []) %}
+          <li>
+            <strong>{{ section.title }}</strong>
+            <span>{{ section.summary }}</span>
+            {% if section.badge %}<em>{{ section.badge }}</em>{% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    </div>
+    <div class="surface-panel surface-panel-muted workflow-editor__overview-card">
+      <div class="eyebrow-label">Terminology guide</div>
+      <dl class="workflow-editor__glossary mb-0">
+        <div><dt>Process flow</dt><dd>The ordered status path and department handoffs.</dd></div>
+        <div><dt>Request form</dt><dd>The intake experience a user or guest fills out.</dd></div>
+        <div><dt>Template</dt><dd>The admin-configured set of extra fields attached to a request form.</dd></div>
+        <div><dt>Route</dt><dd>One allowed move from the current status to the next status and department.</dd></div>
+        <div><dt>Department</dt><dd>The team that owns the request at a given step.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <details class="workflow-editor__section" open>
+    <summary>
+      <span>
+        <span class="eyebrow-label">Stage 1</span>
+        <strong>Basics</strong>
+      </span>
+      <span class="text-muted small">Name the process flow, scope it, and decide whether it is active.</span>
+    </summary>
+    <div class="workflow-editor__section-body">
+    {{ section_heading('Process flow basics', 'Set the process flow name, scope, and activation state before editing the path.', compact=True) }}
     <div class="workflow-editor__grid">
       <div>
         {{ form.name.label(class='form-label') }}
@@ -32,10 +69,36 @@
       {{ form.description.label(class='form-label') }}
       {{ form.description(class='form-control', rows=3) }}
     </div>
-  </section>
+    </div>
+  </details>
 
-  <section>
-    {{ section_heading('Workflow steps', 'Build the ordered handoff path. Move or remove steps before saving.', compact=True) }}
+  <details class="workflow-editor__section" open>
+    <summary>
+      <span>
+        <span class="eyebrow-label">Stage 2</span>
+        <strong>Process path</strong>
+      </span>
+      <span class="text-muted small">Design the route that submitters and departments will follow.</span>
+    </summary>
+    <div class="workflow-editor__section-body">
+    {{ section_heading('Process path', 'Build the ordered handoff path. When one status can send work to multiple departments, the request form will prompt the sender to choose the destination.', compact=True) }}
+    <div class="workflow-editor__assist mb-3">
+      <div class="surface-panel surface-panel-muted workflow-editor__assist-card">
+        <div class="eyebrow-label">Quick guide</div>
+        <ul class="workflow-editor__tips mb-0">
+          <li>Think in handoffs: each row should answer who sends work, who receives it, and which status marks that step.</li>
+          <li>Use familiar status labels so request owners can understand the next move without opening admin settings.</li>
+          <li>When a route branches to multiple departments, keep the status label shared and let the request screen collect the department choice.</li>
+        </ul>
+      </div>
+      <div class="surface-panel surface-panel-muted workflow-editor__assist-card">
+        <div class="eyebrow-label">Submitter preview</div>
+        <p class="small text-muted mb-2" id="workflowPreviewIntro">Submitters only see the next valid route for their department, not the whole admin builder.</p>
+        <ul id="workflowRoutePreview" class="workflow-route-preview mb-0">
+          <li class="text-muted small">Add at least one step to preview the path.</li>
+        </ul>
+      </div>
+    </div>
     <div id="workflow-steps" class="workflow-steps-list mb-2" aria-label="Workflow steps">
       {% if rendered_spec and rendered_spec.steps %}
         {% for s in rendered_spec.steps %}
@@ -87,8 +150,39 @@
     <datalist id="status-options-B"></datalist>
     <datalist id="status-options-C"></datalist>
     <datalist id="status-options-all"></datalist>
-    <small class="form-text text-muted">Status suggestions follow the selected “to” department. Save to serialize the full workflow JSON.</small>
-  </section>
+    <small class="form-text text-muted">Status suggestions follow the selected receiving department. Saving serializes the full process-flow JSON behind the builder.</small>
+    </div>
+  </details>
+  <details class="workflow-editor__section" open>
+    <summary>
+      <span>
+        <span class="eyebrow-label">Stage 3</span>
+        <strong>Implementation</strong>
+      </span>
+      <span class="text-muted small">Choose whether to keep iterating or publish the connected status options.</span>
+    </summary>
+    <div class="workflow-editor__section-body">
+      <div class="workflow-editor__assist mb-3">
+        <div class="surface-panel surface-panel-muted workflow-editor__assist-card">
+          <div class="eyebrow-label">What each action does</div>
+          <ul class="workflow-editor__tips mb-0">
+            <li><strong>Save Draft</strong> keeps the process flow editable without creating any missing status options.</li>
+            <li><strong>Save &amp; Implement</strong> stores the process flow and creates any missing status options used in the path.</li>
+            <li>Request forms, templates, and departments stay separate; implementation only affects the process flow and related statuses.</li>
+          </ul>
+        </div>
+        <div class="surface-panel surface-panel-muted workflow-editor__assist-card">
+          <div class="eyebrow-label">Current intake summary</div>
+          <p class="small text-muted mb-2">This is how the process flow will be introduced on request forms.</p>
+          <div class="workflow-preview-card">
+            <strong>{{ workflow_preview.name if workflow_preview else 'Default process flow' }}</strong>
+            <div class="small text-muted">{{ workflow_preview.scope if workflow_preview else 'All departments' }}</div>
+            <p class="small mb-0 mt-2">{{ workflow_preview.description if workflow_preview else 'Requests follow the standard routing path.' }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
   <div class="workflow-editor__footer">
     <button name="action" value="save" class="btn btn-secondary">Save Draft</button>
     <button name="action" value="implement" class="btn btn-primary">Save &amp; Implement</button>
@@ -168,6 +262,28 @@
         const spec = { steps: steps, transitions: transitions };
         const hidden = document.getElementById('spec_json');
         if(hidden) hidden.value = JSON.stringify(spec, null, 2);
+
+        const preview = document.getElementById('workflowRoutePreview');
+        if(preview){
+          preview.innerHTML = '';
+          if(!steps.length){
+            const item = document.createElement('li');
+            item.className = 'text-muted small';
+            item.textContent = 'Add at least one step to preview the path.';
+            preview.appendChild(item);
+          } else {
+            steps.forEach(function(step, index){
+              const item = document.createElement('li');
+              item.className = 'workflow-route-preview__item';
+              const from = step.from_dept || 'Unassigned';
+              const to = step.to_dept || 'Unassigned';
+              const status = step.status || 'Status';
+              item.innerHTML = '<span class="workflow-route-preview__index">' + (index + 1) + '</span>' +
+                '<div><strong>' + status + '</strong><div class="small text-muted">Department ' + from + ' → Department ' + to + '</div></div>';
+              preview.appendChild(item);
+            });
+          }
+        }
       }
 
       function populateStatusDatalists(){

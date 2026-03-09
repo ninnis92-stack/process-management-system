@@ -5,7 +5,7 @@
   <div>
     <div class="page-header__eyebrow">Department A intake</div>
     <h3 class="page-header__title mb-0">New Request</h3>
-    <p class="page-header__lede mb-0">Capture the request details, required part information, and any dynamic fields configured by the admin team.</p>
+    <p class="page-header__lede mb-0">Complete the request form, review the process flow preview, and submit with enough context for the next department.</p>
   </div>
 </section>
 
@@ -38,6 +38,34 @@
           </ul>
         </div>
       {% endif %}
+
+      <section class="intake-explainer mb-3">
+        <div class="intake-explainer__main">
+          <div class="eyebrow-label">How this request moves</div>
+          <h4 class="mb-1">Process flow preview</h4>
+          <p class="text-muted mb-0">The request form captures information. The process flow below shows the likely status path after you submit.</p>
+        </div>
+        <div class="intake-explainer__meta">
+          <span class="badge text-bg-light border">{{ process_preview.name if process_preview else 'Default process flow' }}</span>
+          <span class="badge text-bg-light border">{{ process_preview.scope if process_preview else 'Department A' }}</span>
+        </div>
+      </section>
+      <div class="process-preview-card mb-4" aria-live="polite">
+        <p class="text-muted small mb-2">{{ process_preview.description if process_preview else 'Requests follow the standard status path for Department A.' }}</p>
+        {% if process_preview and process_preview.steps %}
+          <ol class="process-preview-list mb-0">
+            {% for step in process_preview.steps %}
+              <li>
+                <strong>{{ step.label }}</strong>
+                <span>{{ step.status }}</span>
+                <em>Department {{ step.from_department or 'A' }} → Department {{ step.to_department or 'B' }}</em>
+              </li>
+            {% endfor %}
+          </ol>
+        {% else %}
+          <div class="small text-muted">Requests usually start in Department A and move into the configured review path for Department B.</div>
+        {% endif %}
+      </div>
 
       {{ section_heading('Part and method context', 'Provide the part identifiers first so the request can be routed and verified correctly.', compact=True) }}
 
@@ -109,9 +137,9 @@
       {% if template_spec %}
         <section class="template-intake-summary mb-3">
           <div>
-            <div class="eyebrow-label">Admin-built request form</div>
+            <div class="eyebrow-label">Admin-built template</div>
             <h4 class="mb-1">{{ template.name }}</h4>
-            <p class="text-muted mb-0">{{ template.description or 'This request form was configured by an admin. Labels, validation, verification, and linked auto-fill behavior all come from the template setup.' }}</p>
+            <p class="text-muted mb-0">{{ template.description or 'This template adds the extra fields on this request form. Labels, validation, verification, and linked auto-fill behavior all come from the template setup.' }}</p>
           </div>
           <div class="template-intake-summary__meta">
             {{ meta_badge(template_spec|length ~ ' configured field' ~ ('s' if template_spec|length != 1 else '')) }}
@@ -120,7 +148,7 @@
             {% endif %}
           </div>
         </section>
-        {{ section_heading('Additional fields', 'These fields are configured by the admin team for this workflow. Verification-backed fields can validate values and, when enabled, fill in related fields automatically.', compact=True) }}
+        {{ section_heading('Additional fields', 'These fields are configured by the admin team for this request form template. Verification-backed fields can validate values and, when enabled, fill in related fields automatically.', compact=True) }}
         {% for section in (template_sections or []) %}
         <section class="template-section-block mb-4">
           <div class="template-section-block__header" data-section-header>

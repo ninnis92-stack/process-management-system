@@ -5,9 +5,12 @@ def test_dark_mode_vibe_logic_present_in_theme_script():
 
     assert "function isDarkModeEnabled()" in content
     assert "document.body.classList.contains('dark-mode')" in content
-    assert 'root.style.setProperty("--surface", mixHex(p.accent, "#1e1e1e", 0.10));' in content
-    assert 'root.style.setProperty("--nav-bg", mixHex(p.accent, "#202124", 0.18));' in content
-    assert '#121212' in content
+    assert 'root.style.setProperty("--surface", mixHex(p.accent, "#111c2d", 0.08));' in content
+    assert 'root.style.setProperty("--surface-2", mixHex(p.accent, "#18263b", 0.06));' in content
+    assert 'root.style.setProperty("--nav-bg", mixHex(p.accent, "#0b1220", 0.16));' in content
+    assert '#08111f' in content
     # new variables added for improved vibe support
     assert 'root.style.setProperty("--nav-text"' in content
     assert 'root.style.setProperty("--body-text"' in content
+    # the light-mode branch of applyTheme should also reset nav/body text
+    assert 'root.style.setProperty("--nav-text", mixHex("#f8fbff"' in content

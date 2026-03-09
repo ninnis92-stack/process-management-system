@@ -9,6 +9,7 @@ from app.models import (
     FormField,
     FormFieldOption,
     Request as ReqModel,
+    TemplateSwapRule,
     WebhookSubscription,
 )
 from app.extensions import db, get_or_404
@@ -171,6 +172,53 @@ def api_request_detail(request_id: int):
 
     req = get_or_404(ReqModel, request_id)
     return jsonify({"ok": True, "request": serialize_request(req)})
+
+
+@app.route("/api/template-swap", methods=["GET"])
+def api_template_swap():
+    """Check for a template-swap rule for a given template, field and value.
+
+    Returns the target template's external schema if a matching rule exists.
+    """
+    ik = _check_api_key(request)
+    # allow anonymous callers for frontend use; do not require API key
+    template_id = request.args.get("template_id", type=int)
+    field = (request.args.get("field") or "").strip()
+    value = (request.args.get("value") or "").strip()
+
+    if not template_id or not field:
+        return jsonify({"ok": False, "error": "missing_params"}), 400
+
+    rule = TemplateSwapRule.query.filter_by(
+        template_id=template_id, trigger_field_name=field, trigger_value=value
+    ).first()
+    if not rule:
+        return jsonify({"ok": True, "swap": False})
+
+    t = get_or_404(FormTemplate, rule.target_template_id)
+    fields = sorted(list(getattr(t, "fields", []) or []), key=lambda field: getattr(field, "order", 0))
+    spec = build_template_spec(
+        fields, verification_prefill_enabled=bool(getattr(t, "verification_prefill_enabled", False))
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "swap": True,
+            "template": {
+                "id": t.id,
+                "name": t.name,
+                "description": t.description,
+                "layout": getattr(t, "layout", "standard"),
+                "layout_label": getattr(t, "layout_label", "Standard"),
+                "external_enabled": bool(getattr(t, "external_enabled", False)),
+                "external_provider": getattr(t, "external_provider", None),
+                "external_form_id": getattr(t, "external_form_id", None),
+                "external_form_url": getattr(t, "external_form_url", None),
+                "fields": spec,
+                "sections": group_template_spec_by_section(spec),
+            },
+        }
+    )
 
 
 @app.route("/api/integrations/fetch", methods=["POST"])

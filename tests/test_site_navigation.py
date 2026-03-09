@@ -47,10 +47,17 @@ def test_public_navigation_links_resolve(client):
     html = rv.get_data(as_text=True)
 
     assert "Sign in to keep requests moving" in html
+    # form should always submit to the login endpoint even if current URL is wrong
+    assert 'form method="post" action="/auth/login"' in html
     assert "Open Guest Dashboard" in html
     assert "Start Guest Submission" in html
     assert "Guest Dashboard" in html
     assert "Guest Submit" in html
+
+    # the form should come before the verbose hero copy to speed up repeat logins
+    # look for the keyword rather than exact class attribute since multiple classes
+    assert html.find('login-form-panel') != -1
+    assert html.find('login-form-panel') < html.index('Sign in to keep requests moving')
 
     links = _extract_nav_links(html)
     expected = {
@@ -191,7 +198,7 @@ def test_admin_navigation_links_resolve(app, client):
     assert 'if (!loggedIn || active || isAdmin' in html
 
     assert "Admin" in html
-    assert "Guest Forms" in html
+    assert "Guest Request Forms" in html
     assert "Metrics" in html
     assert "Retention" in html  # ensure retention card text shows up
     assert "Switch Dept" in html  # card we just added
@@ -275,6 +282,25 @@ def test_initial_quote_on_dashboard(app, client):
         quotes = cfg.rolling_quotes or SiteConfig.DEFAULT_QUOTE_SETS.get("default", [])
     # at least one of the configured quotes should appear somewhere in the html
     assert any(q and q in html for q in quotes), "no rolling quote rendered in dashboard"
+
+
+def test_quote_css_allows_full_quote(client):
+    # the navbar styles should not artificially clamp or hide long quotes
+    resp = client.get("/static/styles.css")
+    css = resp.get_data(as_text=True)
+    assert "#motivation" in css
+    # ensure the restrictive rules from earlier versions have been removed
+    # extract the block for #motivation and inspect its body only
+    import re
+    match = re.search(r"#motivation\s*\{([^}]*)\}", css, flags=re.DOTALL)
+    assert match, "#motivation rule missing from stylesheet"
+    body = match.group(1)
+    # remove CSS comments so our comment explaining removal doesn't trigger
+    body_no_comments = re.sub(r"/\*.*?\*/", "", body, flags=re.DOTALL)
+    assert "line-clamp" not in body_no_comments
+    assert "-webkit-line-clamp" not in body_no_comments
+    assert "max-width: none" in body_no_comments
+    assert "overflow: visible" in body_no_comments
 
 
 def test_brand_link_respects_company_url(app, client):

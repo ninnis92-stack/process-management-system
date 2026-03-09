@@ -5,7 +5,7 @@
   <div>
     <div class="page-header__eyebrow">External intake</div>
     <h3 class="page-header__title mb-0">Guest Submission</h3>
-    <p class="page-header__lede mb-0">Submit a request without signing in, route it to the correct department, and receive a tracking link after submission.</p>
+    <p class="page-header__lede mb-0">Complete the guest request form, review the routing preview, and receive a tracking link after submission.</p>
   </div>
 </section>
 <section class="helper-grid mb-3">
@@ -41,7 +41,20 @@
         </div>
       </div>
 
-      {{ section_heading('Routing and workflow', 'Choose the department and optional workflow before adding the request details.', compact=True) }}
+      <section class="intake-explainer mb-3">
+        <div class="intake-explainer__main">
+          <div class="eyebrow-label">Before you submit</div>
+          <h4 class="mb-1">Form, process flow, and department are separate choices</h4>
+          <p class="text-muted mb-0">The guest form controls access, the department controls who sees the request first, and the optional process flow controls the status path after submission.</p>
+        </div>
+        <div class="intake-explainer__meta">
+          <span class="badge text-bg-light border">Guest form</span>
+          <span class="badge text-bg-light border">Department route</span>
+          <span class="badge text-bg-light border">Optional process flow</span>
+        </div>
+      </section>
+
+      {{ section_heading('Routing and process flow', 'Choose the department and optional process flow before adding the request details.', compact=True) }}
 
       <div class="row">
         <div class="col-12 mb-3">
@@ -68,7 +81,7 @@
                       {% if (request.form.get('guest_form') or request.args.get('guest_form')) == gf.slug %}selected{% endif %}>{{ gf.name }}</option>
             {% endfor %}
           </select>
-          <div class="form-text" id="guestFormRouteHint">Select a specific guest form if you have a link or want to target a particular workflow.</div>
+          <div class="form-text" id="guestFormRouteHint">Select a specific guest form if you have a link or want to use a pre-configured intake experience.</div>
         </div>
       </div>
 
@@ -102,8 +115,30 @@
         <div class="col-md-6 mb-3">
           <label class="form-label">Workflow (optional)</label>
           {{ form.workflow_id(class="form-select") }}
-          <div class="form-text">Optional: choose a workflow to apply to this request.</div>
+          <div class="form-text">Optional: choose a process flow to apply to this request after it is created.</div>
         </div>
+      </div>
+
+      <div class="process-preview-card mb-4" id="guestProcessPreview" aria-live="polite"
+           data-default-preview='{{ default_process_preview|tojson }}'
+           data-workflow-previews='{{ workflow_previews|tojson }}'>
+        <div class="eyebrow-label">Process flow preview</div>
+        <h4 class="h6 mb-1" id="guestProcessPreviewName">{{ default_process_preview.name }}</h4>
+        <p class="text-muted small mb-2" id="guestProcessPreviewDescription">{{ default_process_preview.description }}</p>
+        <div class="small text-muted mb-2" id="guestProcessPreviewScope">{{ default_process_preview.scope }}</div>
+        <ol class="process-preview-list mb-0" id="guestProcessPreviewSteps">
+          {% if default_process_preview.steps %}
+            {% for step in default_process_preview.steps %}
+              <li>
+                <strong>{{ step.label }}</strong>
+                <span>{{ step.status }}</span>
+                <em>Department {{ step.from_department or selected_guest_form.owner_department or 'B' }} → Department {{ step.to_department or selected_guest_form.owner_department or 'B' }}</em>
+              </li>
+            {% endfor %}
+          {% else %}
+            <li><strong>Default routing</strong><span>NEW_FROM_A</span><em>Request is routed to the selected department first.</em></li>
+          {% endif %}
+        </ol>
       </div>
 
       {{ section_heading('Request details', 'Capture the title, timing, and type of work being requested.', compact=True) }}
@@ -170,6 +205,41 @@ document.addEventListener("DOMContentLoaded", function () {
   const summaryDept = document.getElementById("guestFormSummaryDept");
   const summaryDomains = document.getElementById("guestFormSummaryDomains");
   const routeHint = document.getElementById("guestFormRouteHint");
+  const workflowSelect = document.getElementById("workflow_id");
+  const processPreview = document.getElementById("guestProcessPreview");
+  const processPreviewName = document.getElementById("guestProcessPreviewName");
+  const processPreviewDescription = document.getElementById("guestProcessPreviewDescription");
+  const processPreviewScope = document.getElementById("guestProcessPreviewScope");
+  const processPreviewSteps = document.getElementById("guestProcessPreviewSteps");
+
+  const renderPreviewSteps = (preview, fallbackDepartment) => {
+    if (!processPreviewSteps) return;
+    processPreviewSteps.innerHTML = '';
+    if (!preview || !preview.steps || !preview.steps.length) {
+      const li = document.createElement('li');
+      li.innerHTML = `<strong>Default routing</strong><span>NEW_FROM_A</span><em>Request is routed to Department ${fallbackDepartment || 'B'} first.</em>`;
+      processPreviewSteps.appendChild(li);
+      return;
+    }
+    preview.steps.forEach((step) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<strong>${step.label || step.status || 'Step'}</strong><span>${step.status || ''}</span><em>Department ${step.from_department || fallbackDepartment || 'B'} → Department ${step.to_department || fallbackDepartment || 'B'}</em>`;
+      processPreviewSteps.appendChild(li);
+    });
+  };
+
+  const updateWorkflowPreview = () => {
+    if (!processPreview) return;
+    const previews = JSON.parse(processPreview.dataset.workflowPreviews || '{}');
+    const defaultPreview = JSON.parse(processPreview.dataset.defaultPreview || '{}');
+    const selectedWorkflow = workflowSelect ? String(workflowSelect.value || '0') : '0';
+    const selectedOwnerDepartment = document.getElementById('owner_department') ? document.getElementById('owner_department').value : '';
+    const preview = previews[selectedWorkflow] || defaultPreview;
+    if (processPreviewName) processPreviewName.textContent = preview.name || 'Default process flow';
+    if (processPreviewDescription) processPreviewDescription.textContent = preview.description || 'Requests follow the configured process flow after submission.';
+    if (processPreviewScope) processPreviewScope.textContent = preview.scope || `Starts in Department ${selectedOwnerDepartment || 'B'}`;
+    renderPreviewSteps(preview, selectedOwnerDepartment);
+  };
 
   const updateGuestFormSummary = () => {
     if (!guestFormSelect) return;
@@ -188,7 +258,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (summaryPolicy) summaryPolicy.textContent = policyLabel;
     if (summaryDept) summaryDept.textContent = ownerDepartment ? `Routes to Dept ${ownerDepartment}` : 'Routing follows the department selected below';
     if (summaryDomains) summaryDomains.textContent = domains ? `Approved organizations: ${domains}` : 'No organization domain filter is currently applied.';
-    if (routeHint) routeHint.textContent = ownerDepartment ? `This form routes submissions to Dept ${ownerDepartment}.` : 'Select a specific guest form if you have a link or want to target a particular workflow.';
+    if (routeHint) routeHint.textContent = ownerDepartment ? `This guest form routes submissions to Department ${ownerDepartment}.` : 'Select a specific guest form if you have a link or want to use a pre-configured intake experience.';
 
     // adjust layout class on surrounding shell
     const shell = document.getElementById('externalFormShell');
@@ -202,8 +272,16 @@ document.addEventListener("DOMContentLoaded", function () {
   if (!form || !btn) return;
 
   updateGuestFormSummary();
+  updateWorkflowPreview();
   if (guestFormSelect) {
     guestFormSelect.addEventListener('change', updateGuestFormSummary);
+  }
+  if (workflowSelect) {
+    workflowSelect.addEventListener('change', updateWorkflowPreview);
+  }
+  const ownerDepartmentSelect = document.getElementById('owner_department');
+  if (ownerDepartmentSelect) {
+    ownerDepartmentSelect.addEventListener('change', updateWorkflowPreview);
   }
 
   form.addEventListener("submit", function () {

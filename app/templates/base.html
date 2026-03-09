@@ -28,7 +28,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" integrity="sha512-p1Cm0QlW0FQvgw+Vxv0+H5a6uVgnF6V5u0Y2dd4AozqA3BsnF7mk/WvJL3Z8zUuNX1U4MZT+O2e2d3dH+pvGVHg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <!-- bump version after latest CSS changes to force clients to fetch new stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260309c') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260309d') }}">
   <!-- bundled frontend assets (built by Vite/ES modules) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css', v='20260309d') }}">
   {% if active_theme_css %}
@@ -95,7 +95,7 @@
             {% endif %}
             {% if current_user.is_admin %}
               <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin') else '' }}" href="{{ url_for('admin.index') }}">Admin</a></li>
-              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin.guest_forms') else '' }}" href="{{ url_for('admin.list_guest_forms') }}">Guest Forms</a></li>
+              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin.guest_forms') else '' }}" href="{{ url_for('admin.list_guest_forms') }}">Guest Request Forms</a></li>
             {% endif %}
           {% endif %}
           <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('external.external_dashboard') else '' }}" href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a></li>
@@ -382,13 +382,10 @@
   <script id="rolling-quotes-data" type="application/json" defer>{{ rolling_quotes|tojson }}</script>
   {% endif %}
   <script type="module" src="{{ url_for('static', filename='dist/app.js', v='20260308c') }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260309d') }}" defer></script>
   <script>
     (function(){
       try{
-        // Only apply dark-mode when the server has flagged the user as dark-mode
-        // enabled.  System preferences are intentionally ignored so that the
-        // app behaves consistently regardless of the visitor's OS theme and
-        // so toggling the setting always has a visual effect.
         const isDarkUser = document.body.getAttribute('data-user-dark-mode') === '1';
         document.body.classList.toggle('dark-mode', isDarkUser);
       }catch(e){}
@@ -649,12 +646,14 @@
       document.addEventListener('DOMContentLoaded', restore);
       document.body.addEventListener('change', function(ev){
         const el = ev.target;
-        if(!el.matches('.form-check-input')) return;
-        const form = el.closest('form');
-        if(form && form.dataset.autosaveEndpoint){
+        if(!(el instanceof Element)) return;
+        const form = el.closest('form[data-autosave-endpoint]');
+        if(form && el.matches('input, select, textarea')){
           scheduleSave(form);
         }
-        saveState();
+        if(el.matches('.form-check-input')){
+          saveState();
+        }
       });
 
       window.addEventListener('beforeunload', function(){

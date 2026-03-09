@@ -30,6 +30,16 @@
                 <option value="{{ val }}" {% if (current_user.vibe_index is not none and current_user.vibe_index == val) or (form.vibe_index.data is not none and form.vibe_index.data == val) %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
+            <div id="userThemePreview" class="theme-preview-card mt-3" data-theme-preview-card>
+              <div class="theme-preview-card__swatches" aria-hidden="true">
+                <span class="theme-preview-card__swatch" data-vibe-preview-accent></span>
+                <span class="theme-preview-card__swatch" data-vibe-preview-accent2></span>
+              </div>
+              <div>
+                <div class="theme-preview-card__label">Active vibe</div>
+                <div class="theme-preview-card__name" data-vibe-preview-name>Theme preview</div>
+              </div>
+            </div>
             <div class="form-text">Choose your UI accent theme. In dark mode, the selected vibe now tints the dark surfaces, nav, and background. Admin-imported themes override this setting.</div>
           </div>
         {% endif %}
@@ -71,6 +81,7 @@
       const checkbox = document.getElementById('dark_mode');
       const label = document.getElementById('darkModeLabel');
       const statusEl = document.getElementById('settingsAutoSaveStatus');
+      const vibeSelect = document.getElementById('vibe_index');
       if (!checkbox || !label || !statusEl) return;
 
       const syncDarkModeText = () => {
@@ -84,11 +95,30 @@
       checkbox.addEventListener('change', () => {
         syncDarkModeText();
         syncBodyClass();
+        const selected = Number(vibeSelect && vibeSelect.value);
+        if (window.applyVibeTheme && Number.isFinite(selected)) {
+          window.applyVibeTheme(selected);
+        }
       });
+
+      if (vibeSelect) {
+        vibeSelect.addEventListener('change', () => {
+          const selected = Number(vibeSelect.value);
+          if (window.applyVibeTheme && Number.isFinite(selected)) {
+            window.applyVibeTheme(selected);
+          }
+        });
+      }
 
       // initial state
       syncDarkModeText();
       syncBodyClass();
+      if (vibeSelect) {
+        const selected = Number(vibeSelect.value);
+        if (window.applyVibeTheme && Number.isFinite(selected)) {
+          window.applyVibeTheme(selected);
+        }
+      }
     })();
   </script>
 

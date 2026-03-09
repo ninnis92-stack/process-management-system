@@ -1,28 +1,39 @@
 {% extends "base.html" %}
 {% block body_class %}top-nav-layout no-vibe{% endblock %}
 {% block content %}
-<section class="login-hero surface-panel mb-4">
-  <div class="login-hero__content">
-    <div class="page-header__eyebrow">Welcome back</div>
-    <h1 class="login-hero__title">Sign in to keep requests moving</h1>
-    <p class="login-hero__lede">Track handoffs, update priorities, send reminders, and manage guest-facing workflows from one polished workspace.</p>
-    <div class="login-hero__chips" aria-label="Platform highlights">
-      <span class="login-hero__chip">Priority controls</span>
-      <span class="login-hero__chip">Reminder automation</span>
-      <span class="login-hero__chip">Guest tracking</span>
-    </div>
-  </div>
-  <div class="login-hero__aside">
-    <div class="login-hero__aside-card">
-      <div class="small text-uppercase text-muted fw-semibold mb-2">Quick paths</div>
-      <a class="btn btn-primary w-100 mb-2" href="{{ url_for('external.external_dashboard') }}">Open Guest Dashboard</a>
-      <a class="btn btn-outline-primary w-100" href="{{ url_for('external.external_new') }}">Start Guest Submission</a>
-      <div class="small text-muted mt-3">Need internal access? Use the department-linked account that owns your saved work and approval rights.</div>
-    </div>
-  </div>
-</section>
-
 <div class="row justify-content-center g-4 align-items-start login-grid">
+  <div class="col-lg-5 col-md-7">
+    <section class="surface-panel form-shell login-form-panel">
+      <div class="section-heading">
+        <div>
+          <h4 class="section-heading__title">Sign in</h4>
+          <p class="section-heading__subtitle">Use your local credentials or SSO when enabled for your organization.</p>
+        </div>
+      </div>
+      {% if config.SSO_ENABLED %}
+        <a class="btn btn-outline-primary w-100 mb-3" href="{{ url_for('auth.sso_login') }}">Sign in with SSO</a>
+        <div class="text-muted small mb-2">Having trouble? Use local login below.</div>
+      {% endif %}
+      <form method="post" action="{{ url_for('auth.login') }}">
+        {{ form.csrf_token }}
+        {%- if request.args.get('next') -%}
+          <input type="hidden" name="next" value="{{ request.args.get('next') }}" />
+        {%- endif -%}
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          {{ form.email(class="form-control", autocomplete="off", autocapitalize="off", spellcheck="false") }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          {{ form.password(class="form-control") }}
+        </div>
+        <button class="btn btn-primary w-100">Sign in</button>
+      </form>
+      <div class="login-form-panel__footer small text-muted mt-3">
+        Looking for a guest-facing experience instead? Use <a href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a> to track or <a href="{{ url_for('external.external_new') }}">Guest Submit</a> to open a new external request.
+      </div>
+    </section>
+  </div>
   <div class="col-lg-4 col-md-5">
     <section class="surface-panel helper-stack login-panel-stack">
       <div class="section-heading section-heading-compact mb-0">
@@ -54,37 +65,29 @@
       </div>
     </section>
   </div>
-  <div class="col-lg-5 col-md-7">
-    <section class="surface-panel form-shell login-form-panel">
-      <div class="section-heading">
-        <div>
-          <h4 class="section-heading__title">Sign in</h4>
-          <p class="section-heading__subtitle">Use your local credentials or SSO when enabled for your organization.</p>
-        </div>
-      </div>
-        {% if config.SSO_ENABLED %}
-          <a class="btn btn-outline-primary w-100 mb-3" href="{{ url_for('auth.sso_login') }}">Sign in with SSO</a>
-          <div class="text-muted small mb-2">Having trouble? Use local login below.</div>
-        {% endif %}
-        <form method="post">
-          {{ form.csrf_token }}
-          {%- if request.args.get('next') -%}
-            <input type="hidden" name="next" value="{{ request.args.get('next') }}" />
-          {%- endif -%}
-          <div class="mb-3">
-            <label class="form-label">Email</label>
-            {{ form.email(class="form-control", autocomplete="off", autocapitalize="off", spellcheck="false") }}
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Password</label>
-            {{ form.password(class="form-control") }}
-          </div>
-          <button class="btn btn-primary w-100">Sign in</button>
-        </form>
-        <div class="login-form-panel__footer small text-muted mt-3">
-          Looking for a guest-facing experience instead? Use <a href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a> to track or <a href="{{ url_for('external.external_new') }}">Guest Submit</a> to open a new external request.
-        </div>
-      </section>
-  </div>
 </div>
+
+<details class="login-info mt-4">
+  <summary class="fw-semibold">Why sign in?</summary>
+  <section class="login-hero surface-panel mb-4">
+    <div class="login-hero__content">
+      <div class="page-header__eyebrow">Welcome back</div>
+      <h1 class="login-hero__title">Sign in to keep requests moving</h1>
+      <p class="login-hero__lede">Track handoffs, update priorities, send reminders, and manage guest-facing workflows from one polished workspace.</p>
+      <div class="login-hero__chips" aria-label="Platform highlights">
+        <span class="login-hero__chip">Priority controls</span>
+        <span class="login-hero__chip">Reminder automation</span>
+        <span class="login-hero__chip">Guest tracking</span>
+      </div>
+    </div>
+    <div class="login-hero__aside">
+      <div class="login-hero__aside-card">
+        <div class="small text-uppercase text-muted fw-semibold mb-2">Quick paths</div>
+        <a class="btn btn-primary w-100 mb-2" href="{{ url_for('external.external_dashboard') }}">Open Guest Dashboard</a>
+        <a class="btn btn-outline-primary w-100" href="{{ url_for('external.external_new') }}">Start Guest Submission</a>
+        <div class="small text-muted mt-3">Need internal access? Use the department-linked account that owns your saved work and approval rights.</div>
+      </div>
+    </div>
+  </section>
+</details>
 {% endblock %}

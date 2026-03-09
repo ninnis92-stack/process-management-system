@@ -2,15 +2,15 @@
 {% from 'admin/_macros.html' import page_header %}
 
 {% block content %}
-{{ page_header('Status options', url_for('admin.create_status_option'), 'New status option', 'Workflow control', 'Keep status codes, notifications, and downstream routing aligned across every workflow.') }}
+{{ page_header('Status options', url_for('admin.create_status_option'), 'New status option', 'Workflow control', 'Keep status codes, notifications, and downstream routing aligned across every process flow.') }}
 <section class="surface-panel surface-panel-muted">
   <div class="admin-status-toolbar">
     <div>
       <div class="fw-semibold">Approval-ready status catalog</div>
-      <div class="small text-muted">Use this catalog to keep notifications, email behavior, screenshots, and staged approvals aligned before integrations go live.</div>
+      <div class="small text-muted">Use this catalog to keep notifications, email behavior, screenshots, and staged approvals aligned before process flows go live.</div>
     </div>
     <div class="page-toolbar">
-      <a href="{{ url_for('admin.list_workflows') }}" class="btn btn-secondary">View workflows</a>
+      <a href="{{ url_for('admin.list_workflows') }}" class="btn btn-secondary">View process flows</a>
     </div>
   </div>
 </section>

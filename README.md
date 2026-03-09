@@ -1,7 +1,7 @@
 # Process Management Prototype
 
 This repository contains a **Flask-based process management system** built as a prototype for handling
-structured intake forms, multi‑step workflows, and departmental collaboration.  It is intended to
+structured intake forms, multi‑step process flows, and departmental collaboration.  It is intended to
 serve as the reference implementation for a larger process‑management platform, with a focus on:
 
 - rapid configuration via templated request forms
@@ -19,7 +19,7 @@ lightweight Stimulus controllers for interactivity.
 
 ## Overview
 
-This prototype supports structured intake forms, multi‑step workflows, and an
+This prototype supports structured intake forms, multi‑step process flows, and an
 extensible admin interface.  Admins can build custom request templates,
 configure verification integrations that auto‑fill other fields, and declare
 conditional requirements (per field, section, or upload area).  The app runs
@@ -30,13 +30,13 @@ Key capabilities:
 
 - **Dynamic request templates** with sections, verification‑prefill, and
   conditional requirements
-- **Workflow engine** with status transitions, path history and loop protection
+- **Process-flow engine** with status transitions, path history and loop protection
 - **Priority and reminder controls** including `highest` priority, automated
   reminders, user-pushed reminders, and per-user daily reminder limits
 - **Polished public sign-in** with clearer guest-path entry points and a more
   production-ready first impression for external users
-- **Command center** for users, departments, workflows, site config, integrations,
-  guest forms, feature flags, and more
+- **Command center** for users, departments, process flows, site config, integrations,
+  guest request forms, feature flags, and more
 - **Field verification** powered by third‑party tracker integrations
 - **Guest submission and lookup** via external blueprints
 - **Per-form guest access policies** for public, SSO-linked, approved-organization,
@@ -268,7 +268,29 @@ and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORIN
 - Redis is optional; if you set `REDIS_URL` Fly health will check it, otherwise
   it’s skipped.
 
-### Live deployment checks (March 8, 2026)
+## Live deployment checks (March 8-9, 2026)
+- Added a progressive-disclosure process-flow builder, clearer guest/internal
+  request-form previews, extracted guest-form admin routes into
+  `app/admin/guest_forms.py`, and completed a terminology pass so process flow,
+  request form, template, route, and department read as distinct concepts.
+- Re-ran the expanded regression suite after the cleanup/refactor; it passed at
+  `49 passed` for the admin command center, navigation, guest request forms,
+  internal intake, and process-flow UI slices.
+- Deployed the latest release to
+  `process-management-prototype-lingering-bush-6175` with
+  `fly deploy -a process-management-prototype-lingering-bush-6175`.
+- Verified the Fly release command completed successfully, the updated machine
+  reached `started`, and Fly health checks reported `/ready` with
+  `components.database.status: ok`.
+- Ran `fly ssh console --command "python seed.py"` against the live app and
+  confirmed seeded users plus all quote sets were present at `30 quote(s)` each.
+- Ran deployed smoke checks with:
+  `bash scripts/smoke_test.sh https://process-management-prototype-lingering-bush-6175.fly.dev`,
+  `python scripts/smoke_deployed_login.py --url https://process-management-prototype-lingering-bush-6175.fly.dev`,
+  `python scripts/admin_smoke.py --url https://process-management-prototype-lingering-bush-6175.fly.dev`, and
+  `python scripts/clear_smoke_remote.py --url https://process-management-prototype-lingering-bush-6175.fly.dev`.
+- Verified seeded-user login, admin routes, metrics JSON, remote cleanup, and
+  both `/health` and `/ready`; the live app and database are healthy.
 - Polished the public sign-in experience with a stronger hero, direct guest
   entry points, and clearer production-facing copy; also introduced
   reminder-named aliases such as `notify-reminders`, `/push_reminder`, and
@@ -418,7 +440,7 @@ Rules can reference other fields or entire sections. Operators include
 `all_populated`.  Admins edit rules via a guided builder on the field settings
 page; advanced users can edit the underlying JSON.
 
-### Workflow safety
+### Process-flow safety
 
 Transition endpoints maintain a short‑term history of status moves and
 prevent bouncing between the same two states repeatedly.  The request detail
@@ -429,8 +451,8 @@ page displays the last few steps and suggests next actions to the user.
 ## Admin & user interface
 
 - **Command center**: located under `/admin` with subpages for users, departments,
-  workflows, statuses, site configuration, integrations, feature flags, guest
-  form templates, etc.
+  process flows, statuses, site configuration, integrations, feature flags, guest
+  request forms, and request-form templates.
 - Admin users no longer see the department‑selection prompt on every page
   refresh.  The modal only appears when they intentionally choose “Switch
   Dept” (this makes the command center experience smoother on phones and other
@@ -483,5 +505,5 @@ external/imported themes will revert to a basic, compatible dark palette.
 
 ---
 
-Enjoy building and customizing your request workflows! Feedback and patches
+Enjoy building and customizing your request process flows! Feedback and patches
 are welcome via the GitHub repository.

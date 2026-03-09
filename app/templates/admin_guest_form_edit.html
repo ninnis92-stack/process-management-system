@@ -2,10 +2,10 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
   <div>
-    <h3 class="mb-1">{{ 'Edit' if edit else 'New' }} Guest Form</h3>
-    <p class="text-muted mb-0">Configure who can submit this form, how it routes, and future-ready SSO credential requirements.</p>
+    <h3 class="mb-1">{{ 'Edit' if edit else 'New' }} Guest Request Form</h3>
+    <p class="text-muted mb-0">Configure who can submit this request form, which department receives it first, and which request form template adds extra fields.</p>
   </div>
-  <a href="{{ url_for('admin.list_guest_forms') }}" class="btn btn-outline-secondary admin-back-btn">← Back to guest forms</a>
+  <a href="{{ url_for('admin.list_guest_forms') }}" class="btn btn-outline-secondary admin-back-btn">← Back to guest request forms</a>
 </div>
 
 <form method="post" class="card shadow-sm guest-form-admin-shell">
@@ -34,11 +34,12 @@
           <div class="col-md-6">
             {{ form.template_id.label(class='form-label') }}
             {{ form.template_id(class='form-select') }}
+            <div class="form-text">Optional: attach a request form template to add admin-managed fields to this guest request form.</div>
           </div>
           <div class="col-md-6">
             {{ form.owner_department.label(class='form-label') }}
             {{ form.owner_department(class='form-select') }}
-            <div class="form-text">Requests created through this form route here first.</div>
+            <div class="form-text">Requests created through this guest request form route here first.</div>
           </div>
           <div class="col-12">
             {{ form.access_policy.label(class='form-label') }}

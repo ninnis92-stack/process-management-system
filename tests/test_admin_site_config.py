@@ -698,9 +698,10 @@ def test_admin_dashboard_cards_navigate(app, client):
 def test_base_template_bumps_static_asset_version(client):
     rv = client.get("/auth/login")
     assert rv.status_code == 200
-    assert b"/static/styles.css?v=20260308b" in rv.data
+    # versions bump whenever CSS/JS changes so browsers refetch
+    assert b"/static/styles.css?v=20260309d" in rv.data
     # main script may either be the legacy path or the built bundle in `dist`
-    assert b"/static/app.js?v=20260308b" in rv.data or b"/static/dist/app.js?v=" in rv.data
+    assert b"/static/app.js?v=20260309d" in rv.data or b"/static/dist/app.js?v=" in rv.data
 
 
 def test_login_next_redirection(client, app):

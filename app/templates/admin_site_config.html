@@ -11,6 +11,11 @@
     .site-config-card .card-header { background:#f8f9fa; }
     .site-config-help code, .site-config-help pre { font-size:.85rem; }
     .site-config-preview-box { min-height:84px; background:#f8f9fa; border:1px dashed rgba(0,0,0,.12); border-radius:.5rem; padding:.75rem; }
+    .theme-preset-swatches { display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:.75rem; margin-top:.85rem; }
+    .theme-preset-card { border:1px solid rgba(0,0,0,.08); border-radius:.85rem; padding:.75rem; background:rgba(255,255,255,.75); }
+    .theme-preset-card__bar { height:14px; border-radius:999px; margin-bottom:.55rem; }
+    .theme-preset-card__name { font-weight:600; font-size:.92rem; }
+    .theme-preset-card__meta { font-size:.78rem; color:#64748b; }
   </style>
 
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -51,6 +56,33 @@
               {{ form.theme_preset.label(class_='form-label') }}
               {{ form.theme_preset(class_='form-select') }}
               <div class="form-text">Choose a preset theme for internal branding.</div>
+              <div class="theme-preset-swatches" data-theme-preview-grid>
+                <div class="theme-preset-card">
+                  <div class="theme-preset-card__bar" style="background:linear-gradient(90deg,#4f8cff,#8b5cf6);"></div>
+                  <div class="theme-preset-card__name">Default</div>
+                  <div class="theme-preset-card__meta">Blue / violet brand baseline</div>
+                </div>
+                <div class="theme-preset-card">
+                  <div class="theme-preset-card__bar" style="background:linear-gradient(90deg,#3ec1d3,#7ad7f0);"></div>
+                  <div class="theme-preset-card__name">Ocean</div>
+                  <div class="theme-preset-card__meta">Cool cyan with airy contrast</div>
+                </div>
+                <div class="theme-preset-card">
+                  <div class="theme-preset-card__bar" style="background:linear-gradient(90deg,#7bc96f,#b6d7a8);"></div>
+                  <div class="theme-preset-card__name">Forest</div>
+                  <div class="theme-preset-card__meta">Natural green operational theme</div>
+                </div>
+                <div class="theme-preset-card">
+                  <div class="theme-preset-card__bar" style="background:linear-gradient(90deg,#ff8a5b,#ffb26b);"></div>
+                  <div class="theme-preset-card__name">Sunset</div>
+                  <div class="theme-preset-card__meta">Warm orange for energetic branding</div>
+                </div>
+                <div class="theme-preset-card">
+                  <div class="theme-preset-card__bar" style="background:linear-gradient(90deg,#8ea7ff,#7a5cff);"></div>
+                  <div class="theme-preset-card__name">Midnight</div>
+                  <div class="theme-preset-card__meta">Deeper indigo for darker identity</div>
+                </div>
+              </div>
             </div>
             <div class="col-md-8">
               {{ form.logo_upload.label(class_='form-label') }}

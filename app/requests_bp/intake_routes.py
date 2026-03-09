@@ -20,6 +20,7 @@ from ..services.request_intake import (
     load_request_template_context,
     validate_template_request_submission,
 )
+from .workflow import active_workflow_intake_preview
 from . import requests_bp
 from .forms import (
     NewRequestForm,
@@ -43,6 +44,7 @@ def request_new():
     template_fields = template_context.template_fields or None
     template_spec = template_context.template_spec
     template_sections = template_context.template_sections
+    process_preview = active_workflow_intake_preview("A")
 
     if template and getattr(template, "external_enabled", False):
         if request.method == "POST":
@@ -90,6 +92,7 @@ def request_new():
                     template_fields=template_fields,
                     template_spec=template_spec,
                     template_sections=template_sections,
+                    process_preview=process_preview,
                 )
 
         req = ReqModel(
@@ -272,6 +275,7 @@ def request_new():
         template_fields=template_fields,
         template_spec=template_spec,
         template_sections=template_sections,
+        process_preview=process_preview,
     )
 
 

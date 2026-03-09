@@ -48,6 +48,35 @@ def main():
                     # Best-effort; if ALTER fails (e.g., complex schema), continue and
                     # let later commit-time handling attempt again.
                     pass
+            if "quote_interval" not in cols:
+                try:
+                    # add column used by rolling quote feature
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE user ADD COLUMN quote_interval INTEGER"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            if "daily_nudge_limit" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE user ADD COLUMN daily_nudge_limit INTEGER NOT NULL DEFAULT 1"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
         except Exception:
             # If inspection isn't available, proceed — seed has additional
             # fallback handling later when commits fail.
@@ -161,6 +190,18 @@ def main():
 
         cfg = SiteConfig.get()
         normalized_sets = SiteConfig.normalize_quote_sets(getattr(cfg, "rolling_quote_sets", None))
+        # ensure each set has at least 30 entries so the rolling quote feature
+        # can cycle without immediately repeating.  We simply repeat existing
+        # quotes in a round-robin fashion if a set is too small.
+        for name, quotes in normalized_sets.items():
+            if isinstance(quotes, list) and len(quotes) < 30:
+                if not quotes:
+                    quotes.extend([f"Quote {i+1}" for i in range(30)])
+                else:
+                    i = 0
+                    while len(quotes) < 30:
+                        quotes.append(quotes[i % len(quotes)])
+                        i += 1
         cfg._rolling_quote_sets = json.dumps(normalized_sets)
         if not getattr(cfg, "active_quote_set", None) or cfg.active_quote_set not in normalized_sets:
             cfg.active_quote_set = "default"

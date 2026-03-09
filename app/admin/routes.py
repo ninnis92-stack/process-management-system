@@ -41,8 +41,6 @@ from .forms import DepartmentAssignmentForm
 from ..models import FormTemplate, FormField, DepartmentFormAssignment
 from .forms import FieldVerificationForm, FieldRequirementForm
 from ..models import FieldVerification
-from .forms import GuestFormAdminForm
-from ..models import GuestForm
 from ..requests_bp.workflow import owner_for_status
 from ..services.integrations import (
     INTEGRATION_KIND_SCAFFOLDS,
@@ -84,133 +82,7 @@ def _submitted_checkbox_enabled(field_name: str) -> bool:
 from . import tenants  # noqa: F401, E402
 from . import users    # noqa: F401, E402
 from . import workflows  # noqa: F401, E402
-
-
-@admin_bp.route("/guest_forms")
-@login_required
-def list_guest_forms():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    forms = GuestForm.query.order_by(GuestForm.created_at.desc()).all()
-    return render_template("admin_guest_forms.html", forms=forms)
-
-
-@admin_bp.route("/guest_forms/new", methods=["GET", "POST"])
-@login_required
-def create_guest_form():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    templates = FormTemplate.query.order_by(FormTemplate.name.asc()).all()
-    choices = [(0, "-- none --")] + [(t.id, t.name) for t in templates]
-    form = GuestFormAdminForm()
-    form.template_id.choices = choices
-
-    if form.validate_on_submit():
-        slug = form.slug.data.strip()
-        g = GuestForm(
-            name=form.name.data.strip(),
-            slug=slug,
-            template_id=(form.template_id.data or None) or None,
-            require_sso=bool((form.access_policy.data or "public") in {"sso_linked", "approved_sso_domains"}),
-            access_policy=(form.access_policy.data or "public"),
-            allowed_email_domains=(form.allowed_email_domains.data or "").strip() or None,
-            credential_requirements_json=(form.credential_requirements_json.data or "").strip() or None,
-            owner_department=form.owner_department.data or "B",
-            layout=(form.layout.data if getattr(form, 'layout', None) else 'standard'),
-            is_default=bool(form.is_default.data),
-            active=bool(form.active.data),
-        )
-        if g.is_default:
-            # unset other defaults
-            try:
-                GuestForm.query.update({GuestForm.is_default: False})
-                db.session.flush()
-            except Exception:
-                db.session.rollback()
-        db.session.add(g)
-        try:
-            db.session.commit()
-            flash("Guest form created.", "success")
-            return redirect(url_for("admin.list_guest_forms"))
-        except Exception:
-            db.session.rollback()
-            flash("Failed to create guest form.", "danger")
-
-    return render_template("admin_guest_form_edit.html", form=form)
-
-
-@admin_bp.route("/guest_forms/<int:gf_id>/edit", methods=["GET", "POST"])
-@login_required
-def edit_guest_form(gf_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    g = get_or_404(GuestForm, gf_id)
-    templates = FormTemplate.query.order_by(FormTemplate.name.asc()).all()
-    choices = [(0, "-- none --")] + [(t.id, t.name) for t in templates]
-    form = GuestFormAdminForm(obj=g)
-    form.template_id.choices = choices
-    form.template_id.data = g.template_id or 0
-    form.owner_department.data = g.owner_department or "B"
-    if not form.is_submitted():
-        form.access_policy.data = g.normalized_access_policy
-        form.allowed_email_domains.data = g.allowed_email_domains or ""
-        form.credential_requirements_json.data = g.credential_requirements_pretty_json
-        form.layout.data = g.layout or "standard"
-
-    if form.validate_on_submit():
-        g.name = form.name.data.strip()
-        g.slug = form.slug.data.strip()
-        g.template_id = (form.template_id.data or None) or None
-        g.access_policy = form.access_policy.data or "public"
-        g.require_sso = bool(g.access_policy in {"sso_linked", "approved_sso_domains"})
-        g.allowed_email_domains = (form.allowed_email_domains.data or "").strip() or None
-        g.credential_requirements_json = (form.credential_requirements_json.data or "").strip() or None
-        g.owner_department = form.owner_department.data or "B"
-        g.layout = form.layout.data or "standard"
-        g.active = bool(form.active.data)
-        if form.is_default.data:
-            try:
-                GuestForm.query.update({GuestForm.is_default: False})
-                db.session.flush()
-            except Exception:
-                db.session.rollback()
-            g.is_default = True
-        else:
-            g.is_default = False
-        try:
-            db.session.commit()
-            flash("Guest form updated.", "success")
-            return redirect(url_for("admin.list_guest_forms"))
-        except Exception:
-            db.session.rollback()
-            flash("Failed to update guest form.", "danger")
-
-    return render_template("admin_guest_form_edit.html", form=form, edit=g)
-
-
-@admin_bp.route("/guest_forms/<int:gf_id>/delete", methods=["POST"])
-@login_required
-def delete_guest_form(gf_id: int):
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    g = get_or_404(GuestForm, gf_id)
-    try:
-        db.session.delete(g)
-        db.session.commit()
-        flash("Guest form deleted.", "success")
-    except Exception:
-        try:
-            db.session.rollback()
-        except Exception:
-            pass
-        flash("Failed to delete guest form.", "danger")
-    return redirect(url_for("admin.list_guest_forms"))
+from . import guest_forms  # noqa: F401, E402
 
 
 @admin_bp.route("/toggle_notifications", methods=["POST"])

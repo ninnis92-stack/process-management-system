@@ -2067,7 +2067,7 @@ def request_detail(request_id: int):
     transition_form = TransitionForm()
     dept = current_user.department
     # Use active Workflow spec (if present) to compute allowed transitions and labels.
-    from .workflow import allowed_transitions_with_labels
+    from .workflow import allowed_transition_routes, allowed_transitions_with_labels
 
     if dept == "A":
         # Dept A has a constrained set: prefer workflow-defined choices but
@@ -2110,6 +2110,21 @@ def request_detail(request_id: int):
         transition_form.to_status.choices = allowed_transitions_with_labels(
             dept, req.status
         )
+
+    transition_routes = allowed_transition_routes(dept, req.status)
+    transition_target_choices = []
+    seen_transition_targets = set()
+    for route in transition_routes:
+        target_department = (route.get("to_department") or "").strip().upper()
+        if not target_department or target_department in seen_transition_targets:
+            continue
+        seen_transition_targets.add(target_department)
+        transition_target_choices.append(
+            (target_department, f"Department {target_department}")
+        )
+    transition_form.target_department.choices = [
+        ("", "-- Choose department --")
+    ] + transition_target_choices
 
     # Keep a local `possible` list for downstream handoff hint logic (legacy name)
     possible = transition_form.to_status.choices
@@ -2240,6 +2255,7 @@ def request_detail(request_id: int):
         handoff_targets=[
             t for t, _ in possible if handoff_for_transition(req.status, t)
         ],
+        transition_routes=transition_routes,
         recent_status_path=recent_status_path,
         suggested_next_actions=suggested_next_actions,
         approval_state=approval_state,
@@ -3333,46 +3349,87 @@ def do_transition(request_id: int):
         # and retry once.
         possible = []
 
+        from .workflow import allowed_transition_routes, allowed_transitions_with_labels
+
         if dept == "A":
             # Dept A: only reopen or close
             for to in ("B_IN_PROGRESS", "CLOSED"):
                 if is_transition_valid_for_request(req, dept, req.status, to):
                     possible.append((to, to))
         elif dept == "B":
-            # Dept B: expose all B-facing destinations; actual guardrails enforced after submit
-            for to in (
-                "B_IN_PROGRESS",
-                "WAITING_ON_A_RESPONSE",
-                "PENDING_C_REVIEW",
-                "C_APPROVED",
-                "C_NEEDS_CHANGES",
-                "B_FINAL_REVIEW",
-                "EXEC_APPROVAL",
-                "SENT_TO_A",
-                "CLOSED",
-            ):
-                if to == "WAITING_ON_A_RESPONSE":
-                    label = "Pending review from Department A"
-                elif to == "B_IN_PROGRESS":
-                    label = "In progress by Department B"
-                elif to == "PENDING_C_REVIEW":
-                    label = "Under review by Department C"
-                else:
-                    label = to
-                possible.append((to, label))
+            choices = allowed_transitions_with_labels(dept, req.status)
+            possible = [
+                (
+                    code,
+                    "Pending review from Department A"
+                    if code == "WAITING_ON_A_RESPONSE"
+                    else label,
+                )
+                for code, label in choices
+            ]
         else:
             # Dept C: only approve or request changes
-            for to in ("C_APPROVED", "C_NEEDS_CHANGES"):
-                if is_transition_valid_for_request(req, dept, req.status, to):
-                    possible.append((to, to))
+            possible = allowed_transitions_with_labels(dept, req.status)
 
         form.to_status.choices = possible
+        transition_routes = allowed_transition_routes(dept, req.status)
+        target_choices = []
+        seen_targets = set()
+        for route in transition_routes:
+            target_department = (route.get("to_department") or "").strip().upper()
+            if not target_department or target_department in seen_targets:
+                continue
+            seen_targets.add(target_department)
+            target_choices.append((target_department, f"Department {target_department}"))
+        form.target_department.choices = [("", "-- Choose department --")] + target_choices
 
         if not form.validate_on_submit():
             flash("Transition failed validation.", "danger")
             return redirect(url_for("requests.request_detail", request_id=req.id))
 
         to_status = form.to_status.data
+        selected_target_department = (
+            (getattr(form, "target_department", None).data or "").strip().upper()
+            if getattr(form, "target_department", None)
+            else ""
+        ) or None
+
+        matching_routes = [
+            route for route in transition_routes if route.get("to_status") == to_status
+        ]
+        route_target_departments = sorted(
+            {
+                (route.get("to_department") or "").strip().upper()
+                for route in matching_routes
+                if (route.get("to_department") or "").strip().upper()
+            }
+        )
+        selected_route = None
+        if matching_routes:
+            if selected_target_department:
+                selected_route = next(
+                    (
+                        route
+                        for route in matching_routes
+                        if (route.get("to_department") or "").strip().upper()
+                        == selected_target_department
+                    ),
+                    None,
+                )
+            if selected_route is None and len(route_target_departments) == 1:
+                selected_route = matching_routes[0]
+            elif selected_route is None and len(route_target_departments) > 1:
+                flash(
+                    "Choose which department this request should be sent to.",
+                    "warning",
+                )
+                return redirect(url_for("requests.request_detail", request_id=req.id))
+
+        resolved_target_owner = (
+            (selected_route.get("to_department") or "").strip().upper()
+            if selected_route and selected_route.get("to_department")
+            else (selected_target_department or owner_for_status(to_status))
+        )
 
         if dept == "B":
             req.requires_c_review = bool(form.requires_c_review.data)
@@ -3438,11 +3495,16 @@ def do_transition(request_id: int):
         # this is a handoff (cross-department transfer) OR when the actor provided
         # a summary/details or attachments for this status update.
         handoff = handoff_for_transition(req.status, to_status)
+        if selected_route and selected_route.get("to_department"):
+            handoff = (
+                selected_route.get("from_department") or req.owner_department,
+                selected_route.get("to_department") or resolved_target_owner,
+            )
         # If no explicit handoff rule exists but the owner department implied by the
         # target status differs from the current owner, treat this as a transfer
         # handoff (e.g., selecting a status that names a different department).
         if not handoff:
-            target_owner = owner_for_status(to_status)
+            target_owner = resolved_target_owner
             if target_owner and target_owner != req.owner_department:
                 handoff = (req.owner_department, target_owner)
 
@@ -3455,7 +3517,7 @@ def do_transition(request_id: int):
             create_submission = True
         else:
             # If owner would change, treat as implicit handoff
-            target_owner = owner_for_status(to_status)
+            target_owner = resolved_target_owner
             if target_owner and target_owner != req.owner_department:
                 from_dept = req.owner_department
                 to_dept = target_owner
@@ -3469,7 +3531,7 @@ def do_transition(request_id: int):
                 )
                 if has_summary or has_details or has_files:
                     from_dept = req.owner_department
-                    to_dept = owner_for_status(to_status) or req.owner_department
+                    to_dept = resolved_target_owner or req.owner_department
                     create_submission = True
 
         if create_submission:
@@ -3555,7 +3617,7 @@ def do_transition(request_id: int):
 
             if handoff:
                 req.status = to_status
-                req.owner_department = owner_for_status(to_status)
+                req.owner_department = resolved_target_owner
 
             if handoff:
                 recipients = [u for u in _users_in_dept(to_dept) if u.id != current_user.id]
@@ -3569,7 +3631,7 @@ def do_transition(request_id: int):
                 )
 
         req.status = to_status
-        req.owner_department = owner_for_status(to_status)
+        req.owner_department = resolved_target_owner
         if from_status != to_status:
             _create_approval_cycle_for_status(req, to_status)
         _log(

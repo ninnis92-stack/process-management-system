@@ -28,3 +28,4 @@ def test_request_new_includes_stimulus_controllers(client, app):
     assert 'data-controller="onboarding field-focus"' in html
     # offcanvas help markup should exist
     assert 'id="onboardingHelp"' in html
+    assert 'Process flow preview' in html

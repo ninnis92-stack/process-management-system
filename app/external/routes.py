@@ -31,6 +31,7 @@ from types import SimpleNamespace
 from werkzeug.routing import BuildError
 from .forms import ExternalNewRequestForm, ExternalCommentForm, GuestLookupForm
 from ..security import rate_limit
+from ..requests_bp.workflow import workflow_intake_preview
 
 external_bp = Blueprint("external", __name__, url_prefix="/external")
 
@@ -145,6 +146,11 @@ def external_new():
     guest_forms = GuestForm.query.filter_by(active=True).order_by(GuestForm.name.asc()).all()
     selected_guest_form = _resolve_guest_form_selection(guest_forms)
     effective_guest_form = selected_guest_form or _fallback_guest_form_policy()
+    workflow_previews = {
+        str(w.id): workflow_intake_preview(w, w.department_code)
+        for w in wfs
+    }
+    default_process_preview = workflow_intake_preview(None, getattr(effective_guest_form, "owner_department", None) or "B")
     if request.method == "GET" and getattr(effective_guest_form, "owner_department", None):
         form.owner_department.data = effective_guest_form.owner_department
 
@@ -162,6 +168,8 @@ def external_new():
                 form=form,
                 guest_forms=guest_forms,
                 selected_guest_form=effective_guest_form,
+                workflow_previews=workflow_previews,
+                default_process_preview=default_process_preview,
             )
 
         # Determine owner department precedence:
@@ -367,6 +375,8 @@ def external_new():
         tracking_link=tracking_link,
         guest_forms=guest_forms,
         selected_guest_form=effective_guest_form,
+        workflow_previews=workflow_previews,
+        default_process_preview=default_process_preview,
     )
 
 

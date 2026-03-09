@@ -86,6 +86,12 @@ def test_admin_guest_form_can_store_access_policy_fields(app, client):
         # layout value persisted
         assert form.layout == "compact"
 
+    list_page = client.get("/admin/guest_forms")
+    assert list_page.status_code == 200
+    html = list_page.get_data(as_text=True)
+    assert "Guest Request Forms" in html
+    assert "request form template" in html.lower()
+
 
 def test_guest_form_layout_applied_to_ui(app, client, monkeypatch):
     # create a guest form with a non-standard layout and verify the class appears

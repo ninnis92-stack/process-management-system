@@ -19,7 +19,11 @@ from ..models import (
 )
 from .routes import admin_bp
 from .forms import WorkflowForm, StatusBucketForm, StatusOptionForm
-from ..requests_bp.workflow import owner_for_status
+from ..requests_bp.workflow import (
+    owner_for_status,
+    workflow_editor_sections,
+    workflow_intake_preview,
+)
 
 
 # Helper logic related to workflows and status options, extracted from
@@ -259,6 +263,8 @@ def create_workflow():
         "admin_workflow_form.html",
         form=form,
         status_options_map=_build_status_options_map(),
+        editor_sections=workflow_editor_sections(None),
+        workflow_preview=workflow_intake_preview(None),
     )
 
 
@@ -350,6 +356,8 @@ def edit_workflow(wf_id: int):
         wf=wf,
         editor_spec=_normalize_workflow_spec(wf.spec, wf.name),
         status_options_map=_build_status_options_map(wf),
+        editor_sections=workflow_editor_sections(_normalize_workflow_spec(wf.spec, wf.name), wf.department_code),
+        workflow_preview=workflow_intake_preview(wf, wf.department_code),
     )
 
 

@@ -78,6 +78,74 @@ def _restore_last_active_dept_for_user(user):
         return
 
 
+def _setting_present(payload, key):
+    try:
+        return key in payload
+    except Exception:
+        return False
+
+
+def _coerce_checkbox_value(value):
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() not in ("", "0", "false", "off", "no")
+
+
+def _sync_current_user_preferences(user):
+    try:
+        current_user.dark_mode = bool(getattr(user, "dark_mode", False))
+        current_user.quotes_enabled = bool(getattr(user, "quotes_enabled", True))
+        current_user.vibe_index = getattr(user, "vibe_index", None)
+        current_user.quote_set = getattr(user, "quote_set", None)
+        current_user.quote_interval = getattr(user, "quote_interval", None)
+    except Exception:
+        pass
+
+
+def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None, partial=False):
+    if not user or payload is None:
+        return {}
+
+    if external_theme_loaded is None:
+        external_theme_loaded = is_external_theme_active()
+
+    updated = {}
+
+    if _setting_present(payload, "dark_mode") or _setting_present(payload, "dark_mode_present"):
+        user.dark_mode = _coerce_checkbox_value(payload.get("dark_mode"))
+        updated["dark_mode"] = bool(user.dark_mode)
+
+    if _setting_present(payload, "quotes_enabled") or _setting_present(payload, "quotes_enabled_present"):
+        user.quotes_enabled = _coerce_checkbox_value(payload.get("quotes_enabled"))
+        updated["quotes_enabled"] = bool(user.quotes_enabled)
+
+    if not external_theme_loaded and _setting_present(payload, "vibe_index"):
+        raw_vibe = payload.get("vibe_index")
+        if raw_vibe in (None, ""):
+            user.vibe_index = None
+        else:
+            try:
+                user.vibe_index = int(raw_vibe)
+            except Exception:
+                pass
+        updated["vibe_index"] = getattr(user, "vibe_index", None)
+
+    if _setting_present(payload, "quote_set"):
+        quote_set = payload.get("quote_set")
+        user.quote_set = (str(quote_set).strip() or None) if quote_set is not None else None
+        updated["quote_set"] = getattr(user, "quote_set", None)
+
+    if _setting_present(payload, "quote_interval"):
+        raw_interval = payload.get("quote_interval")
+        try:
+            user.quote_interval = int(raw_interval) if str(raw_interval or "").strip() else None
+        except Exception:
+            pass
+        updated["quote_interval"] = getattr(user, "quote_interval", None)
+
+    return updated
+
+
 def _get_user_departments(user):
     """Return a list of department codes the user may act as.
 
@@ -327,51 +395,15 @@ def settings():
         try:
             u = db.session.get(User, current_user.id)
             if u:
-                if 'dark_mode_present' in request.form or 'dark_mode' in request.form:
-                    submitted = (request.form.get('dark_mode') or '').strip().lower()
-                    u.dark_mode = submitted not in ('', '0', 'false', 'off', 'no')
-                # Determine whether an external/imported theme is active; when
-                # an external theme is present, we do not persist per-user vibe.
-                external_theme_loaded = is_external_theme_active()
-                # Only persist the user's vibe choice when external theme is not loaded
-                if not external_theme_loaded and hasattr(form, 'vibe_index'):
-                    try:
-                        if 'vibe_index' in request.form:
-                            u.vibe_index = int(form.vibe_index.data)
-                    except Exception:
-                        pass
-                # persist the user's quote set preference (may be None/empty)
-                if hasattr(form, 'quote_set'):
-                    try:
-                        if 'quote_set' in request.form:
-                            q = form.quote_set.data or None
-                            # persisted value should be normalized via model
-                            u.quote_set = q
-                    except Exception:
-                        pass
-                if hasattr(form, 'quotes_enabled'):
-                    try:
-                        if 'quotes_enabled_present' in request.form or 'quotes_enabled' in request.form:
-                            submitted = (request.form.get('quotes_enabled') or '').strip().lower()
-                            u.quotes_enabled = submitted not in ('', '0', 'false', 'off', 'no')
-                    except Exception:
-                        pass
-                if hasattr(form, 'quote_interval'):
-                    # only persist if present and the user is allowed to choose
-                    try:
-                        if 'quote_interval' in request.form:
-                            raw = request.form.get('quote_interval') or ''
-                            u.quote_interval = int(raw) if raw.strip() else None
-                    except Exception:
-                        pass
-                if hasattr(form, 'quote_interval'):
-                    try:
-                        if 'quote_interval' in request.form:
-                            u.quote_interval = int(form.quote_interval.data or 0)
-                    except Exception:
-                        pass
+                _apply_user_preference_updates(
+                    u,
+                    request.form,
+                    external_theme_loaded=is_external_theme_active(),
+                    partial=False,
+                )
                 db.session.add(u)
                 db.session.commit()
+                _sync_current_user_preferences(u)
                 flash("Settings saved.", "success")
         except Exception:
             try:
@@ -382,6 +414,55 @@ def settings():
         return redirect(url_for("requests.dashboard"))
 
     return render_template("settings.html", form=form)
+
+
+@auth_bp.route("/preferences", methods=["POST"])
+@login_required
+def set_preferences():
+    """Persist one or more user account preferences immediately."""
+    payload = request.get_json(silent=True) if request.is_json else request.form
+    try:
+        u = db.session.get(User, current_user.id)
+        if not u:
+            return jsonify({"ok": False, "error": "user_not_found"}), 404
+
+        updated = _apply_user_preference_updates(
+            u,
+            payload,
+            external_theme_loaded=is_external_theme_active(),
+            partial=True,
+        )
+        db.session.add(u)
+        db.session.commit()
+        _sync_current_user_preferences(u)
+        return jsonify({"ok": True, "preferences": updated})
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({"ok": False, "error": "save_failed"}), 500
+
+
+@auth_bp.route("/preferences/dark-mode", methods=["POST"])
+@login_required
+def set_dark_mode_preference():
+    """Compatibility wrapper for the dedicated dark-mode endpoint."""
+    response = set_preferences()
+    try:
+        body, status = response
+    except Exception:
+        body = response
+        status = 200
+    try:
+        payload = body.get_json() if hasattr(body, "get_json") else None
+        if isinstance(payload, dict) and payload.get("ok") is True:
+            prefs = payload.get("preferences") or {}
+            payload["dark_mode"] = prefs.get("dark_mode", False)
+            return jsonify(payload), status
+    except Exception:
+        pass
+    return response
 
 
 @auth_bp.route("/departments", methods=["GET"])
@@ -528,8 +609,13 @@ def login():
             # redirect admins immediately to the command center; skip department flow
             if getattr(user, "is_admin", False):
                 next_url = request.args.get('next') or request.form.get('next')
-                if next_url and next_url.startswith('/') and not next_url.startswith('//'):
-                    return redirect(next_url)
+                if next_url:
+                    from urllib.parse import urlparse
+
+                    parsed = urlparse(next_url)
+                    if parsed.path and parsed.path.startswith('/') and not parsed.path.startswith('//'):
+                        if not parsed.path.startswith('/static/'):
+                            return redirect(next_url)
                 return redirect(url_for("admin.index"))
         except Exception:
             try:
@@ -570,8 +656,16 @@ def login():
         # Respect a `next` parameter when redirecting after login.  Only
         # allow internal paths to avoid open-redirect attacks.
         next_url = request.args.get('next') or request.form.get('next')
-        if next_url and next_url.startswith('/') and not next_url.startswith('//'):
-            return redirect(next_url)
+        # ignore attempts to redirect to static assets (common when a CSS/JS
+        # file is fetched while session has expired and login_required kicks in).
+        if next_url:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(next_url)
+            # only allow same-host/internal paths
+            if parsed.path and parsed.path.startswith('/') and not parsed.path.startswith('//'):
+                if not parsed.path.startswith('/static/'):
+                    return redirect(next_url)
         return redirect(url_for("requests.dashboard"))
 
     return render_template("login.html", form=form)
@@ -724,4 +818,6 @@ def set_vibe():
     u = db.session.get(User, current_user.id)
     u.vibe_index = max(0, int(v))
     db.session.commit()
+    # Reflect change in current_user proxy for immediate client-side use
+    _sync_current_user_preferences(u)
     return ({"ok": True}, 200)

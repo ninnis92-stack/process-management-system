@@ -545,6 +545,17 @@
               </div>
             </div>
 
+            <div class="mb-3 d-none" id="targetDepartmentFieldWrap">
+              <label class="form-label">Send to department</label>
+              {{ transition_form.target_department(class="form-select", id="targetDepartmentSelect") }}
+              <div class="form-text" id="targetDepartmentHelp">Choose which department should receive this request for the selected transition.</div>
+            </div>
+
+            <div class="status-update-summary mb-3" id="transitionOutcomePanel" aria-live="polite">
+              <div class="status-update-summary__title">What happens next</div>
+              <div class="status-update-summary__text text-muted" id="transitionOutcomeText">Choose a status to preview the next handoff and whether a submission summary is required.</div>
+            </div>
+
             <div class="row g-3">
               <div class="col-12">
                 <label id="submissionSummaryLabel" class="form-label">Summary</label>
@@ -575,6 +586,75 @@
 
             <button class="btn btn-primary w-100">Apply Transition</button>
           </form>
+          {% if transition_routes %}
+          <script id="transition-routes-data" type="application/json">{{ transition_routes|tojson }}</script>
+          <script>
+            document.addEventListener('DOMContentLoaded', function(){
+              const statusSelect = document.getElementById('toStatusSelect');
+              const targetWrap = document.getElementById('targetDepartmentFieldWrap');
+              const targetSelect = document.getElementById('targetDepartmentSelect');
+              const targetHelp = document.getElementById('targetDepartmentHelp');
+              const routesEl = document.getElementById('transition-routes-data');
+              if(!statusSelect || !targetWrap || !targetSelect || !routesEl) return;
+
+              let routes = [];
+              try {
+                routes = JSON.parse(routesEl.textContent || '[]');
+              } catch (e) {
+                routes = [];
+              }
+              if(!Array.isArray(routes) || !routes.length) return;
+
+              const labelForDepartment = (dept) => `Department ${dept}`;
+
+              const updateTargetDepartments = () => {
+                const selectedStatus = String(statusSelect.value || '').trim();
+                const matching = routes.filter((route) => String(route.to_status || '').trim() === selectedStatus);
+                const departments = [...new Set(matching.map((route) => String(route.to_department || '').trim()).filter(Boolean))];
+
+                targetSelect.innerHTML = '';
+                if(!departments.length){
+                  const blank = document.createElement('option');
+                  blank.value = '';
+                  blank.textContent = '-- Choose department --';
+                  targetSelect.appendChild(blank);
+                  targetSelect.value = '';
+                  targetWrap.classList.add('d-none');
+                  return;
+                }
+
+                if(departments.length === 1){
+                  const only = departments[0];
+                  const option = document.createElement('option');
+                  option.value = only;
+                  option.textContent = labelForDepartment(only);
+                  targetSelect.appendChild(option);
+                  targetSelect.value = only;
+                  targetWrap.classList.add('d-none');
+                  return;
+                }
+
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = '-- Choose department --';
+                targetSelect.appendChild(placeholder);
+                departments.forEach((dept) => {
+                  const option = document.createElement('option');
+                  option.value = dept;
+                  option.textContent = labelForDepartment(dept);
+                  targetSelect.appendChild(option);
+                });
+                if(targetHelp){
+                  targetHelp.textContent = 'This status can route to more than one department. Choose the destination before applying the transition.';
+                }
+                targetWrap.classList.remove('d-none');
+              };
+
+              statusSelect.addEventListener('change', updateTargetDepartments);
+              updateTargetDepartments();
+            });
+          </script>
+          {% endif %}
           {% else %}
             <div class="text-muted">Only the assigned user may apply transitions.</div>
           {% endif %}
@@ -662,19 +742,56 @@
         handoffTargets = [];
       }
       const toSelect = document.querySelector('select[name="to_status"]');
+      const targetSelect = document.getElementById('targetDepartmentSelect');
       const summaryEl = document.querySelector('input[name="submission_summary"]');
       const detailsEl = document.querySelector('textarea[name="submission_details"]');
       const summaryLabel = document.getElementById('submissionSummaryLabel');
       const detailsLabel = document.getElementById('submissionDetailsLabel');
+      const outcomeText = document.getElementById('transitionOutcomeText');
+      const routesEl = document.getElementById('transition-routes-data');
+      let transitionRoutes = [];
+      try {
+        transitionRoutes = JSON.parse((routesEl && routesEl.textContent) || '[]');
+      } catch (e) {
+        transitionRoutes = [];
+      }
+
+      function selectedRouteForStatus(statusValue){
+        const status = String(statusValue || '').trim();
+        const selectedDepartment = String((targetSelect && targetSelect.value) || '').trim();
+        const matches = transitionRoutes.filter((route) => String(route.to_status || '').trim() === status);
+        if (!matches.length) return null;
+        if (selectedDepartment) {
+          const exact = matches.find((route) => String(route.to_department || '').trim() === selectedDepartment);
+          if (exact) return exact;
+        }
+        return matches[0];
+      }
 
       function updateForSelection() {
         if (!toSelect) return;
         const v = toSelect.value;
-        const isHandoff = handoffTargets.indexOf(v) !== -1;
+        const selectedRoute = selectedRouteForStatus(v);
+        const destinationDepartment = selectedRoute && selectedRoute.to_department ? selectedRoute.to_department : '';
+        const isHandoff = destinationDepartment ? destinationDepartment !== '{{ req.owner_department }}' : handoffTargets.indexOf(v) !== -1;
         if (summaryEl) summaryEl.required = isHandoff;
         if (detailsEl) detailsEl.required = false; // details optional for transfers
         if (summaryLabel) summaryLabel.textContent = isHandoff ? 'Summary' : 'Update Summary (optional)';
         if (detailsLabel) detailsLabel.textContent = 'Details (optional)';
+
+        if (outcomeText) {
+          if (!v) {
+            outcomeText.textContent = 'Choose a status to preview the next handoff and whether a submission summary is required.';
+          } else if (isHandoff && destinationDepartment) {
+            outcomeText.textContent = `This change will send the request to Department ${destinationDepartment}. Add a short summary so the next team can act quickly.`;
+          } else if (destinationDepartment) {
+            outcomeText.textContent = `This change keeps the request moving with Department ${destinationDepartment}. A summary is optional unless you want to provide extra context.`;
+          } else if (isHandoff) {
+            outcomeText.textContent = 'This change transfers the request to another department. Add a short summary so the next team can act quickly.';
+          } else {
+            outcomeText.textContent = 'This change updates the request in place. Add a summary only if the next reviewer needs more context.';
+          }
+        }
 
         // Toggle handoff hint visibility
         const handoffHint = document.getElementById('handoffHint');
@@ -708,6 +825,9 @@
 
       if (toSelect) {
         toSelect.addEventListener('change', updateForSelection);
+        if (targetSelect) {
+          targetSelect.addEventListener('change', updateForSelection);
+        }
         updateForSelection();
       }
     })();

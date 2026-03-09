@@ -4,11 +4,14 @@
   <section class="admin-hero surface-panel">
     <div class="admin-hero__content">
       <p class="eyebrow-label">Command center</p>
-      <h1 class="admin-hero__title">Operate every workflow in one curated room.</h1>
-      <p class="admin-hero__lede">Track guests, dashboards, and core configuration with fast insights, quick actions, and purposeful context.</p>
+      <h1 class="admin-hero__title">Operate every process flow, request form, and department from one command center.</h1>
+      <p class="admin-hero__lede">Track guest intake, dashboards, and core configuration with fast insights, quick actions, and clearer terminology.</p>
       <div class="admin-hero__actions">
         <a class="btn btn-sm btn-primary" href="{{ url_for('admin.metrics_config') }}">Open metrics suite</a>
         <a class="btn btn-sm btn-outline-light" href="{{ url_for('admin.feature_flags') }}">Explore feature flags</a>
+        {% if FeatureFlags.get().vibe_enabled %}
+          <button id="vibeBtnAdmin" data-vibe-trigger="admin" type="button" class="btn btn-sm btn-outline-light">Vibe · <span class="vibeLabel">—</span></button>
+        {% endif %}
         <span class="admin-hero__hint">Command center syncs with each department automatically.</span>
       </div>
     </div>
@@ -84,10 +87,10 @@
     <section class="surface-panel admin-section-panel">
       <div class="admin-section__header">
         <div>
-          <p class="eyebrow-label">Workflow &amp; status</p>
-          <h3 class="admin-section__title">Blueprints that keep work moving</h3>
+          <p class="eyebrow-label">Process flow &amp; status</p>
+          <h3 class="admin-section__title">Routing controls that keep work moving</h3>
         </div>
-        <span class="admin-section__hint">Statuses, workflows, and buckets stay in sync.</span>
+        <span class="admin-section__hint">Statuses, process flows, and buckets stay in sync.</span>
       </div>
       <div class="admin-dashboard-grid">
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_status_options') }}" onclick="window.location.assign('{{ url_for('admin.list_status_options') }}'); return false;">
@@ -97,8 +100,8 @@
         </button>
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_workflows') }}" onclick="window.location.assign('{{ url_for('admin.list_workflows') }}'); return false;">
           <div class="tile-ico"><i class="fas fa-project-diagram"></i></div>
-          <div class="tile-title">Workflows</div>
-          <div class="tile-sub">Configure progress flows.</div>
+          <div class="tile-title">Process Flows</div>
+          <div class="tile-sub">Configure routing paths and handoffs.</div>
         </button>
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_buckets') }}" onclick="window.location.assign('{{ url_for('admin.list_buckets') }}'); return false;">
           <div class="tile-ico"><i class="fas fa-folder-open"></i></div>

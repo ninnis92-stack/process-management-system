@@ -41,10 +41,22 @@ def test_dark_mode_class_added_server_side(client, app):
     # request a page and verify the body has the class
     rv = client.get("/dashboard")
     assert rv.status_code == 200
-    # body class attribute should include dark-mode
     m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
     assert m, "no body tag?"
     assert b"dark-mode" in m.group(1)
+
+
+def test_admin_dashboard_keeps_dark_mode_and_shows_admin_vibe_button(client, app):
+    make_user(app, dark_mode=True)
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/admin/")
+    assert rv.status_code == 200
+    m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
+    assert m, "no body tag?"
+    assert b"dark-mode" in m.group(1)
+    assert b'id="vibeBtnAdmin"' in rv.data
 
 
 def test_dark_mode_not_added_by_default(client, app):
@@ -73,13 +85,12 @@ def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):
     # the checkbox input should be checked so the client script can
     # initialize body class correctly
     assert b'<input checked' in rv.data.split(b'name="dark_mode"')[0]
-    # body tag should already include the dark-mode class server-side
     m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
     assert m, "no body tag?"
     assert b"dark-mode" in m.group(1)
-    # ensure the client-side preview script is present
     assert b"document.body.classList.toggle('dark-mode', checkbox.checked)" in rv.data
     assert b"/auth/preferences" in rv.data
+    assert b'id="userThemePreview"' in rv.data
 
 
 def test_settings_page_shows_enable_text_when_dark_mode_disabled(client, app):
@@ -117,6 +128,9 @@ def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
     assert payload["preferences"]["quote_set"] == "engineering"
     assert payload["preferences"]["quote_interval"] == 30
     assert payload["preferences"]["vibe_index"] == 5
+    rv = client.get("/dashboard")
+    m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
+    assert m and b"dark-mode" in m.group(1)
 
     with app.app_context():
         user = User.query.filter_by(email="admin@example.com").first()

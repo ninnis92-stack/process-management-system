@@ -2,9 +2,9 @@
 {% block content %}
   <section class="page-header">
     <div>
-      <div class="page-header__eyebrow">Workflow control</div>
+      <div class="page-header__eyebrow">Routing control</div>
       <h2 class="page-header__title mb-0">{{ 'Edit Bucket' if bucket else 'New Bucket' }}</h2>
-      <p class="page-header__lede mb-0">Configure how requests are grouped on dashboards and maintain the statuses mapped to each bucket.</p>
+      <p class="page-header__lede mb-0">Configure how requests are grouped on dashboards and optionally connect each bucket to a process flow.</p>
     </div>
   </section>
 
@@ -29,9 +29,9 @@
       <label class="form-check-label">Active</label>
     </div>
           <div class="mb-3">
-            <label class="form-label">Assign Workflow</label>
+            <label class="form-label">Assign Process Flow</label>
             {{ form.workflow_id(class="form-select") }}
-            <div class="form-text">Optional: choose a workflow to associate with this bucket.</div>
+            <div class="form-text">Optional: choose a process flow to associate with this bucket.</div>
           </div>
     <div class="admin-actions-group">
       <button class="btn btn-primary">{{ 'Save' }}</button>
@@ -89,7 +89,7 @@
 
     {% if workflows %}
       <section class="surface-panel">
-      <h4 class="section-title">Workflows available for this department</h4>
+      <h4 class="section-title">Process flows available for this department</h4>
       <ul class="list-group mb-3">
         {% for wf in workflows %}
           <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -103,7 +103,7 @@
             </div>
           </li>
         {% else %}
-          <li class="list-group-item text-muted">No workflows available.</li>
+          <li class="list-group-item text-muted">No process flows available.</li>
         {% endfor %}
       </ul>
       </section>
