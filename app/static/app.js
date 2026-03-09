@@ -627,15 +627,20 @@
     );
 
     if (darkMode) {
-      root.style.setProperty("--nav-bg", mixHex(p.accent, "#0b1220", 0.16));
-      // tint the nav text slightly with the accent so the interface feels
-      // cohesive when the vibe is active
-      root.style.setProperty("--nav-text", mixHex("#e8f0fb", p.accent, 0.08));
-      // body text can get a subtle hint as well
-      root.style.setProperty("--body-text", mixHex("#e5eef8", p.accent, 0.06));
-      root.style.setProperty("--surface", mixHex(p.accent, "#111c2d", 0.08));
-      root.style.setProperty("--surface-2", mixHex(p.accent, "#18263b", 0.06));
-      root.style.setProperty("--surface-3", mixHex(p.accent, "#21344e", 0.08));
+      // make the accent much more visible in dark mode; users were
+      // reporting that clicking Vibe produced almost no perceptible change
+      // because the previous mixing weights were extremely light.
+      root.style.setProperty("--nav-bg", mixHex(p.accent, "#0b1220", 0.30));
+      // tint the nav text aggressively so the accent shows up against the
+      // already-dark background
+      root.style.setProperty("--nav-text", mixHex("#e8f0fb", p.accent, 0.15));
+      // body text should still be legible, but with a noticeable hue
+      root.style.setProperty("--body-text", mixHex("#e5eef8", p.accent, 0.12));
+      // surfaces get a stronger wash of color so cards and panels clearly
+      // change when the vibe cycles
+      root.style.setProperty("--surface", mixHex(p.accent, "#111c2d", 0.20));
+      root.style.setProperty("--surface-2", mixHex(p.accent, "#18263b", 0.15));
+      root.style.setProperty("--surface-3", mixHex(p.accent, "#21344e", 0.20));
       root.style.setProperty("--border", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.20)`);
       root.style.setProperty("--focus", `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.26)`);
       root.style.setProperty("--banner-bg", `linear-gradient(135deg, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.28), rgba(8, 17, 31, 0.34))`);

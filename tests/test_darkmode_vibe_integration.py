@@ -7,12 +7,12 @@ def test_dark_mode_vibe_logic_present_in_theme_script():
     assert "document.body.classList.contains('dark-mode')" in content
 
     # dark-mode branch should tint a bunch of palettes with the accent
-    assert 'root.style.setProperty("--nav-bg", mixHex(p.accent, "#0b1220", 0.16));' in content
-    assert 'root.style.setProperty("--nav-text", mixHex("#e8f0fb", p.accent, 0.08));' in content
-    assert 'root.style.setProperty("--body-text", mixHex("#e5eef8", p.accent, 0.06));' in content
-    assert 'root.style.setProperty("--surface", mixHex(p.accent, "#111c2d", 0.08));' in content
-    assert 'root.style.setProperty("--surface-2", mixHex(p.accent, "#18263b", 0.06));' in content
-    assert 'root.style.setProperty("--surface-3", mixHex(p.accent, "#21344e", 0.08));' in content
+    assert 'root.style.setProperty("--nav-bg", mixHex(p.accent, "#0b1220", 0.30));' in content
+    assert 'root.style.setProperty("--nav-text", mixHex("#e8f0fb", p.accent, 0.15));' in content
+    assert 'root.style.setProperty("--body-text", mixHex("#e5eef8", p.accent, 0.12));' in content
+    assert 'root.style.setProperty("--surface", mixHex(p.accent, "#111c2d", 0.20));' in content
+    assert 'root.style.setProperty("--surface-2", mixHex(p.accent, "#18263b", 0.15));' in content
+    assert 'root.style.setProperty("--surface-3", mixHex(p.accent, "#21344e", 0.20));' in content
     assert '#08111f' in content  # page-bg dark base
 
     # light-mode branch must still set sane defaults and reset text colors
