@@ -684,6 +684,7 @@
     const vibeFeatureEnabled = isVibeFeatureEnabled();
     vibeButtons.forEach((button) => {
       try {
+        button.disabled = darkMode;
         const unavailable = darkMode || !vibeFeatureEnabled;
         button.hidden = !vibeFeatureEnabled;
         button.disabled = unavailable;

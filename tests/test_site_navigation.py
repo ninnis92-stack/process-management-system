@@ -200,8 +200,11 @@ def test_admin_navigation_links_resolve(app, client):
     assert "Admin" in html
     assert "Guest Request Forms" in html
     assert "Metrics" in html
+    if "Retention" not in html:
+        # dump for debugging
+        print("ADMIN HTML:\n", html)
     assert "Retention" in html  # ensure retention card text shows up
-    assert "Switch Dept" in html  # card we just added
+    assert "Switch department" in html  # card we just added (label changed)
 
     links = _extract_nav_links(html)
     expected = {

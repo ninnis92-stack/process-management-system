@@ -63,32 +63,32 @@
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_users') }}" onclick="window.location.assign('{{ url_for('admin.list_users') }}'); return false;">
           <div class="tile-ico"><i class="fas fa-users"></i></div>
           <div class="tile-title">Users</div>
-          <div class="tile-sub">Manage accounts.</div>
+          <div class="tile-sub">Open account access, roles, and profile controls.</div>
         </button>
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_departments') }}" onclick="window.location.assign('{{ url_for('admin.list_departments') }}'); return false;">
           <div class="tile-ico"><i class="fas fa-tags"></i></div>
           <div class="tile-title">Departments</div>
-          <div class="tile-sub">Manage department settings.</div>
+          <div class="tile-sub">Adjust department rules, labels, and ownership.</div>
         </button>
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.site_config') }}" onclick="window.location.assign('{{ url_for('admin.site_config') }}'); return false;">
           <div class="tile-ico"><i class="fas fa-globe"></i></div>
-          <div class="tile-title">Site</div>
-          <div class="tile-sub">Branding, banner & theme.</div>
+          <div class="tile-title">Workspace branding</div>
+          <div class="tile-sub">Update naming, theme, and shared workspace presentation.</div>
         </button>
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.site_config') }}#quotes-settings" onclick="window.location.assign('{{ url_for('admin.site_config') }}#quotes-settings'); return false;">
           <div class="tile-ico"><i class="fas fa-quote-left"></i></div>
           <div class="tile-title">Quotes</div>
-          <div class="tile-sub">Rolling quotes & quote sets.</div>
+          <div class="tile-sub">Manage rotating quote sets and workspace messaging.</div>
         </button>
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.special_email') }}" onclick="window.location.assign('{{ url_for('admin.special_email') }}'); return false;">
           <div class="tile-ico"><i class="fas fa-envelope"></i></div>
           <div class="tile-title">Email Forms</div>
-          <div class="tile-sub">Inbound form settings.</div>
+          <div class="tile-sub">Configure inbound email intake and routing behavior.</div>
         </button>
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.monitor') }}" onclick="window.location.assign('{{ url_for('admin.monitor') }}'); return false;">
           <div class="tile-ico"><i class="fas fa-chart-bar"></i></div>
-          <div class="tile-title">Monitor</div>
-          <div class="tile-sub">Admin dashboards.</div>
+          <div class="tile-title">Monitoring</div>
+          <div class="tile-sub">Review live dashboards, activity, and support tooling.</div>
         </button>
       </div>
     </section>
@@ -105,17 +105,17 @@
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_status_options') }}" onclick="window.location.assign('{{ url_for('admin.list_status_options') }}'); return false;">
           <div class="tile-ico"><i class="fas fa-cogs"></i></div>
           <div class="tile-title">Status Options</div>
-          <div class="tile-sub">Manage all codes and settings.</div>
+          <div class="tile-sub">Edit workflow statuses, labels, and transition defaults.</div>
         </button>
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_workflows') }}" onclick="window.location.assign('{{ url_for('admin.list_workflows') }}'); return false;">
           <div class="tile-ico"><i class="fas fa-project-diagram"></i></div>
           <div class="tile-title">Process Flows</div>
-          <div class="tile-sub">Configure routing paths and handoffs.</div>
+          <div class="tile-sub">Shape request routing, handoffs, and approval paths.</div>
         </button>
         <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_buckets') }}" onclick="window.location.assign('{{ url_for('admin.list_buckets') }}'); return false;">
           <div class="tile-ico"><i class="fas fa-folder-open"></i></div>
           <div class="tile-title">Buckets</div>
-          <div class="tile-sub">Dashboard buckets.</div>
+          <div class="tile-sub">Organize queue groupings shown on dashboards.</div>
         </button>
       </div>
     </section>
@@ -131,35 +131,35 @@
       <div class="admin-dashboard-grid">
         <a class="admin-tile admin-card" href="{{ url_for('auth.choose_dept') }}" data-nav-url="{{ url_for('auth.choose_dept') }}">
           <div class="tile-ico"><i class="fas fa-exchange-alt"></i></div>
-          <div class="tile-title">Switch Dept</div>
-          <div class="tile-sub">Choose your active department.</div>
+          <div class="tile-title">Switch department</div>
+          <div class="tile-sub">Change the department context for your current session.</div>
         </a>
         <form method="post" action="{{ url_for('admin.toggle_notifications') }}" class="admin-tile admin-card admin-toggle-card{% if flags.enable_notifications %} active{% endif %} p-0 m-0" style="display:inline-block;">
           <button type="submit" class="btn w-100 h-100 p-0">
             <div class="tile-ico"><i class="fas fa-bell"></i></div>
             <div class="tile-title">Notifications {{ 'on' if flags.enable_notifications else 'off' }}</div>
-            <div class="tile-sub">Toggle the global notification feed.</div>
+            <div class="tile-sub">Turn the shared notification feed on or off.</div>
           </button>
         </form>
         <a class="admin-tile admin-card" href="{{ url_for('admin.notifications_retention') }}" data-nav-url="{{ url_for('admin.notifications_retention') }}">
           <div class="tile-ico"><i class="fas fa-bell"></i></div>
-          <div class="tile-title">Retention</div>
-          <div class="tile-sub">Retention & routing.</div>
+          <div class="tile-title">Notification Retention</div>
+          <div class="tile-sub">Review retention windows and delivery routing.</div>
         </a>
         <a class="admin-tile admin-card" href="{{ url_for('admin.feature_flags') }}" data-nav-url="{{ url_for('admin.feature_flags') }}">
           <div class="tile-ico">🚦</div>
-          <div class="tile-title">Integrations & Flags</div>
-          <div class="tile-sub">Flags, integrations, unmapped.</div>
+          <div class="tile-title">Flags & integrations</div>
+          <div class="tile-sub">Manage feature rollout, connections, and unmapped items.</div>
         </a>
         <a class="admin-tile admin-card" href="{{ url_for('admin.migration_status') }}" data-nav-url="{{ url_for('admin.migration_status') }}">
           <div class="tile-ico">🛠️</div>
           <div class="tile-title">Migrations</div>
-          <div class="tile-sub">Check DB migration status.</div>
+          <div class="tile-sub">Check schema readiness and migration health.</div>
         </a>
         <a class="admin-tile admin-card" href="{{ url_for('admin.debug_workspace') }}" data-nav-url="{{ url_for('admin.debug_workspace') }}">
           <div class="tile-ico">🧰</div>
-          <div class="tile-title">Debug</div>
-          <div class="tile-sub">Debug workspace & helpers.</div>
+          <div class="tile-title">Debug workspace</div>
+          <div class="tile-sub">Open diagnostics, helper tools, and troubleshooting views.</div>
         </a>
       </div>
     </section>
@@ -176,17 +176,17 @@
         <a class="admin-tile admin-card" href="{{ url_for('admin.tenant_overview') }}" data-nav-url="{{ url_for('admin.tenant_overview') }}">
           <div class="tile-ico"><i class="fas fa-building"></i></div>
           <div class="tile-title">Tenants</div>
-          <div class="tile-sub">Workspace scope.</div>
+          <div class="tile-sub">Inspect workspace boundaries and tenant-level setup.</div>
         </a>
         <a class="admin-tile admin-card" href="{{ url_for('admin.job_overview') }}" data-nav-url="{{ url_for('admin.job_overview') }}">
           <div class="tile-ico"><i class="fas fa-tasks"></i></div>
           <div class="tile-title">Jobs</div>
-          <div class="tile-sub">Reliable background work.</div>
+          <div class="tile-sub">Review background task health and queue activity.</div>
         </a>
         <a class="admin-tile admin-card" href="{{ url_for('admin.integration_events') }}" data-nav-url="{{ url_for('admin.integration_events') }}">
           <div class="tile-ico"><i class="fas fa-plug"></i></div>
           <div class="tile-title">Integration Events</div>
-          <div class="tile-sub">Outbox boundary.</div>
+          <div class="tile-sub">Track outbound sync events and retry state.</div>
         </a>
       </div>
     </section>

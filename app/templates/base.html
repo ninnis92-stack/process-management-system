@@ -161,11 +161,12 @@
               </button>
               <ul class="dropdown-menu dropdown-menu-end account-dropdown-menu" aria-labelledby="accountMenuBtn">
                 <li class="px-3 py-2">
-                  <div class="small text-muted">{{ department_labels.get(current_user.department, 'Dept ' ~ current_user.department) }}</div>
+                  <div class="small text-muted">Signed in as</div>
                   <div class="fw-bold">{{ current_user.email }}</div>
+                  <div class="small text-muted mt-1">{{ department_labels.get(current_user.department, 'Dept ' ~ current_user.department) }}</div>
                 </li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item account-dropdown-item" href="{{ url_for('auth.settings') }}">Settings</a></li>
+                <li><a class="dropdown-item account-dropdown-item" href="{{ url_for('auth.settings') }}">Account settings</a></li>
                 {# switch dept link previously appeared here for all users with
                    multiple departments.  now we offer a navbar dropdown, so the
                    modal link is no longer needed and is removed to reduce
@@ -174,10 +175,10 @@
                    own. #}
                 {# empty placeholder for backward compatibility in case some
                    custom template relied on the list structure. #}
-                                <li>
+                <li>
                   <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="dropdown-item account-dropdown-item">Logout</button>
+                    <button type="submit" class="dropdown-item account-dropdown-item">Sign out</button>
                   </form>
                 </li>
               </ul>

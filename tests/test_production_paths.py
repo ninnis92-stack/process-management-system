@@ -31,6 +31,17 @@ def test_sso_callback_returns_400_without_email_claim(client, app, monkeypatch):
     assert b"no email claim" in response.data.lower()
 
 
+def test_login_page_makes_sso_option_clear_when_enabled(client, app):
+    app.config["SSO_ENABLED"] = True
+
+    response = client.get("/auth/login")
+
+    assert response.status_code == 200
+    assert b"Continue with SSO" in response.data
+    assert b"Or use local credentials" in response.data
+    assert b"Use email and password only if an administrator gave you local credentials" in response.data
+
+
 def test_timestamped_webhook_replay_is_rejected(app, client, monkeypatch):
     app.config["WEBHOOK_SHARED_SECRET"] = "secret-123"
     app.config["WEBHOOK_REQUIRE_TIMESTAMP"] = True

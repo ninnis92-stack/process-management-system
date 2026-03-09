@@ -2,29 +2,40 @@
 {% from 'admin/_macros.html' import toggle_checkbox %}
 
 {% block content %}
-  <div class="card">
-    <div class="card-header">
-      <strong>Settings</strong>
+  {% set dark_mode_enabled = form.dark_mode.data if form.dark_mode.data is not none else current_user.dark_mode %}
+  {% set quotes_enabled = form.quotes_enabled.data if form.quotes_enabled.data is not none else current_user.quotes_enabled %}
+  {% set external_theme = external_theme_loaded %}
+
+  <section class="page-header mb-3">
+    <div>
+      <div class="page-header__eyebrow">Account preferences</div>
+      <h1 class="page-header__title">Settings</h1>
+      <p class="page-header__lede">Adjust appearance, quote behavior, and personal workspace defaults. Changes save automatically.</p>
     </div>
-    <div class="card-body">
-      {% set dark_mode_enabled = form.dark_mode.data if form.dark_mode.data is not none else current_user.dark_mode %}
-        {% set quotes_enabled = form.quotes_enabled.data if form.quotes_enabled.data is not none else current_user.quotes_enabled %}
-        <form method="post" action="{{ url_for('auth.settings') }}" id="userSettingsForm" data-autosave-endpoint="{{ url_for('auth.set_preferences') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="dark_mode_present" value="1">
-          <input type="hidden" name="quotes_enabled_present" value="1">
+  </section>
 
-          <div class="form-check mb-3">
-            {{ form.dark_mode(class_='form-check-input') }}
-            <label class="form-check-label" for="dark_mode" id="darkModeLabel">{{ 'Dark mode enabled' if dark_mode_enabled else 'Dark mode disabled' }}</label>
-            <div id="darkModeVibeNote" class="form-text mt-1">Dark mode disables custom themes; vibe controls are inactive.</div>
+  <form method="post" action="{{ url_for('auth.settings') }}" id="userSettingsForm" data-autosave-endpoint="{{ url_for('auth.set_preferences') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="dark_mode_present" value="1">
+    <input type="hidden" name="quotes_enabled_present" value="1">
+
+    <div class="settings-grid">
+      <section class="surface-panel settings-section">
+        <div class="section-heading section-heading-compact">
+          <div>
+            <h2 class="section-heading__title">Appearance</h2>
+            <p class="section-heading__subtitle">Keep the interface comfortable while preserving all existing theme and vibe rules.</p>
           </div>
+        </div>
 
-          {{ toggle_checkbox(form.quotes_enabled, 'Rotating quotes enabled', 'Rotating quotes disabled') }}
+        <div class="form-check mb-3">
+          {{ form.dark_mode(class_='form-check-input') }}
+          <label class="form-check-label" for="dark_mode" id="darkModeLabel">{{ 'Dark mode enabled' if dark_mode_enabled else 'Dark mode disabled' }}</label>
+          <div id="darkModeVibeNote" class="form-text mt-1">Dark mode disables custom themes; vibe controls are inactive.</div>
+        </div>
 
-        {% set external_theme = external_theme_loaded %}
         {% if not external_theme and form.vibe_index %}
-          <div class="mb-3">
+          <div class="mb-0">
             <label for="vibe_index" class="form-label">Theme</label>
             <select class="form-select" id="vibe_index" name="vibe_index" {% if dark_mode_enabled or not vibe_feature_enabled %}disabled{% endif %} data-all-choices='{{ all_vibe_choices|tojson }}'>
               {% for val, label in form.vibe_index.choices %}
@@ -48,6 +59,17 @@
             <div id="vibeFeatureNote" class="form-text text-warning mt-1" {% if vibe_feature_enabled %}hidden{% endif %}>Theme selection is disabled while the global vibe feature is turned off.</div>
           </div>
         {% endif %}
+      </section>
+
+      <section class="surface-panel settings-section">
+        <div class="section-heading section-heading-compact">
+          <div>
+            <h2 class="section-heading__title">Quotes & workspace rhythm</h2>
+            <p class="section-heading__subtitle">Choose how motivational text appears and how often it updates while you work.</p>
+          </div>
+        </div>
+
+        {{ toggle_checkbox(form.quotes_enabled, 'Rotating quotes enabled', 'Rotating quotes disabled') }}
 
         {% if form.quote_set %}
           <div class="mb-3">
@@ -60,8 +82,9 @@
             <div class="form-text">Select which set of rolling quotes you'd like to see; leave blank to follow the site default.</div>
           </div>
         {% endif %}
+
         {% if form.quote_interval %}
-          <div class="mb-3">
+          <div class="mb-0">
             <label for="quote_interval" class="form-label">Quote rotation interval</label>
             <select class="form-select" id="quote_interval" name="quote_interval">
               {% for val, label in form.quote_interval.choices %}
@@ -71,14 +94,14 @@
             <div class="form-text">How often quotes should advance. Choose between 15 and 60 seconds in 5‑second steps.</div>
           </div>
         {% endif %}
-
-        <div id="settingsAutoSaveStatus" class="form-text" aria-live="polite">Changes save automatically.</div>
-        <noscript>
-          <button class="btn btn-primary mt-3" type="submit">Save settings</button>
-        </noscript>
-      </form>
+      </section>
     </div>
-  </div>
+
+    <div id="settingsAutoSaveStatus" class="ui-action-note settings-autosave-note mt-3" aria-live="polite">Changes save automatically.</div>
+    <noscript>
+      <button class="btn btn-primary mt-3" type="submit">Save settings</button>
+    </noscript>
+  </form>
 
   <script>
     // Only settings page needs the live preview logic for dark mode / labels

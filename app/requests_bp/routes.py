@@ -811,14 +811,20 @@ def dashboard():
         )
 
     # helper to compute counts for current bucket_list using provided base query
+    # 'Unassigned' buckets should count only requests with no assignee; they are
+    # otherwise treated as a catch-all so we don't inject status filters.
     def _compute_status_counts(base_q):
         counts = {}
         for b in bucket_list:
+            # start with base query for department-scoped items
+            q = base_q
+            namekey = (b.name or "").strip().lower()
+            if namekey == "unassigned":
+                q = q.filter(ReqModel.assigned_to_user_id.is_(None))
+            # apply status restrictions if bucket has statuses defined
             scs = [s.status_code for s in b.statuses.order_by(BucketStatus.order.asc()).all()]
             if scs:
-                q = base_q.filter(ReqModel.status.in_(scs))
-            else:
-                q = base_q
+                q = q.filter(ReqModel.status.in_(scs))
             counts[b.id] = q.count()
         return counts
 
@@ -828,8 +834,10 @@ def dashboard():
         b = db.session.get(StatusBucket, int(bucket_id))
         if b:
             status_codes = [s.status_code for s in b.statuses.order_by(BucketStatus.order.asc()).all()]
+            bucket_namekey = (b.name or "").strip().lower()
         else:
             status_codes = None
+            bucket_namekey = None
 
     if dept == "A":
         # Dept A should see all open requests owned by Department A
@@ -840,14 +848,14 @@ def dashboard():
         if bucket_id:
             if status_codes is None:
                 items = []
-            elif status_codes:
-                items = (
-                    base_a.filter(ReqModel.status.in_(status_codes))
-                    .order_by(ReqModel.updated_at.desc())
-                    .all()
-                )
             else:
-                items = base_a.order_by(ReqModel.updated_at.desc()).all()
+                q = base_a
+                if status_codes:
+                    q = q.filter(ReqModel.status.in_(status_codes))
+                # apply unassigned filter if asked
+                if bucket_namekey == "unassigned":
+                    q = q.filter(ReqModel.assigned_to_user_id.is_(None))
+                items = q.order_by(ReqModel.updated_at.desc()).all()
             status_counts = _compute_status_counts(base_a)
             return render_template(
                 "dashboard.html",
@@ -900,14 +908,12 @@ def dashboard():
                     s.status_code
                     for s in b.statuses.order_by(BucketStatus.order.asc()).all()
                 ]
+                q = base_b
                 if status_codes:
-                    items = (
-                        base_b.filter(ReqModel.status.in_(status_codes))
-                        .order_by(ReqModel.updated_at.desc())
-                        .all()
-                    )
-                else:
-                    items = base_b.order_by(ReqModel.updated_at.desc()).all()
+                    q = q.filter(ReqModel.status.in_(status_codes))
+                if bucket_namekey == "unassigned":
+                    q = q.filter(ReqModel.assigned_to_user_id.is_(None))
+                items = q.order_by(ReqModel.updated_at.desc()).all()
             label = b.name if b else "Bucket"
             buckets = {label: items}
             status_counts = {}
@@ -1014,14 +1020,16 @@ def dashboard():
             buckets = {}
             status_counts = {}
             for b in bucket_list:
+                q = base_b
+                namekey = (b.name or "").strip().lower()
+                if namekey == "unassigned":
+                    q = q.filter(ReqModel.assigned_to_user_id.is_(None))
                 status_codes = [
                     s.status_code
                     for s in b.statuses.order_by(BucketStatus.order.asc()).all()
                 ]
                 if status_codes:
-                    q = base_b.filter(ReqModel.status.in_(status_codes))
-                else:
-                    q = base_b
+                    q = q.filter(ReqModel.status.in_(status_codes))
                 items = q.order_by(ReqModel.updated_at.desc()).all()
                 buckets[b.name] = items
                 status_counts[b.id] = q.count()
@@ -1270,14 +1278,13 @@ def dashboard():
         if bucket_id:
             if status_codes is None:
                 items = []
-            elif status_codes:
-                items = (
-                    base_c.filter(ReqModel.status.in_(status_codes))
-                    .order_by(ReqModel.updated_at.desc())
-                    .all()
-                )
             else:
-                items = base_c.order_by(ReqModel.updated_at.desc()).all()
+                q = base_c
+                if status_codes:
+                    q = q.filter(ReqModel.status.in_(status_codes))
+                if bucket_namekey == "unassigned":
+                    q = q.filter(ReqModel.assigned_to_user_id.is_(None))
+                items = q.order_by(ReqModel.updated_at.desc()).all()
             status_counts = _compute_status_counts(base_c)
             return render_template(
                 "dashboard.html",
@@ -3732,6 +3739,10 @@ def do_transition(request_id: int):
         owner_recipients = [
             u for u in _users_in_dept(req.owner_department) if u.id != current_user.id
         ]
+        # always notify the assigned user as well, unless they're the one making the change
+        if req.assigned_to_user and req.assigned_to_user.id != current_user.id:
+            if req.assigned_to_user not in owner_recipients:
+                owner_recipients.append(req.assigned_to_user)
         body_text = submission_summary_text or req.title
         if dept == "A" and to_status == "CLOSED":
             notify_users(
@@ -3782,6 +3793,11 @@ def do_transition(request_id: int):
                             owner_recipients = [originator]
                         else:
                             owner_recipients = []
+                        # the assigned user should still get updates even if
+                        # the admin opted to notify only the originator
+                        if req.assigned_to_user and req.assigned_to_user.id != current_user.id:
+                            if req.assigned_to_user not in owner_recipients:
+                                owner_recipients.append(req.assigned_to_user)
                 except Exception:
                     current_app.logger.exception(
                         "Failed to apply originator-only notify rule"

@@ -23,7 +23,7 @@
 <section class="surface-panel dashboard-launchpad mb-3">
   <div class="dashboard-launchpad__intro">
     <div>
-      <div class="dashboard-launchpad__eyebrow">Operations cockpit</div>
+      <div class="dashboard-launchpad__eyebrow">Workspace overview</div>
       <h4 class="mb-1">
         {% if mode == 'A' %}
           Keep incoming requests moving with fewer clicks
@@ -61,11 +61,13 @@
 </section>
 
 <form class="page-toolbar surface-panel dashboard-search" method="get" action="{{ url_for('requests.search_requests') }}">
-  <input id="searchInput" name="q" class="form-control me-2" type="search" placeholder="Search by request # or description" aria-label="Search" value="{{ request.args.get('q','') }}">
+  <label class="visually-hidden" for="searchInput">Search requests</label>
+  <input id="searchInput" name="q" class="form-control me-2" type="search" placeholder="Search request #, title, part, or description" aria-label="Search requests" value="{{ request.args.get('q','') }}">
   <button class="btn btn-outline-secondary" type="submit">Search</button>
   {% if request.args.get('q') %}
     <a href="{{ url_for('requests.dashboard') }}" class="btn btn-link ms-2">Clear</a>
   {% endif %}
+  <span class="text-muted small">Use IDs, titles, or part details to jump back into work faster.</span>
 </form>
 
 {% if saved_views %}
@@ -162,7 +164,7 @@
           </a>
         </div>
       {% else %}
-        <div class="col-12"><div class="empty-state">No requests yet.</div></div>
+        <div class="col-12"><div class="empty-state">No requests yet. Create a new request to start tracking work here.</div></div>
       {% endfor %}
     </div>
   </section>
@@ -178,7 +180,7 @@
     </div>
 
     {% if not bucket_list %}
-      <div class="empty-state mb-0">No buckets configured.</div>
+      <div class="empty-state mb-0">No buckets are configured yet. Add one in admin to organize queue views for this team.</div>
     {% endif %}
   </section>
 
@@ -221,7 +223,7 @@
                 </form>
               {% endif %}
           {% else %}
-            <div class="list-group-item text-muted">No items.</div>
+            <div class="list-group-item text-muted">No items in this bucket right now.</div>
           {% endfor %}
         </div>
       </div>
@@ -249,7 +251,7 @@
         <small class="text-muted">{{ r.pricebook_display }} · {{ r.priority }} · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}</small>
       </a>
     {% else %}
-      <div class="empty-state">No pending items.</div>
+      <div class="empty-state">No pending items right now. New approvals will appear here when they need review.</div>
     {% endfor %}
   </div>
 {% endif %}

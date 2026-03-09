@@ -957,6 +957,24 @@ def create_app():
                         )
                         db.session.add(arch)
 
+                    # Ensure each department has an "Unassigned" bucket so that
+                    # dashboard logic can special-case it; admins may override or
+                    # edit these via the UI if desired.  We choose order=0 so it
+                    # appears before more specific buckets, but admins can adjust
+                    # order afterwards.
+                    for code in ("A", "B", "C"):
+                        existing = StatusBucket.query.filter_by(
+                            name="Unassigned", department_name=code
+                        ).first()
+                        if not existing:
+                            ua = StatusBucket(
+                                name="Unassigned",
+                                department_name=code,
+                                order=0,
+                                active=True,
+                            )
+                            db.session.add(ua)
+
                     db.session.commit()
                     app.logger.info("Seeded default departments and Dept B buckets")
             except Exception:

@@ -670,13 +670,19 @@ def import_default_buckets():
 
     # Recommended default buckets for Dept B (used by tests)
     try:
+        # Unassigned bucket (no statuses - catch-all filter applied at dashboard)
+        ua = StatusBucket.query.filter_by(name="Unassigned", department_name="B").first()
+        if not ua:
+            ua = StatusBucket(name="Unassigned", department_name="B", order=0, active=True)
+            db.session.add(ua)
+
         # In Progress bucket
         b = StatusBucket.query.filter_by(
             name="In Progress", department_name="B"
         ).first()
         if not b:
             b = StatusBucket(
-                name="In Progress", department_name="B", order=0, active=True
+                name="In Progress", department_name="B", order=1, active=True
             )
             db.session.add(b)
             db.session.flush()
@@ -686,7 +692,7 @@ def import_default_buckets():
         # Waiting bucket
         w = StatusBucket.query.filter_by(name="Waiting", department_name="B").first()
         if not w:
-            w = StatusBucket(name="Waiting", department_name="B", order=1, active=True)
+            w = StatusBucket(name="Waiting", department_name="B", order=2, active=True)
             db.session.add(w)
             db.session.flush()
             ws = BucketStatus(

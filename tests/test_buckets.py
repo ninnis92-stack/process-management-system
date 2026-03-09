@@ -61,8 +61,16 @@ def test_bucket_import_and_filtering(app, client):
     rv = client.post("/admin/buckets/import_default", follow_redirects=True)
     assert b"Imported recommended buckets" in rv.data
 
-    # find the 'In Progress' bucket id
+    # verify unassigned bucket exists for each department and find In Progress
     with app.app_context():
+        for dept_code in ("A", "B", "C"):
+            ua = StatusBucket.query.filter_by(
+                name="Unassigned", department_name=dept_code
+            ).first()
+            assert ua is not None, f"Unassigned bucket should be auto-created for Dept {dept_code}"
+        unassigned = StatusBucket.query.filter_by(
+            name="Unassigned", department_name="B"
+        ).first()
         in_progress = StatusBucket.query.filter_by(
             name="In Progress", department_name="B"
         ).first()
@@ -74,14 +82,17 @@ def test_bucket_import_and_filtering(app, client):
     # request dashboard filtered by bucket_id
     rv = client.get(f"/dashboard?bucket_id={in_progress.id}")
     assert rv.status_code == 200
-    # debug snapshot to understand layout changes (full html)
-    debug_html = rv.data.decode(errors='ignore')
-    print('dashboard html length', len(debug_html))
-    print(debug_html)
     # should include the Progress Item
     assert b"Progress Item" in rv.data
     # should not include the Needs Input Item in this bucket
     assert b"Needs Input Item" not in rv.data
+
+    # unassigned bucket should include any request without an assignee (r1)
+    rv = client.get(f"/dashboard?bucket_id={unassigned.id}")
+    assert rv.status_code == 200
+    assert b"Progress Item" in rv.data
+    # unassigned filter doesn't care about status; r2 is assigned? r2 has no assignee and WAITING_ON_A so should also show
+    assert b"Needs Input Item" in rv.data
 
 
 def test_bucket_filtering_other_departments(app, client):
