@@ -84,6 +84,7 @@ def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
     assert b'class="brand-banner-row"' in rv.data
     assert b'class="brand-banner-row__quote-panel"' in rv.data
     assert b'class="brand-banner-row__control-panel"' in rv.data
+    assert b'class="brand-banner-row__control-shell"' in rv.data
     assert b'data-theme-banner' in rv.data
     assert b'id="motivation"' in rv.data
     assert b'id="vibeBtn"' in rv.data
@@ -96,6 +97,8 @@ def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
         css = f.read()
     assert '.brand-stack' in css and 'z-index: 2' in css
     assert '.brand-banner-row' in css and 'margin-left: 0.5rem' in css
+    assert '.brand-banner-row__control-shell' in css
+    assert 'background: rgb(var(--accent-rgb, 79, 140, 255));' in css
 
 
 def test_dashboard_brand_banner_renders_without_vibe_button_when_feature_disabled(client, app):

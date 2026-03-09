@@ -713,10 +713,10 @@ body.theme-preset-midnight:not(.dark-mode) {
 .brand-banner-row__quote-panel {
   min-width: 0;
   flex: 1 1 auto;
-  padding: 0.42rem 0.7rem;
+  padding: 0.55rem 0.8rem;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.32);
-  border: 1px solid rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 .brand-banner-row__content {
   min-width: 0;
@@ -732,6 +732,26 @@ body.theme-preset-midnight:not(.dark-mode) {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.brand-banner-row__control-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.28rem;
+  padding: 0.52rem 0.58rem;
+  min-width: 148px;
+  border-radius: 14px;
+  background: rgba(10, 18, 34, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 12px 24px rgba(5, 10, 20, 0.28);
+}
+.brand-banner-row__control-label {
+  font-size: 0.61rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.64);
+  font-weight: 700;
+  text-align: center;
 }
 .brand-banner-row__eyebrow {
   font-size: 0.68rem;
@@ -750,13 +770,16 @@ body.theme-preset-midnight:not(.dark-mode) {
 .brand-vibe-btn {
   flex: 0 0 auto;
   white-space: nowrap;
-  padding: 0.38rem 0.72rem;
+  width: 100%;
+  justify-content: center;
+  padding: 0.5rem 0.82rem;
   font-size: 0.76rem;
   line-height: 1.1;
   border-radius: 999px;
-  background: rgba(var(--accent-rgb, 79, 140, 255), 0.72);
-  border-color: rgba(var(--accent-rgb, 79, 140, 255), 0.88) !important;
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.24);
+  background: rgb(var(--accent-rgb, 79, 140, 255));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff !important;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.28);
 }
 
 #motivation {
@@ -932,8 +955,8 @@ a:hover { color: var(--accent-2); }
 
 .theme-nav .brand-vibe-btn:hover,
 .theme-nav .brand-vibe-btn:focus-visible {
-  background: rgba(var(--accent-rgb, 79, 140, 255), 0.44);
-  border-color: rgba(var(--accent-rgb, 79, 140, 255), 0.62) !important;
+  background: color-mix(in srgb, rgb(var(--accent-rgb, 79, 140, 255)) 84%, white 16%);
+  border-color: rgba(255, 255, 255, 0.3) !important;
   color: var(--nav-text);
 }
 
@@ -1748,6 +1771,10 @@ a:hover { color: var(--accent-2); }
   }
   .brand-banner-row__quote-panel,
   .brand-banner-row__control-panel {
+    width: 100%;
+  }
+  .brand-banner-row__control-shell {
+    min-width: 0;
     width: 100%;
   }
   .brand-vibe-btn {
