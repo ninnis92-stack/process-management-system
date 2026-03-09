@@ -83,12 +83,16 @@
         </a>
         {% if show_brand_banner %}
           <div class="brand-banner-row" data-theme-banner>
-            <div class="brand-banner-row__content">
-              <div class="brand-banner-row__eyebrow">{{ 'Dark-mode vibe' if dark_mode_active and vibe_ui_enabled else ('Current vibe' if vibe_ui_enabled else 'Workspace note') }}</div>
-              <div id="motivation" class="brand-quote" aria-live="polite">{{ initial_quote or 'Theme your workspace instantly.' }}</div>
+            <div class="brand-banner-row__quote-panel">
+              <div class="brand-banner-row__content">
+                <div class="brand-banner-row__eyebrow">{{ 'Dark-mode vibe' if dark_mode_active and vibe_ui_enabled else ('Current vibe' if vibe_ui_enabled else 'Workspace note') }}</div>
+                <div id="motivation" class="brand-quote" aria-live="polite">{{ initial_quote or 'Theme your workspace instantly.' }}</div>
+              </div>
             </div>
             {% if vibe_ui_enabled %}
-              <button id="vibeBtn" data-vibe-trigger="navbar" type="button" class="btn btn-outline-light btn-sm brand-vibe-btn">Vibe · <span class="vibeLabel">—</span></button>
+              <div class="brand-banner-row__control-panel">
+                <button id="vibeBtn" data-vibe-trigger="navbar" type="button" class="btn btn-outline-light btn-sm brand-vibe-btn">Vibe · <span class="vibeLabel">—</span></button>
+              </div>
             {% endif %}
           </div>
         {% endif %}

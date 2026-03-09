@@ -19,7 +19,7 @@ lightweight Stimulus controllers for interactivity.
 
 ## Overview
 
-*Note: recent updates changed dark-mode behavior such that enabling dark mode disables all vibe/theme controls.  The navbar vibe button is removed and the theme selector is greyed out with a warning.  No accent colors are applied while dark mode is active.*
+*Note: recent updates changed dark-mode behavior such that enabling dark mode disables all vibe/theme controls. The navbar vibe button is removed and the theme selector is greyed out with a warning. No accent colors are applied while dark mode is active. The navbar banner now keeps quotes in their own panel, with the vibe button rendered as a separate control so it can disappear cleanly when disabled.*
 
 This prototype supports structured intake forms, multi‑step process flows, and an
 extensible admin interface.  Admins can build custom request templates,
@@ -44,7 +44,7 @@ Key capabilities:
 - **Per-form guest access policies** for public, SSO-linked, approved-organization,
   and unaffiliated-only intake paths
 - **SSO/OIDC support** with optional admin sync
-- **Theme/vibe system**, dark mode (now integrated with vibe accents).  Dark mode entirely disables custom themes.  When dark mode is active the vibe button is hidden and the theme dropdown is locked, with explanatory text shown to the user.  Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
+- **Theme/vibe system**, dark mode (now integrated with vibe accents). Dark mode entirely disables custom themes. When dark mode is active the vibe button is hidden and the theme dropdown is locked, with explanatory text shown to the user. The navbar quote area and vibe control are separated so quotes stay visible even when the vibe button is absent, and recent UI polish reduced excess transparency across shared panels and controls. Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
 
 Everything is covered by a comprehensive test suite and deploys automatically
 using a release script that migrates the database, creates missing columns,
