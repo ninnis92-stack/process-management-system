@@ -924,7 +924,7 @@ body.no-brand-banner .brand-cluster {
   border: 1px solid var(--banner-border);
   box-shadow: var(--banner-shadow);
   min-height: 50px;
-  margin-left: 0.5rem; /* keep a bit of space from brand title */
+  margin-left: 1rem; /* keep a bit more space from brand title so text never bumps the border */
   position: relative;
   z-index: 1; /* sit behind brand-stack so kicker/logo remain visible */
 }
