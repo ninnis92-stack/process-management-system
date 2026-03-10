@@ -1,17 +1,23 @@
 import hashlib
 
+from flask import has_request_context, request
+
 from ..extensions import db
 
 
-from flask import g
+def _request_cache():
+    if not has_request_context():
+        return {}
+    return request.environ.setdefault("_user_context_cache", {})
 
 
 def gravatar_url(email, size=34, default="mp"):
-    # cache the result per-request in ``flask.g`` to avoid recomputing the
-    # md5 digest when the same address is rendered multiple times on a page.
+    # cache the result per-request to avoid recomputing the md5 digest when
+    # the same address is rendered multiple times on a page.
+    cache = _request_cache()
     key = f"gravatar:{email}:{size}:{default}"
-    if hasattr(g, key):
-        return getattr(g, key)
+    if key in cache:
+        return cache[key]
 
     if not email:
         result = f"https://www.gravatar.com/avatar/?d={default}&s={size}"
@@ -23,7 +29,7 @@ def gravatar_url(email, size=34, default="mp"):
         except Exception:
             result = f"https://www.gravatar.com/avatar/?d={default}&s={size}"
 
-    setattr(g, key, result)
+    cache[key] = result
     return result
 
 
@@ -39,16 +45,17 @@ def avatar_url_for(user, size=34):
 def get_user_departments(user):
     """Return ordered department codes the user may act as.
 
-    Results are cached on ``flask.g`` for the duration of the request so
+    Results are cached for the duration of the request so
     repeated permission checks or template renders don't hit the database
     multiple times.
     """
     if not user:
         return []
 
+    cache = _request_cache()
     cache_key = f"user_depts:{getattr(user, 'id', None)}"
-    if hasattr(g, cache_key):
-        return getattr(g, cache_key)
+    if cache_key in cache:
+        return cache[cache_key]
 
     try:
         from ..models import Department, UserDepartment
@@ -99,7 +106,7 @@ def get_user_departments(user):
         else:
             result = depts
 
-        setattr(g, cache_key, result)
+        cache[cache_key] = result
         return result
     except Exception:
         try:

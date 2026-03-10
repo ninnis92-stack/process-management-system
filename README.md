@@ -146,7 +146,7 @@ and default diff views.
    ```bash
    make smoke        # hit home, dashboard, and admin/site_config
    make smoke-clean  # erase local sqlite DB between runs
-  make test         # run pytest suite (currently 217 tests)
+  make test         # run pytest suite (currently 221 tests)
    ```
 
 6. **Clearing state**
@@ -165,6 +165,8 @@ and default diff views.
    Once the new release is live, run the basic smoke script against the target URL:
    ```bash
   bash scripts/smoke_test.sh https://your-app.fly.dev
+  python scripts/smoke_deployed_login.py --url https://your-app.fly.dev
+  python scripts/admin_smoke.py --url https://your-app.fly.dev
    ```
    For staging environments the `scripts/clear_smoke_remote.py` helper logs in as the
    seeded admin and posts to `/admin/debug/cleanup` to remove test records:
@@ -179,7 +181,7 @@ and default diff views.
 
 8. **Tests**
    ```bash
-  make test          # runs full pytest suite (currently 217 tests)
+  make test          # runs full pytest suite (currently 221 tests)
    ```
 
 9. **Performance & tuning**
@@ -192,9 +194,10 @@ and default diff views.
      file even contains a sample query showing `selectinload()` usage when you
      need to avoid N+1 database round‑trips.
    * the application already caches the dashboard, search results, and
-     metrics UI for a short time; templates use per‑request caches in
+     metrics UI for a short time; templates use request-scoped caches in
      helpers such as `get_user_departments()` and `gravatar_url()` to avoid
-     repeating identical database or hashing work within a single request.
+     repeating identical database or hashing work within a single request
+     without leaking stale values across requests.
    * performing a `make smoke` run or using `k6/load_test.js` while running a
      profiler (e.g. `pyinstrument`) is the best way to identify the real
      hotspots in your usage scenario.  Once you know where the delays are you
@@ -342,6 +345,13 @@ and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORIN
   it’s skipped.
 
 ## Live deployment checks (March 8-9, 2026)
+- March 10, 2026: fixed a dashboard bucket-query regression by batching
+  `BucketStatus` lookups instead of eager-loading the dynamic relationship,
+  made admin workflow-profile sync idempotent for `DepartmentEditor` rows,
+  and moved helper caches to request scope so department-switch results stay
+  fresh across requests in tests and production.
+- Re-ran the full local regression suite after those fixes; it passed at
+  `221 passed`.
 - Added a progressive-disclosure process-flow builder, clearer guest/internal
   request-form previews, extracted guest-form admin routes into
   `app/admin/guest_forms.py`, and completed a terminology pass so process flow,

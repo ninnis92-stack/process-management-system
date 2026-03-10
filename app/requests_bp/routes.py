@@ -834,14 +834,8 @@ def dashboard():
                 db.session.rollback()
             except Exception:
                 pass
-        # load buckets along with their statuses to avoid N+1 queries when
-    # iterating over `bucket_list` below.  the Python-side sort mirrors the
-    # previous SQL `order_by` call on the relationship.
-    from sqlalchemy.orm import selectinload
-
-    bucket_list = (
-            StatusBucket.query.options(selectinload(StatusBucket.statuses))
-            .filter(StatusBucket.active == True)
+        bucket_list = (
+            StatusBucket.query.filter(StatusBucket.active == True)
             .filter(
                 (StatusBucket.department_name == None)
                 | (StatusBucket.department_name == "")
@@ -850,6 +844,18 @@ def dashboard():
             .order_by(StatusBucket.order.asc())
             .all()
         )
+
+    bucket_status_map = {bucket.id: [] for bucket in bucket_list}
+    if bucket_status_map:
+        bucket_status_rows = (
+            BucketStatus.query.filter(BucketStatus.bucket_id.in_(bucket_status_map.keys()))
+            .order_by(BucketStatus.bucket_id.asc(), BucketStatus.order.asc())
+            .all()
+        )
+        for bucket_status in bucket_status_rows:
+            bucket_status_map.setdefault(bucket_status.bucket_id, []).append(
+                bucket_status.status_code
+            )
 
     # helper to compute counts for current bucket_list using provided base query
     # 'Unassigned' buckets should count only requests with no assignee; they are
@@ -863,9 +869,7 @@ def dashboard():
             if namekey == "unassigned":
                 q = q.filter(ReqModel.assigned_to_user_id.is_(None))
             # apply status restrictions if bucket has statuses defined
-            # statuses are already eager-loaded; sort in Python instead of
-            # issuing a new query for each bucket.
-            scs = [s.status_code for s in sorted(b.statuses, key=lambda s: s.order)]
+            scs = bucket_status_map.get(b.id, [])
             if scs:
                 q = q.filter(ReqModel.status.in_(scs))
             counts[b.id] = q.count()
@@ -876,7 +880,7 @@ def dashboard():
         selected_bucket_mode = True
         b = db.session.get(StatusBucket, int(bucket_id))
         if b:
-            status_codes = [s.status_code for s in sorted(b.statuses, key=lambda s: s.order)]
+            status_codes = bucket_status_map.get(b.id, [])
             bucket_namekey = (b.name or "").strip().lower()
         else:
             status_codes = None
@@ -949,10 +953,7 @@ def dashboard():
             if not b:
                 items = []
             else:
-                status_codes = [
-                    s.status_code
-                    for s in b.statuses.order_by(BucketStatus.order.asc()).all()
-                ]
+                status_codes = bucket_status_map.get(b.id, [])
                 q = base_b
                 if status_codes:
                     q = q.filter(ReqModel.status.in_(status_codes))
@@ -1070,10 +1071,7 @@ def dashboard():
                 namekey = (b.name or "").strip().lower()
                 if namekey == "unassigned":
                     q = q.filter(ReqModel.assigned_to_user_id.is_(None))
-                status_codes = [
-                    s.status_code
-                    for s in b.statuses.order_by(BucketStatus.order.asc()).all()
-                ]
+                status_codes = bucket_status_map.get(b.id, [])
                 if status_codes:
                     q = q.filter(ReqModel.status.in_(status_codes))
                 items = q.order_by(ReqModel.updated_at.desc()).all()

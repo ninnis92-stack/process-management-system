@@ -202,11 +202,33 @@ def _workflow_profile_config(profile_name: str) -> dict:
 def _sync_user_workflow_profile(user: User):
     if not user or not getattr(user, "id", None):
         return
-    departments = [dept for dept in get_user_departments(user) if dept in set(_available_department_codes(include_codes=get_user_departments(user)))]
+
+    def _normalized_department(value):
+        return (value or "").strip().upper()
+
+    user_departments = get_user_departments(user)
+    departments = [
+        dept
+        for dept in user_departments
+        if dept in set(_available_department_codes(include_codes=user_departments))
+    ]
     config = _workflow_profile_config(getattr(user, "workflow_role_profile", "member"))
-    existing_rows = DepartmentEditor.query.filter_by(user_id=user.id).all()
+    existing_rows = list(getattr(user, "dept_editor_roles", []) or [])
+    existing_rows.extend(
+        DepartmentEditor.query.filter_by(user_id=user.id).all()
+    )
+    existing_rows.extend(
+        obj
+        for obj in db.session.new
+        if isinstance(obj, DepartmentEditor) and getattr(obj, "user_id", None) == user.id
+    )
+    existing_rows_by_department = {}
+    for row in existing_rows:
+        dept_key = _normalized_department(getattr(row, "department", None))
+        if dept_key and dept_key not in existing_rows_by_department:
+            existing_rows_by_department[dept_key] = row
     managed_rows = {
-        (row.department or "").strip().upper(): row
+        _normalized_department(getattr(row, "department", None)): row
         for row in existing_rows
         if getattr(row, "managed_by_profile", False)
     }
@@ -227,7 +249,7 @@ def _sync_user_workflow_profile(user: User):
             managed_rows.pop(dept, None)
 
     for dept in departments:
-        row = managed_rows.get(dept)
+        row = managed_rows.get(dept) or existing_rows_by_department.get(dept)
         if not row:
             row = DepartmentEditor(user_id=user.id, department=dept, managed_by_profile=True)
             db.session.add(row)
@@ -235,6 +257,55 @@ def _sync_user_workflow_profile(user: User):
         row.can_view_metrics = bool(config.get("can_view_metrics", False))
         row.can_change_priority = bool(config.get("can_change_priority", False))
         row.managed_by_profile = True
+
+
+def _dedupe_department_editor_rows(user: User):
+    if not user or not getattr(user, "id", None):
+        return
+
+    def _normalized_department(value):
+        return (value or "").strip().upper()
+
+    with db.session.no_autoflush:
+        rows = list(DepartmentEditor.query.filter_by(user_id=user.id).all())
+        rows.extend(
+            obj
+            for obj in db.session.new
+            if isinstance(obj, DepartmentEditor)
+            and (getattr(obj, "user_id", None) == user.id or getattr(obj, "user", None) is user)
+        )
+
+    rows_by_department = {}
+    for row in rows:
+        dept_key = _normalized_department(getattr(row, "department", None))
+        if not dept_key:
+            continue
+        rows_by_department.setdefault(dept_key, []).append(row)
+
+    for dept_key, dept_rows in rows_by_department.items():
+        if len(dept_rows) < 2:
+            continue
+
+        kept_row = next((row for row in dept_rows if getattr(row, "id", None)), dept_rows[0])
+        for duplicate_row in dept_rows:
+            if duplicate_row is kept_row:
+                continue
+            kept_row.department = dept_key
+            kept_row.can_edit = bool(getattr(duplicate_row, "can_edit", False) or kept_row.can_edit)
+            kept_row.can_view_metrics = bool(
+                getattr(duplicate_row, "can_view_metrics", False) or kept_row.can_view_metrics
+            )
+            kept_row.can_change_priority = bool(
+                getattr(duplicate_row, "can_change_priority", False)
+                or kept_row.can_change_priority
+            )
+            kept_row.managed_by_profile = bool(
+                getattr(duplicate_row, "managed_by_profile", False) or kept_row.managed_by_profile
+            )
+            if getattr(duplicate_row, "id", None):
+                db.session.delete(duplicate_row)
+            else:
+                db.session.expunge(duplicate_row)
 
 
 def _populate_admin_user_form(form: AdminCreateUserForm, user: Optional[User] = None):
@@ -455,6 +526,7 @@ def create_user():
         db.session.add(u)
         db.session.commit()
         _sync_user_workflow_profile(u)
+        _dedupe_department_editor_rows(u)
         db.session.commit()
         ensure_user_tenant_membership(u)
         flash(f"Created user {email}.", "success")
@@ -492,7 +564,9 @@ def edit_user(user_id: int):
             getattr(form, "role", None) and form.role.data == "admin"
         ) or bool(form.is_admin.data)
         _apply_admin_user_settings(u, form)
+        db.session.commit()
         _sync_user_workflow_profile(u)
+        _dedupe_department_editor_rows(u)
         db.session.commit()
         flash(f"Updated user {u.email}.", "success")
         return redirect(url_for("admin.list_users"))
@@ -598,6 +672,7 @@ def manage_user_departments(user_id: int):
 
         try:
             _sync_user_workflow_profile(u)
+            _dedupe_department_editor_rows(u)
             db.session.commit()
             flash("Updated department assignments.", "success")
             for warning in overlap_warnings:
@@ -676,10 +751,12 @@ def bulk_update_users():
             if getattr(user, "preferred_start_department", None) and user.preferred_start_department not in set(get_user_departments(user)):
                 user.preferred_start_department = target_department
             _sync_user_workflow_profile(user)
+            _dedupe_department_editor_rows(user)
             changed += 1
         elif action == "apply_role_profile":
             user.workflow_role_profile = target_profile
             _sync_user_workflow_profile(user)
+            _dedupe_department_editor_rows(user)
             changed += 1
 
     db.session.commit()
