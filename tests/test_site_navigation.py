@@ -99,8 +99,7 @@ def test_login_page_shows_motivational_quotes_by_default(client, app):
     # Banner text should still not appear (banner_html is empty)
     assert "Banner text" not in html
     # At least one motivational quote should appear in the navbar
-    from app.models import SiteConfig as SC
-    motivational_quotes = SC.DEFAULT_QUOTE_SETS.get("motivational", [])
+    motivational_quotes = SiteConfig.DEFAULT_QUOTE_SETS.get("motivational", [])
     assert any(q in html for q in motivational_quotes), (
         "Login page should always show at least one motivational quote"
     )
@@ -118,8 +117,7 @@ def test_login_page_shows_motivational_quotes_by_default(client, app):
     # Custom quote still should not appear in the rendered HTML
     assert unique_custom_quote not in html
     # Motivational quotes should appear in the HTML (the nav area renders them)
-    from app.models import SiteConfig as SC
-    motivational_quotes = SC.DEFAULT_QUOTE_SETS.get("motivational", [])
+    motivational_quotes = SiteConfig.DEFAULT_QUOTE_SETS.get("motivational", [])
     assert any(q in html for q in motivational_quotes), (
         "Login page should contain a motivational quote"
     )

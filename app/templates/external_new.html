@@ -158,7 +158,12 @@
         {{ form.description(class="form-control", rows="6", placeholder="Add background, expected outcome, and any links or context the team should know.") }}
       </div>
 
-      <details class="advanced-request-details mb-3"{% if form.errors %} open{% endif %}>
+      {# Auto-expand the advanced section only when one of its own fields has a validation error. #}
+      {% set _ns = namespace(advanced_has_errors=false) %}
+      {% for _fname in ['request_type', 'priority', 'pricebook_status', 'sales_list_reference', 'donor_part_number', 'target_part_number', 'no_donor_reason'] %}
+        {% if form.errors.get(_fname) %}{% set _ns.advanced_has_errors = true %}{% endif %}
+      {% endfor %}
+      <details class="advanced-request-details mb-3"{% if _ns.advanced_has_errors %} open{% endif %}>
         <summary class="advanced-request-details__toggle">
           <span class="advanced-request-details__label">Advanced details</span>
           <span class="advanced-request-details__hint text-muted small">Request type, priority, part numbers, and sales list fields — most guests can leave these at their defaults.</span>
