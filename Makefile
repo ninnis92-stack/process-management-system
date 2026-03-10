@@ -40,6 +40,19 @@ smoke:
 smoke-clean:
 	@echo "Clearing development database (SQLite)"
 	@rm -f instance/app.db
+
+# run the full pytest suite against a disposable Postgres container
+# this mirrors the CI service job and helps catch dialect-specific bugs.
+# requires Docker to be installed locally.
+.PHONY: test-postgres
+
+test-postgres:
+	@echo "Starting temporary Postgres for tests..."
+	@docker run --rm --name pmp-test-postgres -e POSTGRES_PASSWORD=password -e POSTGRES_DB=test -d postgres:15
+	@sleep 5
+	@echo "Running pytest against Postgres"
+	@DATABASE_URL=postgres://postgres:password@localhost:5432/test pytest -q
+	@docker rm -f pmp-test-postgres
 PYTHON?=python3
 PIP?=pip
 VENV?=.venv

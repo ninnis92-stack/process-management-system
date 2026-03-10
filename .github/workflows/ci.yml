@@ -30,8 +30,51 @@ jobs:
       - name: Check migrations
         run: |
           bash scripts/check_migrations.sh
-      - name: Run tests
+      - name: Run tests (SQLite)
         env:
+          UPLOAD_FOLDER: ${{ github.workspace }}/uploads
+          AUTO_CREATE_DB: "True"
+          WTF_CSRF_ENABLED: "False"
+          TESTING: "True"
+        run: |
+          mkdir -p "$UPLOAD_FOLDER"
+          PYTHONPATH=. pytest -q
+
+  postgres-test:
+    needs: test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    strategy:
+      matrix:
+        python-version: [3.11]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Wait for Postgres
+        run: |
+          until pg_isready -h localhost -p 5432; do sleep 1; done
+      - name: Run tests (Postgres)
+        env:
+          DATABASE_URL: postgres://postgres:password@localhost:5432/test
           UPLOAD_FOLDER: ${{ github.workspace }}/uploads
           AUTO_CREATE_DB: "True"
           WTF_CSRF_ENABLED: "False"

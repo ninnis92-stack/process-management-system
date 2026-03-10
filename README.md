@@ -182,7 +182,12 @@ and default diff views.
 8. **Tests**
    ```bash
   make test          # runs full pytest suite (currently 221 tests)
+  make test-postgres # start a temporary Postgres container and run the suite against it
    ```
+
+   The GitHub Actions pipeline now includes a `postgres-test` job which spins up
+   Postgres 15 as a service and runs the same tests, ensuring dialect
+   compatibility.
 
 9. **Performance & tuning**
 
