@@ -1055,6 +1055,9 @@ body.no-brand-banner .brand-cluster {
 /* Ensure brand area centers vertically and doesn't cause navbar resizing */
 .theme-nav .navbar-brand, .theme-nav .brand-stack { align-items: center; display: flex; }
 
+/* keep brand link on top of the banner when they overlap */
+.theme-nav .navbar-brand, .brand-stack { position: relative; z-index: 2; }
+
 /* Reserve a stable width for the brand area so changing quote length doesn't push navbar items */
 .theme-nav .navbar-brand {
   flex: 0 1 auto;
@@ -1076,6 +1079,7 @@ body.no-brand-banner .brand-cluster {
 
   .brand-banner-row {
     width: min(100%, 560px);
+    margin-top: 0.3rem; /* give a bit of vertical separation when wrapping */
   }
 }
 
@@ -1085,6 +1089,9 @@ body.no-brand-banner .brand-cluster {
   min-width: 0;
   justify-content: flex-end;
 }
+
+/* banner should sit below the brand text by default */
+.brand-banner-row { z-index: 1; }
 
 body.no-brand-banner .nav-actions {
   margin-left: 0.5rem;

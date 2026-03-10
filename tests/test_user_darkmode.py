@@ -97,7 +97,9 @@ def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
     with open('app/static/styles.css', 'r') as f:
         css = f.read()
     assert '.brand-stack' in css and 'z-index: 2' in css
+    assert '.theme-nav .navbar-brand' in css and 'z-index: 2' in css
     assert '.brand-banner-row' in css and 'margin-left: 0.5rem' in css
+    assert 'margin-top: 0.3rem' in css  # small-screen wrap spacing
     assert '.brand-kicker' in css and 'line-height: 1.25' in css
     assert '.brand-banner-row__control-shell' in css
     assert '.ui-control-shell--banner' in css
