@@ -7,6 +7,19 @@
   <div class="mb-3">{{ form.name.label }}{{ form.name(class_='form-control') }}</div>
   <div class="mb-3">{{ form.order.label }}{{ form.order(class_='form-control') }}</div>
   <div class="mb-3">{{ form.active() }} {{ form.active.label }}</div>
+  <div class="mb-3">{{ form.notification_template.label }}
+    {{ form.notification_template(class_='form-control', rows=4) }}
+    {% if form.notification_template.description %}
+      <small class="form-text text-muted">{{ form.notification_template.description }}</small>
+    {% endif %}
+  </div>
+  <div class="mb-3">{{ form.handoff_template_doc_url.label }}{{ form.handoff_template_doc_url(class_='form-control', placeholder='https://...') }}</div>
+  <div class="mb-3">{{ form.handoff_template_checklist.label }}
+    {{ form.handoff_template_checklist(class_='form-control', rows=4) }}
+    {% if form.handoff_template_checklist.description %}
+      <small class="form-text text-muted">{{ form.handoff_template_checklist.description }}</small>
+    {% endif %}
+  </div>
   <button class="btn btn-primary">Save</button>
 </form>
 {% endblock %}

@@ -9,7 +9,7 @@ Keep the send path idempotent and non-blocking from request handlers.
 """
 
 from .extensions import db
-from .models import Notification, User, SpecialEmailConfig, NotificationRetention
+from .models import Notification, User, UserDepartment, SpecialEmailConfig, NotificationRetention
 from .models import DepartmentFormAssignment, FormTemplate
 from flask import current_app
 from threading import Thread
@@ -18,6 +18,8 @@ from typing import Optional
 from .services.emailer import EmailService
 from .services.job_dispatcher import run_job
 import importlib
+from sqlalchemy import and_, or_
+from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import sessionmaker
 
 # Use importlib to import optional dependencies at runtime. Add explicit Pylance
@@ -38,10 +40,59 @@ except Exception:  # pragma: no cover - RQ optional for dev
 try:
     _tasks_mod = importlib.import_module("app.tasks")  # type: ignore[reportMissingImports]
     send_emails_task = getattr(_tasks_mod, "send_emails_task", None)
+    fanout_notifications_task = getattr(_tasks_mod, "fanout_notifications_task", None)
 except (
     Exception
 ):  # pragma: no cover - tasks module may be unavailable to static checker
     send_emails_task = None
+    fanout_notifications_task = None
+
+
+def _send_notification_fanout_async(notification_entries, request_id=None):
+    from flask import current_app as _current
+
+    try:
+        app = _current._get_current_object()
+    except Exception:
+        app = None
+
+    if app and (getattr(app, "testing", False) or app.config.get("TESTING")):
+        if fanout_notifications_task:
+            fanout_notifications_task(notification_entries, request_id=request_id)
+        return
+
+    rq_enabled = bool(app.config.get("RQ_ENABLED", False)) if app else False
+    redis_url = (app.config.get("REDIS_URL") or app.config.get("RQ_REDIS_URL")) if app else None
+
+    if rq_enabled and redis_url and fanout_notifications_task:
+        try:
+            conn = Redis.from_url(redis_url)
+            q = Queue("notifications", connection=conn)
+            q.enqueue(fanout_notifications_task, notification_entries, request_id)
+            return
+        except Exception:
+            try:
+                _current.logger.exception("Failed to enqueue notification fan-out job; falling back to thread")
+            except Exception:
+                pass
+
+    def _send():
+        if app is None or not fanout_notifications_task:
+            return
+        with app.app_context():
+            try:
+                run_job(
+                    "fanout_notifications",
+                    fanout_notifications_task,
+                    notification_entries,
+                    request_id=request_id,
+                    queue_name="notifications",
+                    payload={"recipient_count": len(notification_entries or []), "request_id": request_id},
+                )
+            except Exception:
+                _current.logger.exception("Notification fan-out failed")
+
+    Thread(target=_send, daemon=True).start()
 
 
 def _get_latest_department_template(department_code: str):
@@ -59,14 +110,110 @@ def _get_latest_department_template(department_code: str):
 
 
 def users_in_department(dept: str):
-    return User.query.filter_by(department=dept, is_active=True).all()
+    normalized = (dept or "").strip().upper()
+    if not normalized:
+        return []
+    assignment_candidates = (
+        User.query.options(joinedload(User.departments))
+        .outerjoin(
+            UserDepartment,
+            and_(UserDepartment.user_id == User.id, UserDepartment.department == normalized),
+        )
+        .filter(User.is_active.is_(True))
+        .filter(
+            or_(
+                User.department == normalized,
+                UserDepartment.id.isnot(None),
+            )
+        )
+        .order_by(User.email.asc())
+        .all()
+    )
+    routed_candidates = (
+        User.query.options(joinedload(User.departments))
+        .filter(User.is_active.is_(True))
+        .filter(User.notification_departments_json.like(f'%"{normalized}"%'))
+        .order_by(User.email.asc())
+        .all()
+    )
+    candidates = list(assignment_candidates) + list(routed_candidates)
+    recipients = []
+    seen = set()
+    for user in candidates:
+        primary_match = (getattr(user, "department", "") or "").strip().upper() == normalized
+        routed_match = normalized in (getattr(user, "notification_departments", []) or [])
+        assignment_match = any(
+            (getattr(assignment, "department", "") or "").strip().upper() == normalized
+            and getattr(assignment, "is_active_assignment", True)
+            for assignment in (getattr(user, "departments", []) or [])
+        )
+        if not (primary_match or routed_match or assignment_match):
+            continue
+        if getattr(user, "id", None) in seen:
+            continue
+        seen.add(user.id)
+        recipients.append(user)
+    return recipients
 
 
-def _send_emails_async(recipients_map, subject, body, html=None, request_id=None):
+def _notification_recipients(users, title, body=None):
+    recipients = []
+    seen = set()
+    for user in users or []:
+        if not user or not getattr(user, "id", None) or not getattr(user, "is_active", True):
+            continue
+        if user.id not in seen:
+            recipients.append(
+                {
+                    "user": user,
+                    "subject": title,
+                    "body": body,
+                    "is_backup": False,
+                    "source_user": user,
+                }
+            )
+            seen.add(user.id)
+
+    for entry in list(recipients):
+        user = entry["user"]
+        backup = getattr(user, "backup_approver", None)
+        if not backup or not getattr(backup, "id", None):
+            continue
+        if not getattr(backup, "is_active", True) or backup.id == user.id or backup.id in seen:
+            continue
+        source_label = getattr(user, "name", None) or getattr(user, "email", None) or "this teammate"
+        prefix = f"You received this as backup approver for {source_label}."
+        backup_body = prefix if not body else f"{prefix}\n\n{body}"
+        recipients.append(
+            {
+                "user": backup,
+                "subject": f"{title} — backup coverage",
+                "body": backup_body,
+                "is_backup": True,
+                "source_user": user,
+            }
+        )
+        seen.add(backup.id)
+
+    return recipients
+
+
+def _send_emails_async(recipients_map, subject=None, body=None, html=None, request_id=None):
     """Send emails in background.
 
-    recipients_map: dict mapping email -> user_id (or None)
+    recipients_map: dict mapping email -> user_id (legacy) or payload dict
     """
+    if recipients_map and all(not isinstance(v, dict) for v in recipients_map.values()):
+        recipients_map = {
+            email: {
+                "user_id": user_id,
+                "subject": subject,
+                "body": body,
+                "html": html,
+            }
+            for email, user_id in recipients_map.items()
+        }
+
     from flask import current_app as _current
 
     try:
@@ -116,11 +263,19 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
         with app.app_context():
             def _deliver_email_job():
                 svc = EmailService()
-                emails = list(recipients_map.keys())
-                res = svc.send_email(emails, subject, body, html=html)
+                skipped = []
+                error = None
 
-                skipped = res.get("skipped") or []
-                error = res.get("error")
+                for email, payload in recipients_map.items():
+                    res = svc.send_email(
+                        [email],
+                        payload.get("subject") or subject,
+                        payload.get("body") or body,
+                        html=payload.get("html") if isinstance(payload, dict) else html,
+                    )
+                    skipped.extend(res.get("skipped") or [])
+                    if res.get("error"):
+                        error = res.get("error")
 
                 # Persist notification rows about skipped or failed deliveries
                 # using a fresh SQLAlchemy session to avoid interfering with the
@@ -134,7 +289,8 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
                         session = Session()
                         try:
                             for e in skipped:
-                                uid = recipients_map.get(e)
+                                payload = recipients_map.get(e) or {}
+                                uid = payload.get("user_id") if isinstance(payload, dict) else payload
                                 if uid:
                                     session.add(
                                         Notification(
@@ -150,7 +306,8 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
                                     )
 
                             if error:
-                                for e, uid in recipients_map.items():
+                                for e, payload in recipients_map.items():
+                                    uid = payload.get("user_id") if isinstance(payload, dict) else payload
                                     if uid:
                                         session.add(
                                             Notification(
@@ -178,7 +335,7 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
                             pass
 
                 return {
-                    "recipients": emails,
+                    "recipients": list(recipients_map.keys()),
                     "skipped": skipped,
                     "error": error,
                 }
@@ -191,7 +348,14 @@ def _send_emails_async(recipients_map, subject, body, html=None, request_id=None
                     payload={
                         "request_id": request_id,
                         "recipient_count": len(recipients_map or {}),
-                        "subject": subject,
+                        "subject": subject or next(
+                            (
+                                payload.get("subject")
+                                for payload in (recipients_map or {}).values()
+                                if isinstance(payload, dict) and payload.get("subject")
+                            ),
+                            None,
+                        ),
                     },
                 )
             except Exception:
@@ -222,21 +386,78 @@ def notify_users(
     except Exception:
         email_enabled = False
 
-    for u in users:
-        has_email = bool(getattr(u, "email", None))
-        if email_enabled and has_email and allow_email:
-            # collect for email send but do not create DB Notification row
-            recipients_map[u.email] = u.id
+    recipients = _notification_recipients(users, title, body)
+    notification_entries = []
+
+    try:
+        fanout_threshold = int(current_app.config.get("NOTIFICATION_FANOUT_ASYNC_THRESHOLD", 50) or 50)
+    except Exception:
+        fanout_threshold = 50
+
+    for entry in recipients:
+        u = entry["user"]
+        resolved_title = entry["subject"]
+        resolved_body = entry["body"]
+
+        # apply optional department-specific template if configured.  Templates
+        # are simple Jinja2 strings and are evaluated with the current user,
+        # source_user, title and body in the context.  Errors during template
+        # rendering are logged but do not interrupt notification delivery.
+        templ = None
+        if getattr(u, "department_obj", None):
+            templ = getattr(u.department_obj, "notification_template", None)
+        if templ:
+            try:
+                from jinja2 import Template
+
+                rendered = Template(templ).render(
+                    title=resolved_title,
+                    body=resolved_body or "",
+                    user=u,
+                    source_user=entry.get("source_user"),
+                )
+                # rendered text becomes the body; subject remains unchanged
+                resolved_body = rendered
+            except Exception:
+                current_app.logger.exception(
+                    "failed to render notification template for dept %s",
+                    getattr(u.department_obj, "code", None),
+                )
+
+        notification_entries.append(
+            {
+                "user_id": u.id,
+                "email": getattr(u, "email", None),
+                "title": resolved_title,
+                "body": (resolved_body or "") + ("\n\n" + url if url else "") if email_enabled and getattr(u, "email", None) and allow_email else resolved_body,
+                "url": url,
+                "type": ntype,
+                "allow_email": allow_email,
+            }
+        )
+
+    if fanout_threshold > 0 and len(notification_entries) >= fanout_threshold:
+        _send_notification_fanout_async(notification_entries, request_id=request_id)
+        return
+
+    for entry in notification_entries:
+        has_email = bool(entry.get("email"))
+        if email_enabled and has_email and entry.get("allow_email", True):
+            recipients_map[entry["email"]] = {
+                "user_id": entry["user_id"],
+                "subject": entry["title"],
+                "body": entry["body"],
+                "html": None,
+            }
         else:
-            # fallback: persist in-app notification
             db.session.add(
                 Notification(
-                    user_id=u.id,
+                    user_id=entry["user_id"],
                     request_id=request_id,
-                    type=ntype,
-                    title=title,
-                    body=body,
-                    url=url,
+                    type=entry["type"],
+                    title=entry["title"],
+                    body=entry["body"],
+                    url=entry["url"],
                 )
             )
 
@@ -254,10 +475,11 @@ def notify_users(
     # do not exceed the configured cap. We perform deletions within the same
     # session so the caller's commit will persist the removals.
     try:
-        for u in users:
+        for entry in notification_entries:
+            u = type("NotificationUser", (), {"id": entry["user_id"], "email": entry.get("email")})
             # only enforce for users that will have DB rows (email-disabled or no email)
             has_email = bool(getattr(u, "email", None))
-            if email_enabled and has_email:
+            if email_enabled and has_email and entry.get("allow_email", True):
                 continue
             count = Notification.query.filter_by(user_id=u.id).count()
             if count > max_per_user:
@@ -281,11 +503,12 @@ def notify_users(
 
     # Fire-and-forget email notifications (non-blocking). Email sending is optional/config-driven
     if recipients_map:
-        subject = title
-        text_body = (body or "") + ("\n\n" + url if url else "")
-        html_body = None
         _send_emails_async(
-            recipients_map, subject, text_body, html=html_body, request_id=request_id
+            recipients_map,
+            subject=title,
+            body=(body or "") + ("\n\n" + url if url else ""),
+            html=None,
+            request_id=request_id,
         )
 
     # ✅ do NOT commit here; commit happens in the route after all writes

@@ -108,7 +108,7 @@
 {% if (q or status_filter or priority_filter or sla_filter or approval_only) and results is not none %}
   <section class="surface-panel section-intro">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <div class="mb-0 text-muted">Showing {{ results|length }} result{{ '' if results|length == 1 else 's' }}{% if q %} for "{{ q }}"{% endif %}</div>
+      <div class="mb-0 text-muted">Showing {{ results|length }} result{{ '' if results|length == 1 else 's' }}{% if q %} for "<span class="nowrap">{{ q }}</span>"{% endif %}</div>
       <div class="search-filter-summary">
         {% if status_filter %}<span class="search-filter-summary__chip">Status · {{ status_filter }}</span>{% endif %}
         {% if priority_filter %}<span class="search-filter-summary__chip">Priority · {{ priority_filter.title() }}</span>{% endif %}

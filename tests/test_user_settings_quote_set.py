@@ -51,7 +51,8 @@ def test_user_can_select_quote_set(app, client):
     assert rv.status_code == 200
     assert b"First, solve the problem." in rv.data
 
-    # if we clear the preference, dashboard should fall back to default quotes
+    # if we clear the preference, dashboard should fall back to the
+    # motivational site default rather than the legacy laundry-heavy set
     rv = client.post(
         "/auth/settings",
         data={"quote_set": ""},
@@ -60,8 +61,7 @@ def test_user_can_select_quote_set(app, client):
     assert rv.status_code == 200
     rv = client.get("/dashboard")
     assert rv.status_code == 200
-    # default set includes "Sort today" phrase
-    assert b"Sort today: socks first" in rv.data
+    assert b"Progress, not perfection." in rv.data
 
     # now disable quotes entirely and verify dashboard hides them
     rv = client.post(

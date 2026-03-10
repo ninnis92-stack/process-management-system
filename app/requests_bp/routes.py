@@ -70,12 +70,17 @@ from ..notifcations import notify_users, users_in_department
 from .. import notifcations as notifications_module
 from ..services.ticketing import TicketingClient
 from ..services.verification import VerificationService
-from ..services.integrations import emit_webhook_event, serialize_request
+from ..services.integrations import (
+    build_handoff_bundle_payload,
+    emit_webhook_event,
+    serialize_request,
+)
 from ..services.process_metrics import (
     build_process_metrics_summary,
     record_process_metric_event,
 )
 from ..services.tenant_context import tenant_role_for_user
+from ..utils.user_context import get_user_departments
 from .permissions import (
     allowed_comment_scopes_for_user,
     can_view_request,
@@ -136,6 +141,35 @@ def _user_is_dept_head(user, dept: str) -> bool:
         except Exception:
             pass
         return False
+
+
+def _watched_department_links_for_user(user) -> list[dict]:
+    try:
+        if not user or not getattr(user, "is_authenticated", False):
+            return []
+        allowed = set(get_user_departments(user))
+        current = (getattr(user, "department", None) or "").strip().upper()
+        labels = {"A": "Dept A", "B": "Dept B", "C": "Dept C"}
+        links = []
+        for dept in getattr(user, "watched_departments", []) or []:
+            code = (dept or "").strip().upper()
+            if not code or code not in allowed or code == current:
+                continue
+            links.append(
+                {
+                    "department": code,
+                    "title": labels.get(code, f"Dept {code}"),
+                    "meta": "Quick access queue",
+                    "href": url_for("requests.department_dashboard", dept=code),
+                }
+            )
+        return links
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return []
 
 
 def _require_metrics_access(user) -> list[str]:
@@ -755,6 +789,7 @@ def dashboard():
 
     artifact_form = ArtifactForm()
     saved_views = _saved_views_for_current_user()
+    watched_department_links = _watched_department_links_for_user(current_user)
 
     # expose an assignment picker for dept heads in the bucket UI
     can_bulk_assign = _user_is_dept_head(current_user, dept)
@@ -866,6 +901,7 @@ def dashboard():
                 now=datetime.utcnow(),
                 artifact_form=artifact_form,
                 saved_views=saved_views,
+                watched_department_links=watched_department_links,
                 approval_cards=[],
             )
 
@@ -881,6 +917,7 @@ def dashboard():
             now=datetime.utcnow(),
             artifact_form=artifact_form,
             saved_views=saved_views,
+            watched_department_links=watched_department_links,
             approval_cards=[],
         )
 
@@ -927,6 +964,7 @@ def dashboard():
                 now=datetime.utcnow(),
                 artifact_form=artifact_form,
                 saved_views=saved_views,
+                watched_department_links=watched_department_links,
                 approval_cards=_approval_dashboard_cards(current_user, items),
             )
 
@@ -1265,6 +1303,7 @@ def dashboard():
             assignment_form=assignment_form,
             can_bulk_assign=can_bulk_assign,
             saved_views=saved_views,
+            watched_department_links=watched_department_links,
             approval_cards=_approval_dashboard_cards(
                 current_user,
                 [req for bucket_items in buckets.values() for req in bucket_items],
@@ -1297,6 +1336,7 @@ def dashboard():
                 assignment_form=assignment_form,
                 can_bulk_assign=can_bulk_assign,
                 saved_views=saved_views,
+                watched_department_links=watched_department_links,
                 approval_cards=_approval_dashboard_cards(current_user, items),
             )
 
@@ -1317,6 +1357,7 @@ def dashboard():
             assignment_form=assignment_form,
             can_bulk_assign=can_bulk_assign,
             saved_views=saved_views,
+            watched_department_links=watched_department_links,
             approval_cards=_approval_dashboard_cards(current_user, pending),
         )
 
@@ -3636,6 +3677,53 @@ def do_transition(request_id: int):
                     ntype="handoff",
                     request_id=req.id,
                 )
+                try:
+                    from ..models import IntegrationConfig
+
+                    configs = IntegrationConfig.query.filter_by(
+                        department=to_dept,
+                        enabled=True,
+                    ).all()
+                    bundle_payload = build_handoff_bundle_payload(req, sub)
+                    tc = TicketingClient()
+                    for cfg in configs:
+                        try:
+                            cfg_data = json.loads(cfg.config) if cfg.config else {}
+                        except Exception:
+                            cfg_data = {}
+                        bundle_options = cfg_data.get("handoff_bundle") or {}
+                        if not bundle_options.get("enabled"):
+                            continue
+
+                        payload = dict(bundle_payload)
+                        if not bundle_options.get("include_submission", True):
+                            payload.pop("submission", None)
+                        if not bundle_options.get("include_attachments", True):
+                            payload["attachments"] = []
+
+                        if cfg.kind == "ticketing" and bundle_options.get("create_ticket", True):
+                            tc.create_ticket(
+                                f"Handoff bundle for Request #{req.id}",
+                                json.dumps(payload, default=str, indent=2),
+                                metadata={"request_id": req.id, "dept": to_dept, **cfg_data},
+                            )
+                        elif cfg.kind == "webhook":
+                            target_url = cfg_data.get("url") or (cfg_data.get("endpoints") or {}).get("url")
+                            if not target_url:
+                                continue
+                            requests = __import__("requests")
+                            headers = {"Content-Type": "application/json"}
+                            if cfg_data.get("token"):
+                                headers["Authorization"] = f"Bearer {cfg_data.get('token')}"
+                            payload["event"] = bundle_options.get("event_name") or "handoff_bundle"
+                            requests.post(
+                                target_url,
+                                json=payload,
+                                headers=headers,
+                                timeout=5,
+                            )
+                except Exception:
+                    current_app.logger.exception("Failed to emit handoff bundle integration payload")
 
         req.status = to_status
         req.owner_department = resolved_target_owner

@@ -1,54 +1,122 @@
 {% extends "base.html" %}
 {% block content %}
-<h3 class="mb-3">Create / Update User</h3>
-<a class="btn btn-sm btn-outline-secondary admin-back-btn mb-2" href="{{ url_for('admin.index') }}">← Admin dashboard</a>
-<form method="post" class="card p-3" style="max-width: 720px;">
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Administration</div>
+    <h3 class="page-header__title mb-0">{{ 'Edit user' if edit else 'Create user' }}</h3>
+    <p class="page-header__lede mb-0">Set access, landing behavior, reminders, and cross-department visibility without forcing users to configure everything themselves.</p>
+  </div>
+  <div class="page-header__actions">
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_users') }}">Back to users</a>
+  </div>
+</section>
+
+<form method="post" class="surface-panel">
   {{ form.hidden_tag() }}
-  <div class="mb-3">
-    <label class="form-label">Email</label>
-    {{ form.email(class="form-control") }}
+  <div class="row g-3">
+    <div class="col-12 col-md-6">
+      <label class="form-label">Email</label>
+      {{ form.email(class="form-control") }}
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Display name</label>
+      {{ form.name(class="form-control") }}
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Password {% if edit %}(leave blank to keep current){% endif %}</label>
+      {{ form.password(class="form-control") }}
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">Role</label>
+      {{ form.role(class="form-select") }}
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">Primary department</label>
+      {{ form.department(class="form-select") }}
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Workflow role profile</label>
+      {{ form.workflow_role_profile(class="form-select") }}
+      <div class="form-text">Profiles automatically manage per-department editor permissions for assigned departments.</div>
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">Daily reminder limit</label>
+      {{ form.daily_nudge_limit(class="form-control", min="1", max="5") }}
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">Quote interval</label>
+      {{ form.quote_interval(class="form-select") }}
+    </div>
   </div>
-  <div class="mb-3">
-    <label class="form-label">Display name</label>
-    {{ form.name(class="form-control") }}
+
+  <hr class="my-4">
+
+  <div class="row g-3">
+    <div class="col-12">
+      <h5 class="mb-1">Workflow landing</h5>
+      <p class="text-muted mb-0">Choose where this person lands after sign-in so shared staff arrive in the right queue faster.</p>
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Preferred start page</label>
+      {{ form.preferred_start_page(class="form-select") }}
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Preferred start department</label>
+      {{ form.preferred_start_department(class="form-select") }}
+      <div class="form-text">Users with extra department access can land directly in that queue.</div>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Quick-access departments</label>
+      {{ form.watched_departments(class="form-select", multiple=true, size=3) }}
+      <div class="form-text">These departments appear as dashboard shortcuts when the user is allowed to access them.</div>
+    </div>
   </div>
-  <div class="mb-3">
-    <label class="form-label">Password (leave blank to keep current)</label>
-    {{ form.password(class="form-control") }}
+
+  <hr class="my-4">
+
+  <div class="row g-3">
+    <div class="col-12">
+      <h5 class="mb-1">Experience & notifications</h5>
+      <p class="text-muted mb-0">Keep personal UI preferences and reminder behavior aligned with the team’s workflow needs.</p>
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Quote set</label>
+      {{ form.quote_set(class="form-select") }}
+      <div class="form-text">Assign a user-specific quote set or leave it on the site default.</div>
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Backup approver</label>
+      {{ form.backup_approver_user_id(class="form-select") }}
+      <div class="form-text">Mirrors this user's alerts to a teammate during coverage periods without changing core permissions.</div>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Notification routing departments</label>
+      {{ form.notification_departments(class="form-select", multiple=true, size=3) }}
+      <div class="form-text">Send this user extra queue notifications for the selected departments, even when they are not the primary owner.</div>
+    </div>
+    <div class="col-12 d-flex flex-column gap-2">
+      <div class="form-check">
+        {{ form.department_override(class="form-check-input") }}
+        <label class="form-check-label ms-2">{{ form.department_override.label.text }}</label>
+      </div>
+      <div class="form-check">
+        {{ form.quotes_enabled(class="form-check-input") }}
+        <label class="form-check-label ms-2">Enable rotating quotes</label>
+      </div>
+      <div class="form-check">
+        {{ form.is_active(class="form-check-input") }}
+        <label class="form-check-label ms-2">Active</label>
+      </div>
+      <div class="form-check">
+        {{ form.is_admin(class="form-check-input") }}
+        <label class="form-check-label ms-2">Admin</label>
+      </div>
+    </div>
   </div>
-  <div class="mb-3">
-    <label class="form-label">Role</label>
-    {{ form.role(class="form-select") }}
+
+  <div class="d-flex flex-wrap gap-2 mt-4 justify-content-end">
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_users') }}">Cancel</a>
+    <button class="btn btn-primary">{{ 'Save changes' if edit else 'Create user' }}</button>
   </div>
-  <div class="mb-3">
-    <label class="form-label">Department</label>
-    {{ form.department(class="form-select") }}
-    <div class="form-text">Admins can reassign the primary department here, or let SSO refresh it on login when department sync is enabled.</div>
-  </div>
-  <div class="form-check mb-3">
-    {{ form.department_override(class="form-check-input") }}
-    <label class="form-check-label ms-2">{{ form.department_override.label.text }}</label>
-    <div class="form-text">Turn this on when admins should keep reassigning the primary department manually. Leave it off when the configured SSO department claim should drive updates instead.</div>
-  </div>
-  <div class="form-check mb-3">
-    {{ form.is_active(class="form-check-input") }}
-    <label class="form-check-label ms-2">Active</label>
-  </div>
-  <div class="form-check mb-3">
-    {{ form.is_admin(class="form-check-input") }}
-    <label class="form-check-label ms-2">Admin</label>
-    <div class="form-text">Admins can always be allocated manually in the app, regardless of SSO admin sync.</div>
-  </div>
-  <div class="mb-3">
-    <label class="form-label">Quote set</label>
-    {{ form.quote_set(class="form-select") }}
-    <div class="form-text">Assign a user-specific quote set or leave it on the site default.</div>
-  </div>
-  <div class="form-check mb-3">
-    {{ form.quotes_enabled(class="form-check-input") }}
-    <label class="form-check-label ms-2">Enable rotating quotes</label>
-    <div class="form-text">Turn this off to hide rotating quotes for this user on signed-in pages.</div>
-  </div>
-  <button class="btn btn-primary">Create / Update</button>
 </form>
 {% endblock %}

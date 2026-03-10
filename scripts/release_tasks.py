@@ -35,11 +35,11 @@ def _ensure_quote_sets_ready():
         cfg._rolling_quote_sets = json.dumps(normalized_sets)
         print("quote_sets=normalized")
 
-    active = getattr(cfg, "active_quote_set", None) or "default"
-    if active not in normalized_sets:
-        active = "default"
+    active = str(getattr(cfg, "active_quote_set", None) or "").strip().lower() or "motivational"
+    if active not in normalized_sets or active == "default":
+        active = "motivational" if "motivational" in normalized_sets else "default"
         cfg.active_quote_set = active
-        print("quote_sets=active_reset_to_default")
+        print("quote_sets=active_reset_to_motivational")
 
     missing = [name for name, quotes in normalized_sets.items() if not quotes]
     if missing:
@@ -186,6 +186,125 @@ def main():
                             )
                         )
                     print("schema_fix=user.daily_nudge_limit_added")
+                if "preferred_start_page" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN preferred_start_page VARCHAR(40) DEFAULT 'dashboard'"
+                            )
+                        )
+                    print("schema_fix=user.preferred_start_page_added")
+                if "preferred_start_department" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN preferred_start_department VARCHAR(2)"
+                            )
+                        )
+                    print("schema_fix=user.preferred_start_department_added")
+                if "watched_departments_json" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN watched_departments_json TEXT"
+                            )
+                        )
+                    print("schema_fix=user.watched_departments_json_added")
+                if "workflow_role_profile" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN workflow_role_profile VARCHAR(40) DEFAULT 'member'"
+                            )
+                        )
+                    print("schema_fix=user.workflow_role_profile_added")
+                if "notification_departments_json" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN notification_departments_json TEXT"
+                            )
+                        )
+                    print("schema_fix=user.notification_departments_json_added")
+                if "backup_approver_user_id" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN backup_approver_user_id INTEGER"
+                            )
+                        )
+                    print("schema_fix=user.backup_approver_user_id_added")
+
+                # departments also need notification_template support
+                if "department" in insp.get_table_names():
+                    dept_cols = {c["name"] for c in insp.get_columns("department")}
+                    if "notification_template" not in dept_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE \"department\" ADD COLUMN notification_template TEXT"
+                                )
+                            )
+                        print("schema_fix=department.notification_template_added")
+                    if "handoff_template_doc_url" not in dept_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE \"department\" ADD COLUMN handoff_template_doc_url VARCHAR(500)"
+                                )
+                            )
+                        print("schema_fix=department.handoff_template_doc_url_added")
+                    if "handoff_template_checklist_json" not in dept_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE \"department\" ADD COLUMN handoff_template_checklist_json TEXT"
+                                )
+                            )
+                        print("schema_fix=department.handoff_template_checklist_json_added")
+
+                if "user_department" in insp.get_table_names():
+                    ud_cols = {c["name"] for c in insp.get_columns("user_department")}
+                    if "assignment_kind" not in ud_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE user_department ADD COLUMN assignment_kind VARCHAR(20) NOT NULL DEFAULT 'shared'"
+                                )
+                            )
+                        print("schema_fix=user_department.assignment_kind_added")
+                    if "note" not in ud_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE user_department ADD COLUMN note VARCHAR(255)"
+                                )
+                            )
+                        print("schema_fix=user_department.note_added")
+                    if "expires_at" not in ud_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE user_department ADD COLUMN expires_at TIMESTAMP"
+                                )
+                            )
+                        print("schema_fix=user_department.expires_at_added")
+                    if "handoff_doc_url" not in ud_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE user_department ADD COLUMN handoff_doc_url VARCHAR(500)"
+                                )
+                            )
+                        print("schema_fix=user_department.handoff_doc_url_added")
+                    if "handoff_checklist_json" not in ud_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE user_department ADD COLUMN handoff_checklist_json TEXT"
+                                )
+                            )
+                        print("schema_fix=user_department.handoff_checklist_json_added")
 
                 special_cols = (
                     {c["name"] for c in insp.get_columns("special_email_config")}
@@ -203,6 +322,14 @@ def main():
                                 )
                             )
                         print("schema_fix=department_editor.can_change_priority_added")
+                    if "managed_by_profile" not in dept_cols:
+                        with engine.begin() as conn:
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE department_editor ADD COLUMN managed_by_profile BOOLEAN NOT NULL DEFAULT FALSE"
+                                )
+                            )
+                        print("schema_fix=department_editor.managed_by_profile_added")
                 # ensure status_option stores nudge level
                 if "status_option" in insp.get_table_names():
                     so_cols = {c["name"] for c in insp.get_columns("status_option")}

@@ -5,6 +5,7 @@ from wtforms import (
     StringField,
     PasswordField,
     SelectField,
+    SelectMultipleField,
     BooleanField,
     SubmitField,
     TextAreaField,
@@ -53,6 +54,49 @@ class AdminCreateUserForm(FlaskForm):
     quotes_enabled = BooleanField("Enable rotating quotes", default=True)
     quote_interval = SelectField(
         "Quote rotation interval", coerce=int, choices=[], validators=[Optional()]
+    )
+    workflow_role_profile = SelectField(
+        "Workflow role profile",
+        choices=[
+            ("member", "Member"),
+            ("coordinator", "Coordinator"),
+            ("metrics_lead", "Metrics Lead"),
+            ("queue_lead", "Queue Lead"),
+        ],
+        default="member",
+        validators=[Optional()],
+    )
+    preferred_start_page = SelectField(
+        "Preferred start page",
+        choices=[
+            ("dashboard", "Dashboard"),
+            ("search", "Search"),
+            ("metrics", "Metrics"),
+            ("admin_monitor", "Admin monitor"),
+        ],
+        default="dashboard",
+        validators=[Optional()],
+    )
+    preferred_start_department = SelectField(
+        "Preferred start department",
+        choices=[],
+        validators=[Optional()],
+    )
+    watched_departments = SelectMultipleField(
+        "Quick-access departments",
+        choices=[],
+        validators=[Optional()],
+    )
+    notification_departments = SelectMultipleField(
+        "Notification routing departments",
+        choices=[],
+        validators=[Optional()],
+    )
+    backup_approver_user_id = SelectField(
+        "Backup approver",
+        coerce=int,
+        choices=[],
+        validators=[Optional()],
     )
     submit = SubmitField("Create / Update User")
 
@@ -186,6 +230,20 @@ class DepartmentForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired(), Length(max=200)])
     order = IntegerField("Order", default=0, validators=[Optional()])
     active = BooleanField("Active", default=True)
+    notification_template = TextAreaField(
+        "Notification template",
+        description="Optional Jinja2 template applied to notifications sent to users in this department. ``{{ body }}`` and ``{{ title }}`` are available.",
+        validators=[Optional()],
+    )
+    handoff_template_doc_url = StringField(
+        "Default handoff doc link",
+        validators=[Optional(), Length(max=500)],
+    )
+    handoff_template_checklist = TextAreaField(
+        "Default handoff checklist",
+        description="Optional defaults for temporary handoffs in this department. Enter one step per line.",
+        validators=[Optional()],
+    )
     submit = SubmitField("Save Department")
 
 

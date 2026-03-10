@@ -1,26 +1,79 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <div class="container" style="max-width:600px;margin-top:24px;">
-    <h3>Manage Departments for {{ user.email }}</h3>
-    <p>Primary department: <strong>{{ user.department }}</strong></p>
-    <form method="post">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="mb-3">
-        <label class="form-label">Assigned departments</label>
-        <div>
-          {% for d in choices %}
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="checkbox" id="dept_{{ d }}" name="departments" value="{{ d }}" {% if d in assigned %}checked{% endif %} {% if d == user.department %}disabled{% endif %}>
-              <label class="form-check-label" for="dept_{{ d }}">{{ d }} {% if d == user.department %}(primary){% endif %}</label>
+  <section class="page-header">
+    <div>
+      <div class="page-header__eyebrow">Administration</div>
+      <h3 class="page-header__title mb-0">Department assignments</h3>
+      <p class="page-header__lede mb-0">Manage permanent access, temporary loans, and shared queue coverage for {{ user.email }}.</p>
+    </div>
+    <div class="page-header__actions">
+      <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_users') }}">Back to users</a>
+    </div>
+  </section>
+
+  <section class="surface-panel mb-3">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <span class="badge rounded-pill text-bg-primary">Primary department: {{ user.department }}</span>
+      <span class="text-muted small">Temporary loans can be given an end date so shared staffing unwinds automatically.</span>
+    </div>
+  </section>
+
+  <form method="post" class="surface-panel">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row g-3">
+      {% for d in choices %}
+        {% set row = assigned_rows.get(d) %}
+        <div class="col-12 col-lg-4">
+          <div class="border rounded-4 p-3 h-100 bg-body-tertiary">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="dept_{{ d }}" name="departments" value="{{ d }}" {% if d in assigned or d == user.department %}checked{% endif %} {% if d == user.department %}disabled{% endif %}>
+              <label class="form-check-label fw-semibold" for="dept_{{ d }}">
+                {{ department_meta.get(d).label if department_meta.get(d) else ('Dept ' ~ d) }}{% if department_meta.get(d) and department_meta.get(d).label != d %} <span class="text-muted">({{ d }})</span>{% endif %} {% if d == user.department %}<span class="text-muted">(primary)</span>{% endif %}
+              </label>
             </div>
-          {% endfor %}
+            {% if d != user.department %}
+              {% if overlap_map and overlap_map.get(d) %}
+                <div class="alert alert-warning py-2 px-3 small mb-2">
+                  Overlaps with
+                  {% for conflict in overlap_map.get(d) %}
+                    Dept {{ conflict.department }}{% if conflict.expires_at %} until {{ conflict.expires_at.strftime('%b %d %H:%M') }}{% endif %}{% if not loop.last %}, {% endif %}
+                  {% endfor %}
+                </div>
+              {% endif %}
+              <div class="mb-2">
+                <label class="form-label small">Assignment type</label>
+                <select class="form-select form-select-sm" name="assignment_kind_{{ d }}">
+                  <option value="shared" {% if not row or row.assignment_kind == 'shared' %}selected{% endif %}>Shared / ongoing</option>
+                  <option value="temporary" {% if row and row.assignment_kind == 'temporary' %}selected{% endif %}>Temporary loan</option>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small">Ends at</label>
+                <input class="form-control form-control-sm" type="datetime-local" name="assignment_expires_at_{{ d }}" value="{{ row.expires_at.strftime('%Y-%m-%dT%H:%M') if row and row.expires_at else '' }}">
+              </div>
+              <div>
+                <label class="form-label small">Notes</label>
+                <input class="form-control form-control-sm" type="text" maxlength="255" name="assignment_note_{{ d }}" value="{{ row.note if row else '' }}" placeholder="Coverage reason, project, backup owner...">
+              </div>
+              <div class="mt-2">
+                <label class="form-label small">Handoff doc link</label>
+                <input class="form-control form-control-sm" type="url" maxlength="500" name="assignment_handoff_doc_url_{{ d }}" value="{{ row.handoff_doc_url if row and row.handoff_doc_url else (department_meta.get(d).handoff_template_doc_url if department_meta.get(d) else '') }}" placeholder="https://...">
+              </div>
+              <div class="mt-2">
+                <label class="form-label small">Handoff checklist</label>
+                <textarea class="form-control form-control-sm" name="assignment_handoff_checklist_{{ d }}" rows="3" placeholder="One handoff step per line">{{ '\n'.join(row.handoff_checklist) if row and row.handoff_checklist else ('\n'.join(department_meta.get(d).handoff_template_checklist) if department_meta.get(d) else '') }}</textarea>
+              </div>
+            {% else %}
+              <div class="small text-muted">This stays available automatically and does not need an end date.</div>
+            {% endif %}
+          </div>
         </div>
-      </div>
-      <div class="text-end">
-        <a class="btn btn-link" href="{{ url_for('admin.list_users') }}">Back</a>
-        <button class="btn btn-primary" type="submit">Save</button>
-      </div>
-    </form>
-  </div>
+      {% endfor %}
+    </div>
+    <div class="d-flex flex-wrap gap-2 justify-content-end mt-4">
+      <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_users') }}">Cancel</a>
+      <button class="btn btn-primary" type="submit">Save assignments</button>
+    </div>
+  </form>
 {% endblock %}

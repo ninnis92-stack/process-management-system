@@ -99,6 +99,8 @@ def _sync_current_user_preferences(user):
         current_user.vibe_index = getattr(user, "vibe_index", None)
         current_user.quote_set = getattr(user, "quote_set", None)
         current_user.quote_interval = getattr(user, "quote_interval", None)
+        current_user.preferred_start_page = getattr(user, "preferred_start_page", "dashboard")
+        current_user.preferred_start_department = getattr(user, "preferred_start_department", None)
     except Exception:
         pass
 
@@ -115,9 +117,60 @@ def _safe_login_redirect_target():
 
 
 def _authenticated_user_home_url(user):
+    if not user:
+        return url_for("requests.dashboard")
+
+    preferred_page = str(getattr(user, "preferred_start_page", "dashboard") or "dashboard").strip().lower() or "dashboard"
+    preferred_dept = str(getattr(user, "preferred_start_department", "") or "").strip().upper()
+    allowed_depts = set(get_user_departments(user))
+    if preferred_dept and preferred_dept in allowed_depts:
+        _session["active_dept"] = preferred_dept
+
     if getattr(user, "is_admin", False):
+        if preferred_page == "admin_monitor":
+            return url_for("admin.monitor", dept=preferred_dept or getattr(user, "department", "B") or "B")
+        if preferred_page == "metrics":
+            return url_for("admin.metrics_config")
+        if preferred_page == "search":
+            return url_for("requests.search_requests")
+        if preferred_dept:
+            return url_for("requests.dashboard", as_dept=preferred_dept)
         return url_for("admin.index")
+
+    if preferred_page == "search":
+        return url_for("requests.search_requests")
+    if preferred_page == "metrics":
+        try:
+            from ..utils.user_context import can_view_metrics_for_user
+
+            if can_view_metrics_for_user(user):
+                return url_for("requests.metrics_ui")
+        except Exception:
+            pass
+    if preferred_dept and preferred_dept in allowed_depts:
+        return url_for("requests.department_dashboard", dept=preferred_dept)
     return url_for("requests.dashboard")
+
+
+def _restore_user_department_context(user):
+    """Restore a useful active department for the current session.
+
+    Prefer the admin-managed start department when it is still valid; fall back
+    to the last active department, then the first allowed department.
+    """
+    try:
+        depts = _get_user_departments(user)
+        preferred = (getattr(user, "preferred_start_department", None) or "").strip().upper()
+        if preferred and preferred in depts:
+            _session["active_dept"] = preferred
+            return
+        if getattr(user, "last_active_dept", None):
+            _restore_last_active_dept_for_user(user)
+            if _session.get("active_dept"):
+                return
+        _session["active_dept"] = depts[0] if depts else getattr(user, "department", None)
+    except Exception:
+        pass
 
 
 VIBE_PALETTE_CHOICES = [
@@ -377,20 +430,15 @@ def sso_callback():
         next_url = request.args.get('next') or request.form.get('next')
         if next_url and next_url.startswith('/') and not next_url.startswith('//'):
             return redirect(next_url)
-        return redirect(url_for("admin.index"))
+        return redirect(_authenticated_user_home_url(user))
     try:
         depts = _get_user_departments(user)
         if len(depts) > 1:
             return redirect(url_for("auth.choose_dept"))
-        if getattr(user, "last_active_dept", None):
-            _restore_last_active_dept_for_user(user)
-        else:
-            _session["active_dept"] = (
-                depts[0] if depts else getattr(user, "department", None)
-            )
+        _restore_user_department_context(user)
     except Exception:
         pass
-    return redirect(url_for("requests.dashboard"))
+    return redirect(_authenticated_user_home_url(user))
 
 
 @auth_bp.route("/choose_dept", methods=["GET"])
@@ -674,7 +722,7 @@ def login():
                 next_url = _safe_login_redirect_target()
                 if next_url:
                     return redirect(next_url)
-                return redirect(url_for("admin.index"))
+                return redirect(_authenticated_user_home_url(user))
         except Exception:
             try:
                 current_app.logger.exception(
@@ -698,17 +746,7 @@ def login():
             # the navbar dropdown (admins and multi-dept users).  simply
             # default to the first department and let the picker handle
             # further switches.
-            restored = False
-            if getattr(user, "last_active_dept", None):
-                try:
-                    _restore_last_active_dept_for_user(user)
-                    restored = True
-                except Exception:
-                    restored = False
-            if not restored:
-                _session["active_dept"] = (
-                    depts[0] if depts else getattr(user, "department", None)
-                )
+            _restore_user_department_context(user)
         except Exception:
             pass
         # Respect a `next` parameter when redirecting after login.  Only
@@ -718,7 +756,7 @@ def login():
         # file is fetched while session has expired and login_required kicks in).
         if next_url:
             return redirect(next_url)
-        return redirect(url_for("requests.dashboard"))
+        return redirect(_authenticated_user_home_url(user))
 
     return render_template("login.html", form=form)
 
@@ -831,20 +869,12 @@ def totp_verify():
         session["totp_verified"] = True
         # TOTP flow also honours admin landing
         if getattr(u, "is_admin", False):
-            return redirect(url_for("admin.index"))
+                return redirect(_authenticated_user_home_url(u))
         try:
-            depts = _get_user_departments(u)
-            # same logic during 2FA login path; skip explicit chooser even if
-            # multiple departments are available.
-            if getattr(u, "last_active_dept", None):
-                _restore_last_active_dept_for_user(u)
-            else:
-                _session["active_dept"] = (
-                    depts[0] if depts else getattr(u, "department", None)
-                )
+            _restore_user_department_context(u)
         except Exception:
             pass
-        return redirect(url_for("requests.dashboard"))
+        return redirect(_authenticated_user_home_url(u))
 
     flash("Invalid code.", "danger")
     return render_template("totp_verify.html")

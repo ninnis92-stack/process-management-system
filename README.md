@@ -19,7 +19,7 @@ lightweight Stimulus controllers for interactivity.
 
 ## Overview
 
-*Note: recent updates changed dark-mode behavior such that enabling dark mode disables personal vibe/theme controls. The navbar vibe button is removed and the theme selector is greyed out with a warning, but adopted brand presets now carry their accent palette into the app's native dark mode automatically. The navbar banner now keeps quotes in their own panel, with the vibe button rendered inside its own solid control shell so it stays visually separate and can disappear cleanly when disabled. If the global vibe feature toggle is turned off, the shell is removed while the quote banner remains in a quote-only layout. Shared action-shell styling is now used across the navbar, command center, and monitor views so controls can appear or disappear without breaking alignment. The old dark-mode-compatible subset preview UI was also removed so dark mode has a single, consistent presentation, and the broader dashboard/admin/login surfaces now use a cleaner solid-panel visual system instead of the older glassy treatment.*
+*Note: recent updates changed dark-mode behavior such that enabling dark mode disables personal vibe/theme controls. The navbar vibe button is removed and the theme selector is greyed out with a warning, but adopted brand presets now carry their accent palette into the app's native dark mode automatically. The navbar banner now keeps quotes in their own panel, with the vibe button rendered inside its own solid control shell so it stays visually separate and can disappear cleanly when disabled. If the global vibe feature toggle is turned off, the shell is removed while the quote banner remains in a quote-only layout. Shared action-shell styling is now used across the navbar, command center, and monitor views so controls can appear or disappear without breaking alignment. The old dark-mode-compatible subset preview UI was also removed so dark mode has a single, consistent presentation, and the broader dashboard/admin/login surfaces now use a cleaner solid-panel visual system instead of the older glassy treatment. Recent dashboard polish also toned down the launchpad accents so the Workspace overview eyebrow, badges, and queue counters now follow the same quieter theme language as surrounding cards rather than using a separate bright-blue treatment.*
 
 This prototype supports structured intake forms, multi‑step process flows, and an
 extensible admin interface.  Admins can build custom request templates,
@@ -35,16 +35,26 @@ Key capabilities:
 - **Process-flow engine** with status transitions, path history and loop protection
 - **Priority and reminder controls** including `highest` priority, automated
   reminders, user-pushed reminders, and per-user daily reminder limits
+- **Handoff operations tooling** with department-level default handoff docs and
+  checklists, temporary cross-department coverage, coverage calendar search,
+  and downloadable `.ics` exports
+- **Scalable notifications** with department-specific templates, backup
+  approver routing, and async fan-out for larger recipient groups
 - **Polished public sign-in** with clearer guest-path entry points and a more
   production-ready first impression for external users
 - **Command center** for users, departments, process flows, site config, integrations,
   guest request forms, feature flags, and more
+- **Smarter navigation**: the client adds prefetch hints for hovered links so
+  subsequent clicks feel faster without requiring any backend changes.
 - **Field verification** powered by third‑party tracker integrations
+- **Optional handoff bundle delivery** through existing ticketing/webhook
+  integrations so transfer packets can be mirrored externally without adding
+  more core workflow form fields
 - **Guest submission and lookup** via external blueprints
 - **Per-form guest access policies** for public, SSO-linked, approved-organization,
   and unaffiliated-only intake paths
 - **SSO/OIDC support** with optional admin sync
-- **Theme/vibe system**, dark mode (now integrated with vibe accents). Dark mode disables personal vibe overrides and hides the vibe button, while adopted brand presets continue to tint the native dark palette so branded imports still feel consistent. The theme dropdown is locked with explanatory text shown to the user. The navbar quote area and vibe control are separated so quotes stay visible even when the vibe button is absent, the vibe button itself now sits inside a distinct solid control shell instead of blending into the banner, disabling the global vibe feature leaves the banner in a quote-only state rather than removing it outright, shared action bars and control shells keep admin and monitor layouts uniform when controls are added or removed, the old dark-mode compatibility chips/previews are gone, and recent UI polish replaced the older glassy treatment with a more solid shared surface system across login, dashboard, settings, and admin pages. Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
+- **Theme/vibe system**, dark mode (now integrated with vibe accents). Dark mode disables personal vibe overrides and hides the vibe button, while adopted brand presets continue to tint the native dark palette so branded imports still feel consistent. The theme dropdown is locked with explanatory text shown to the user. The navbar quote area and vibe control are separated so quotes stay visible even when the vibe button is absent, the vibe button itself now sits inside a distinct solid control shell instead of blending into the banner, disabling the global vibe feature leaves the banner in a quote-only state rather than removing it outright, shared action bars and control shells keep admin and monitor layouts uniform when controls are added or removed, the old dark-mode compatibility chips/previews are gone, recent UI polish replaced the older glassy treatment with a more solid shared surface system across login, dashboard, settings, and admin pages, and the dashboard overview/badge accents now stay aligned with the surrounding theme instead of using an unrelated bright-blue emphasis. Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
 
 Everything is covered by a comprehensive test suite and deploys automatically
 using a release script that migrates the database, creates missing columns,
@@ -94,7 +104,9 @@ needed.
    Run `python seed.py` locally if you need to resynchronize a development
    database or inspect the seeding logic.  The release script now also
    normalizes and validates quote sets so every built-in set has loadable
-   content before a deploy is considered healthy.
+  content before a deploy is considered healthy. Recent release safety nets
+  also backfill the newer department notification-template and handoff-default
+  columns so older installs can deploy without manual SQL.
 
 6. **Run the app (local deployment)**
    ```bash
@@ -126,7 +138,7 @@ needed.
    ```bash
    make smoke        # hit home, dashboard, and admin/site_config
    make smoke-clean  # erase local sqlite DB between runs
-   make test         # run pytest suite (≈100 tests)
+  make test         # run pytest suite (currently 214 tests)
    ```
 
 8. **Clearing state**
@@ -154,6 +166,9 @@ needed.
 - The same release path now also repairs legacy `guest_form` installs by adding
   `access_policy`, `allowed_email_domains`, and
   `credential_requirements_json` when those fields are missing.
+- Release-time schema repair also backfills newer department/user handoff and
+  notification columns used by coverage planning, notification templating, and
+  handoff package defaults.
 - Release-time quote validation auto-fills missing built-in quote sets, resets an
   invalid active quote set back to `default`, and fails the release if any set
   would still be empty.
@@ -358,7 +373,7 @@ and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORIN
 - Ran deployed smoke checks with `bash scripts/smoke_test.sh https://process-management-prototype-lingering-bush-6175.fly.dev`, `python scripts/smoke_deployed_login.py --url https://process-management-prototype-lingering-bush-6175.fly.dev`, and `python scripts/admin_smoke.py`; after the schema fix the admin assignments page returned HTTP 200.
 - Cleared remote smoke data with `python scripts/clear_smoke_remote.py`; the cleanup endpoint completed successfully and reported `{"deleted":0}`.
 - Checked both `https://process-management-prototype-lingering-bush-6175.fly.dev/ready` and `https://process-management-prototype-lingering-bush-6175.fly.dev/health`; both returned `{"status":"ok"}`, and `/ready` reported `components.database.status: ok`.
-- The login page now uses the `motivational` quote set when rolling quotes are enabled; admins can toggle the flag on or off via `/admin/feature_flags` and the control is independent of any per-user preferences.
+- The login page now uses the `motivational` quote set when rolling quotes are enabled; the site-wide default also now resolves to `motivational` unless an admin explicitly chooses another active set. A new `chores` quote set was added so laundry and household routines live in a consistent motivational theme instead of feeling out of place.
 - Added client‑side persistence for toggle checkboxes (feature flags and similar forms), ensuring their on/off state survives page refreshes after saving.
 
 ---
@@ -405,8 +420,8 @@ third-party form should mirror.
 **Notes on rolling quotes:** quotes shown in the navbar are selected
 at random on every page render and during the automatic 8‑second rotation,
 meaning there is no repeating, predictable cycle.  Each quote set shipped with
-the app contains 30 entries (placeholders will be padded if admins supply
-fewer) and the server-side rendering uses `random.choice` so the initial text
+the app contains 30 entries, and shorter sets are expanded with themed
+motivational filler lines instead of generic placeholders. The server-side rendering uses `random.choice` so the initial text
 on each request is truly arbitrary.  The separate rolling-quote banner that
 used to appear under the navbar has been removed entirely.
 Additional notes:
@@ -457,6 +472,14 @@ page displays the last few steps and suggests next actions to the user.
 - **Command center**: located under `/admin` with subpages for users, departments,
   process flows, statuses, site configuration, integrations, feature flags, guest
   request forms, and request-form templates.
+- Department admins can now store default handoff document links and checklist
+  templates per department. Those defaults prefill temporary assignment cards,
+  stay mobile-friendly in the admin UI, and flow into the coverage calendar and
+  `.ics` export when a specific assignment does not override them.
+- The coverage calendar now supports saved free-text search by teammate,
+  department label, note, checklist item, handoff doc URL, or backup pair so
+  larger organizations can narrow active coverage quickly without losing the
+  existing lightweight workflow.
 - Admin users no longer see the department‑selection prompt on every page
   refresh.  The modal only appears when they intentionally choose “Switch
   Dept” (this makes the command center experience smoother on phones and other
@@ -487,6 +510,13 @@ page displays the last few steps and suggests next actions to the user.
 - Stored per-user preferences are normalized to lowercase/trimmed values on
   save and during seed/release tasks, protecting against case mismatches or
   legacy entries that could otherwise disappear after an upgrade.
+- Notification delivery now supports per-department body templates and can
+  switch to async fan-out for larger recipient lists while still keeping in-app
+  notifications and backup-approver routing intact during smaller day-to-day
+  sends.
+- Ticketing and webhook integrations can optionally emit a structured handoff
+  bundle payload containing request metadata, submission details, and
+  attachment descriptors whenever a department handoff is created.
 - **User settings**: dark mode (keeps adopted brand presets blended into the native dark palette while disabling personal vibes), theme/vibe selection, quote set, rotating
   quotes.
 - **Templates & requirements**: rich form editing with grouped fields, hints,

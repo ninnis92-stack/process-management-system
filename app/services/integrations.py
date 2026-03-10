@@ -27,6 +27,7 @@ INTEGRATION_KIND_SCAFFOLDS: dict[str, dict[str, Any]] = {
             "auth": {"type": "token", "token_env": "", "username_env": ""},
             "endpoints": {"base_url": "", "create": "", "update": "", "lookup": ""},
             "mapping": {"title": "title", "description": "description", "priority": "priority", "status": "status"},
+            "handoff_bundle": {"enabled": False, "include_submission": True, "include_attachments": True, "create_ticket": True},
             "compatibility": {"request_format": "json", "response_format": "json", "supports_webhooks": True},
         },
     },
@@ -40,6 +41,7 @@ INTEGRATION_KIND_SCAFFOLDS: dict[str, dict[str, Any]] = {
             "auth": {"type": "hmac", "secret_env": "WEBHOOK_SHARED_SECRET"},
             "endpoints": {"url": "", "retry_url": ""},
             "mapping": {"event": "event", "payload": "payload", "sent_at": "sent_at"},
+            "handoff_bundle": {"enabled": False, "include_submission": True, "include_attachments": True, "event_name": "handoff_bundle"},
             "compatibility": {"request_format": "json", "signature_header": "X-Webhook-Signature", "supports_retries": True},
         },
     },
@@ -214,6 +216,40 @@ def _json_default(value: Any):
     if isinstance(value, datetime):
         return value.isoformat() + "Z"
     return str(value)
+
+
+def build_handoff_bundle_payload(request_obj: ReqModel, submission_obj: Any) -> dict[str, Any]:
+    attachments = []
+    for attachment in list(getattr(submission_obj, "attachments", []) or []):
+        attachments.append(
+            {
+                "id": getattr(attachment, "id", None),
+                "filename": getattr(attachment, "original_filename", None),
+                "stored_filename": getattr(attachment, "stored_filename", None),
+                "content_type": getattr(attachment, "content_type", None),
+                "size_bytes": getattr(attachment, "size_bytes", None),
+            }
+        )
+    return {
+        "event": "handoff_bundle",
+        "request": {
+            "id": getattr(request_obj, "id", None),
+            "title": getattr(request_obj, "title", None),
+            "status": getattr(request_obj, "status", None),
+            "owner_department": getattr(request_obj, "owner_department", None),
+        },
+        "submission": {
+            "id": getattr(submission_obj, "id", None),
+            "from_department": getattr(submission_obj, "from_department", None),
+            "to_department": getattr(submission_obj, "to_department", None),
+            "from_status": getattr(submission_obj, "from_status", None),
+            "to_status": getattr(submission_obj, "to_status", None),
+            "summary": getattr(submission_obj, "summary", None),
+            "details": getattr(submission_obj, "details", None),
+            "created_at": getattr(submission_obj, "created_at", None),
+        },
+        "attachments": attachments,
+    }
 
 
 def _sign_payload(payload: bytes, secret: str | None) -> str | None:

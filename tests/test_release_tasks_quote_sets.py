@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import re
 
 from app.extensions import db
 from app.models import SiteConfig
@@ -26,7 +27,7 @@ def test_release_task_normalizes_quote_sets_and_repairs_active_set(app):
         module._ensure_quote_sets_ready()
 
         refreshed = SiteConfig.get()
-        assert refreshed.active_quote_set == "default"
+        assert refreshed.active_quote_set == "motivational"
         # each built-in set should still be populated and at target length
         for name in SiteConfig.DEFAULT_QUOTE_SETS:
             assert refreshed.rolling_quote_sets[name]
@@ -35,6 +36,18 @@ def test_release_task_normalizes_quote_sets_and_repairs_active_set(app):
         eng = refreshed.rolling_quote_sets["engineering"]
         assert eng[0] == "Ship it."
         assert len(eng) == 30
+
+
+def test_builtin_quote_sets_use_themed_padding_instead_of_placeholders():
+    for name, quotes in SiteConfig.DEFAULT_QUOTE_SETS.items():
+        assert len(quotes) == 30
+        assert not any(
+            re.fullmatch(rf"{re.escape(str(name))} quote \d+", str(quote), re.IGNORECASE)
+            for quote in quotes
+        )
+
+    assert "chores" in SiteConfig.DEFAULT_QUOTE_SETS
+    assert any("dish" in quote.lower() or "counter" in quote.lower() for quote in SiteConfig.DEFAULT_QUOTE_SETS["chores"])
 
 
 def test_release_task_keeps_custom_quote_sets_with_content(app):

@@ -90,6 +90,25 @@
   </section>
 {% endif %}
 
+{% if watched_department_links %}
+  <section class="surface-panel mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h5 class="mb-0">Cross-department quick access</h5>
+        <small class="text-muted">Admin-managed department shortcuts help shared staff jump between queues without extra navigation.</small>
+      </div>
+    </div>
+    <div class="dashboard-chip-list mt-3">
+      {% for link in watched_department_links %}
+        <a class="dashboard-chip" href="{{ link.href }}">
+          <span class="dashboard-chip__title">{{ link.title }}</span>
+          <span class="dashboard-chip__meta">{{ link.meta }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
 {% if approval_cards %}
   <section class="mb-3">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">

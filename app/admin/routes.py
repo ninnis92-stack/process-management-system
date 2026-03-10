@@ -518,9 +518,15 @@ def site_config():
         if not banner:
             banner = flask_request.form.get("banner_html")
 
-        rolling_enabled = bool(form.show_banner.data)
-        if "rolling_enabled" in flask_request.form:
-            rolling_enabled = True
+        # only update rolling_quotes_enabled when the form actually
+        # included the corresponding checkbox/key; otherwise we would turn
+        # the feature off simply because the admin changed some other field.
+        if "show_banner" in flask_request.form or "rolling_enabled" in flask_request.form:
+            rolling_enabled = bool(form.show_banner.data)
+            if "rolling_enabled" in flask_request.form:
+                # legacy flag present means enable regardless of checkbox state
+                rolling_enabled = True
+            cfg.rolling_quotes_enabled = rolling_enabled
 
         # only consider updating rolling quotes if admin actually typed or
         # pasted something into the textarea (or provided the legacy CSV field).
@@ -555,7 +561,9 @@ def site_config():
                 cfg.logo_filename = f"uploads/branding/{stored_name}"
 
         cfg.banner_html = _sanitize_banner_html(banner) or None
-        cfg.rolling_quotes_enabled = rolling_enabled
+        # rolling_quotes_enabled updated above only when the checkbox/key was
+        # present; avoid touching it here so unrelated updates don't flip the
+        # feature flag.
         if rolling_input is not None:
             # preserve existing quotes when no data submitted
             cfg.rolling_quotes = rolling_input or None
@@ -2105,6 +2113,13 @@ def create_integration():
     from .forms import IntegrationConfigForm
 
     form = IntegrationConfigForm()
+    try:
+        departments = Department.query.filter_by(is_active=True).order_by(Department.order.asc(), Department.code.asc()).all()
+        choices = [((row.code or "").strip().upper(), (row.label or row.code or "").strip()) for row in departments]
+        if choices:
+            form.department.choices = choices
+    except Exception:
+        pass
     selected_kind = form.kind.data or (form.kind.choices[0][0] if form.kind.choices else "webhook")
     if form.validate_on_submit():
         try:
@@ -2153,6 +2168,15 @@ def edit_integration(int_id: int):
 
     ic = get_or_404(IntegrationConfig, int_id)
     form = IntegrationConfigForm(obj=ic)
+    try:
+        departments = Department.query.filter_by(is_active=True).order_by(Department.order.asc(), Department.code.asc()).all()
+        choices = [((row.code or "").strip().upper(), (row.label or row.code or "").strip()) for row in departments]
+        if getattr(ic, "department", None) and ic.department not in {code for code, _label in choices}:
+            choices.append((ic.department, ic.department))
+        if choices:
+            form.department.choices = choices
+    except Exception:
+        pass
     if flask_request.method == "GET":
         try:
             normalized = normalize_integration_config(ic.kind, ic.config)
@@ -2256,7 +2280,10 @@ def create_department():
             description=None,
             is_active=bool(form.active.data),
             order=int(form.order.data or 0),
+            notification_template=(form.notification_template.data or None),
+            handoff_template_doc_url=(form.handoff_template_doc_url.data or None),
         )
+        d.handoff_template_checklist = (form.handoff_template_checklist.data or "").splitlines()
         db.session.add(d)
         db.session.commit()
         flash("Department created.", "success")
@@ -2277,9 +2304,14 @@ def edit_department(dept_id: int):
         d.label = form.name.data
         d.order = int(form.order.data or 0)
         d.is_active = bool(form.active.data)
+        d.notification_template = (form.notification_template.data or None)
+        d.handoff_template_doc_url = (form.handoff_template_doc_url.data or None)
+        d.handoff_template_checklist = (form.handoff_template_checklist.data or "").splitlines()
         db.session.commit()
         flash("Department updated.", "success")
         return redirect(url_for("admin.list_departments"))
+    if flask_request.method == "GET":
+        form.handoff_template_checklist.data = "\n".join(getattr(d, "handoff_template_checklist", []) or [])
     return render_template("admin_department_edit.html", form=form, dept=d)
 
 

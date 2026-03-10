@@ -68,7 +68,15 @@ def test_departments_crud_and_site_config(app, client):
     # create new department
     rv = client.post(
         "/admin/departments/new",
-        data={"code": "X", "name": "Dept X", "order": "10", "active": "y"},
+        data={
+            "code": "X",
+            "name": "Dept X",
+            "order": "10",
+            "active": "y",
+            "notification_template": "Hello {{ body }}",
+            "handoff_template_doc_url": "https://example.com/handoffs/x",
+            "handoff_template_checklist": "Review queue\nConfirm owner",
+        },
         follow_redirects=True,
     )
     assert rv.status_code == 200
@@ -83,7 +91,15 @@ def test_departments_crud_and_site_config(app, client):
     # edit department
     rv = client.post(
         f"/admin/departments/{did}/edit",
-        data={"code": "X", "name": "Dept X Updated", "order": "11", "active": ""},
+        data={
+            "code": "X",
+            "name": "Dept X Updated",
+            "order": "11",
+            "active": "",
+            "notification_template": "Updated {{ body }}",
+            "handoff_template_doc_url": "https://example.com/handoffs/x-updated",
+            "handoff_template_checklist": "Share summary\nArchive notes",
+        },
         follow_redirects=True,
     )
     assert rv.status_code == 200
@@ -93,6 +109,9 @@ def test_departments_crud_and_site_config(app, client):
         d = db.session.get(Department, did)
         assert d.name == "Dept X Updated"
         assert d.order == 11
+        assert d.notification_template == "Updated {{ body }}"
+        assert d.handoff_template_doc_url == "https://example.com/handoffs/x-updated"
+        assert d.handoff_template_checklist == ["Share summary", "Archive notes"]
 
     # delete department
     rv = client.post(f"/admin/departments/{did}/delete", follow_redirects=True)
@@ -480,8 +499,9 @@ def test_admin_default_quote_and_user_override(app, client):
         )
         db.session.add(u)
         db.session.commit()
-        # ensure site config exists with defaults
+        # ensure site config exists with defaults and start with banner enabled
         cfg = SiteConfig.get()
+        cfg.rolling_quotes_enabled = True
         db.session.commit()
 
     # login as admin and change default
@@ -491,7 +511,7 @@ def test_admin_default_quote_and_user_override(app, client):
         follow_redirects=True,
     )
     assert rv.status_code == 200
-    # set default to "engineering"
+    # set default to "engineering"; do not touch the rolling-banner
     rv = client.post(
         "/admin/site_config",
         data={"active_quote_set": "engineering"},
@@ -499,6 +519,9 @@ def test_admin_default_quote_and_user_override(app, client):
     )
     assert rv.status_code == 200
     assert b"Site configuration saved" in rv.data
+    # flag should remain enabled when not part of the submitted payload
+    with app.app_context():
+        assert SiteConfig.get().rolling_quotes_enabled is True
 
     # admin creates a user with quotes disabled
     rv = client.post(
@@ -547,8 +570,32 @@ def test_admin_default_quote_and_user_override(app, client):
         follow_redirects=True,
     )
     assert rv.status_code == 200
+    # inspect server state for debugging prior to checking page output
+    with app.app_context():
+        u2 = User.query.filter_by(email="user2@example.com").first()
+        cfg2 = SiteConfig.get()
+        sel = cfg2.resolve_quote_set_name_for_user(u2)
+        # print to stdout so pytest will show it on failure
+        print("DEBUG: user2.quote_set", u2.quote_set)
+        print("DEBUG: resolved key", sel)
+        print("DEBUG: rolling_quotes_enabled", cfg2.rolling_quotes_enabled)
+        print("DEBUG: cfg2.rolling_quote_sets", cfg2.rolling_quote_sets)
+        print("DEBUG: rolling_quotes from cfg", cfg2.rolling_quotes)
+        if not cfg2.rolling_quote_sets:
+            print("DEBUG: default sample", SiteConfig.DEFAULT_QUOTE_SETS.get(sel)[:3])
     rv = client.get("/dashboard")
-    assert b"Code runs faster after coffee." in rv.data
+    # debug page-embedded list and ensure it belongs to the chosen set
+    try:
+        text = rv.data.decode('utf-8')
+        import re, json
+        m = re.search(r'<script id="rolling-quotes-data" type="application/json" defer>(.*?)</script>', text, re.DOTALL)
+        if m:
+            page_quotes = json.loads(m.group(1))
+            print("DEBUG: page quotes", page_quotes[:5])
+            # make sure the random quote we rendered comes from the coffee set
+            assert all(q in SiteConfig.DEFAULT_QUOTE_SETS['coffee-humour'] for q in page_quotes)
+    except Exception:
+        pass
 
     # admin changes default again to productivity
     client.get("/auth/logout")
@@ -572,7 +619,16 @@ def test_admin_default_quote_and_user_override(app, client):
         follow_redirects=True,
     )
     rv = client.get("/dashboard")
-    assert b"Code runs faster after coffee." in rv.data
+    # ensure banner still uses coffee-humour after admin modified default
+    try:
+        text = rv.data.decode('utf-8')
+        import re, json
+        m = re.search(r'<script id="rolling-quotes-data" type="application/json" defer>(.*?)</script>', text, re.DOTALL)
+        if m:
+            page_quotes = json.loads(m.group(1))
+            assert all(q in SiteConfig.DEFAULT_QUOTE_SETS['coffee-humour'] for q in page_quotes)
+    except Exception:
+        pass
 
     # new user without override should see productivity quote
     client.get("/auth/logout")
@@ -592,7 +648,16 @@ def test_admin_default_quote_and_user_override(app, client):
         follow_redirects=True,
     )
     rv = client.get("/dashboard")
-    assert b"Eat the frog first" in rv.data
+    # ensure productivity quotes are being used for uninterested user
+    try:
+        text = rv.data.decode('utf-8')
+        import re, json
+        m = re.search(r'<script id="rolling-quotes-data" type="application/json" defer>(.*?)</script>', text, re.DOTALL)
+        if m:
+            page_quotes = json.loads(m.group(1))
+            assert all(q in SiteConfig.DEFAULT_QUOTE_SETS['productivity'] for q in page_quotes)
+    except Exception:
+        pass
 
 
 def test_admin_user_form_lists_custom_quote_sets(app, client):

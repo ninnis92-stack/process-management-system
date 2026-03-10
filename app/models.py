@@ -196,6 +196,21 @@ class IntegrationEvent(TenantScopedMixin, db.Model):
 class User(TenantScopedMixin, db.Model, UserMixin):
     """Application user account (local or SSO-backed)."""
 
+    @property
+    def department_obj(self):
+        """Return the Department record for this user's primary department.
+
+        This is a convenience used by notification rendering when templates are
+        defined on departments. Returns ``None`` if no matching department can
+        be found.
+        """
+        from .models import Department
+
+        code = (getattr(self, "department", None) or "").strip().upper()
+        if not code:
+            return None
+        return Department.query.filter_by(code=code).first()
+
     # relationship mapping to the Tenant record; explicit primaryjoin is
     # required because the tenant_id column comes from the mixin rather than
     # being defined directly on `User`.
@@ -216,6 +231,14 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
+    backup_approver_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
+    backup_approver = db.relationship(
+        "User",
+        foreign_keys=[backup_approver_user_id],
+        remote_side=[id],
+        backref="coverage_for_users",
+        uselist=False,
+    )
     # Optional TOTP 2FA for local accounts
     totp_secret = db.Column(db.String(64), nullable=True)
     totp_enabled = db.Column(db.Boolean, nullable=False, default=False)
@@ -277,6 +300,122 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     # or switched contexts. This is used to restore their active department
     # on subsequent logins when they have multiple department assignments.
     last_active_dept = db.Column(db.String(2), nullable=True)
+    # admin-managed landing preference so people can drop into the most useful
+    # workspace immediately after login.
+    preferred_start_page = db.Column(db.String(40), nullable=True, default="dashboard")
+    preferred_start_department = db.Column(db.String(2), nullable=True)
+    # admin-managed list of departments the user wants surfaced as quick-access
+    # queue links on the dashboard. Stored as JSON text for compatibility with
+    # existing SQLite and Postgres deployments.
+    watched_departments_json = db.Column(db.Text, nullable=True)
+    # admin-managed extra departments whose notifications should also be routed
+    # to this user even if they are not the primary owner of that queue.
+    notification_departments_json = db.Column(db.Text, nullable=True)
+    # lightweight role preset used by admin bulk actions and user editing. The
+    # preset is translated into DepartmentEditor rows so existing permission
+    # checks keep working without bespoke branching throughout the app.
+    workflow_role_profile = db.Column(db.String(40), nullable=True, default="member")
+
+    WORKFLOW_ROLE_PROFILES = {
+        "member": {
+            "label": "Member",
+            "can_edit": False,
+            "can_view_metrics": False,
+            "can_change_priority": False,
+        },
+        "coordinator": {
+            "label": "Coordinator",
+            "can_edit": True,
+            "can_view_metrics": False,
+            "can_change_priority": False,
+        },
+        "metrics_lead": {
+            "label": "Metrics Lead",
+            "can_edit": True,
+            "can_view_metrics": True,
+            "can_change_priority": False,
+        },
+        "queue_lead": {
+            "label": "Queue Lead",
+            "can_edit": True,
+            "can_view_metrics": True,
+            "can_change_priority": True,
+        },
+    }
+
+    @validates("preferred_start_page")
+    def _normalize_preferred_start_page(self, key, value):
+        normalized = str(value or "dashboard").strip().lower() or "dashboard"
+        allowed = {"dashboard", "search", "metrics", "admin_monitor"}
+        return normalized if normalized in allowed else "dashboard"
+
+    @validates("preferred_start_department")
+    def _normalize_preferred_start_department(self, key, value):
+        if value is None:
+            return None
+        normalized = str(value).strip().upper()
+        return normalized or None
+
+    @validates("workflow_role_profile")
+    def _normalize_workflow_role_profile(self, key, value):
+        normalized = str(value or "member").strip().lower() or "member"
+        return normalized if normalized in self.WORKFLOW_ROLE_PROFILES else "member"
+
+    @property
+    def watched_departments(self) -> list[str]:
+        try:
+            parsed = json.loads(self.watched_departments_json or "[]")
+        except Exception:
+            parsed = []
+        if not isinstance(parsed, list):
+            return []
+        cleaned = []
+        for item in parsed:
+            dept = str(item or "").strip().upper()
+            if dept and dept not in cleaned:
+                cleaned.append(dept)
+        return cleaned
+
+    @watched_departments.setter
+    def watched_departments(self, value):
+        cleaned = []
+        for item in value or []:
+            dept = str(item or "").strip().upper()
+            if dept and dept not in cleaned:
+                cleaned.append(dept)
+        self.watched_departments_json = json.dumps(cleaned)
+
+    @property
+    def notification_departments(self) -> list[str]:
+        try:
+            parsed = json.loads(self.notification_departments_json or "[]")
+        except Exception:
+            parsed = []
+        if not isinstance(parsed, list):
+            return []
+        cleaned = []
+        for item in parsed:
+            dept = str(item or "").strip().upper()
+            if dept and dept not in cleaned:
+                cleaned.append(dept)
+        return cleaned
+
+    @notification_departments.setter
+    def notification_departments(self, value):
+        cleaned = []
+        for item in value or []:
+            dept = str(item or "").strip().upper()
+            if dept and dept not in cleaned:
+                cleaned.append(dept)
+        self.notification_departments_json = json.dumps(cleaned)
+
+    @property
+    def workflow_role_profile_label(self) -> str:
+        profile = self.WORKFLOW_ROLE_PROFILES.get(
+            str(getattr(self, "workflow_role_profile", "member") or "member").strip().lower(),
+            self.WORKFLOW_ROLE_PROFILES["member"],
+        )
+        return profile.get("label", "Member")
 
 
 class SavedSearchView(TenantScopedMixin, db.Model):
@@ -1158,7 +1297,7 @@ class SiteConfig(TenantScopedMixin, db.Model):
     _rolling_quote_sets = db.Column(
         "rolling_quote_sets", db.Text, nullable=True
     )  # JSON map of named sets -> list of strings
-    active_quote_set = db.Column(db.String(80), nullable=True, default="default")
+    active_quote_set = db.Column(db.String(80), nullable=True, default="motivational")
     quote_permissions = db.Column(db.Text, nullable=True)  # JSON: {"departments":{code:[sets]},"users":{email:[sets]}}
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -1170,109 +1309,244 @@ class SiteConfig(TenantScopedMixin, db.Model):
     # fewer than that we pad with benign placeholder lines to meet the target.
     _QUOTE_SETS_BASE = {
         "default": [
-            "Sort today: socks first, worries later.",
-            "A folded stack is a small victory.",
-            "One load at a time, one win at a time.",
-            "Fresh socks, fresh perspective.",
-            "Turn laundry into a tiny ritual of calm.",
+            "Start where you are and make this hour count.",
+            "A calm plan beats rushed chaos every time.",
+            "One finished task can reset an entire day.",
+            "Consistency is quieter than hype and stronger than both.",
+            "Keep moving; clarity usually catches up to action.",
+            "A steady pace still reaches meaningful places.",
+            "Momentum grows when you honor the next small promise.",
+            "Give today's work your full attention, not your full panic.",
         ],
-        # two new themes requested by the user
         "sales": [
-            "Sell the problem you solve, not the product.",
-            "Follow up once is good; follow up twice closes deals.",
-            "People buy solutions, not features.",
-            "Ask more questions; you sell fewer assumptions.",
-            "Pitch benefits over features and watch interest grow.",
+            "Lead with the customer's problem and trust the value to follow.",
+            "The best follow-up sounds helpful, not desperate.",
+            "Curiosity closes more deals than pressure ever will.",
+            "When you listen well, the next right pitch gets easier.",
+            "Confidence lands best when it is backed by preparation.",
+            "One thoughtful conversation can change the whole quarter.",
+            "Sell with clarity, and decisions feel lighter for everyone.",
+            "Progress in sales often starts with one more honest question.",
         ],
         "motivational": [
-            # expanded set with more varied perspectives for broader appeal
             "Progress, not perfection.",
             "Small habits compound into big results.",
             "Show up today; momentum finds you tomorrow.",
             "Focus on the next right step.",
-            "Your only limit is the one you set yourself.",
-            "Your attitude determines your direction.",
-            "Believe you can and you're halfway there.",
-            "Dream big. Start small. Act now.",
-            "Success is the sum of small efforts repeated daily.",
-            "Don't wait for opportunity. Create it.",
+            "Discipline is a form of self-respect.",
+            "You do not need a new day to make a better choice.",
+            "Quiet effort still changes loud outcomes.",
+            "Keep your promises to yourself, especially the small ones.",
+            "Courage often looks like doing the ordinary thing again.",
+            "A little progress with intention beats a lot of delay.",
+            "Your pace is allowed to be steady and still be powerful.",
+            "Make the day answer to your priorities, not your mood.",
         ],
-        # rename riddles to be explicitly laundry-themed
+        # Keep the legacy key for compatibility while making the content
+        # feel like playful laundry motivation instead of unrelated riddles.
         "laundry riddles": [
-            "I speak without a mouth and hear without ears. What am I? (An echo)",
-            "I have keys but no locks. What am I? (A piano)",
-            "What has hands but cannot clap? (A clock)",
-            "The more you take, the more you leave behind. What are they? (Footsteps)",
-            "What gets wetter the more it dries? (A towel)",
+            "Turn laundry into a tiny ritual of calm.",
+            "A folded stack is proof that order can be built.",
+            "One load at a time is still a real kind of progress.",
+            "Fresh clothes can reset more than a closet.",
+            "Match the socks, clear the mind.",
+            "Wash, dry, fold, done: momentum loves a simple rhythm.",
+            "Clean routines make crowded weeks feel lighter.",
+            "Finishing the basket feels better than avoiding it ever did.",
         ],
-        # an engineering-focused set requested for motivation
+        "chores": [
+            "A five-minute tidy can rescue an entire evening.",
+            "The sink looks less dramatic after the first plate.",
+            "Small chores are easier when you stop negotiating with them.",
+            "A reset room can reset a restless mind.",
+            "Wipe the counter, lighten the mood.",
+            "Done is a beautiful look for the to-do list at home.",
+            "Routine care keeps tomorrow from feeling crowded.",
+            "A little maintenance is a quiet form of kindness to yourself.",
+        ],
         "engineering": [
             "First, solve the problem. Then, write the code.",
-            "Experience is the name everyone gives to their mistakes.",
-            "If it works, it’s obsolete. If it doesn’t work, it’s creative.",
-            "Optimism is an occupational hazard of programming; feedback is the cure.",
-            "In engineering, absence of evidence is not evidence of absence.",
+            "Readable wins twice: once today and again during the next fix.",
+            "A small reliable improvement beats a dramatic fragile rewrite.",
+            "Good systems are built by patient iterations, not lucky guesses.",
+            "Debugging is proof that you are getting closer to understanding.",
+            "Strong foundations make fast shipping safer.",
+            "Clarity in the design saves courage in production.",
+            "The next clean commit is still forward motion.",
         ],
         "productivity": [
-            "Eat the frog first and the rest of the day is easy.",
-            "You can do anything, but not everything.",
-            "Progress, not perfection.",
-            "A to-do list is good; a done list is better.",
-            "Do the hard work now so it’s easy tomorrow.",
+            "Protect the first hour and the rest of the day improves.",
+            "A shorter list with real priorities is still ambitious.",
+            "Do the hardest useful thing before the noise gets loud.",
+            "Progress improves when attention stops multitasking.",
+            "The right system makes discipline easier to repeat.",
+            "Completion creates energy that planning alone never will.",
+            "Your calendar should reflect your goals, not your guilt.",
+            "Finish one meaningful task and let momentum do the rest.",
         ],
         "leadership": [
-            "Leaders eat last.",
-            "Manage the system, not the people.",
-            "Don’t ask others to do what you wouldn’t do yourself.",
-            "Earn trust before asking for effort.",
-            "Leadership is influence, not title.",
+            "Calm leadership gives everyone else room to think.",
+            "The clearest standard is the one you model yourself.",
+            "Trust grows when your actions arrive before your slogans.",
+            "Good leaders make the work feel possible, not smaller.",
+            "Consistency builds credibility long before titles do.",
+            "The strongest teams are shaped by steady clarity.",
+            "People commit faster when they feel respected.",
+            "Leadership is often the art of reducing confusion.",
         ],
         "innovation": [
-            "Fail fast, learn faster.",
-            "Question assumptions; they’re free to discard.",
-            "If it hasn’t been done, it may not be worth doing—or you may be the first.",
-            "Disrupt yourself before someone else does.",
-            "Creativity is intelligence having fun.",
+            "Better questions usually arrive before better products.",
+            "Try the bold idea, then make it workable.",
+            "Original thinking gets stronger when it meets real constraints.",
+            "Test early enough that learning still feels cheap.",
+            "Curiosity is a competitive advantage when it becomes action.",
+            "Useful innovation solves friction, not just boredom.",
+            "Small experiments can uncover very large opportunities.",
+            "New value often starts as an awkward first version.",
         ],
         "customer-centric": [
-            "Start with the customer and work backwards.",
-            "Delight > satisfy.",
-            "Listen twice as much as you speak.",
-            "Solve problems they didn’t know they had.",
-            "Know your user better than they know themselves.",
+            "Listen closely enough and the roadmap starts writing itself.",
+            "The customer usually remembers how easy you made things feel.",
+            "Useful service is one of the fastest ways to build trust.",
+            "Solve the real pain point and the rest gets simpler.",
+            "Empathy is a practical business skill.",
+            "Clarity for the customer is a form of quality.",
+            "Better experiences are built from better noticing.",
+            "Make the next step obvious and confidence goes up.",
         ],
         "coffee-humour": [
-            "Code runs faster after coffee.",
-            "Decaf is for the weak.",
-            "Instant human, just add coffee.",
-            "Behind every successful developer is a substantial amount of coffee.",
-            "Coffee: because adulting is hard.",
+            "Coffee cannot solve everything, but it can improve the opening draft.",
+            "A warm mug and a clear task list make a strong alliance.",
+            "Caffeine is not a strategy, but it is a respectable sidekick.",
+            "Some breakthroughs begin one sip before they make sense.",
+            "Coffee first, brilliance immediately after is the aspiration.",
+            "A patient brew can rescue a noisy morning.",
+            "Optimism tastes stronger after the first cup.",
+            "Even the calendar looks friendlier beside good coffee.",
         ],
         "wellbeing": [
-            "Take a walk; the code will still be there.",
-            "Rest is not a reward; it’s a requirement.",
-            "You are not a machine; mind the breaks.",
-            "Healthy body, healthy debugging.",
-            "Step away from the screen; your eyes will thank you.",
+            "Rest is productive when it protects tomorrow's focus.",
+            "A breath, a stretch, and a reset can change the tone of the day.",
+            "You work better when you remember you are a person first.",
+            "Steady energy matters more than dramatic bursts.",
+            "Protecting your peace is part of doing good work.",
+            "A short walk can untangle what force cannot.",
+            "Recovery is not separate from performance; it supports it.",
+            "Gentle routines often create the strongest resilience.",
         ],
     }
 
-    # pad all sets to exactly 30 quotes using innocuous placeholders
+    _QUOTE_SET_PADDING = {
+        "default": {
+            "openings": ["Keep the day simple", "Choose the next useful step", "Stay steady", "Aim for calm progress"],
+            "actions": ["finish one meaningful task", "honor the plan you made", "let small wins stack up", "give your attention a single job"],
+            "payoffs": ["momentum will meet you", "clarity tends to follow", "the day will feel lighter", "confidence grows from repetition"],
+        },
+        "sales": {
+            "openings": ["Lead with value", "Stay curious", "Follow up with purpose", "Keep the conversation human"],
+            "actions": ["ask one better question", "solve the real hesitation", "make the next decision easy", "show the outcome, not just the feature list"],
+            "payoffs": ["trust grows faster", "good deals get easier to spot", "clarity does the heavy lifting", "relationships outlast the quarter"],
+        },
+        "motivational": {
+            "openings": ["Start anyway", "Stay with the process", "Protect your momentum", "Trust the small win"],
+            "actions": ["do the next right thing", "repeat the habit that helps", "move before doubt gets louder", "keep your standards close"],
+            "payoffs": ["results will eventually catch up", "your confidence will strengthen", "today will count", "progress will stop feeling accidental"],
+        },
+        "laundry riddles": {
+            "openings": ["Sort the load", "Fold what is ready", "Reset the basket", "Treat laundry like a checkpoint"],
+            "actions": ["finish one cycle at a time", "pair the socks before the excuses", "make the room feel cared for", "turn the routine into rhythm"],
+            "payoffs": ["calm returns faster", "home feels easier to enter", "order becomes visible", "the week gets less noisy"],
+        },
+        "chores": {
+            "openings": ["Tidy a little now", "Pick one corner", "Handle the simple task", "Reset the space"],
+            "actions": ["clear one surface", "wash the next dish", "close one household loop", "do the part future-you will notice"],
+            "payoffs": ["the room will breathe again", "stress loses some volume", "evening gets easier", "routine starts helping you back"],
+        },
+        "engineering": {
+            "openings": ["Ship with intention", "Debug with patience", "Design for clarity", "Keep the system understandable"],
+            "actions": ["reduce one source of risk", "write the simpler version first", "improve the path that fails most often", "name things so the code can explain itself"],
+            "payoffs": ["future fixes get easier", "reliability compounds", "the next release feels safer", "the team moves faster together"],
+        },
+        "productivity": {
+            "openings": ["Guard your focus", "Start with the priority", "Trim the noise", "Finish before you optimize"],
+            "actions": ["protect one block of deep work", "close the task that matters most", "trade urgency for intention", "let the checklist support you"],
+            "payoffs": ["time opens up", "progress gets measurable", "the backlog feels smaller", "energy stops leaking away"],
+        },
+        "leadership": {
+            "openings": ["Lead calmly", "Model the standard", "Communicate early", "Make the path clearer"],
+            "actions": ["remove one point of confusion", "match your actions to your message", "set the tone with consistency", "help the team see the priority"],
+            "payoffs": ["trust has room to grow", "people move with confidence", "the team steadies faster", "clarity becomes contagious"],
+        },
+        "innovation": {
+            "openings": ["Test the new idea", "Challenge the assumption", "Stay experimental", "Build the first useful version"],
+            "actions": ["learn from the quick draft", "keep curiosity attached to execution", "treat feedback like fuel", "let constraints sharpen the concept"],
+            "payoffs": ["the next version gets smarter", "new options appear", "useful change becomes possible", "creative work gains traction"],
+        },
+        "customer-centric": {
+            "openings": ["Start with the customer", "Listen one layer deeper", "Reduce the friction", "Make the next step easy"],
+            "actions": ["solve the felt pain point", "write for clarity", "keep empathy practical", "design around their real goal"],
+            "payoffs": ["trust gets stronger", "adoption feels natural", "support gets lighter", "people remember the experience"],
+        },
+        "coffee-humour": {
+            "openings": ["Respect the coffee", "Let the mug buy you a minute", "Begin after the first sip", "Pair the plan with caffeine"],
+            "actions": ["tackle the task while the optimism is warm", "keep the humor in the process", "use the ritual to settle in", "start before the cup gets cold"],
+            "payoffs": ["the morning feels friendlier", "the hard part looks smaller", "focus tends to show up", "the draft gets written"],
+        },
+        "wellbeing": {
+            "openings": ["Protect your energy", "Choose a kinder pace", "Let recovery count", "Take the small pause"],
+            "actions": ["breathe before the next push", "notice what your body is asking for", "rest before frustration hardens", "keep the routine sustainable"],
+            "payoffs": ["resilience lasts longer", "focus returns cleaner", "stress loses its grip", "good work stays repeatable"],
+        },
+    }
+
+    def _build_padded_quote_set(name, quotes, profiles=_QUOTE_SET_PADDING, max_length=MAX_QUOTE_LENGTH):
+        cleaned = [
+            str(item).strip()[:max_length]
+            for item in (quotes or [])
+            if str(item).strip()
+        ][:30]
+        if len(cleaned) >= 30:
+            return cleaned
+
+        profile = profiles.get(str(name or "").strip().lower()) or profiles["motivational"]
+        seen = {item.casefold() for item in cleaned}
+
+        for opening in profile.get("openings", []):
+            for action in profile.get("actions", []):
+                for payoff in profile.get("payoffs", []):
+                    candidate = f"{opening}; {action}; {payoff}."
+                    candidate = candidate[:max_length].strip()
+                    key = candidate.casefold()
+                    if candidate and key not in seen:
+                        cleaned.append(candidate)
+                        seen.add(key)
+                    if len(cleaned) >= 30:
+                        return cleaned[:30]
+
+        theme = str(name or "motivation").replace("-", " ").strip() or "motivation"
+        counter = 1
+        while len(cleaned) < 30:
+            candidate = (
+                f"Keep {theme} moving with one clear step {counter}; "
+                f"steady effort still counts."
+            )[:max_length].strip()
+            key = candidate.casefold()
+            if key not in seen:
+                cleaned.append(candidate)
+                seen.add(key)
+            counter += 1
+        return cleaned[:30]
+
     DEFAULT_QUOTE_SETS = {}
     for name, quotes in _QUOTE_SETS_BASE.items():
-        padded = list(quotes)
-        counter = 1
-        while len(padded) < 30:
-            padded.append(f"{name} quote {counter}")
-            counter += 1
-        DEFAULT_QUOTE_SETS[name] = padded
+        DEFAULT_QUOTE_SETS[name] = _build_padded_quote_set(name, quotes)
 
     @classmethod
     def normalize_quote_sets(cls, quote_sets=None):
         """Return quote sets with guaranteed quotes for each built-in set."""
         defaults = {
-            str(name): [str(item).strip()[: cls.MAX_QUOTE_LENGTH] for item in (quotes or []) if str(item).strip()]
-            for name, quotes in cls.DEFAULT_QUOTE_SETS.items()
+            str(name): cls._build_padded_quote_set(name, quotes)
+            for name, quotes in cls._QUOTE_SETS_BASE.items()
         }
 
         normalized = {}
@@ -1297,16 +1571,10 @@ class SiteConfig(TenantScopedMixin, db.Model):
             if name not in merged:
                 merged[name] = list(quotes)
 
-        # enforce uniform 30‑item length for every set by trimming extras and
-        # padding placeholders when needed.
+        # enforce uniform 30-item length for every set using themed filler
+        # language instead of generic placeholders.
         for name, quotes in merged.items():
-            if len(quotes) > 30:
-                del quotes[30:]
-            if len(quotes) < 30:
-                counter = 1
-                while len(quotes) < 30:
-                    quotes.append(f"{name} quote {counter}")
-                    counter += 1
+            merged[name] = cls._build_padded_quote_set(name, quotes)
         return merged
 
     @classmethod
@@ -1366,7 +1634,7 @@ class SiteConfig(TenantScopedMixin, db.Model):
             if not sets:
                 sets = type(self).normalize_quote_sets()
 
-            active = (self.active_quote_set or "default")
+            active = (self.active_quote_set or "motivational")
             if active in sets:
                 return sets.get(active, [])
             # fallback to the first available set
@@ -1507,7 +1775,7 @@ class SiteConfig(TenantScopedMixin, db.Model):
                 if str(name).lower() == active:
                     return name
 
-        for fallback in ("default",):
+        for fallback in ("motivational", "default"):
             for name in names:
                 if str(name).lower() == fallback:
                     return name
@@ -1568,8 +1836,13 @@ class SiteConfig(TenantScopedMixin, db.Model):
             current_sets = getattr(cfg, "rolling_quote_sets", None) or {}
             if normalized_sets != current_sets or not getattr(cfg, "_rolling_quote_sets", None):
                 cfg._rolling_quote_sets = json.dumps(normalized_sets)
-            if not getattr(cfg, "active_quote_set", None) or cfg.active_quote_set not in normalized_sets:
-                cfg.active_quote_set = "default"
+            active_quote_set = str(getattr(cfg, "active_quote_set", "") or "").strip().lower()
+            if (
+                not active_quote_set
+                or active_quote_set not in normalized_sets
+                or active_quote_set == "default"
+            ):
+                cfg.active_quote_set = "motivational" if "motivational" in normalized_sets else "default"
             db.session.commit()
         except Exception:
             try:
@@ -1586,6 +1859,14 @@ class Department(TenantScopedMixin, db.Model):
     code = db.Column(db.String(2), nullable=False, unique=True, index=True)
     label = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
+    # allow admins to supply a simple Jinja-based template that will be
+    # rendered when notifications are sent to users primarily associated with
+    # this department.  Keeping it on the department object keeps the UI
+    # lightweight and prevents needing a separate configuration table.
+    notification_template = db.Column(db.Text, nullable=True)
+    handoff_template_doc_url = db.Column(db.String(500), nullable=True)
+    handoff_template_checklist_json = db.Column(db.Text, nullable=True)
+
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     order = db.Column(db.Integer, nullable=False, default=0)
@@ -1597,6 +1878,21 @@ class Department(TenantScopedMixin, db.Model):
     @name.setter
     def name(self, v):
         self.label = v
+
+    @property
+    def handoff_template_checklist(self) -> list[str]:
+        try:
+            parsed = json.loads(self.handoff_template_checklist_json or "[]")
+        except Exception:
+            return []
+        if not isinstance(parsed, list):
+            return []
+        return [str(item or "").strip() for item in parsed if str(item or "").strip()]
+
+    @handoff_template_checklist.setter
+    def handoff_template_checklist(self, values):
+        cleaned = [str(item or "").strip()[:255] for item in (values or []) if str(item or "").strip()]
+        self.handoff_template_checklist_json = json.dumps(cleaned)
 
 
 class StatusOption(TenantScopedMixin, db.Model):
@@ -1744,6 +2040,7 @@ class DepartmentEditor(TenantScopedMixin, db.Model):
     can_view_metrics = db.Column(db.Boolean, nullable=False, default=False)
     # department head may reassign the priority of requests in this dept
     can_change_priority = db.Column(db.Boolean, nullable=False, default=False)
+    managed_by_profile = db.Column(db.Boolean, nullable=False, default=False)
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (
         db.UniqueConstraint("user_id", "department", name="uq_user_dept_editor"),
@@ -1764,10 +2061,54 @@ class UserDepartment(TenantScopedMixin, db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     user = db.relationship("User", backref="departments")
     department = db.Column(db.String(2), nullable=False, index=True)
+    assignment_kind = db.Column(db.String(20), nullable=False, default="shared")
+    note = db.Column(db.String(255), nullable=True)
+    handoff_doc_url = db.Column(db.String(500), nullable=True)
+    handoff_checklist_json = db.Column(db.Text, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (
         db.UniqueConstraint("user_id", "department", name="uq_user_department"),
     )
+
+    @property
+    def is_temporary(self) -> bool:
+        return str(getattr(self, "assignment_kind", "shared") or "shared").strip().lower() == "temporary"
+
+    @property
+    def is_expired(self) -> bool:
+        expires_at = getattr(self, "expires_at", None)
+        if not expires_at:
+            return False
+        return expires_at <= datetime.utcnow()
+
+    @property
+    def is_active_assignment(self) -> bool:
+        return not self.is_expired
+
+    @property
+    def handoff_checklist(self) -> list[str]:
+        try:
+            parsed = json.loads(self.handoff_checklist_json or "[]")
+        except Exception:
+            return []
+        if not isinstance(parsed, list):
+            return []
+        cleaned = []
+        for item in parsed:
+            text = str(item or "").strip()
+            if text:
+                cleaned.append(text)
+        return cleaned
+
+    @handoff_checklist.setter
+    def handoff_checklist(self, values):
+        cleaned = []
+        for item in values or []:
+            text = str(item or "").strip()
+            if text:
+                cleaned.append(text[:255])
+        self.handoff_checklist_json = json.dumps(cleaned)
 
 
 class IntegrationConfig(TenantScopedMixin, db.Model):

@@ -28,26 +28,40 @@ def get_user_departments(user):
     if not user:
         return []
     try:
+        from ..models import Department, UserDepartment
+
         depts = []
-        primary = (getattr(user, "department", None) or "").strip().upper()
+        primary = (
+            getattr(user, "_stored_primary_department", None)
+            or getattr(user, "department", None)
+            or ""
+        ).strip().upper()
         if primary:
             depts.append(primary)
 
-        assignments = sorted(
-            getattr(user, "departments", []) or [],
-            key=lambda assignment: (
-                getattr(assignment, "id", 0) or 0,
-                (getattr(assignment, "department", None) or "").strip().upper(),
-            ),
-        )
+        assignments = []
+        if getattr(user, "id", None):
+            assignments = (
+                UserDepartment.query.filter_by(user_id=user.id)
+                .order_by(UserDepartment.id.asc(), UserDepartment.department.asc())
+                .all()
+            )
+        else:
+            assignments = sorted(
+                getattr(user, "departments", []) or [],
+                key=lambda assignment: (
+                    getattr(assignment, "id", 0) or 0,
+                    (getattr(assignment, "department", None) or "").strip().upper(),
+                ),
+            )
         for assignment in assignments:
+            if getattr(assignment, "is_active_assignment", True) is False:
+                continue
             dept = (getattr(assignment, "department", None) or "").strip().upper()
             if dept and dept not in depts:
                 depts.append(dept)
 
         if getattr(user, "is_admin", False):
-            from ..models import Department
-
             rows = (
                 Department.query.filter_by(is_active=True)
                 .order_by(Department.order.asc(), Department.code.asc())

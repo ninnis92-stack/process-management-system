@@ -15,30 +15,18 @@
   } catch (e) {}
   // Prefer server-injected rolling quotes; fall back to built-in lines.
   let lines = (window && window.ROLLING_QUOTES && Array.isArray(window.ROLLING_QUOTES)) ? window.ROLLING_QUOTES.slice() : [
-    "Sort today: socks first, worries later.",
-    "A folded stack is a small victory.",
-    "One load at a time, one win at a time.",
-    "Tackle the smallest basket first.",
-    "Fresh socks, fresh perspective.",
-    "Turn laundry into a tiny ritual of calm.",
-    "Don't wait for motivation—start the wash.",
-    "Clean clothes, clearer head.",
-    "Fold with intention; carry less chaos.",
-    "A warm dryer is a hug for your clothes.",
-    "Separate colors, not your priorities.",
-    "Make today productive—finish one load.",
-    "Every matched pair is progress.",
-    "Treat stains as experiments, not failures.",
-    "Declutter your closet, declutter your day.",
-    "A neat drawer frees mental space.",
-    "Air-dry patience; speed comes after practice.",
-    "Small care preserves the longest wear.",
-    "Refresh your routine with a fresh load.",
-    "Laundry fi is peace earned.",
-    "Celebrate a completed basket.",
-    "Put it away; let it be finished.",
-    "Socks find their way home eventually.",
-    "Folded clothes, elevated mood."
+    "Progress, not perfection.",
+    "Small habits compound into big results.",
+    "Show up today; momentum finds you tomorrow.",
+    "Focus on the next right step.",
+    "Discipline is a form of self-respect.",
+    "You do not need a new day to make a better choice.",
+    "Quiet effort still changes loud outcomes.",
+    "Keep your promises to yourself, especially the small ones.",
+    "Courage often looks like doing the ordinary thing again.",
+    "A little progress with intention beats a lot of delay.",
+    "Your pace is allowed to be steady and still be powerful.",
+    "Make the day answer to your priorities, not your mood."
   ];
 
   // If the configured list was empty we should still show the built-in
@@ -46,30 +34,18 @@
   // undefined text and can leave the placeholder unchanged.
   if (!lines || lines.length === 0) {
     lines = [
-      "Sort today: socks first, worries later.",
-      "A folded stack is a small victory.",
-      "One load at a time, one win at a time.",
-      "Tackle the smallest basket first.",
-      "Fresh socks, fresh perspective.",
-      "Turn laundry into a tiny ritual of calm.",
-      "Don't wait for motivation—start the wash.",
-      "Clean clothes, clearer head.",
-      "Fold with intention; carry less chaos.",
-      "A warm dryer is a hug for your clothes.",
-      "Separate colors, not your priorities.",
-      "Make today productive—finish one load.",
-      "Every matched pair is progress.",
-      "Treat stains as experiments, not failures.",
-      "Declutter your closet, declutter your day.",
-      "A neat drawer frees mental space.",
-      "Air-dry patience; speed comes after practice.",
-      "Small care preserves the longest wear.",
-      "Refresh your routine with a fresh load.",
-      "Laundry fi is peace earned.",
-      "Celebrate a completed basket.",
-      "Put it away; let it be finished.",
-      "Socks find their way home eventually.",
-      "Folded clothes, elevated mood."
+      "Progress, not perfection.",
+      "Small habits compound into big results.",
+      "Show up today; momentum finds you tomorrow.",
+      "Focus on the next right step.",
+      "Discipline is a form of self-respect.",
+      "You do not need a new day to make a better choice.",
+      "Quiet effort still changes loud outcomes.",
+      "Keep your promises to yourself, especially the small ones.",
+      "Courage often looks like doing the ordinary thing again.",
+      "A little progress with intention beats a lot of delay.",
+      "Your pace is allowed to be steady and still be powerful.",
+      "Make the day answer to your priorities, not your mood."
     ];
   }
   // start with a shallow copy of lines; no fixed shuffle order is needed
@@ -868,42 +844,57 @@
     try{
       if(isUserLoggedIn()){
         fetch('/auth/vibe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ vibe_index: effectiveIdx }) })
-          .then(async (response) => {
-            let payload = null;
-            try {
-              payload = await response.json();
-            } catch (e) {}
+            .then(async (response) => {
+              let payload = null;
+              try {
+                payload = await response.json();
+              } catch (e) {}
 
-            if (!response.ok) {
-              if (payload && (payload.error === 'dark_mode_vibe_disabled' || payload.error === 'vibe_disabled')) {
-                // dark mode prevents any theme changes; nothing to do here.
+              if (!response.ok) {
+                if (payload && (payload.error === 'dark_mode_vibe_disabled' || payload.error === 'vibe_disabled')) {
+                  // dark mode prevents any theme changes; nothing to do here.
+                  return;
+                }
+                showVibeFeedback("Couldn't save your theme change. Please try again.", 'warning');
                 return;
               }
+
+              if (payload && Number.isFinite(Number(payload.vibe_index)) && Number(payload.vibe_index) !== effectiveIdx) {
+                applyTheme(Number(payload.vibe_index));
+                return;
+              }
+
+              clearVibeFeedback();
+              const settingsStatus = document.getElementById('settingsAutoSaveStatus');
+              if (settingsStatus) {
+                settingsStatus.textContent = 'Changes save automatically.';
+              }
+            })
+            .catch(() => {
               showVibeFeedback("Couldn't save your theme change. Please try again.", 'warning');
-              return;
-            }
-
-            if (payload && Number.isFinite(Number(payload.vibe_index)) && Number(payload.vibe_index) !== effectiveIdx) {
-              applyTheme(Number(payload.vibe_index));
-              return;
-            }
-
-            clearVibeFeedback();
-            const settingsStatus = document.getElementById('settingsAutoSaveStatus');
-            if (settingsStatus) {
-              settingsStatus.textContent = 'Changes save automatically.';
-            }
-          })
-          .catch(() => {
-            showVibeFeedback("Couldn't save your theme change. Please try again.", 'warning');
-          });
-      }
-    }catch(e){}
+            });
+        }
+      }catch(e){}
   }
+
+// end of main theme logic
+
+// add prefetch hints for anchor links on hover to reduce perceived navigation
+  document.body.addEventListener('mouseover', function(e){
+    const a = e.target.closest('a');
+    if(!a) return;
+    const href = a.getAttribute('href');
+    if(!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.href = href;
+    document.head.appendChild(link);
+  });
   // If an admin-imported external theme or logo is active the body gets the
   // `no-vibe` class; in that case we should leave the CSS alone and not
   // override the accent colors or dark-mode colors.  this keeps branding
   // intact when a site-specific stylesheet is loaded.
+
   function isUserLoggedIn() {
     if (typeof window.USER_LOGGED_IN !== 'undefined') return !!window.USER_LOGGED_IN;
     return document.body.dataset.userLoggedIn === '1';

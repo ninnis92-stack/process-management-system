@@ -304,7 +304,11 @@ def test_initial_quote_on_dashboard(app, client):
     assert "Loading inspiration" not in html
     with app.app_context():
         cfg = SiteConfig.get()
-        quotes = cfg.rolling_quotes or SiteConfig.DEFAULT_QUOTE_SETS.get("default", [])
+        # fall back to the motivation-driven site default now that "motivational"
+        # replaced the legacy "default" set as the active baseline.
+        quotes = cfg.rolling_quotes or SiteConfig.DEFAULT_QUOTE_SETS.get(
+            "motivational", []
+        )
     # at least one of the configured quotes should appear somewhere in the html
     assert any(q and q in html for q in quotes), "no rolling quote rendered in dashboard"
 

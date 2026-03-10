@@ -8,7 +8,9 @@ app = create_app()
 with app.app_context():
     cfg = SiteConfig.get()
     quote_sets = SiteConfig.normalize_quote_sets(getattr(cfg, "rolling_quote_sets", None))
-    active = cfg.active_quote_set if getattr(cfg, "active_quote_set", None) in quote_sets else "default"
+    active = str(getattr(cfg, "active_quote_set", "") or "").strip().lower()
+    if active not in quote_sets or active == "default":
+        active = "motivational" if "motivational" in quote_sets else "default"
 
     changed = False
     if quote_sets != (getattr(cfg, "rolling_quote_sets", None) or {}):

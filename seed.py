@@ -77,6 +77,154 @@ def main():
                             pass
                 except Exception:
                     pass
+            if "preferred_start_page" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN preferred_start_page VARCHAR(40) DEFAULT 'dashboard'"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            if "preferred_start_department" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN preferred_start_department VARCHAR(2)"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            if "watched_departments_json" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN watched_departments_json TEXT"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            if "workflow_role_profile" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN workflow_role_profile VARCHAR(40) DEFAULT 'member'"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            if "notification_departments_json" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN notification_departments_json TEXT"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            if "backup_approver_user_id" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN backup_approver_user_id INTEGER"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            # ensure department table can store notification templates
+            try:
+                dept_cols = [c["name"] for c in inspector.get_columns("department")]
+                if "notification_template" not in dept_cols:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"department\" ADD COLUMN notification_template TEXT"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                if "handoff_template_doc_url" not in dept_cols:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"department\" ADD COLUMN handoff_template_doc_url VARCHAR(500)"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                if "handoff_template_checklist_json" not in dept_cols:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"department\" ADD COLUMN handoff_template_checklist_json TEXT"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            try:
+                user_department_cols = [c["name"] for c in inspector.get_columns("user_department")]
+                if "handoff_doc_url" not in user_department_cols:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE user_department ADD COLUMN handoff_doc_url VARCHAR(500)"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                if "handoff_checklist_json" not in user_department_cols:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE user_department ADD COLUMN handoff_checklist_json TEXT"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+            except Exception:
+                pass
         except Exception:
             # If inspection isn't available, proceed — seed has additional
             # fallback handling later when commits fail.
@@ -209,8 +357,13 @@ def main():
                         quotes.append(quotes[i % len(quotes)])
                         i += 1
         cfg._rolling_quote_sets = json.dumps(normalized_sets)
-        if not getattr(cfg, "active_quote_set", None) or cfg.active_quote_set not in normalized_sets:
-            cfg.active_quote_set = "default"
+        active_quote_set = str(getattr(cfg, "active_quote_set", "") or "").strip().lower()
+        if (
+            not active_quote_set
+            or active_quote_set not in normalized_sets
+            or active_quote_set == "default"
+        ):
+            cfg.active_quote_set = "motivational" if "motivational" in normalized_sets else "default"
         # normalize any existing user preferences just in case there are stray
         # upper‑case or whitespace‑padded values from earlier releases or manual
         # edits; the model's validator will also keep future writes consistent.

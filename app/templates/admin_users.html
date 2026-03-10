@@ -4,12 +4,24 @@
   <div>
     <div class="page-header__eyebrow">Administration</div>
     <h3 class="page-header__title mb-0">Users</h3>
-    <p class="page-header__lede mb-0">Manage access, departments, and impersonation workflows in one place.</p>
+    <p class="page-header__lede mb-0">Manage access, departments, backup coverage, and queue-routing preferences in one place.</p>
   </div>
   <div class="page-header__actions">
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.coverage_calendar') }}">Coverage calendar</a>
     <a class="btn btn-primary" href="{{ url_for('admin.create_user') }}">Create / Update User</a>
   </div>
 </section>
+
+{% if user_stats %}
+<section class="surface-panel surface-panel-muted mb-3">
+  <div class="d-flex flex-wrap gap-2">
+    <span class="dashboard-section-badge">{{ user_stats.total }} total users</span>
+    <span class="dashboard-section-badge">{{ user_stats.inactive }} inactive</span>
+    <span class="dashboard-section-badge">{{ user_stats.multi_dept }} shared across departments</span>
+    <span class="dashboard-section-badge">{{ user_stats.expiring_loans }} loans ending soon</span>
+  </div>
+</section>
+{% endif %}
 
 <section class="surface-panel surface-panel-muted">
   <div class="page-toolbar d-flex flex-wrap gap-2">
@@ -39,31 +51,103 @@
   </div>
 </section>
 
+<form id="bulk-update-form" method="post" action="{{ url_for('admin.bulk_update_users') }}" class="surface-panel surface-panel-muted my-3">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row g-2 align-items-end">
+    <div class="col-12 col-lg-4">
+      <label class="form-label">Bulk action</label>
+      <select class="form-select" name="bulk_action">
+        <option value="activate">Activate selected users</option>
+        <option value="deactivate">Deactivate selected users</option>
+        <option value="set_primary_department">Set primary department</option>
+        <option value="apply_role_profile">Apply workflow role profile</option>
+      </select>
+    </div>
+    <div class="col-6 col-lg-2">
+      <label class="form-label">Department</label>
+      <select class="form-select" name="bulk_department">
+        <option value="">No change</option>
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+      </select>
+    </div>
+    <div class="col-6 col-lg-3">
+      <label class="form-label">Workflow profile</label>
+      <select class="form-select" name="bulk_role_profile">
+        <option value="member">Member</option>
+        <option value="coordinator">Coordinator</option>
+        <option value="metrics_lead">Metrics Lead</option>
+        <option value="queue_lead">Queue Lead</option>
+      </select>
+    </div>
+    <div class="col-12 col-lg-3 d-grid d-lg-flex justify-content-lg-end">
+      <button type="submit" class="btn btn-primary">Apply to selected</button>
+    </div>
+  </div>
+  <div class="form-text mt-2">Use the checkboxes in the table below. Bulk updates avoid repetitive edits when teams rotate coverage.</div>
+</form>
+
 <section class="surface-panel table-shell">
 <div class="table-responsive">
   <table class="table table-sm align-middle">
     <thead>
       <tr>
+        <th style="width: 42px;">
+          <input
+            type="checkbox"
+            aria-label="Select all users"
+            onchange="document.querySelectorAll('input[name=\'user_ids\']').forEach((box) => { box.checked = this.checked; });"
+          >
+        </th>
         <th>Email</th>
-        <th>Name</th>
         <th>Workspace</th>
-        <th>Department</th>
-        <th>Admin</th>
-        <th>Active</th>
-        <th>Created</th>
+        <th>Workflow</th>
+        <th>Coverage</th>
+        <th>Status</th>
         <th></th>
       </tr>
     </thead>
     <tbody>
       {% for u in users %}
         <tr>
-          <td>{{ u.email }}</td>
-          <td>{{ u.name or '' }}</td>
+          <td>
+            <input type="checkbox" name="user_ids" value="{{ u.id }}" class="form-check-input" form="bulk-update-form">
+          </td>
+          <td>
+            <div class="fw-semibold">{{ u.email }}</div>
+            {% if u.name %}<div class="text-muted small">{{ u.name }}</div>{% endif %}
+            <div class="d-flex flex-wrap gap-1 mt-1">
+              <span class="badge text-bg-light">Dept {{ u.department }}</span>
+              {% if u.is_admin %}<span class="badge text-bg-primary">Admin</span>{% endif %}
+              {% if not u.is_active %}<span class="badge text-bg-secondary">Inactive</span>{% endif %}
+            </div>
+          </td>
           <td>{{ u.tenant.name if u.tenant else '–' }}</td>
-          <td>{{ u.department }}</td>
-          <td>{{ 'Yes' if u.is_admin else 'No' }}</td>
-          <td>{{ 'Yes' if u.is_active else 'No' }}</td>
-          <td>{{ u.created_at }}</td>
+          <td>
+            <div class="fw-semibold">{{ u.workflow_role_profile_label if u.workflow_role_profile_label is defined else (u.workflow_role_profile or 'Member')|replace('_', ' ')|title }}</div>
+            {% if u.watched_departments %}
+              <div class="text-muted small">Quick access: {{ u.watched_departments|join(', ') }}</div>
+            {% endif %}
+            {% if u.notification_departments %}
+              <div class="text-muted small">Alerts: {{ u.notification_departments|join(', ') }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.backup_approver %}
+              <div class="small"><strong>Backup:</strong> {{ u.backup_approver.email }}</div>
+            {% endif %}
+            {% set active_loans = u.departments|selectattr('is_active_assignment')|list %}
+            {% if active_loans %}
+              <div class="small text-muted">{{ active_loans|length }} extra dept{{ '' if active_loans|length == 1 else 's' }}</div>
+            {% else %}
+              <div class="small text-muted">Primary dept only</div>
+            {% endif %}
+          </td>
+          <td>
+            <div class="small">{{ 'Active' if u.is_active else 'Inactive' }}</div>
+            <div class="text-muted small">Created {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '–' }}</div>
+          </td>
           <td class="text-end">
             <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.edit_user', user_id=u.id) }}">Edit</a>
             <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.manage_user_departments', user_id=u.id) }}">Departments</a>
@@ -82,7 +166,7 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="8" class="text-muted">No users.</td></tr>
+        <tr><td colspan="7" class="text-muted">No users.</td></tr>
       {% endfor %}
     </tbody>
   </table>

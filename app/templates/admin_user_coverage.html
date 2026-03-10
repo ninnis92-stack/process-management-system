@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <div class="page-header__eyebrow">Administration</div>
+    <h3 class="page-header__title mb-0">Coverage calendar</h3>
+    <p class="page-header__lede mb-0">Review temporary department loans, backup approvers, and notification routing before a handoff turns into a blind spot.</p>
+  </div>
+  <div class="page-header__actions">
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_users') }}">Back to users</a>
+  </div>
+</section>
+
+<form method="get" class="surface-panel surface-panel-muted mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-6 col-md-3">
+      <label class="form-label">Department</label>
+      <select class="form-select" name="dept">
+        <option value="" {% if not dept_filter %}selected{% endif %}>All departments</option>
+        {% for code, label in department_choices %}
+          <option value="{{ code }}" {% if dept_filter == code %}selected{% endif %}>{{ label }}{% if label != code %} ({{ code }}){% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label">Horizon</label>
+      <select class="form-select" name="days">
+        <option value="7" {% if horizon_days == 7 %}selected{% endif %}>7 days</option>
+        <option value="14" {% if horizon_days == 14 %}selected{% endif %}>14 days</option>
+        <option value="30" {% if horizon_days == 30 %}selected{% endif %}>30 days</option>
+      </select>
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">Search</label>
+      <input class="form-control" type="search" name="q" value="{{ coverage_query or '' }}" placeholder="User, team, note, checklist...">
+    </div>
+    <div class="col-12 col-md-3 d-grid d-md-flex justify-content-md-end">
+      <a class="btn btn-outline-secondary" href="{{ url_for('admin.coverage_calendar', reset=1) }}">Reset filters</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('admin.coverage_calendar', dept=dept_filter or None, days=horizon_days, q=coverage_query or None, format='ics') }}">Download .ics</a>
+      <button class="btn btn-primary" type="submit">Update calendar</button>
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 mt-3">
+    <span class="dashboard-section-badge">{{ coverage_stats.active }} active loan{{ '' if coverage_stats.active == 1 else 's' }}</span>
+    <span class="dashboard-section-badge">{{ coverage_stats.ending_soon }} ending within 3 days</span>
+    <span class="dashboard-section-badge">{{ coverage_stats.backup_pairs }} backup approver link{{ '' if coverage_stats.backup_pairs == 1 else 's' }}</span>
+    <span class="dashboard-section-badge">{{ coverage_stats.conflicts }} overlap warning{{ '' if coverage_stats.conflicts == 1 else 's' }}</span>
+  </div>
+  {% if filters_saved %}
+    <div class="form-text mt-2">These filters stay saved for this session so you can return to the same coverage view quickly.</div>
+  {% endif %}
+</form>
+
+<section class="surface-panel mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <h5 class="mb-0">Upcoming coverage agenda</h5>
+      <small class="text-muted">Each day shows temporary department coverage active on that date.</small>
+    </div>
+  </div>
+
+  {% if calendar_days %}
+    <div class="row g-3">
+      {% for day in calendar_days %}
+        <div class="col-12 col-xl-6">
+          <div class="border rounded-4 p-3 h-100 bg-body-tertiary">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+              <div class="fw-semibold">{{ day.date.strftime('%a, %b %-d') if day.date is defined else '' }}</div>
+              <span class="badge text-bg-light">{{ day.entries|length }} coverage item{{ '' if day.entries|length == 1 else 's' }}</span>
+            </div>
+            {% if day.entries %}
+              <div class="d-flex flex-column gap-2">
+                {% for entry in day.entries %}
+                  <div class="border rounded-3 p-2 bg-body">
+                    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                      <div class="fw-semibold">{{ entry.user.email }} → Dept {{ entry.department }}</div>
+                      {% if entry.has_conflict %}
+                        <span class="badge text-bg-warning">Overlap warning</span>
+                      {% endif %}
+                    </div>
+                    <div class="small text-muted">{{ entry.starts_at.strftime('%b %-d %H:%M') }} to {{ entry.ends_at.strftime('%b %-d %H:%M') }}</div>
+                    {% if entry.note %}<div class="small mt-1">{{ entry.note }}</div>{% endif %}
+                    {% if entry.handoff_doc_url %}<div class="small mt-1"><a href="{{ entry.handoff_doc_url }}" target="_blank" rel="noopener noreferrer">Open handoff doc</a></div>{% endif %}
+                    {% if entry.handoff_checklist %}
+                      <ul class="small mt-2 mb-0 ps-3">
+                        {% for item in entry.handoff_checklist %}
+                          <li>{{ item }}</li>
+                        {% endfor %}
+                      </ul>
+                    {% endif %}
+                    {% if entry.backup_approver %}<div class="small text-muted mt-1">Backup approver: {{ entry.backup_approver.email }}</div>{% endif %}
+                    {% if entry.conflicts %}
+                      <div class="small text-warning mt-1">
+                        Conflicts with
+                        {% for conflict in entry.conflicts %}
+                          Dept {{ conflict.department }}{% if conflict.ends_at %} until {{ conflict.ends_at.strftime('%b %-d %H:%M') }}{% endif %}{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="small text-muted">No temporary cross-department coverage scheduled.</div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">No temporary coverage falls inside the selected window.</div>
+  {% endif %}
+</section>
+
+<section class="surface-panel">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <h5 class="mb-0">Backup approver map</h5>
+      <small class="text-muted">Use this list to spot who is receiving mirrored alerts and extra notification routing.</small>
+    </div>
+  </div>
+
+  {% if backup_pairs %}
+    <div class="row g-3">
+      {% for pair in backup_pairs %}
+        <div class="col-12 col-lg-6">
+          <div class="border rounded-4 p-3 h-100 bg-body-tertiary">
+            <div class="fw-semibold">{{ pair.user.email }}</div>
+            <div class="small text-muted">Primary departments: {{ pair.departments|join(', ') if pair.departments else 'None' }}</div>
+            <div class="mt-2">Backup approver: <strong>{{ pair.backup.email if pair.backup else 'None' }}</strong></div>
+            {% if pair.notification_departments %}
+              <div class="small text-muted mt-1">Extra alert routing: {{ pair.notification_departments|join(', ') }}</div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">No backup approvers configured for this filter.</div>
+  {% endif %}
+</section>
+{% endblock %}

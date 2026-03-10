@@ -286,6 +286,12 @@ def create_app():
         except Exception:
             return
 
+        try:
+            if not hasattr(current_user, "_stored_primary_department"):
+                current_user._stored_primary_department = getattr(current_user, "department", None)
+        except Exception:
+            pass
+
         imp_admin = None
         from flask import session as _session, current_app as _current_app
 
@@ -314,7 +320,7 @@ def create_app():
             if active_dept:
                 # Validate that the current user is allowed to view as this dept
                 try:
-                    from .models import UserDepartment, Department
+                    from .utils.user_context import user_can_access_department
 
                     allowed = False
                     # Always allow switching to primary department
@@ -323,13 +329,8 @@ def create_app():
                     # Admins may switch freely
                     if getattr(current_user, "is_admin", False):
                         allowed = True
-                    # Otherwise check explicit assignments
                     if not allowed:
-                        ud = UserDepartment.query.filter_by(
-                            user_id=current_user.id, department=active_dept
-                        ).first()
-                        if ud:
-                            allowed = True
+                        allowed = user_can_access_department(current_user, active_dept)
                     if allowed:
                         try:
                             current_user.department = active_dept
@@ -427,8 +428,18 @@ def create_app():
                 else:
                     try:
                         selected_quote_key = cfg.resolve_quote_set_name_for_user(quote_user)
-                        if selected_quote_key and cfg.rolling_quote_sets:
-                            rolling_quotes = cfg.rolling_quote_sets.get(selected_quote_key, [])
+                        if selected_quote_key:
+                            # prefer configured sets if present, otherwise fall
+                            # back to built-in defaults so personal overrides
+                            # still work without any admin customization.
+                            if cfg.rolling_quote_sets:
+                                rolling_quotes = cfg.rolling_quote_sets.get(
+                                    selected_quote_key, []
+                                )
+                            else:
+                                rolling_quotes = SiteConfig.DEFAULT_QUOTE_SETS.get(
+                                    selected_quote_key, []
+                                )
                     except Exception:
                         pass
                 if getattr(cfg, "logo_filename", None):
@@ -545,7 +556,7 @@ def create_app():
                         __import__('random').choice(quotes) if quotes and enabled else None
                     )(rolling_quotes[:] if rolling_quotes else [], rolling_quotes_enabled)
                     if rolling_quotes and rolling_quotes_enabled
-                    else (SiteConfig.DEFAULT_QUOTE_SETS.get('default', [None])[0])
+                    else (SiteConfig.DEFAULT_QUOTE_SETS.get('motivational', [None])[0])
                 ),
                 allow_user_reminders_enabled=allow_user_reminders_enabled,
                 external_theme_loaded=external_theme_loaded,
