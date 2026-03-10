@@ -224,7 +224,7 @@
   {% if ep.startswith('admin') %}
     <nav aria-label="breadcrumb" class="container-fluid mt-2">
       <ol class="breadcrumb mb-0">
-        <li class="breadcrumb-item"><a href="{{ url_for('admin.index') }}">Admin</a></li>
+        <li class="breadcrumb-item">Admin</li>
         {% if request.endpoint == 'admin.list_status_options' %}
           <li class="breadcrumb-item active" aria-current="page">Status Options</li>
         {% elif request.endpoint == 'admin.list_workflows' %}

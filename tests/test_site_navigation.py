@@ -292,6 +292,8 @@ def test_admin_navigation_links_resolve(app, client):
     assert "Metrics" in html
     assert re.search(r'<a class="nav-link[^"]*" href="/admin/">Admin</a>', html)
     assert not re.search(r'<a class="nav-link[^"]*" href="/admin/">Dashboard</a>', html)
+    # ensure breadcrumb isn’t itself a clickable Admin link
+    assert not re.search(r'<ol class="breadcrumb[^"]*">[\s\S]*?<a[^>]+>Admin<\/a>', html)
     if "Retention" not in html:
         # dump for debugging
         print("ADMIN HTML:\n", html)
