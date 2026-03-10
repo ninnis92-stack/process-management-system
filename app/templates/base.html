@@ -28,7 +28,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" integrity="sha512-p1Cm0QlW0FQvgw+Vxv0+H5a6uVgnF6V5u0Y2dd4AozqA3BsnF7mk/WvJL3Z8zUuNX1U4MZT+O2e2d3dH+pvGVHg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <!-- bump version after latest CSS changes to force clients to fetch new stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260310b') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260310c') }}">
   <!-- bundled frontend assets (built by Vite/ES modules) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css', v='20260310a') }}">
   {% if active_theme_css %}
@@ -415,7 +415,7 @@
   <script id="rolling-quotes-data" type="application/json" defer>{{ rolling_quotes|tojson }}</script>
   {% endif %}
   <script type="module" src="{{ url_for('static', filename='dist/app.js', v='20260308c') }}" defer></script>
-  <script src="{{ url_for('static', filename='app.js', v='20260310a') }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260310b') }}" defer></script>
   <script>
     (function(){
       try{

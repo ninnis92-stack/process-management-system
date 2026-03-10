@@ -139,6 +139,8 @@ def test_feature_flags_autosave_support(client, app):
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
     assert 'data-autosave-endpoint="/admin/feature_flags"' in html
+    # status element used by the client-side script for feedback
+    assert 'id="featureFlagsAutoSaveStatus"' in html
     # verify global JS includes beforeunload handler to flush autosaves
     # and the new fetch+keepalive logic (not sendBeacon) so JSON posts work
     # root redirects logged-in users so hit dashboard directly
@@ -212,6 +214,31 @@ def test_feature_flags_json_autosave_handles_string_booleans(client, app):
         flags = FeatureFlags.get()
         assert flags.enable_notifications is False
         assert flags.guest_dashboard_enabled is False
+
+
+def test_feature_flags_autosave_handles_plain_text(client, app):
+    """Even when the payload isn't recognized as JSON the flags should update."""
+    make_admin(app)
+    with app.app_context():
+        flags = FeatureFlags.get()
+        flags.enable_notifications = False
+        db.session.commit()
+
+    rv = login_admin(client)
+    assert rv.status_code == 200
+
+    # simulate a fetch/sendBeacon post where the content-type isn't JSON
+    rv = client.post(
+        "/admin/feature_flags",
+        data="enable_notifications=y",
+        content_type="text/plain",
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert rv.status_code == 200
+    payload = rv.get_json()
+    assert payload and payload.get("ok") is True
+    with app.app_context():
+        assert FeatureFlags.get().enable_notifications is True
 
 
 def test_feature_flags_fallback_defaults_keep_vibe_enabled(app, monkeypatch):

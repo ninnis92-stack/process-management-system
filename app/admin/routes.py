@@ -1662,39 +1662,36 @@ def feature_flags():
         flags = FeatureFlags()
     form = FeatureFlagsForm()
 
-    # support JSON autosave calls in addition to regular form POST
-    if flask_request.is_json:
-        data = flask_request.get_json(silent=True) or {}
-        # update only the flags provided in the payload
-        for field in (
-            "enable_notifications",
-            "enable_nudges",
-            "allow_user_nudges",
-            "vibe_enabled",
-            "sso_admin_sync_enabled",
-            "sso_department_sync_enabled",
-            "enable_external_forms",
-            "rolling_quotes_enabled",
-            "guest_dashboard_enabled",
-            "guest_submission_enabled",
-        ):
-            if field in data:
+    # only process updates on POST; GET requests should fall through to the
+    # normal render logic further down.  Autosave requests may arrive as JSON,
+    # as urlencoded form data, or even with a bare text/plain body (sendBeacon
+    # fallback).  We'll treat all of them the same, then reply with JSON if the
+    # caller looked like it was AJAX, otherwise perform a redirect so the
+    # manual "Save" button still behaves.
+    if flask_request.method == 'POST':
+        # autosave/JSON requests are marked by the AJAX header inserted by
+        # the global fetch wrapper; normal form submissions without that
+        # header fall back to the familiar checkbox-coercion logic.
+        if flask_request.headers.get('X-Requested-With') == 'XMLHttpRequest' or flask_request.is_json:
+            data = {}
+            if flask_request.is_json:
+                data = flask_request.get_json(silent=True) or {}
+            elif flask_request.form:
+                data = flask_request.form.to_dict(flat=True)
+            else:
+                # first try to interpret body as JSON
+                raw = flask_request.get_data(as_text=True) or ''
                 try:
-                    setattr(flags, field, _coerce_checkbox_like_value(data[field]))
+                    data = json.loads(raw) if raw else {}
                 except Exception:
-                    pass
-        try:
-            db.session.commit()
-        except Exception:
-            try:
-                db.session.rollback()
-            except Exception:
-                pass
-            return jsonify({"ok": False, "error": "save_failed"}), 500
-        # echo back current state
-        return jsonify({
-            "ok": True,
-            "flags": {f: bool(getattr(flags, f, False)) for f in (
+                    data = {}
+                # if looks like urlencoded key=value pairs, parse those
+                if not data and raw:
+                    from urllib.parse import parse_qs
+                    parsed = parse_qs(raw, keep_blank_values=True)
+                    data = {k: v[0] for k, v in parsed.items()}
+
+            for field in (
                 "enable_notifications",
                 "enable_nudges",
                 "allow_user_nudges",
@@ -1705,8 +1702,69 @@ def feature_flags():
                 "rolling_quotes_enabled",
                 "guest_dashboard_enabled",
                 "guest_submission_enabled",
-            )},
-        })
+            ):
+                if field in data:
+                    try:
+                        setattr(flags, field, _coerce_checkbox_like_value(data[field]))
+                    except Exception:
+                        pass
+            try:
+                db.session.commit()
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                return jsonify({"ok": False, "error": "save_failed"}), 500
+
+            return jsonify({
+                "ok": True,
+                "flags": {f: bool(getattr(flags, f, False)) for f in (
+                    "enable_notifications",
+                    "enable_nudges",
+                    "allow_user_nudges",
+                    "vibe_enabled",
+                    "sso_admin_sync_enabled",
+                    "sso_department_sync_enabled",
+                    "enable_external_forms",
+                    "rolling_quotes_enabled",
+                    "guest_dashboard_enabled",
+                    "guest_submission_enabled",
+                )},
+            })
+        else:
+            # regular form submission; use original checkbox logic for
+            # missing/unchecked values.
+            if form.validate_on_submit():
+                flags.enable_notifications = _submitted_checkbox_enabled(
+                    "enable_notifications"
+                )
+                flags.enable_nudges = _submitted_checkbox_enabled("enable_nudges")
+                flags.allow_user_nudges = _submitted_checkbox_enabled(
+                    "allow_user_nudges"
+                )
+                flags.vibe_enabled = _submitted_checkbox_enabled("vibe_enabled")
+                flags.sso_admin_sync_enabled = _submitted_checkbox_enabled(
+                    "sso_admin_sync_enabled"
+                )
+                flags.sso_department_sync_enabled = _submitted_checkbox_enabled(
+                    "sso_department_sync_enabled"
+                )
+                flags.enable_external_forms = _submitted_checkbox_enabled(
+                    "enable_external_forms"
+                )
+                flags.rolling_quotes_enabled = _submitted_checkbox_enabled(
+                    "rolling_quotes_enabled"
+                )
+                flags.guest_dashboard_enabled = _submitted_checkbox_enabled(
+                    "guest_dashboard_enabled"
+                )
+                flags.guest_submission_enabled = _submitted_checkbox_enabled(
+                    "guest_submission_enabled"
+                )
+                db.session.commit()
+                flash("Feature flags updated.", "success")
+            return redirect(url_for("admin.feature_flags"))
 
     if flask_request.method == "GET":
         form.enable_notifications.data = bool(

@@ -24,6 +24,7 @@
 
     <form method="post" class="admin-feature-flags" data-autosave-endpoint="{{ url_for('admin.feature_flags') }}">
       {{ form.hidden_tag() }}
+      <div id="featureFlagsAutoSaveStatus" class="ui-action-note settings-autosave-note mt-2" aria-live="polite"></div>
 
       <section class="admin-feature-flags__section">
         <div class="admin-feature-flags__section-header">

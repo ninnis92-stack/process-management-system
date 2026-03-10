@@ -908,6 +908,13 @@ document.addEventListener('DOMContentLoaded', function(){
     syncThemeBannerLayout({ quotesEnabled });
     syncVibeControlAvailability();
 
+    // visual feedback so admins know the change actually reached the server
+    const statusEl = document.getElementById('featureFlagsAutoSaveStatus');
+    if (statusEl) {
+      statusEl.textContent = 'Changes saved.';
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    }
+
     if (vibeEnabled && !isDarkModeEnabled()) {
       const saved = Number(localStorage.getItem('vibeTheme'));
       const userVibe = getUserVibeIndex();
