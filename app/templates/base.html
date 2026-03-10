@@ -639,13 +639,20 @@
       const path = location.pathname;
       const pending = new Map(); // form -> timeout id
 
+      function sessionPersistForms(){
+        return Array.from(document.querySelectorAll('form[data-toggle-session-persist="session"]'));
+      }
+
       function restore(){
         try{
           const all = JSON.parse(sessionStorage.getItem(storageKey)||'{}');
           const saved = all[path];
-          if(saved && Array.isArray(saved)){
+          const forms = sessionPersistForms();
+          if(saved && Array.isArray(saved) && forms.length){
             saved.forEach(s=>{
-              const cb = document.querySelector(`.form-check-input[name="${s.name}"]`);
+              const cb = forms
+                .map(form => form.querySelector(`.form-check-input[name="${s.name}"]`))
+                .find(Boolean);
               if(cb){
                 cb.checked = s.checked;
                 cb.dispatchEvent(new Event('change'));
@@ -660,8 +667,12 @@
 
       function saveState(){
         try{
+          const forms = sessionPersistForms();
+          if(!forms.length) return;
           const all = JSON.parse(sessionStorage.getItem(storageKey)||'{}');
-          const list = Array.from(document.querySelectorAll('.form-check-input[data-toggle-text-checked]')).map(cb=>({name:cb.name,checked:cb.checked}));
+          const list = forms.flatMap(form =>
+            Array.from(form.querySelectorAll('.form-check-input[data-toggle-text-checked]')).map(cb=>({name:cb.name,checked:cb.checked}))
+          );
           all[path] = list;
           sessionStorage.setItem(storageKey, JSON.stringify(all));
         }catch(e){/* ignore */}
@@ -738,7 +749,7 @@
         if(form && el.matches('input, select, textarea')){
           scheduleSave(form);
         }
-        if(el.matches('.form-check-input')){
+        if(el.matches('.form-check-input') && el.closest('form[data-toggle-session-persist="session"]')){
           saveState();
         }
       });
@@ -753,8 +764,7 @@
       });
 
       // also save session storage when page is submitted normally
-      const form = document.querySelector('form');
-      if(form) form.addEventListener('submit', saveState);
+      sessionPersistForms().forEach(form => form.addEventListener('submit', saveState));
     })();
   </script>
 </body>

@@ -694,6 +694,7 @@ document.addEventListener('DOMContentLoaded', function(){
   const vibeButtons = Array.from(document.querySelectorAll('#vibeBtn, #vibeBtnDept, #vibeBtnAdmin, [data-vibe-trigger]'));
   const vibeShells = Array.from(document.querySelectorAll('[data-vibe-shell]'));
   const vibeControlPanels = Array.from(document.querySelectorAll('[data-vibe-control-panel]'));
+  const quotePanels = Array.from(document.querySelectorAll('[data-vibe-quote-panel]'));
   const themeBanners = Array.from(document.querySelectorAll('[data-theme-banner]'));
   const themeManagedProps = [
     '--accent', '--accent-rgb', '--accent-2', '--nav-bg', '--nav-text', '--body-text',
@@ -782,10 +783,26 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   }
 
-  function syncThemeBannerLayout() {
+  function syncThemeBannerLayout(options = {}) {
+    const quotesEnabled = options.quotesEnabled !== false;
     const hasVisibleVibeControl = vibeControlPanels.some((panel) => !panel.hidden);
+    const shouldShowBanner = quotesEnabled || hasVisibleVibeControl;
+
+    try {
+      document.body.classList.toggle('no-brand-banner', !shouldShowBanner);
+    } catch (e) {}
+
+    quotePanels.forEach((panel) => {
+      try {
+        panel.hidden = !quotesEnabled;
+        panel.setAttribute('aria-hidden', !quotesEnabled ? 'true' : 'false');
+      } catch (e) {}
+    });
+
     themeBanners.forEach((banner) => {
       try {
+        banner.hidden = !shouldShowBanner;
+        banner.setAttribute('aria-hidden', !shouldShowBanner ? 'true' : 'false');
         banner.classList.toggle('brand-banner-row--quotes-only', !hasVisibleVibeControl);
       } catch (e) {}
     });
@@ -884,7 +901,11 @@ document.addEventListener('DOMContentLoaded', function(){
     }
 
     const vibeEnabled = !!flags.vibe_enabled;
+    const quotesEnabled = typeof flags.rolling_quotes_enabled === 'undefined'
+      ? true
+      : !!flags.rolling_quotes_enabled;
     setVibeFeatureState(vibeEnabled);
+    syncThemeBannerLayout({ quotesEnabled });
     syncVibeControlAvailability();
 
     if (vibeEnabled && !isDarkModeEnabled()) {

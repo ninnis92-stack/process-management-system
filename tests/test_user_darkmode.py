@@ -257,6 +257,19 @@ def test_dashboard_uses_compact_nav_state_when_vibe_and_quotes_are_disabled(clie
     assert b"no-brand-banner" in m.group(1)
 
 
+def test_user_settings_opt_in_to_session_toggle_persistence(client, app):
+    make_user(app, dark_mode=False)
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/auth/settings")
+    assert rv.status_code == 200
+    assert b'data-toggle-session-persist="session"' in rv.data
+
+    admin = client.get("/admin/feature_flags")
+    assert admin.status_code in (302, 200)
+
+
 def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
     make_user(app, dark_mode=False)
     with app.app_context():

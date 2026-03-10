@@ -147,6 +147,7 @@ def test_feature_flags_autosave_support(client, app):
     assert b"keepalive" in base.data
     assert b"form:autosaved" in base.data
     assert b"card.classList.toggle('active', cb.checked);" in base.data
+    assert b"form[data-toggle-session-persist=\"session\"]" in base.data
 
 
 def test_feature_flags_json_autosave_updates(client, app):
@@ -174,6 +175,18 @@ def test_feature_flags_json_autosave_updates(client, app):
         assert flags.vibe_enabled is True
         assert flags.enable_nudges is False
         assert flags.guest_submission_enabled is False
+
+
+def test_feature_flags_autosave_updates_brand_banner_logic(client, app):
+    make_admin(app)
+    rv = login_admin(client)
+    assert rv.status_code == 200
+
+    with open("app/static/app.js", "r") as handle:
+        script = handle.read()
+    assert "document.body.classList.toggle('no-brand-banner', !shouldShowBanner);" in script
+    assert "banner.hidden = !shouldShowBanner;" in script
+    assert "panel.hidden = !quotesEnabled;" in script
 
 
 def test_feature_flags_json_autosave_handles_string_booleans(client, app):

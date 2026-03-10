@@ -15,7 +15,7 @@
     </div>
   </section>
 
-  <form method="post" action="{{ url_for('auth.settings') }}" id="userSettingsForm" data-autosave-endpoint="{{ url_for('auth.set_preferences') }}">
+  <form method="post" action="{{ url_for('auth.settings') }}" id="userSettingsForm" data-autosave-endpoint="{{ url_for('auth.set_preferences') }}" data-toggle-session-persist="session">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="dark_mode_present" value="1">
     <input type="hidden" name="quotes_enabled_present" value="1">
