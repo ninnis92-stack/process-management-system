@@ -353,6 +353,7 @@ def create_app():
         return
 
     from .auth.routes import auth_bp
+    from .verify import verify_bp
     from .requests_bp import requests_bp
     from .external.routes import external_bp
     from .notifications.routes import notifications_bp
@@ -365,6 +366,8 @@ def create_app():
     app.register_blueprint(notifications_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(integrations_bp)
+    # camera/ocr verification helper
+    app.register_blueprint(verify_bp)
 
     # Provide active theme CSS and logo URL to templates
     @app.context_processor

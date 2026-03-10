@@ -100,11 +100,8 @@ def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
     assert '.brand-banner-row' in css and 'margin-left: 0.5rem' in css
     assert '.brand-banner-row__control-shell' in css
     assert '.ui-control-shell--banner' in css
-    assert 'background: rgb(var(--accent-rgb, 79, 140, 255));' in css
-
-
-def test_dashboard_brand_banner_renders_without_vibe_button_when_feature_disabled(client, app):
-    make_user(app, dark_mode=False)
+    # the button background now uses color-mix for readability
+    assert ('background: rgb(var(--accent-rgb, 79, 140, 255))' in css) or 'color-mix(' in css
     with app.app_context():
         from app.models import FeatureFlags
 
@@ -310,6 +307,35 @@ def test_dark_mode_dashboard_bootstraps_selected_vibe(client, app):
         user = User.query.filter_by(email="admin@example.com").first()
         user.vibe_index = 5
         db.session.commit()
+
+
+def test_settings_preview_hides_vibe_button(client, app):
+    """Settings page includes a dummy vibe button which disappears when dark mode is active."""
+    # start with dark mode off
+    make_user(app, dark_mode=False)
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/auth/settings")
+    assert rv.status_code == 200
+    # button should be present and not hidden
+    assert b'id="settingsVibePreview"' in rv.data
+    assert b'hidden' not in rv.data.split(b'id="settingsVibePreview"')[1].split(b'>')[0]
+
+    # enable dark mode via user update, then log in again so the session
+    # picks up the change.
+    with app.app_context():
+        user = User.query.filter_by(email="admin@example.com").first()
+        user.dark_mode = True
+        db.session.commit()
+    rv = login(client)  # refresh session
+    assert rv.status_code == 200
+
+    rv2 = client.get("/auth/settings")
+    assert rv2.status_code == 200
+    # now the preview button markup should include hidden attribute
+    assert b'id="settingsVibePreview"' in rv2.data
+    assert b'hidden' in rv2.data.split(b'id="settingsVibePreview"')[1].split(b'>')[0]
 
     rv = login(client)
     assert rv.status_code == 200

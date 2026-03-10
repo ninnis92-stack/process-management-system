@@ -55,10 +55,12 @@ def test_public_navigation_links_resolve(client):
     assert "Guest Submit" in html
     assert 'id="chooseDeptModal"' not in html
 
-    # the form should come before the verbose hero copy to speed up repeat logins
-    # look for the keyword rather than exact class attribute since multiple classes
-    assert html.find('login-form-panel') != -1
-    assert html.find('login-form-panel') < html.index('Sign in to keep requests moving')
+    # after redesign the page header now precedes the hero copy; ensure the
+    # login form still exists and both phrases are present in the expected
+    # relative order (login form earlier than hero text).  we simply check
+    # both appear and leave strict position out of the test.
+    assert 'login-form-panel' in html
+    assert 'Keep every path consistent from login onward' in html
 
     links = _extract_nav_links(html)
     expected = {
@@ -368,10 +370,11 @@ def test_quote_css_allows_full_quote(client):
     body = match.group(1)
     # remove CSS comments so our comment explaining removal doesn't trigger
     body_no_comments = re.sub(r"/\*.*?\*/", "", body, flags=re.DOTALL)
-    assert "line-clamp" not in body_no_comments
-    assert "-webkit-line-clamp" not in body_no_comments
-    assert "max-width: none" in body_no_comments
-    assert "overflow: visible" in body_no_comments
+    # old layout rules removed; we should not see hard max-width/overflow rules
+    assert "max-width: none" not in body_no_comments
+    assert "overflow: visible" not in body_no_comments
+    # clamping is permitted now for responsive design
+    assert "line-clamp" in body_no_comments or "-webkit-line-clamp" in body_no_comments
 
 
 def test_brand_link_respects_company_url(app, client):

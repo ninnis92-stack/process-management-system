@@ -57,6 +57,8 @@
                 <div class="theme-preview-card__meta">
                   <div class="theme-preview-card__name" data-vibe-preview-name>Theme preview</div>
                 </div>
+                <!-- mimic navbar vibe button so preview reflects its disappearance in dark mode -->
+                <button type="button" id="settingsVibePreview" class="btn btn-outline-secondary mt-2" {% if dark_mode_enabled or not vibe_feature_enabled %}hidden{% endif %}>Vibe</button>
               </div>
             </div>
             <div class="form-text">Choose your UI accent theme. Teams that prefer a neutral tone can leave this on the default setting. When dark mode is enabled this control is disabled; adopted brand themes still carry their accent palette into native dark mode automatically.</div>
@@ -111,6 +113,23 @@
 
         {{ toggle_checkbox(form.onboarding_guidance_enabled, 'Onboarding guidance enabled', 'Onboarding guidance disabled') }}
         <div class="form-text mt-2">This controls the guided "start here" panels on the main dashboard and the admin command center. Functional workflow previews still stay available where they are needed.</div>
+      </section>
+
+      <section class="surface-panel settings-section">
+        <div class="section-heading section-heading-compact">
+          <div>
+            <h2 class="section-heading__title">Camera capture demo</h2>
+            <p class="section-heading__subtitle">Capture handwritten or printed text using your device camera.</p>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label for="demo_field" class="form-label">Sample field</label>
+          <div class="input-group">
+            <input type="text" name="demo_field" id="demo_field" class="form-control" placeholder="Captured value" autocomplete="off">
+            <button type="button" class="btn btn-outline-secondary" data-camera-target="[name='demo_field']">📷</button>
+          </div>
+          <div class="form-text">Press the camera button to take a photo; returned text will fill the field.</div>
+        </div>
       </section>
     </div>
 
@@ -167,6 +186,11 @@
         }
         if (themePreviewCard) {
           themePreviewCard.classList.toggle('opacity-50', checkbox.checked || !vibeFeatureEnabled);
+        }
+        // also toggle the little dummy vibe button we added to the preview
+        const previewBtn = document.getElementById('settingsVibePreview');
+        if (previewBtn) {
+          previewBtn.hidden = checkbox.checked || !vibeFeatureEnabled;
         }
         if (window.syncVibeThemeState) {
           window.syncVibeThemeState();

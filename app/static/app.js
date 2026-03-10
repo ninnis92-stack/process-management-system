@@ -86,9 +86,9 @@
   slot.setAttribute('tabindex', '0');
   slot.style.cursor = 'pointer';
 
+  // advance the quote when triggered or timer elapses
   function advance() {
-    // pick a random next index (avoid repeating the same quote twice in a row)
-    let nextIdx = Math.floor(Math.random() * order.length);
+    let nextIdx = idx + 1;
     if (nextIdx === idx) {
       nextIdx = (idx + 1) % order.length;
     }
@@ -125,6 +125,52 @@
     setInterval(() => advance(), 8000);
   }
 })();
+
+// -----------------------------------------------------------------------------
+// camera-based field capture helper
+// -----------------------------------------------------------------------------
+function sendCameraImage(blob, fieldName) {
+  const data = new FormData();
+  data.append('image', blob, 'capture.jpg');
+  if (fieldName) data.append('field', fieldName);
+  return fetch('/verify/camera', {method: 'POST', body: data}).then(r=>r.json());
+}
+
+function attachCameraTrigger(button, targetSelector) {
+  if (!button) return;
+  const target = document.querySelector(targetSelector);
+  if (!target) return;
+  button.addEventListener('click', async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      await video.play();
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video,0,0);
+      stream.getTracks().forEach(t=>t.stop());
+      canvas.toBlob(async blob => {
+        const fieldName = target.getAttribute('name');
+        const res = await sendCameraImage(blob, fieldName);
+        if (res.ok && res.field && res.value) {
+          const inp = document.querySelector(`[name="${res.field}"]`);
+          if (inp) inp.value = res.value;
+        }
+      }, 'image/jpeg');
+    } catch (err) {
+      alert('Camera access failed, please use file picker');
+    }
+  });
+}
+
+// automatically wire any button with data-camera-target attribute
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('button[data-camera-target]').forEach(btn=>{
+    attachCameraTrigger(btn, btn.dataset.cameraTarget);
+  });
+});
 
 /* Safe modal wrapper: prevents busted modals from leaving a blocking backdrop.
    - Appends modal elements to document.body before showing (avoids z-index/sandbox issues)

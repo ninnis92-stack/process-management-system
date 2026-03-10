@@ -189,7 +189,12 @@
                 <input class="form-control" type="file" accept="video/*" capture="camcorder" id="dynamic-field-{{ field.name }}" name="{{ field.name }}">
                 <div class="form-text small text-muted">On mobile you can record a video directly.</div>
               {% else %}
-                <input class="form-control js-template-field" type="text" id="dynamic-field-{{ field.name }}" name="{{ field.name }}" value="{{ request.form.get(field.name, '') }}">
+                <div class="input-group">
+                  <input class="form-control js-template-field" type="text" id="dynamic-field-{{ field.name }}" name="{{ field.name }}" value="{{ request.form.get(field.name, '') }}">
+                  {% if field.verification and field.verification.enabled %}
+                    <button type="button" class="btn btn-outline-secondary" data-camera-target="[name='{{ field.name }}']">📷</button>
+                  {% endif %}
+                </div>
               {% endif %}
               {% if field.hint %}
                 <div class="form-text">{{ field.hint }}</div>
