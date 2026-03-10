@@ -432,23 +432,14 @@ and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORIN
 - Ran deployed smoke checks with `bash scripts/smoke_test.sh https://process-management-prototype-lingering-bush-6175.fly.dev`, `python scripts/smoke_deployed_login.py --url https://process-management-prototype-lingering-bush-6175.fly.dev`, and `python scripts/admin_smoke.py`; seeded user and admin logins both succeeded and the checked admin/metrics routes returned HTTP 200.
 - Cleared remote smoke data with `python scripts/clear_smoke_remote.py`; the cleanup endpoint completed successfully and reported `{"deleted":0}`.
 - Checked both `https://process-management-prototype-lingering-bush-6175.fly.dev/ready` and `https://process-management-prototype-lingering-bush-6175.fly.dev/health`; both returned `{"status":"ok"}`, and `/ready` reported `components.database.status: ok`.
-- Added regression coverage for the hero dashboard CTA so guest and authenticated views keep the correct labels and target URLs; the local suite now passes with `115 passed`.
-- Deployed to `process-management-prototype-lingering-bush-6175` with `flyctl deploy -a process-management-prototype-lingering-bush-6175`.
-- Verified the Fly release command `python scripts/release_tasks.py` completed successfully and that release/boot logs showed `seed.py` running plus the seeded demo/admin accounts being emitted.
-- Added a release-task schema safety net for legacy `form_template` installs, and confirmed Fly applied `schema_fix=form_template.external_enabled_added`, `schema_fix=form_template.external_provider_added`, `schema_fix=form_template.external_form_url_added`, and `schema_fix=form_template.external_form_id_added` during deploy.
-- Ran deployed smoke checks with `bash scripts/smoke_test.sh https://process-management-prototype-lingering-bush-6175.fly.dev`, `python scripts/smoke_deployed_login.py --url https://process-management-prototype-lingering-bush-6175.fly.dev`, and `python scripts/admin_smoke.py`; after the schema fix the admin assignments page returned HTTP 200.
-- Cleared remote smoke data with `python scripts/clear_smoke_remote.py`; the cleanup endpoint completed successfully and reported `{"deleted":0}`.
-- Checked both `https://process-management-prototype-lingering-bush-6175.fly.dev/ready` and `https://process-management-prototype-lingering-bush-6175.fly.dev/health`; both returned `{"status":"ok"}`, and `/ready` reported `components.database.status: ok`.
-- The login page now uses the `motivational` quote set when rolling quotes are enabled; the site-wide default also now resolves to `motivational` unless an admin explicitly chooses another active set. A new `chores` quote set was added so laundry and household routines live in a consistent motivational theme instead of feeling out of place.
-- Added client‑side persistence for toggle checkboxes (feature flags and similar forms), ensuring their on/off state survives page refreshes after saving.
+(see `docs/MAINTAINER_NOTES.md` for a full changelog, deployment history, feature notes, and operational guidance)
 
 ---
 
 ## Feature notes
 
-### Guest forms and external intake
+*(moved to docs/MAINTAINER_NOTES.md)*
 
-Guest forms can now be configured per form from the admin UI with clearer,
 mobile-friendly routing and access summaries on both the admin and submitter
 screens.
 
