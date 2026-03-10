@@ -122,7 +122,7 @@
         <ul class="navbar-nav ms-3 me-auto mb-2 mb-lg-0">
           {% if current_user.is_authenticated %}
             {% if current_user.is_admin %}
-              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin') else '' }}" href="{{ url_for('admin.index') }}">Admin</a></li>
+              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin') else '' }}" href="{{ url_for('admin.index') }}"><i class="fas fa-cogs" aria-hidden="true"></i><span class="visually-hidden">Admin</span></a></li>
             {% else %}
               <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('requests.dashboard') else '' }}" href="{{ url_for('requests.dashboard') }}">Dashboard</a></li>
             {% endif %}
@@ -221,26 +221,7 @@
     </div>
   </nav>
 
-  {% if ep.startswith('admin') %}
-    <nav aria-label="breadcrumb" class="container-fluid mt-2">
-      <ol class="breadcrumb mb-0">
-        <li class="breadcrumb-item">Admin</li>
-        {% if request.endpoint == 'admin.list_status_options' %}
-          <li class="breadcrumb-item active" aria-current="page">Status Options</li>
-        {% elif request.endpoint == 'admin.list_workflows' %}
-          <li class="breadcrumb-item active" aria-current="page">Workflows</li>
-        {% elif request.endpoint == 'admin.list_departments' %}
-          <li class="breadcrumb-item active" aria-current="page">Departments</li>
-        {% elif request.endpoint == 'admin.site_config' %}
-          <li class="breadcrumb-item active" aria-current="page">Site Configuration</li>
-        {% elif request.endpoint == 'admin.metrics_config' %}
-          <li class="breadcrumb-item active" aria-current="page">Metrics Settings</li>
-        {% elif request.endpoint == 'admin.quotes_config' %}
-          <li class="breadcrumb-item active" aria-current="page">Quotes</li>
-        {% endif %}
-      </ol>
-    </nav>
-  {% endif %}
+
 
   {% if session.get('impersonate_admin_id') and config.get('ALLOW_IMPERSONATION') %}
     <div class="impersonation-banner text-dark">

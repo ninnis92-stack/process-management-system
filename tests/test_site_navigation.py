@@ -287,10 +287,10 @@ def test_admin_navigation_links_resolve(app, client):
     # later too).
     assert 'if (!loggedIn || active || isAdmin' in html
 
-    assert "Admin" in html
+    # navigation should include guest forms and metrics, admin link uses icon
     assert "Guest Request Forms" in html
     assert "Metrics" in html
-    assert re.search(r'<a class="nav-link[^"]*" href="/admin/">Admin</a>', html)
+    assert re.search(r'href="/admin/"', html)  # admin link present (icon only)
     assert not re.search(r'<a class="nav-link[^"]*" href="/admin/">Dashboard</a>', html)
     # ensure breadcrumb isn’t itself a clickable Admin link
     assert not re.search(r'<ol class="breadcrumb[^"]*">[\s\S]*?<a[^>]+>Admin<\/a>', html)
