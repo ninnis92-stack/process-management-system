@@ -538,7 +538,7 @@ def site_config():
 
         cfg.brand_name = (form.brand_name.data or "").strip() or None
         cfg.theme_preset = (form.theme_preset.data or "default").strip().lower()
-        if cfg.theme_preset not in ("default", "ocean", "forest", "sunset", "midnight"):
+        if cfg.theme_preset not in ("default", "sky", "moss", "dawn", "twilight"):
             cfg.theme_preset = "default"
 
         remove_logo = bool(form.clear_logo.data)

@@ -133,7 +133,7 @@ def test_departments_crud_and_site_config(app, client):
     # Save site config with banner and rolling quotes
     post_data = {
         "brand_name": "Acme Flow",
-        "theme_preset": "forest",
+        "theme_preset": "moss",
         "banner_html": '<div class="site-banner">Welcome</div>',
         "rolling_enabled": "y",
         "rolling_csv": "Quote one\nQuote two",
@@ -146,7 +146,7 @@ def test_departments_crud_and_site_config(app, client):
     with app.app_context():
         cfg = SiteConfig.get()
         assert cfg.brand_name == "Acme Flow"
-        assert cfg.theme_preset == "forest"
+        assert cfg.theme_preset == "moss"
         assert cfg.banner_html is not None
         assert cfg.rolling_quotes_enabled is True
         assert isinstance(cfg.rolling_quotes, list)
@@ -307,7 +307,7 @@ def test_site_config_imports_safe_branding_from_website(app, client, monkeypatch
         cfg = SiteConfig.get()
         assert cfg.brand_name == "Acme Logistics"
         assert cfg.company_url == "https://example.com/home"
-        assert cfg.theme_preset == "forest"
+        assert cfg.theme_preset == "moss"
         assert cfg.logo_filename is not None
         assert cfg.logo_filename.startswith("uploads/branding/")
         target = Path(app.static_folder) / cfg.logo_filename

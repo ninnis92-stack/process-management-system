@@ -328,7 +328,7 @@ def test_brand_adoption_keeps_native_dark_mode_with_brand_preset(client, app):
         from app.models import SiteConfig
 
         cfg = SiteConfig.get()
-        cfg.theme_preset = "forest"
+        cfg.theme_preset = "moss"
         cfg.logo_filename = "uploads/branding/mock-logo.png"
         db.session.commit()
 
@@ -341,7 +341,7 @@ def test_brand_adoption_keeps_native_dark_mode_with_brand_preset(client, app):
     assert m, "no body tag?"
     classes = m.group(1)
     assert b"dark-mode" in classes
-    assert b"theme-preset-forest" in classes
+    assert b"theme-preset-moss" in classes
     assert b'id="vibeBtn"' not in rv.data
 
     settings_page = client.get("/auth/settings")

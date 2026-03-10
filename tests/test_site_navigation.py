@@ -118,7 +118,7 @@ def test_login_page_hides_quotes_when_external_branding_present(client, app):
         try:
             cfg.banner_html = "<div>imported banner</div>"
             cfg.logo_filename = "brand/logo.png"
-            cfg.theme_preset = "ocean"
+            cfg.theme_preset = "sky"
             cfg.rolling_quotes_enabled = True
             cfg.rolling_quotes = ["Progress, not perfection."]
             db.session.add(cfg)

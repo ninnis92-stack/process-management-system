@@ -16,10 +16,10 @@ from werkzeug.utils import secure_filename
 
 THEME_SWATCHES = {
     "default": "#4f8cff",
-    "ocean": "#3ec1d3",
-    "forest": "#7bc96f",
-    "sunset": "#ff8a5b",
-    "midnight": "#7a5cff",
+    "sky": "#3ec1d3",
+    "moss": "#7bc96f",
+    "dawn": "#ff8a5b",
+    "twilight": "#7a5cff",
 }
 
 

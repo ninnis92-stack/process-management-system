@@ -508,9 +508,9 @@ html {
   --border: rgba(148, 163, 184, 0.24);
   --border-strong: rgba(148, 163, 184, 0.34);
   --focus: rgba(125, 211, 252, 0.25);
-  --accent: #7dd3fc;
-  --accent-2: #a78bfa;
-  --accent-rgb: 125, 211, 252;
+  --accent: #5bb3d4;
+  --accent-2: #9271d4;
+  --accent-rgb: 91, 179, 212;
   --surface-raised: #162235;
   --surface-muted: #1b2a40;
   --surface-accent: #22344f;
@@ -536,44 +536,44 @@ html {
   color: var(--nav-bg) !important;
 }
 
-body.theme-preset-ocean.dark-mode {
+body.theme-preset-sky.dark-mode {
   --nav-bg: #081a28;
-  --accent: #3ec1d3;
-  --accent-2: #7ad7f0;
-  --accent-rgb: 62, 193, 211;
+  --accent: #2a9bab;
+  --accent-2: #65aebc;
+  --accent-rgb: 42, 155, 171;
   --focus: rgba(62, 193, 211, 0.22);
   --banner-bg: #122738;
   --banner-border: rgba(62, 193, 211, 0.24);
   --surface-accent: #143247;
 }
 
-body.theme-preset-forest.dark-mode {
+body.theme-preset-moss.dark-mode {
   --nav-bg: #14251d;
-  --accent: #7bc96f;
-  --accent-2: #b6d7a8;
-  --accent-rgb: 123, 201, 111;
+  --accent: #5a9c4e;
+  --accent-2: #99b584;
+  --accent-rgb: 90, 156, 78;
   --focus: rgba(123, 201, 111, 0.22);
   --banner-bg: #1a2d23;
   --banner-border: rgba(123, 201, 111, 0.24);
   --surface-accent: #213728;
 }
 
-body.theme-preset-sunset.dark-mode {
+body.theme-preset-dawn.dark-mode {
   --nav-bg: #25141a;
-  --accent: #ff8a5b;
-  --accent-2: #ffb26b;
-  --accent-rgb: 255, 138, 91;
+  --accent: #d07048;
+  --accent-2: #c28a6a;
+  --accent-rgb: 208, 112, 72;
   --focus: rgba(255, 138, 91, 0.24);
   --banner-bg: #311b22;
   --banner-border: rgba(255, 138, 91, 0.24);
   --surface-accent: #392128;
 }
 
-body.theme-preset-midnight.dark-mode {
+body.theme-preset-twilight.dark-mode {
   --nav-bg: #050913;
-  --accent: #8ea7ff;
-  --accent-2: #7a5cff;
-  --accent-rgb: 142, 167, 255;
+  --accent: #6f85d0;
+  --accent-2: #5fa0c8;
+  --accent-rgb: 111, 133, 208;
   --focus: rgba(142, 167, 255, 0.24);
   --banner-bg: #131a2d;
   --banner-border: rgba(142, 167, 255, 0.24);
@@ -689,7 +689,7 @@ body.no-vibe:not(.dark-mode) .admin-hero {
   background: var(--surface-raised);
 }
 
-body.theme-preset-ocean:not(.dark-mode) {
+body.theme-preset-sky:not(.dark-mode) {
   --nav-bg: #082032;
   --accent: #3ec1d3;
   --accent-2: #7ad7f0;
@@ -698,7 +698,7 @@ body.theme-preset-ocean:not(.dark-mode) {
              #f1fbff;
 }
 
-body.theme-preset-forest:not(.dark-mode) {
+body.theme-preset-moss:not(.dark-mode) {
   --nav-bg: #1f3b2d;
   --accent: #7bc96f;
   --accent-2: #b6d7a8;
@@ -707,7 +707,7 @@ body.theme-preset-forest:not(.dark-mode) {
              #f4fbf5;
 }
 
-body.theme-preset-sunset:not(.dark-mode) {
+body.theme-preset-dawn:not(.dark-mode) {
   --nav-bg: #3b1f2b;
   --accent: #ff8a5b;
   --accent-2: #ffb26b;
@@ -716,7 +716,7 @@ body.theme-preset-sunset:not(.dark-mode) {
              #fff8f3;
 }
 
-body.theme-preset-midnight:not(.dark-mode) {
+body.theme-preset-twilight:not(.dark-mode) {
   --nav-bg: #0a0f1f;
   --accent: #8ea7ff;
   --accent-2: #7a5cff;

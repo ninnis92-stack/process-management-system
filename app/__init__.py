@@ -453,10 +453,10 @@ def create_app():
                     site_theme_preset = (cfg.theme_preset or "default").strip().lower()
                     if site_theme_preset not in (
                         "default",
-                        "ocean",
-                        "forest",
-                        "sunset",
-                        "midnight",
+                        "sky",
+                        "moss",
+                        "dawn",
+                        "twilight",
                     ):
                         site_theme_preset = "default"
             except Exception:
