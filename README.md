@@ -9,7 +9,8 @@ serve as the reference implementation for a larger process‑management platform
 - rich admin tooling with feature flags, themes, and impersonation
 - guest submission and tracking without requiring an account
 - pluggable OCR and background job support
-- camera-based field capture with MediaDevices API and lightweight OCR endpoint (``/verify/camera``); the feature surfaces **only on forms that include a verification field** so it doesn’t clutter unrelated screens.  The client specifies a target field name (echoed back by the server) allowing any input to be filled automatically.  Admin-configured multi-value verification fields accept successive scans, appending values with the configured separator while still running through the normal verification/third‑party pipeline.  A demo button on the user settings page exercises the capture logic but otherwise the buttons appear only where needed.- simple deployment on Postgres/Redis-hosting platforms such as Fly.io or Docker Compose
+- camera-based field capture for verified text inputs on request forms.  A lightweight OCR endpoint (``/verify/camera``) accepts an image and returns a single value; the initiating field name is echoed back so the client can inject it wherever needed.  Bulk/append mode allows a series of scans to accumulate in one field, honouring the workspace’s configured separator.  There’s a trivial demo button on the user-settings page, but camera controls only render on actual form fields marked for verification.
+- simple deployment on Postgres/Redis-hosting platforms such as Fly.io or Docker Compose
 
 The codebase prioritizes readability and test coverage; it uses Flask for request handling, SQLAlchemy
 for ORM, and RQ for asynchronous workers.  The front end remains mostly server-rendered with
@@ -97,6 +98,8 @@ and default diff views.
     Preference updates now also write a timestamp into `localStorage` (similar to feature flags) so that other open browser tabs will reload automatically and mirror your choices.  On the settings page the vibe‑button toggle has a tiny live preview that shows or hides the sample control immediately and the banner layout recomputes when quote or vibe visibility changes.
 
   The admin command centre includes a Notifications card which flips a workspace-wide flag; the backend route at `/admin/toggle_notifications` and the `/notifications/*` API endpoints are fully implemented and covered by tests.  A recent style tweak ensures every admin card (including the bell) uses the standard body text colour so the dashboard looks cohesive in both light and dark modes.
+
+  **Learning aids:** the “Workflow signal” hero panels on dashboard, admin landing and external dashboards are controlled by a per‑user toggle (`onboarding_guidance_enabled`).  The same flag is exposed on the settings page (and saved via the autosave machinery) so users can hide the guided “start here” panels once they’ve seen them; functional workflow previews still appear where they belong.  The toggle respects session persistence and broadcast logic just like other preferences.
 
 2. **Configure**
    Set environment variables or edit `config.py`.  Required:
