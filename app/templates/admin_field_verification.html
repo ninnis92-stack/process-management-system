@@ -16,7 +16,7 @@
   <div class="form-check mb-3">
     {{ form.verify_each_separated_value(class="form-check-input") }}
     <label class="form-check-label">{{ form.verify_each_separated_value.label.text }}</label>
-    <div class="form-text">Use this when one field will contain multiple values and every value should be checked on its own.</div>
+    <div class="form-text">Use this when one field will contain multiple values and every value should be checked on its own. On request forms the camera button switches into an additive scan mode so users can capture one item after another on desktop or mobile.</div>
   </div>
   <div class="row">
     <div class="col-md-4 mb-3">
@@ -27,7 +27,7 @@
     <div class="col-md-8 mb-3">
       <label class="form-label">{{ form.bulk_input_hint.label.text }}</label>
       {{ form.bulk_input_hint(class="form-control", placeholder="Example: Enter values separated by commas") }}
-      <div class="form-text">Shown to users on the request form so admins can customize instructions for this field.</div>
+      <div class="form-text">Shown to users on the request form so admins can customize instructions for this field. This works with inventory, realtime tracker, and other third-party verification providers because each captured value is verified independently.</div>
     </div>
   </div>
   <div class="alert alert-light border mb-3">

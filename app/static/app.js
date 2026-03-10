@@ -129,6 +129,79 @@
 // -----------------------------------------------------------------------------
 // camera-based field capture helper
 // -----------------------------------------------------------------------------
+function normalizeCameraSeparator(rawValue) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) return ',';
+  const aliases = {
+    comma: ',',
+    semicolon: ';',
+    pipe: '|',
+    newline: '\n',
+    '\\n': '\n',
+    tab: '\t',
+    '\\t': '\t'
+  };
+  return aliases[raw.toLowerCase()] || raw;
+}
+
+function getCameraStatusSlot(target) {
+  if (!target || !target.form) return null;
+  const fieldName = target.getAttribute('name');
+  if (!fieldName) return null;
+  return target.form.querySelector(`[data-field-status-for="${fieldName}"]`);
+}
+
+function setCameraStatus(target, message, tone) {
+  const slot = getCameraStatusSlot(target);
+  if (!slot) return;
+  slot.textContent = message || '';
+  slot.classList.remove('is-success', 'is-warning', 'is-loading');
+  if (tone === 'success') slot.classList.add('is-success');
+  if (tone === 'warning') slot.classList.add('is-warning');
+  if (tone === 'loading') slot.classList.add('is-loading');
+}
+
+function splitCameraValues(rawValue, separator) {
+  const value = String(rawValue || '');
+  if (!value.trim()) return [];
+  if (separator === '\n') {
+    return value.split(/\r?\n/).map(part => part.trim()).filter(Boolean);
+  }
+  return value.split(separator).map(part => part.trim()).filter(Boolean);
+}
+
+function appendCameraValue(existingValue, nextValue, separator, dedupe) {
+  const existingItems = splitCameraValues(existingValue, separator);
+  const normalizedNext = String(nextValue || '').trim();
+  if (!normalizedNext) {
+    return { value: existingValue || '', added: false, duplicate: false, count: existingItems.length };
+  }
+
+  if (dedupe) {
+    const seen = new Set(existingItems.map(item => item.toLowerCase()));
+    if (seen.has(normalizedNext.toLowerCase())) {
+      return {
+        value: existingValue || '',
+        added: false,
+        duplicate: true,
+        count: existingItems.length
+      };
+    }
+  }
+
+  const joiner = separator === '\n' ? '\n' : `${separator} `;
+  const merged = existingItems.length
+    ? `${existingValue}${joiner}${normalizedNext}`
+    : normalizedNext;
+
+  return {
+    value: merged,
+    added: true,
+    duplicate: false,
+    count: existingItems.length + 1
+  };
+}
+
 function sendCameraImage(blob, fieldName) {
   const data = new FormData();
   data.append('image', blob, 'capture.jpg');
@@ -141,7 +214,17 @@ function attachCameraTrigger(button, targetSelector) {
   const target = document.querySelector(targetSelector);
   if (!target) return;
   button.addEventListener('click', async () => {
+    const mode = button.dataset.cameraMode === 'append' ? 'append' : 'replace';
+    const separator = normalizeCameraSeparator(button.dataset.cameraSeparator);
+    const dedupe = button.dataset.cameraDedupe !== 'false';
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraStatus(target, 'Camera capture is not available on this device. Please type the value manually.', 'warning');
+        alert('Camera access failed, please use file picker');
+        return;
+      }
+
+      setCameraStatus(target, mode === 'append' ? 'Opening camera to add another value…' : 'Opening camera…', 'loading');
       const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
       const video = document.createElement('video');
       video.srcObject = stream;
@@ -156,10 +239,33 @@ function attachCameraTrigger(button, targetSelector) {
         const res = await sendCameraImage(blob, fieldName);
         if (res.ok && res.field && res.value) {
           const inp = document.querySelector(`[name="${res.field}"]`);
-          if (inp) inp.value = res.value;
+          if (inp) {
+            if (mode === 'append') {
+              const merged = appendCameraValue(inp.value, res.value, separator, dedupe);
+              if (merged.duplicate) {
+                setCameraStatus(inp, 'That scanned value is already in the list. Scan the next item or submit the form.', 'warning');
+                return;
+              }
+              if (!merged.added) {
+                setCameraStatus(inp, 'No readable value was captured. Try scanning again.', 'warning');
+                return;
+              }
+              inp.value = merged.value;
+              setCameraStatus(inp, `Added scan ${merged.count}. Capture again to keep building this list.`, 'success');
+            } else {
+              inp.value = res.value;
+              setCameraStatus(inp, 'Captured value from camera.', 'success');
+            }
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+            inp.dispatchEvent(new Event('change', { bubbles: true }));
+            inp.dispatchEvent(new Event('template-prefill-run', { bubbles: true }));
+          }
+        } else {
+          setCameraStatus(target, 'No readable value was captured. Try again or type the value manually.', 'warning');
         }
       }, 'image/jpeg');
     } catch (err) {
+      setCameraStatus(target, 'Camera access failed. You can still type values manually.', 'warning');
       alert('Camera access failed, please use file picker');
     }
   });
@@ -466,7 +572,7 @@ document.addEventListener('DOMContentLoaded', function(){
         : 'blur';
 
       let inFlight = false;
-      input.addEventListener(eventName, async () => {
+      const runVerification = async () => {
         const value = (input.value || '').trim();
         if(!value || inFlight) {
           if(!value) setStatus(field.name, '', null);
@@ -505,24 +611,42 @@ document.addEventListener('DOMContentLoaded', function(){
           const result = payload.result || {};
           const prefills = payload.prefills || {};
           const appliedCount = Object.keys(prefills).length;
+          const bulkCount = Number(result.count || 0);
+          const failedCount = Array.isArray(result.items)
+            ? result.items.filter(item => item && item.ok !== true).length
+            : 0;
 
           if(result.ok === true && appliedCount > 0) {
             applyPrefills(payload.meta, prefills);
             setStatus(
               field.name,
-              `Verified successfully and updated ${appliedCount} linked field${appliedCount === 1 ? '' : 's'}.`,
+              result.bulk === true
+                ? `Verified ${bulkCount} values successfully and updated ${appliedCount} linked field${appliedCount === 1 ? '' : 's'}.`
+                : `Verified successfully and updated ${appliedCount} linked field${appliedCount === 1 ? '' : 's'}.`,
               'success'
             );
             return;
           }
 
           if(result.ok === true) {
-            setStatus(field.name, 'Verified successfully. No linked fields needed updates.', 'success');
+            setStatus(
+              field.name,
+              result.bulk === true
+                ? `Verified ${bulkCount} values successfully. No linked fields needed updates.`
+                : 'Verified successfully. No linked fields needed updates.',
+              'success'
+            );
             return;
           }
 
           if(result.ok === false) {
-            setStatus(field.name, 'Verification did not return a valid match, so linked fields were not updated.', 'warning');
+            setStatus(
+              field.name,
+              result.bulk === true
+                ? `${failedCount || bulkCount || 'Some'} scanned value${failedCount === 1 ? '' : 's'} could not be verified, so linked fields were not updated.`
+                : 'Verification did not return a valid match, so linked fields were not updated.',
+              'warning'
+            );
             return;
           }
 
@@ -533,7 +657,10 @@ document.addEventListener('DOMContentLoaded', function(){
         } finally {
           inFlight = false;
         }
-      });
+      };
+
+      input.addEventListener(eventName, runVerification);
+      input.addEventListener('template-prefill-run', runVerification);
     };
 
     fields.forEach(wireField);

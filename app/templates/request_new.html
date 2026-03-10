@@ -168,6 +168,7 @@
               <div class="dynamic-field-card__badges mb-2">
                 {% if field.required %}{{ meta_badge('Required', 'light', True) }}{% endif %}
                 {% if field.verification and field.verification.enabled %}{{ meta_badge('Verified', 'light', True) }}{% endif %}
+                {% if field.verification and field.verification.bulk_enabled %}{{ meta_badge('Multi-value scan', 'primary', True) }}{% endif %}
                 {% if field.verification and field.verification.prefill_enabled %}{{ meta_badge('Auto-fills ' ~ field.verification.prefill_targets|length ~ ' linked field' ~ ('s' if field.verification.prefill_targets|length != 1 else ''), 'primary', True) }}{% endif %}
                 {% if field.requirements and field.requirements.enabled %}{{ meta_badge('Conditionally required', 'warning', True, field.requirements.summary or '') }}{% endif %}
               </div>
@@ -188,16 +189,35 @@
               {% elif field.field_type == 'video' %}
                 <input class="form-control" type="file" accept="video/*" capture="camcorder" id="dynamic-field-{{ field.name }}" name="{{ field.name }}">
                 <div class="form-text small text-muted">On mobile you can record a video directly.</div>
+              {% elif field.verification and field.verification.bulk_enabled %}
+                <div class="d-grid gap-2">
+                  <textarea class="form-control js-template-field" id="dynamic-field-{{ field.name }}" name="{{ field.name }}" rows="3">{{ request.form.get(field.name, '') }}</textarea>
+                  <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      data-camera-target="[name='{{ field.name }}']"
+                      data-camera-mode="append"
+                      data-camera-separator="{{ field.verification.value_separator_token }}"
+                      data-camera-dedupe="true"
+                      aria-label="Add another scanned value to {{ field.label }}"
+                    >📷 Add scan</button>
+                    <div class="form-text mb-0">Scan each item in sequence. Each capture appends another value separated by {{ field.verification.value_separator_label }}.</div>
+                  </div>
+                </div>
               {% else %}
                 <div class="input-group">
                   <input class="form-control js-template-field" type="text" id="dynamic-field-{{ field.name }}" name="{{ field.name }}" value="{{ request.form.get(field.name, '') }}">
                   {% if field.verification and field.verification.enabled %}
-                    <button type="button" class="btn btn-outline-secondary" data-camera-target="[name='{{ field.name }}']">📷</button>
+                    <button type="button" class="btn btn-outline-secondary" data-camera-target="[name='{{ field.name }}']" data-camera-mode="replace" aria-label="Scan {{ field.label }} with the camera">📷 <span class="d-none d-sm-inline">Scan</span></button>
                   {% endif %}
                 </div>
               {% endif %}
               {% if field.hint %}
                 <div class="form-text">{{ field.hint }}</div>
+              {% endif %}
+              {% if field.verification and field.verification.bulk_enabled %}
+                <div class="form-text mt-1">This field verifies each entered value separately, including values captured one after another from the camera.</div>
               {% endif %}
               {% if field.requirements and field.requirements.summary %}
                 <div class="form-text mt-1">Required when {{ field.requirements.summary }}.</div>

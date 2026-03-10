@@ -44,6 +44,8 @@ def test_app_js_contains_camera_helpers(app, client):
     assert rv.status_code == 200
     assert b"attachCameraTrigger" in rv.data
     assert b"sendCameraImage" in rv.data
+    assert b"appendCameraValue" in rv.data
+    assert b"template-prefill-run" in rv.data
 
 
 def test_request_form_shows_camera_for_verified_field(app, client):
@@ -87,6 +89,56 @@ def test_request_form_shows_camera_for_verified_field(app, client):
     assert b"data-camera-target=" in rv.data
     # button should appear next to the input name serial
     assert b"[name='serial']" in rv.data
+
+
+def test_request_form_shows_successive_camera_capture_for_bulk_verified_field(app, client):
+    """Bulk-verified fields should render additive camera capture affordances."""
+    with app.app_context():
+        from app.extensions import db
+        from app.models import FormTemplate, FormField, DepartmentFormAssignment, User
+        from werkzeug.security import generate_password_hash
+
+        tmpl = FormTemplate(name="bulkcam", verification_prefill_enabled=True)
+        db.session.add(tmpl)
+        db.session.flush()
+        fld = FormField(
+            template_id=tmpl.id,
+            name="part_numbers",
+            label="Part numbers",
+            field_type="text",
+            verification={
+                "provider": "verification",
+                "external_key": "sku",
+                "params": {
+                    "verify_each_separated_value": True,
+                    "value_separator": "newline",
+                    "bulk_input_hint": "Scan each item one at a time",
+                },
+            },
+        )
+        db.session.add(fld)
+        db.session.add(DepartmentFormAssignment(template_id=tmpl.id, department_name="A"))
+        u = User(
+            email="bulkcam@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=False,
+        )
+        db.session.add(u)
+        db.session.commit()
+        user_id = u.id
+
+    with client.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+
+    rv = client.get("/requests/new", follow_redirects=True)
+    assert rv.status_code == 200
+    assert b"Multi-value scan" in rv.data
+    assert b"data-camera-mode=\"append\"" in rv.data
+    assert b"data-camera-separator=\"newline\"" in rv.data
+    assert b"Add scan" in rv.data
+    assert b"Scan each item in sequence." in rv.data
 
 
 def test_camera_endpoint_ocr(app, client, monkeypatch):

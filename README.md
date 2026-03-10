@@ -9,7 +9,7 @@ serve as the reference implementation for a larger process‑management platform
 - rich admin tooling with feature flags, themes, and impersonation
 - guest submission and tracking without requiring an account
 - pluggable OCR and background job support
-- camera-based field capture with MediaDevices API and lightweight OCR endpoint (``/verify/camera``); the client may specify which form field it expects and the server echoes that field name back so any input can be filled automatically; demo button on settings page exercises this functionality
+- camera-based field capture with MediaDevices API and lightweight OCR endpoint (``/verify/camera``); the client may specify which form field it expects and the server echoes that field name back so any input can be filled automatically; admin-configured multi-value verification fields can now accept successive camera scans and append values using the configured separator while still flowing through the same verification and third-party provider pipeline; demo button on settings page exercises the base capture functionality
 - simple deployment on Postgres/Redis-hosting platforms such as Fly.io or Docker Compose
 
 The codebase prioritizes readability and test coverage; it uses Flask for request handling, SQLAlchemy
@@ -52,6 +52,7 @@ Key capabilities:
 - **Smarter navigation**: the client adds prefetch hints for hovered links so
   subsequent clicks feel faster without requiring any backend changes.
 - **Field verification** powered by third‑party tracker integrations
+- **Successive camera-assisted bulk verification** so admins can configure one field to collect multiple scanned values in order, then verify each value individually against inventory or third-party tracker providers without forcing users into a separate scanner UI
 - **Optional handoff bundle delivery** through existing ticketing/webhook
   integrations so transfer packets can be mirrored externally without adding
   more core workflow form fields

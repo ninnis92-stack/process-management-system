@@ -27,6 +27,7 @@ from .field_verification import (
     collect_prefill_target_names,
     extract_prefill_values,
     get_verification_prefill_config,
+    normalize_bulk_separator,
     resolve_field_verification_rule,
     run_field_verification,
 )
@@ -72,6 +73,27 @@ def build_template_spec(
     verification_prefill_enabled: bool = False,
 ):
     latest_map = latest_map or {}
+
+    def _separator_label(separator):
+        if separator == "\n":
+            return "new line"
+        if separator == "\t":
+            return "tab"
+        if separator == ",":
+            return "comma"
+        if separator == ";":
+            return "semicolon"
+        if separator == "|":
+            return "pipe"
+        return separator
+
+    def _separator_token(separator):
+        if separator == "\n":
+            return "newline"
+        if separator == "\t":
+            return "tab"
+        return separator
+
     spec = []
     for field in template_fields:
         options = [
@@ -88,12 +110,22 @@ def build_template_spec(
             rule_params = verification_rule.get("params") or {}
             field_hint = rule_params.get("bulk_input_hint") or None
         if isinstance(verification_rule, dict):
+            rule_params = verification_rule.get("params") or {}
+            bulk_enabled = bool(rule_params.get("verify_each_separated_value", False))
+            value_separator = normalize_bulk_separator(
+                rule_params.get("value_separator") or rule_params.get("separator")
+            )
             verification_meta = {
                 "enabled": True,
                 "provider": verification_rule.get("provider")
                 or verification_rule.get("type"),
                 "external_key": verification_rule.get("external_key")
                 or verification_rule.get("key"),
+                "bulk_enabled": bulk_enabled,
+                "value_separator": value_separator,
+                "value_separator_token": _separator_token(value_separator),
+                "value_separator_label": _separator_label(value_separator),
+                "camera_capture_mode": "append" if bulk_enabled else "replace",
                 "prefill_enabled": False,
                 "prefill_targets": [],
                 "prefill_trigger": None,
