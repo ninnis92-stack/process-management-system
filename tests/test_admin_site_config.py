@@ -913,7 +913,7 @@ def test_base_template_bumps_static_asset_version(client):
     # versions bump whenever CSS/JS changes so browsers refetch
     assert b"/static/styles.css?v=20260310c" in rv.data
     # main script may either be the legacy path or the built bundle in `dist`
-    assert b"/static/app.js?v=20260310b" in rv.data or b"/static/dist/app.js?v=" in rv.data
+    assert b"/static/app.js?v=20260310c" in rv.data or b"/static/dist/app.js?v=" in rv.data
 
 
 def test_login_next_redirection(client, app):

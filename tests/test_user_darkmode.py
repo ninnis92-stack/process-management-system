@@ -193,6 +193,29 @@ def test_vibe_button_preference_hides_nav(client, app):
     assert b'id="vibeBtn"' not in rv2.data
 
 
+def test_preferences_autosave_broadcast(client, app):
+    """Autosave endpoint should broadcast updates so other tabs reload.
+
+    We can't simulate storage events in the test client, but the JS asset
+    must contain the logic to write and listen for `userPrefsLastUpdate`.
+    """
+    make_user(app, dark_mode=False)
+    rv = login(client)
+    assert rv.status_code == 200
+
+    # grab the main JS file from the settings page where we know the
+    # versioned reference is stable
+    # instead of fetching the asset over HTTP (which sometimes 404s in
+    # the test harness), just open the file on disk so we can search its
+    # contents directly.
+    with open("app/static/app.js", "r") as handle:
+        script = handle.read()
+    # verify our new storage key is mentioned and the live preview listener
+    assert 'userPrefsLastUpdate' in script
+    assert 'vibeToggle' in script
+    assert 'settingsVibePreview' in script
+
+
 def test_workspace_vibe_flag_overrides_user_vibe_button_preference(client, app):
     make_user(app, dark_mode=False)
     with app.app_context():

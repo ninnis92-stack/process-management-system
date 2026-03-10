@@ -125,6 +125,12 @@
     setInterval(() => advance(), 8000);
   }
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 // -----------------------------------------------------------------------------
 // camera-based field capture helper
@@ -335,6 +341,12 @@ document.addEventListener('DOMContentLoaded', function(){
     }catch(e){ console.warn('safeShowModal error', e); }
   };
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 (function initHandoffHint(){
   document.addEventListener('DOMContentLoaded', function(){
@@ -370,6 +382,12 @@ document.addEventListener('DOMContentLoaded', function(){
     }catch(e){ console.warn('initHandoffHint error', e); }
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 (function initHeroToggleButtons(){
   function updateButtons(){
@@ -411,6 +429,12 @@ document.addEventListener('DOMContentLoaded', function(){
     updateButtons();
   }
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 (function initDeptMiniWindow(){
   // Provides a small interactive iframe in admin monitor to load internal pages for debugging.
@@ -488,6 +512,12 @@ document.addEventListener('DOMContentLoaded', function(){
             document.addEventListener('click', function(ev){ try{ const a = ev.target.closest && ev.target.closest('a'); if(a){ const method = a.getAttribute('data-method') || a.getAttribute('data-action'); if(method){ ev.preventDefault(); alert('Action links are disabled in the debug mini-window to prevent data changes.'); } } }catch(e){} }, true);
           }catch(e){}
         })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
       `;
       doc.documentElement.appendChild(protector);
     }catch(e){
@@ -507,6 +537,12 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 (function initTemplateVerificationPrefill(){
   document.addEventListener('DOMContentLoaded', function(){
@@ -664,6 +700,12 @@ document.addEventListener('DOMContentLoaded', function(){
     fields.forEach(wireField);
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 // Attach CSRF token from meta to fetch POST/PUT/DELETE requests automatically
 (function attachCsrfToFetch(){
@@ -689,6 +731,12 @@ document.addEventListener('DOMContentLoaded', function(){
     return _orig.call(this, input, init);
   };
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 (function initTheme() {
   const vibeButtons = Array.from(document.querySelectorAll('#vibeBtn, #vibeBtnDept, #vibeBtnAdmin, [data-vibe-trigger]'));
@@ -895,25 +943,100 @@ document.addEventListener('DOMContentLoaded', function(){
   window.addEventListener('form:autosaved', (event) => {
     const detail = event && event.detail ? event.detail : {};
     const endpoint = String(detail.endpoint || '');
-    const flags = detail.payload && detail.payload.flags ? detail.payload.flags : null;
-    if (!endpoint.endsWith('/admin/feature_flags') || !flags || typeof flags.vibe_enabled === 'undefined') {
+
+    // --- feature flags updates ---
+    if (endpoint.endsWith('/admin/feature_flags')) {
+      const flags = detail.payload && detail.payload.flags ? detail.payload.flags : null;
+      if (flags && typeof flags.vibe_enabled !== 'undefined') {
+        const vibeEnabled = !!flags.vibe_enabled;
+        const quotesEnabled = typeof flags.rolling_quotes_enabled === 'undefined'
+          ? true
+          : !!flags.rolling_quotes_enabled;
+        setVibeFeatureState(vibeEnabled);
+        syncThemeBannerLayout({ quotesEnabled });
+        syncVibeControlAvailability();
+
+        // visual feedback so admins know the change actually reached the server
+        const statusEl = document.getElementById('featureFlagsAutoSaveStatus');
+        if (statusEl) {
+          statusEl.textContent = 'Changes saved.';
+          setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        }
+
+        // force a reload on this tab so the rest of the UI reflects new
+        // global settings (notifications, nudges, guest pages, etc.) without
+        // leaving toggles looking like they changed when nothing else did.
+        setTimeout(() => { location.reload(); }, 500);
+        // write to localStorage to notify other open windows that flags changed.
+        try {
+          localStorage.setItem('featureFlagsLastUpdate', Date.now());
+        } catch (e) { /* ignore when storage is unavailable */ }
+
+        if (vibeEnabled && !isDarkModeEnabled()) {
+          const saved = Number(localStorage.getItem('vibeTheme'));
+          const userVibe = getUserVibeIndex();
+          const nextIdx = Number.isFinite(userVibe) && !Number.isNaN(userVibe)
+            ? userVibe
+            : (Number.isFinite(saved) && !Number.isNaN(saved) ? saved : 0);
+          applyTheme(nextIdx);
+        }
+      }
       return;
     }
 
-    const vibeEnabled = !!flags.vibe_enabled;
-    const quotesEnabled = typeof flags.rolling_quotes_enabled === 'undefined'
-      ? true
-      : !!flags.rolling_quotes_enabled;
-    setVibeFeatureState(vibeEnabled);
-    syncThemeBannerLayout({ quotesEnabled });
-    syncVibeControlAvailability();
+    // --- preferences updates ---
+    if (endpoint.endsWith('/auth/preferences') || endpoint.endsWith('/auth/preferences/dark-mode')) {
+      const prefs = detail.payload && detail.payload.preferences ? detail.payload.preferences : {};
+      let didUpdate = false;
+      // hide/show all vibe buttons based on user pref
+      if (typeof prefs.vibe_button_enabled !== 'undefined') {
+        const enabled = !!prefs.vibe_button_enabled;
+        document.querySelectorAll('#vibeBtn, #vibeBtnDept, #vibeBtnAdmin, [data-vibe-trigger]').forEach((button) => {
+          try {
+            button.hidden = !enabled;
+            button.setAttribute('aria-hidden', !enabled ? 'true' : 'false');
+          } catch (e) {}
+        });
+        syncThemeBannerLayout();
+        didUpdate = true;
+      }
+      // quote visibility
+      if (typeof prefs.quotes_enabled !== 'undefined') {
+        syncThemeBannerLayout({ quotesEnabled: !!prefs.quotes_enabled });
+        didUpdate = true;
+      }
+      // dark mode changes affect classes on <body>
+      if (typeof prefs.dark_mode !== 'undefined') {
+        try {
+          document.body.classList.toggle('dark-mode', !!prefs.dark_mode);
+        } catch (e) {}
+        didUpdate = true;
+      }
+      if (didUpdate) {
+        // notify other tabs so they reload and display the new preferences
+        try {
+          localStorage.setItem('userPrefsLastUpdate', Date.now());
+        } catch (e) {}
+        // avoid reloading the settings page while the user is editing it
+        if (!window.location.pathname.startsWith('/auth/settings')) {
+          setTimeout(() => { location.reload(); }, 200);
+        }
+      }
+    }
 
-    // visual feedback so admins know the change actually reached the server
-    const statusEl = document.getElementById('featureFlagsAutoSaveStatus');
     if (statusEl) {
       statusEl.textContent = 'Changes saved.';
       setTimeout(() => { statusEl.textContent = ''; }, 3000);
     }
+
+    // force a reload on this tab so the rest of the UI reflects new
+    // global settings (notifications, nudges, guest pages, etc.) without
+    // leaving toggles looking like they changed when nothing else did.
+    setTimeout(() => { location.reload(); }, 500);
+    // write to localStorage to notify other open windows that flags changed.
+    try {
+      localStorage.setItem('featureFlagsLastUpdate', Date.now());
+    } catch (e) { /* ignore when storage is unavailable */ }
 
     if (vibeEnabled && !isDarkModeEnabled()) {
       const saved = Number(localStorage.getItem('vibeTheme'));
@@ -1091,6 +1214,18 @@ document.addEventListener('DOMContentLoaded', function(){
     const href = a.getAttribute('href');
     if(!href || href.startsWith('#') || href.startsWith('javascript:')) return;
     const link = document.createElement('link');
+
+// watch the preference checkbox on settings page and hide the preview button
+document.addEventListener('DOMContentLoaded', () => {
+  const vibeToggle = document.querySelector('input[name="vibe_button_enabled"]');
+  if (vibeToggle) {
+    vibeToggle.addEventListener('change', () => {
+      const preview = document.getElementById('settingsVibePreview');
+      if (preview) preview.hidden = !vibeToggle.checked;
+    });
+  }
+});
+
     link.rel = 'prefetch';
     link.href = href;
     document.head.appendChild(link);
@@ -1144,6 +1279,12 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 (function initSearchHelpers() {
   function escapeRegExp(string) {
@@ -1173,6 +1314,12 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 (function initNotifications() {
   const btn = document.getElementById("notifBtn");
@@ -1301,6 +1448,12 @@ document.addEventListener('DOMContentLoaded', function(){
   refreshCount();
   setInterval(refreshCount, 30000);
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 // Attach handler for the 'Requires Executive Approval' button if present
 document.addEventListener('DOMContentLoaded', function(){
@@ -1385,6 +1538,12 @@ document.addEventListener('DOMContentLoaded', function(){
     for (const f of fileInput.files) addFile(f);
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 // Screenshot uploader (drag & drop + preview) for the request detail page
 (function initScreenshotUploader(){
@@ -1472,6 +1631,12 @@ document.addEventListener('DOMContentLoaded', function(){
     }catch(e){ console.warn('initScreenshotUploader error', e); }
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 // Inline media preview for photo/video fields on request forms
 (function initMediaFieldPreviews(){
@@ -1521,6 +1686,12 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 // Initialize the friendly conditional requirement rule builder on admin pages
 (function initRequirementBuilder(){
@@ -1591,6 +1762,12 @@ document.addEventListener('DOMContentLoaded', function(){
     if(toggle) toggle.textContent = 'Show advanced JSON editor';
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 // Show dynamic hints on request forms when conditional requirements become active
 (function initConditionalRequirementHints(){
@@ -1664,6 +1841,12 @@ document.addEventListener('DOMContentLoaded', function(){
     updateHints();
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 (function initTemplateSectionProgress(){
   document.addEventListener('DOMContentLoaded', function(){
@@ -1698,6 +1881,12 @@ document.addEventListener('DOMContentLoaded', function(){
     updateAll();
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
 
 // Monitor transition select and require screenshot when sending from A -> B
 (function monitorTransitionScreenshotRequirement(){
@@ -1751,6 +1940,24 @@ document.addEventListener('DOMContentLoaded', function(){
     }catch(e){ console.warn('monitorTransitionScreenshotRequirement error', e); }
   });
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate' || ev.key === 'userPrefsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});
+
+// when user preferences change they may hide/show the vibe button; reflect
+// that immediately in any tab and reload others.
+document.addEventListener('DOMContentLoaded', () => {
+  const vibeToggle = document.querySelector('input[name="vibe_button_enabled"]');
+  if (vibeToggle) {
+    vibeToggle.addEventListener('change', () => {
+      const preview = document.getElementById('settingsVibePreview');
+      if (preview) preview.hidden = !vibeToggle.checked;
+    });
+  }
+});
 
 (function initPresence(){
   const el = document.getElementById('presenceList');
@@ -1781,3 +1988,9 @@ document.addEventListener('DOMContentLoaded', function(){
   setInterval(heartbeat, 20000);
   setInterval(refresh, 10000);
 })();
+// listen for cross-tab notifications that feature flags changed
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'featureFlagsLastUpdate') {
+    try { location.reload(); } catch (e) { /* ignore */ }
+  }
+});

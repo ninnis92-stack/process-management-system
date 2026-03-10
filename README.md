@@ -95,6 +95,8 @@ and default diff views.
 
   Preferences and feature flags now autosave as soon as you change them; the page will post data automatically and even flush outstanding requests on navigation via the `keepalive` API.  Internally the client uses a traditional `application/x-www-form-urlencoded` payload which works even when headers are stripped (sendBeacon, odd mobile browsers, corporate proxies), and the server happily handles both this and raw JSON.  Dropdowns (vibe/theme selector, quote set, etc.) are treated the same way, and the server echoes back the current value so the UI stays in sync.
 
+    Preference updates now also write a timestamp into `localStorage` (similar to feature flags) so that other open browser tabs will reload automatically and mirror your choices.  On the settings page the vibe‑button toggle has a tiny live preview that shows or hides the sample control immediately and the banner layout recomputes when quote or vibe visibility changes.
+
 2. **Configure**
    Set environment variables or edit `config.py`.  Required:
    - `DATABASE_URL` (Postgres)
