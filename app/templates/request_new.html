@@ -7,6 +7,9 @@
     <h3 class="page-header__title mb-0">New Request</h3>
     <p class="page-header__lede mb-0">Complete the request form, review the process flow preview, and submit with enough context for the next department.</p>
   </div>
+  <div class="page-header__actions">
+    <a class="btn btn-outline-secondary" href="{{ url_for('requests.printable_department_form', dept='A') }}" target="_blank" rel="noopener">Print Blank Form</a>
+  </div>
 </section>
 
 <section class="helper-grid mb-3">

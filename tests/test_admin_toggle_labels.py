@@ -57,14 +57,14 @@ def test_feature_flags_render_correct_action_labels(client, app):
     html = rv.get_data(as_text=True)
 
     assert 'data-toggle-text-checked="Notifications enabled"' in html
-    assert 'Notifications enabled' in html
-    assert 'Automated reminders disabled' in html
-    assert 'Theme button enabled' in html
-    assert 'Guest dashboard enabled' in html
-    assert 'Guest submission disabled' in html
-    assert 'surface-panel admin-feature-flags-panel' in html
-    assert 'admin-feature-flags__section' in html
-    assert 'admin-toggle-card admin-feature-flags__option' in html
+    assert "Notifications enabled" in html
+    assert "Automated reminders disabled" in html
+    assert "Theme button enabled" in html
+    assert "Guest dashboard enabled" in html
+    assert "Guest submission disabled" in html
+    assert "surface-panel admin-feature-flags-panel" in html
+    assert "admin-feature-flags__section" in html
+    assert "admin-toggle-card admin-feature-flags__option" in html
 
     # simulate saving new values and verify the returned page reflects them
     rv2 = client.post(
@@ -85,7 +85,7 @@ def test_feature_flags_render_correct_action_labels(client, app):
     )
     assert rv2.status_code == 200
     html2 = rv2.get_data(as_text=True)
-    assert 'Automated reminders enabled' in html2
+    assert "Automated reminders enabled" in html2
 
 
 def test_admin_dashboard_uses_shared_action_shells(client, app):
@@ -97,10 +97,10 @@ def test_admin_dashboard_uses_shared_action_shells(client, app):
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
 
-    assert 'admin-hero__actions ui-action-bar' in html
-    assert 'ui-action-group' in html
-    assert 'ui-action-note' in html
-    assert 'data-vibe-shell' in html
+    assert "admin-hero__actions ui-action-bar" in html
+    assert "ui-action-group" in html
+    assert "ui-action-note" in html
+    assert "data-vibe-shell" in html
 
 
 def test_feature_flags_post_unchecked_boxes_disable_flags(client, app):
@@ -149,15 +149,15 @@ def test_feature_flags_autosave_support(client, app):
     js_resp = client.get(js_match.group(1))
     assert js_resp.status_code == 200
     assert b"location.reload()" in js_resp.data
-    # verify global JS includes beforeunload handler to flush autosaves
-    # and the new fetch+keepalive logic (not sendBeacon) so JSON posts work
-    # root redirects logged-in users so hit dashboard directly
+    # autosave/session-persistence now lives in a dedicated Vite source module
+    with open("frontend/js/modules/autosave.js", "rb") as handle:
+        autosave = handle.read()
     base = client.get("/dashboard")
-    assert b"beforeunload" in base.data
-    assert b"keepalive" in base.data
-    assert b"form:autosaved" in base.data
+    assert b"beforeunload" in autosave
+    assert b"keepalive" in autosave
+    assert b"form:autosaved" in autosave
     assert b"card.classList.toggle('active', cb.checked);" in base.data
-    assert b"form[data-toggle-session-persist=\"session\"]" in base.data
+    assert b'form[data-toggle-session-persist="session"]' in autosave
 
     # toggling a flag should affect other pages on next request
     # start with vibe enabled
@@ -190,7 +190,11 @@ def test_feature_flags_json_autosave_updates(client, app):
     assert rv.status_code == 200
     rv = client.post(
         "/admin/feature_flags",
-        json={"vibe_enabled": True, "enable_nudges": False, "guest_submission_enabled": False},
+        json={
+            "vibe_enabled": True,
+            "enable_nudges": False,
+            "guest_submission_enabled": False,
+        },
     )
     assert rv.status_code == 200
     payload = rv.get_json()
@@ -210,9 +214,12 @@ def test_feature_flags_autosave_updates_brand_banner_logic(client, app):
     rv = login_admin(client)
     assert rv.status_code == 200
 
-    with open("app/static/app.js", "r") as handle:
+    with open("frontend/js/modules/theme.js", "r") as handle:
         script = handle.read()
-    assert "document.body.classList.toggle('no-brand-banner', !shouldShowBanner);" in script
+    assert (
+        "document.body.classList.toggle('no-brand-banner', !shouldShowBanner);"
+        in script
+    )
     assert "banner.hidden = !shouldShowBanner;" in script
     assert "panel.hidden = !quotesEnabled;" in script
 
@@ -269,6 +276,7 @@ def test_feature_flags_autosave_handles_plain_text(client, app):
 
 def test_feature_flags_fallback_defaults_keep_vibe_enabled(app, monkeypatch):
     with app.app_context():
+
         class _ExecuteResult:
             def fetchone(self):
                 return (1,)
@@ -301,9 +309,11 @@ def test_reject_request_config_label_describes_state(client, app):
     rv = client.get("/admin/reject_request_config")
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
-    assert 'Reject request disabled' in html
+    assert "Reject request disabled" in html
     # the checkbox should also expose the on/off texts as attributes
     assert 'data-toggle-text-checked="Reject request enabled"' in html
+
+
 def test_dashboard_notification_toggle(client, app):
     """Verify dashboard toggle tile label updates with flag state and posts correctly."""
     make_admin(app)
@@ -328,8 +338,8 @@ def test_dashboard_notification_toggle(client, app):
     html = rv.get_data(as_text=True)
     assert "Notifications on" in html
     # active class should be applied when flag is enabled
-    assert 'admin-toggle-card--neutral' in html
-    assert 'admin-toggle-card--neutral active' in html
+    assert "admin-toggle-card--neutral" in html
+    assert "admin-toggle-card--neutral active" in html
 
 
 def test_notifications_endpoints_respect_disabled_flag(client, app):
@@ -390,4 +400,6 @@ def test_admin_card_font_color_uniform_in_css():
         css = f.read()
     assert ".admin-card .tile-title" in css
     assert ".admin-card .tile-sub" in css
-    assert "color: var(--body-text)" in css
+    assert "color: var(--body-text) !important;" in css
+    assert "color: var(--body-text-muted) !important;" in css
+    assert ".admin-toggle-card--neutral.active .tile-sub" in css

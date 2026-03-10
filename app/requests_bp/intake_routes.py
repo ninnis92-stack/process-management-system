@@ -1,12 +1,21 @@
 from datetime import datetime, timedelta
 import time
 
-from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import (
+    abort,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required
 
 from .. import metrics as metrics_module
 from ..extensions import db
-from ..models import Request as ReqModel, SpecialEmailConfig
+from ..models import Request as ReqModel, SpecialEmailConfig, UserDepartment
 from ..notifcations import notify_users, users_in_department
 from ..services.process_metrics import record_process_metric_event
 from ..services.request_creation import (
@@ -33,6 +42,131 @@ from .forms import (
     AssignmentForm,
 )
 from .routes import _log
+
+
+def _normalize_department_code(value: str) -> str:
+    code = (value or "").strip().upper()
+    if code not in {"A", "B", "C"}:
+        abort(404)
+    return code
+
+
+def _user_can_access_department_packet(department_code: str) -> bool:
+    if getattr(current_user, "is_admin", False):
+        return True
+    if (getattr(current_user, "department", "") or "").strip().upper() == department_code:
+        return True
+    assignment = UserDepartment.query.filter_by(
+        user_id=current_user.id,
+        department=department_code,
+    ).first()
+    return bool(assignment and assignment.is_active_assignment)
+
+
+def _choice_rows(field) -> list[dict]:
+    rows = []
+    for raw_value, raw_label in getattr(field, "choices", []) or []:
+        value = str(raw_value or "").strip()
+        if not value:
+            continue
+        label = str(raw_label or value).strip()
+        rows.append({"value": value, "label": label})
+    return rows
+
+
+def _build_printable_core_sections(form: NewRequestForm) -> list[dict]:
+    return [
+        {
+            "title": "Part and method context",
+            "description": "Collect the identifiers needed to route and verify the request correctly.",
+            "fields": [
+                {
+                    "label": form.donor_part_number.label.text,
+                    "kind": "line",
+                    "hint": "Required for Method requests and still useful context for combined requests.",
+                },
+                {
+                    "label": form.target_part_number.label.text,
+                    "kind": "line",
+                    "hint": "Optional for part-number work at intake, but capture it when known.",
+                },
+                {
+                    "label": form.no_donor_reason.label.text,
+                    "kind": "choice",
+                    "options": _choice_rows(form.no_donor_reason),
+                    "hint": "Use this when a new part number is needed and there is no donor reference.",
+                },
+            ],
+        },
+        {
+            "title": "Request details",
+            "description": "Capture the operational context downstream departments need to act on the request.",
+            "fields": [
+                {
+                    "label": form.title.label.text,
+                    "kind": "line",
+                    "wide": True,
+                    "hint": "Use a clear title that explains the work at a glance.",
+                },
+                {
+                    "label": form.request_type.label.text,
+                    "kind": "choice",
+                    "options": _choice_rows(form.request_type),
+                },
+                {
+                    "label": form.priority.label.text,
+                    "kind": "choice",
+                    "options": _choice_rows(form.priority),
+                },
+                {
+                    "label": form.pricebook_status.label.text,
+                    "kind": "choice",
+                    "options": _choice_rows(form.pricebook_status),
+                },
+                {
+                    "label": form.sales_list_reference.label.text,
+                    "kind": "line",
+                    "wide": True,
+                    "hint": "If the item is already on the sales list, capture the SKU or reference here.",
+                },
+                {
+                    "label": form.due_at.label.text,
+                    "kind": "line",
+                    "hint": "Keep the normal 48+ hour lead-time rule when planning manual intake.",
+                },
+                {
+                    "label": form.description.label.text,
+                    "kind": "textarea",
+                    "wide": True,
+                    "hint": "Explain the request background, blockers, and anything the next team should know.",
+                },
+            ],
+        },
+    ]
+
+
+@requests_bp.route("/requests/departments/<dept>/printable-form")
+@login_required
+def printable_department_form(dept: str):
+    department_code = _normalize_department_code(dept)
+    if not _user_can_access_department_packet(department_code):
+        abort(403)
+
+    template_context = load_request_template_context(department_code)
+    process_preview = active_workflow_intake_preview(department_code)
+    form = NewRequestForm()
+
+    return render_template(
+        "request_printable.html",
+        title=f"Printable request form · Dept {department_code}",
+        department_code=department_code,
+        template=template_context.template,
+        template_spec=template_context.template_spec,
+        template_sections=template_context.template_sections,
+        process_preview=process_preview,
+        printable_core_sections=_build_printable_core_sections(form),
+        generated_at=datetime.utcnow(),
+    )
 
 
 @requests_bp.route("/requests/new", methods=["GET", "POST"])

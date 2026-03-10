@@ -33,6 +33,11 @@ Key capabilities:
 
 - **Dynamic request templates** with sections, verification‑prefill, and
   conditional requirements
+- **Printable department packets** generated from the currently assigned request
+  template so teams can produce real-world paper forms without maintaining a
+  second schema. The print view includes the shared intake fields, the
+  template’s configured sections and options, the workflow preview, and the
+  active workspace branding context.
 - **Clearer public entry flow** with a simplified guest intake path, no
   public department-switch modal, and the default quote set used on the
   login screen when rotating quotes are enabled

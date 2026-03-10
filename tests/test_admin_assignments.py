@@ -50,6 +50,7 @@ def test_department_assignment_crud(app, client):
     # list view should show the template name
     rv = client.get("/admin/assignments")
     assert b"Dept B Template" in rv.data
+    assert b"/requests/departments/B/printable-form" in rv.data
 
     # delete assignment
     with app.app_context():
@@ -60,6 +61,68 @@ def test_department_assignment_crud(app, client):
     assert b"Assignment removed" in rv.data
     with app.app_context():
         assert db.session.get(DepartmentFormAssignment, aid) is None
+
+
+def test_department_printable_form_requires_department_access(app, client):
+    with app.app_context():
+        admin = User(
+            email="admin-print@example.com",
+            name="Admin Print",
+            password_hash=generate_password_hash("secret"),
+            is_admin=True,
+            is_active=True,
+            department="B",
+        )
+        member = User(
+            email="dept-b-print@example.com",
+            name="Dept B Print",
+            password_hash=generate_password_hash("secret"),
+            is_active=True,
+            department="B",
+        )
+        outsider = User(
+            email="dept-c-print@example.com",
+            name="Dept C Print",
+            password_hash=generate_password_hash("secret"),
+            is_active=True,
+            department="C",
+        )
+        template = FormTemplate(
+            name="Pack Template",
+            description="Printable packet template",
+        )
+        db.session.add_all([admin, member, outsider, template])
+        db.session.commit()
+        db.session.add(
+            DepartmentFormAssignment(template_id=template.id, department_name="B")
+        )
+        db.session.commit()
+
+    rv = login_admin(client, email="admin-print@example.com")
+    assert rv.status_code == 200
+    rv = client.get("/requests/departments/B/printable-form")
+    assert rv.status_code == 200
+    assert b"Printable Department Packet" in rv.data
+
+    client.post("/auth/logout", follow_redirects=True)
+    rv = client.post(
+        "/auth/login",
+        data={"email": "dept-b-print@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    rv = client.get("/requests/departments/B/printable-form")
+    assert rv.status_code == 200
+
+    client.post("/auth/logout", follow_redirects=True)
+    rv = client.post(
+        "/auth/login",
+        data={"email": "dept-c-print@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    rv = client.get("/requests/departments/B/printable-form")
+    assert rv.status_code == 403
 
 
 def test_bulk_assign_departments_deduplicates_and_reports_results(app, client):

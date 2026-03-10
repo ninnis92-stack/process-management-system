@@ -43,7 +43,7 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
     # our inline script should also include the early-return check for
     # admin status and for the presence of a navbar department selector.
     # when either condition is true the modal logic returns early.
-    assert 'if (!loggedIn || active || isAdmin || navbarDept) return;' in html
+    assert "if (!loggedIn || active || isAdmin || navbarDept) return;" in html
 
     expected_labels = {
         "Users",
@@ -81,10 +81,10 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
     assert 'id="adminQuickSearchClear"' in html
     assert 'id="adminSearchEmptyState"' in html
     for anchor in (
-        '#admin-section-configuration',
-        '#admin-section-flow',
-        '#admin-section-utilities',
-        '#admin-section-foundation',
+        "#admin-section-configuration",
+        "#admin-section-flow",
+        "#admin-section-utilities",
+        "#admin-section-foundation",
     ):
         assert f'href="{anchor}"' in html
 
@@ -142,7 +142,9 @@ def test_admin_navbar_department_switch_updates_session(app, client):
     assert 'id="navbarDeptSelect"' in html
 
     # choose a different department via POST
-    resp = client.post("/auth/switch_dept", data={"department": "A"}, follow_redirects=True)
+    resp = client.post(
+        "/auth/switch_dept", data={"department": "A"}, follow_redirects=True
+    )
     assert resp.status_code == 200
     dash = client.get("/dashboard")
     assert 'data-active-dept="A"' in dash.get_data(as_text=True)
@@ -205,6 +207,31 @@ def test_admin_can_hide_onboarding_guidance_panel(app, client):
     html = rv.get_data(as_text=True)
     assert "First admin pass" not in html
     assert "Workflow signal" not in html
+
+    # also ensure the POST from settings will remove the panel without a
+    # full logout/login cycle (simulated via client POST + visit page)
+    rv2 = client.post(
+        "/auth/preferences",
+        json={
+            "onboarding_guidance_enabled": "",
+            "onboarding_guidance_enabled_present": "1",
+        },
+    )
+    assert rv2.status_code == 200
+    after = client.get("/admin/")
+    assert b"First admin pass" not in after.data
+    assert b"Workflow signal" not in after.data
+    rv2 = client.post(
+        "/auth/preferences",
+        json={
+            "onboarding_guidance_enabled": "",
+            "onboarding_guidance_enabled_present": "1",
+        },
+    )
+    assert rv2.status_code == 200
+    after = client.get("/admin/")
+    assert b"First admin pass" not in after.data
+    assert b"Workflow signal" not in after.data
 
 
 def test_user_settings_surface_expected_controls(app, client):

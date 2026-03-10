@@ -1,6 +1,7 @@
 import io
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
+from app.extensions import db
 from app.models import (
     User,
     FormTemplate,
@@ -9,6 +10,7 @@ from app.models import (
     DepartmentFormAssignment,
     Submission,
     Attachment,
+    SiteConfig,
 )
 
 
@@ -21,8 +23,6 @@ def test_dynamic_submission_with_file_and_regex(app, client):
         is_active=True,
         password_hash=generate_password_hash("password"),
     )
-    from app.extensions import db
-
     db.session.add(u)
     db.session.commit()
 
@@ -105,8 +105,6 @@ def test_conditional_requirement_makes_target_field_required(app, client):
         is_active=True,
         password_hash=generate_password_hash("password"),
     )
-    from app.extensions import db
-
     db.session.add(u)
     db.session.commit()
 
@@ -188,8 +186,6 @@ def test_conditional_section_requirement_can_require_upload_section(app, client)
         is_active=True,
         password_hash=generate_password_hash("password"),
     )
-    from app.extensions import db
-
     db.session.add(u)
     db.session.commit()
 
@@ -254,6 +250,77 @@ def test_conditional_section_requirement_can_require_upload_section(app, client)
         follow_redirects=True,
     )
     assert rv.status_code in (200, 302)
+
+
+def test_printable_department_form_renders_branding_and_template_fields(app, client):
+    user = User(
+        email="printable@example.com",
+        name="Printable User",
+        department="A",
+        is_active=True,
+        password_hash=generate_password_hash("password"),
+    )
+    db.session.add(user)
+    db.session.commit()
+
+    template = FormTemplate(name="Warehouse Intake", description="Printed intake")
+    db.session.add(template)
+    db.session.commit()
+
+    db.session.add_all(
+        [
+            FormField(
+                template_id=template.id,
+                name="rack_location",
+                label="Rack Location",
+                field_type="text",
+                required=True,
+                section_name="Floor checks",
+            ),
+            FormField(
+                template_id=template.id,
+                name="packaging_type",
+                label="Packaging Type",
+                field_type="select",
+                required=False,
+                section_name="Floor checks",
+            ),
+        ]
+    )
+    db.session.commit()
+
+    select_field = FormField.query.filter_by(name="packaging_type").first()
+    db.session.add_all(
+        [
+            FormFieldOption(field_id=select_field.id, value="box", label="Box"),
+            FormFieldOption(field_id=select_field.id, value="crate", label="Crate"),
+        ]
+    )
+    db.session.add(DepartmentFormAssignment(template_id=template.id, department_name="A"))
+    cfg = SiteConfig.get()
+    cfg.brand_name = "Acme Field Ops"
+    cfg.theme_preset = "moss"
+    cfg.logo_filename = "uploads/branding/mock-logo.png"
+    db.session.add(cfg)
+    db.session.commit()
+
+    rv = client.post(
+        "/auth/login",
+        data={"email": "printable@example.com", "password": "password"},
+        follow_redirects=True,
+    )
+    assert rv.status_code in (200, 302)
+
+    rv = client.get("/requests/departments/A/printable-form")
+    assert rv.status_code == 200
+    body = rv.get_data(as_text=True)
+    assert "Printable Department Packet" in body
+    assert "Acme Field Ops" in body
+    assert "Warehouse Intake" in body
+    assert "Rack Location" in body
+    assert "Packaging Type" in body
+    assert "box" in body
+    assert "crate" in body
 
 
 def test_photo_and_video_fields_can_be_added_and_submitted(app, client):

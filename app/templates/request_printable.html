@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% from 'admin/_macros.html' import meta_badge %}
+{% block body_class %}theme-body printable-request-body{% endblock %}
+{% block content %}
+<section class="printable-request-shell">
+  <div class="printable-request-toolbar">
+    <div>
+      <div class="page-header__eyebrow">{{ department_labels.get(department_code, 'Dept ' ~ department_code) }}</div>
+      <h3 class="page-header__title mb-0">Printable Department Packet</h3>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-outline-secondary" href="{{ url_for('requests.dashboard', as_dept=department_code) if current_user.is_admin else url_for('requests.dashboard') }}">Back to workspace</a>
+      <button class="btn btn-primary" type="button" onclick="window.print()">Print form</button>
+    </div>
+  </div>
+
+  <section class="printable-request-header">
+    <div class="printable-request-brand">
+      {% if theme_logo_url %}
+        <img src="{{ theme_logo_url }}" alt="{{ site_brand_name or 'FreshProcess' }} logo">
+      {% else %}
+        <div class="printable-request-brand-mark" aria-hidden="true"></div>
+      {% endif %}
+      <div>
+        <div class="eyebrow-label">{{ site_brand_name or 'FreshProcess' }}</div>
+        <h1 class="printable-request-title">{{ template.name if template else 'Shared request packet' }}</h1>
+        <p class="text-muted mb-0">Use the printed packet for manual intake, floor work, or fallback continuity. The same department template and branding rules power this page and the live app.</p>
+      </div>
+    </div>
+    <div class="printable-request-meta">
+      <div class="printable-request-meta-card">
+        <div class="eyebrow-label">Packet details</div>
+        <div class="d-flex gap-2 flex-wrap mb-2">
+          {{ meta_badge(department_labels.get(department_code, 'Dept ' ~ department_code), 'light') }}
+          {{ meta_badge(template.layout_label if template and template.layout_label else 'Standard layout', 'light') }}
+          {% if external_theme_loaded %}
+            {{ meta_badge('Adopted brand theme', 'primary') }}
+          {% elif site_theme_preset and site_theme_preset != 'default' %}
+            {{ meta_badge(site_theme_preset|title ~ ' theme', 'primary') }}
+          {% else %}
+            {{ meta_badge('Default workspace theme', 'light') }}
+          {% endif %}
+        </div>
+        <div class="small text-muted">Generated {{ generated_at.strftime('%b %d, %Y %I:%M %p UTC') }}</div>
+      </div>
+      <div class="printable-request-meta-card">
+        <div class="eyebrow-label">Branding adoption</div>
+        <div class="small text-muted">Printed forms automatically inherit the active workspace brand name, logo, and theme context so paper workflows stay aligned with the digital intake experience.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="printable-request-process">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-2">
+      <div>
+        <div class="eyebrow-label">Workflow preview</div>
+        <h4 class="mb-1">How this request moves</h4>
+        <p class="text-muted mb-0">This keeps the printed packet aligned with the same operational flow shown in the live intake workspace.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        {{ meta_badge(process_preview.name if process_preview else 'Default process flow', 'light') }}
+        {{ meta_badge(process_preview.scope if process_preview else department_labels.get(department_code, 'Dept ' ~ department_code), 'light') }}
+      </div>
+    </div>
+    {% if process_preview and process_preview.steps %}
+      <ol class="printable-request-process-list">
+        {% for step in process_preview.steps %}
+          <li>
+            <strong>{{ step.label }}</strong>
+            <span>{{ step.status }}</span>
+            <em>Department {{ step.from_department or department_code }} → Department {{ step.to_department or 'B' }}</em>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <div class="small text-muted">Requests usually start in {{ department_labels.get(department_code, 'Dept ' ~ department_code) }} and then move into the configured downstream review path.</div>
+    {% endif %}
+  </section>
+
+  {% for section in printable_core_sections %}
+    <section class="printable-request-section">
+      <div class="mb-3">
+        <div class="eyebrow-label">Core intake</div>
+        <h4 class="mb-1">{{ section.title }}</h4>
+        <p class="text-muted mb-0">{{ section.description }}</p>
+      </div>
+      <div class="printable-request-grid">
+        {% for field in section.fields %}
+          <article class="printable-request-field{% if field.wide %} printable-request-field--wide{% endif %}">
+            <div class="fw-semibold">{{ field.label }}</div>
+            {% if field.kind == 'choice' %}
+              <div class="printable-request-options">
+                {% for option in field.options %}
+                  <div class="printable-request-option"><span class="printable-request-checkbox" aria-hidden="true"></span><span>{{ option.label }}</span></div>
+                {% endfor %}
+              </div>
+            {% elif field.kind == 'textarea' %}
+              <div class="printable-request-textarea" aria-hidden="true"></div>
+            {% else %}
+              <div class="printable-request-line" aria-hidden="true"></div>
+            {% endif %}
+            {% if field.hint %}<div class="form-text mt-2">{{ field.hint }}</div>{% endif %}
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% endfor %}
+
+  {% if template_sections %}
+    {% for section in template_sections %}
+      <section class="printable-request-section">
+        <div class="mb-3">
+          <div class="eyebrow-label">Template section</div>
+          <h4 class="mb-1">{{ section.name }}</h4>
+          <p class="text-muted mb-0">Configured from the department’s assigned request template.</p>
+        </div>
+        <div class="printable-request-grid">
+          {% for field in section.fields %}
+            <article class="printable-request-field{% if field.field_type in ['textarea', 'file', 'photo', 'video'] %} printable-request-field--wide{% endif %}">
+              <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                <div class="fw-semibold">{{ field.label }}{% if field.required %} *{% endif %}</div>
+                <div class="d-flex gap-2 flex-wrap">
+                  {% if field.required %}{{ meta_badge('Required', 'light') }}{% endif %}
+                  {% if field.verification and field.verification.enabled %}{{ meta_badge('Verified', 'light') }}{% endif %}
+                  {% if field.verification and field.verification.prefill_enabled %}{{ meta_badge('Auto-fill source', 'primary') }}{% endif %}
+                </div>
+              </div>
+
+              {% if field.field_type == 'select' %}
+                <div class="printable-request-options">
+                  {% for option in field.options %}
+                    <div class="printable-request-option"><span class="printable-request-checkbox" aria-hidden="true"></span><span>{{ option.label }}</span></div>
+                  {% endfor %}
+                </div>
+              {% elif field.field_type == 'textarea' %}
+                <div class="printable-request-textarea" aria-hidden="true"></div>
+              {% elif field.field_type in ['file', 'photo', 'video'] %}
+                <div class="printable-request-upload">Attach {{ 'photo' if field.field_type == 'photo' else ('video' if field.field_type == 'video' else 'supporting file') }} here or reference the physical attachment.</div>
+              {% else %}
+                <div class="printable-request-line" aria-hidden="true"></div>
+              {% endif %}
+
+              {% if field.hint %}<div class="form-text mt-2">{{ field.hint }}</div>{% endif %}
+              {% if field.requirements and field.requirements.summary %}<div class="form-text mt-1">Required when {{ field.requirements.summary }}.</div>{% endif %}
+              {% if field.verification and field.verification.bulk_enabled %}<div class="form-text mt-1">Multiple values may be captured for this field during live intake.</div>{% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+  {% else %}
+    <section class="printable-request-section">
+      <div class="eyebrow-label">Template section</div>
+      <h4 class="mb-1">No additional configured fields</h4>
+      <p class="text-muted mb-0">This department currently uses the shared intake fields only. Assign a request template to add department-specific printable sections.</p>
+    </section>
+  {% endif %}
+
+  <section class="printable-request-signoff">
+    <div class="mb-2">
+      <div class="eyebrow-label">Operational sign-off</div>
+      <h4 class="mb-1">Manual handling record</h4>
+      <p class="text-muted mb-0">Use these lines when the printed packet moves through a floor, warehouse, or handoff queue before being entered into the app.</p>
+    </div>
+    <div class="printable-request-signoff-grid">
+      <div>
+        <div class="fw-semibold">Prepared by</div>
+        <div class="printable-request-signoff-line" aria-hidden="true"></div>
+      </div>
+      <div>
+        <div class="fw-semibold">Reviewed by</div>
+        <div class="printable-request-signoff-line" aria-hidden="true"></div>
+      </div>
+      <div>
+        <div class="fw-semibold">Date received</div>
+        <div class="printable-request-signoff-line" aria-hidden="true"></div>
+      </div>
+    </div>
+  </section>
+</section>
+{% endblock %}

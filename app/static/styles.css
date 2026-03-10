@@ -432,10 +432,13 @@
 }
 
 .admin-toggle-card--neutral.active .tile-title,
-.admin-toggle-card--neutral.active .tile-sub,
 .admin-toggle-card--neutral.active .btn,
 .admin-toggle-card--neutral.active .form-check-label {
   color: inherit;
+}
+
+.admin-toggle-card--neutral.active .tile-sub {
+  color: var(--body-text-muted) !important;
 }
 
 .template-section-block {
@@ -487,10 +490,13 @@
     transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.12s ease;
   }
 
-  /* ensure all admin-card titles/subtitles use the same readable text color */
-  .admin-card .tile-title,
-  .admin-card .tile-sub {
+  /* keep admin-card hierarchy consistent across every tile state */
+  .admin-card .tile-title {
     color: var(--body-text) !important;
+  }
+
+  .admin-card .tile-sub {
+    color: var(--body-text-muted) !important;
   }
 
   .admin-card,
@@ -3295,6 +3301,262 @@ pre,
 .account-dropdown-menu .account-dropdown-item:hover,
 .account-dropdown-menu .account-dropdown-item:focus-visible {
   color: inherit;
+}
+
+.printable-request-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.printable-request-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.printable-request-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(240px, 0.9fr);
+  gap: 1rem;
+  padding: 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.printable-request-brand {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+.printable-request-brand img {
+  max-height: 54px;
+  width: auto;
+}
+
+.printable-request-brand-mark {
+  width: 54px;
+  height: 54px;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: var(--shadow-sm);
+}
+
+.printable-request-title {
+  margin: 0;
+  font-size: clamp(1.5rem, 1.2rem + 1vw, 2.2rem);
+}
+
+.printable-request-meta {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.printable-request-meta-card {
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.printable-request-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+
+.printable-request-field,
+.printable-request-section,
+.printable-request-process,
+.printable-request-signoff {
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.printable-request-process,
+.printable-request-section,
+.printable-request-signoff {
+  padding: 1rem 1.05rem;
+}
+
+.printable-request-field {
+  padding: 0.85rem 0.95rem;
+}
+
+.printable-request-field--wide {
+  grid-column: 1 / -1;
+}
+
+.printable-request-line {
+  min-height: 2rem;
+  border-bottom: 1.5px solid rgba(15, 23, 42, 0.25);
+  margin-top: 1.15rem;
+}
+
+.printable-request-textarea {
+  min-height: 7rem;
+  border: 1px dashed rgba(15, 23, 42, 0.25);
+  border-radius: 0.75rem;
+  margin-top: 0.9rem;
+  background-image: linear-gradient(to bottom, transparent 0, transparent 1.45rem, rgba(15, 23, 42, 0.08) 1.45rem, rgba(15, 23, 42, 0.08) 1.52rem);
+  background-size: 100% 1.6rem;
+}
+
+.printable-request-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.55rem 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.printable-request-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.94rem;
+}
+
+.printable-request-checkbox {
+  width: 1rem;
+  height: 1rem;
+  border: 1.5px solid rgba(15, 23, 42, 0.48);
+  border-radius: 0.2rem;
+  flex: 0 0 auto;
+}
+
+.printable-request-upload {
+  margin-top: 0.9rem;
+  min-height: 5rem;
+  border: 1px dashed rgba(15, 23, 42, 0.28);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--body-text-muted);
+  padding: 0.9rem;
+}
+
+.printable-request-process-list {
+  display: grid;
+  gap: 0.7rem;
+  padding-left: 1.2rem;
+  margin: 0;
+}
+
+.printable-request-process-list li {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.printable-request-process-list span,
+.printable-request-process-list em {
+  color: var(--body-text-muted);
+  font-style: normal;
+  font-size: 0.9rem;
+}
+
+.printable-request-signoff-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.printable-request-signoff-line {
+  min-height: 2.2rem;
+  border-bottom: 1.5px solid rgba(15, 23, 42, 0.25);
+  margin-top: 1.3rem;
+}
+
+@media (max-width: 900px) {
+  .printable-request-header,
+  .printable-request-grid,
+  .printable-request-signoff-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .theme-nav,
+  .skip-link,
+  .printable-request-toolbar,
+  .footer,
+  #notifMenu,
+  .notif-dropdown,
+  .offcanvas,
+  .modal,
+  .brand-banner-row {
+    display: none !important;
+  }
+
+  body,
+  .theme-body,
+  .page-shell,
+  .surface-panel,
+  .printable-request-header,
+  .printable-request-process,
+  .printable-request-section,
+  .printable-request-field,
+  .printable-request-signoff {
+    background: #ffffff !important;
+    color: #111827 !important;
+    box-shadow: none !important;
+  }
+
+  body {
+    font-size: 12px;
+  }
+
+  .main {
+    padding: 0;
+    min-height: auto;
+  }
+
+  .page-shell {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .printable-request-shell {
+    gap: 0.6rem;
+  }
+
+  .printable-request-header,
+  .printable-request-process,
+  .printable-request-section,
+  .printable-request-signoff,
+  .printable-request-field {
+    border-color: rgba(17, 24, 39, 0.18) !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .printable-request-header {
+    padding: 0 0 0.6rem;
+    border: 0;
+    border-bottom: 2px solid rgba(17, 24, 39, 0.2) !important;
+    border-radius: 0;
+  }
+
+  .printable-request-process,
+  .printable-request-section,
+  .printable-request-signoff {
+    padding: 0.7rem 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .printable-request-field {
+    padding: 0.5rem 0;
+  }
 }
 .notif-dropdown .notif-item strong { color: var(--body-text); font-weight:700; }
 .notif-dropdown .notif-item .small, .notif-dropdown .notif-item small { color: rgba(255,255,255,0.78); }

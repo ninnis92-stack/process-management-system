@@ -80,31 +80,35 @@ def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
 
     rv = client.get("/dashboard")
     assert rv.status_code == 200
-    cluster = rv.data.split(b'class="brand-cluster"', 1)[1].split(b'<button class="navbar-toggler"', 1)[0]
+    cluster = rv.data.split(b'class="brand-cluster"', 1)[1].split(
+        b'<button class="navbar-toggler"', 1
+    )[0]
     assert b'class="brand-banner-row"' in rv.data
     assert b'class="brand-banner-row__quote-panel"' in rv.data
     assert b'class="brand-banner-row__control-panel"' in rv.data
-    assert b'brand-banner-row__control-shell' in rv.data
-    assert b'data-vibe-shell' in rv.data
-    assert b'data-theme-banner' in rv.data
+    assert b"brand-banner-row__control-shell" in rv.data
+    assert b"data-vibe-shell" in rv.data
+    assert b"data-theme-banner" in rv.data
     assert b'id="motivation"' in rv.data
     assert b'id="vibeBtn"' in rv.data
     assert rv.data.index(b'id="motivation"') < rv.data.index(b'id="vibeBtn"')
-    assert cluster.index(b'</a>') < cluster.index(b'id="vibeBtn"')
-    assert b'Current theme' in rv.data
+    assert cluster.index(b"</a>") < cluster.index(b'id="vibeBtn"')
+    assert b"Current theme" in rv.data
 
     # new CSS rules should make brand-stack sit above the banner and add spacing
-    with open('app/static/styles.css', 'r') as f:
+    with open("app/static/styles.css", "r") as f:
         css = f.read()
-    assert '.brand-stack' in css and 'z-index: 2' in css
-    assert '.theme-nav .navbar-brand' in css and 'z-index: 2' in css
-    assert '.brand-banner-row' in css and 'margin-left: 1.3rem' in css
-    assert 'margin-top: 0.3rem' in css  # small-screen wrap spacing
-    assert '.brand-kicker' in css and 'line-height: 1.25' in css
-    assert '.brand-banner-row__control-shell' in css
-    assert '.ui-control-shell--banner' in css
+    assert ".brand-stack" in css and "z-index: 2" in css
+    assert ".theme-nav .navbar-brand" in css and "z-index: 2" in css
+    assert ".brand-banner-row" in css and "margin-left: 1.3rem" in css
+    assert "margin-top: 0.3rem" in css  # small-screen wrap spacing
+    assert ".brand-kicker" in css and "line-height: 1.25" in css
+    assert ".brand-banner-row__control-shell" in css
+    assert ".ui-control-shell--banner" in css
     # the button background now uses color-mix for readability
-    assert ('background: rgb(var(--accent-rgb, 79, 140, 255))' in css) or 'color-mix(' in css
+    assert (
+        "background: rgb(var(--accent-rgb, 79, 140, 255))" in css
+    ) or "color-mix(" in css
     with app.app_context():
         from app.models import FeatureFlags
 
@@ -117,10 +121,10 @@ def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
     rv = client.get("/dashboard")
     assert rv.status_code == 200
     assert b'class="brand-banner-row brand-banner-row--quotes-only"' in rv.data
-    assert b'data-vibe-quote-panel' in rv.data
+    assert b"data-vibe-quote-panel" in rv.data
     assert b'id="motivation"' in rv.data
     assert b'id="vibeBtn"' not in rv.data
-    assert b'data-vibe-control-panel' not in rv.data
+    assert b"data-vibe-control-panel" not in rv.data
 
 
 def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):
@@ -132,17 +136,20 @@ def test_settings_page_shows_disable_text_when_dark_mode_enabled(client, app):
     assert rv.status_code == 200
     # the dark mode label should reflect the preference
     assert b'id="darkModeLabel">Dark mode enabled<' in rv.data
-    assert b'Dark mode disables personal vibe controls, while adopted brand themes stay blended into the native dark palette.' in rv.data
+    assert (
+        b"Dark mode disables personal vibe controls, while adopted brand themes stay blended into the native dark palette."
+        in rv.data
+    )
     assert b'id="vibeDarkModeNote"' in rv.data
     assert b'id="vibe_index" name="vibe_index" disabled' in rv.data
-    assert b'Theme selection is disabled while dark mode is active.' in rv.data
-    assert b'data-vibe-preview-badge' not in rv.data
-    assert b'data-vibe-compatible-chip=' not in rv.data
+    assert b"Theme selection is disabled while dark mode is active." in rv.data
+    assert b"data-vibe-preview-badge" not in rv.data
+    assert b"data-vibe-compatible-chip=" not in rv.data
     assert b"Changes save automatically." in rv.data
     assert b'id="darkModeSubmitBtn"' not in rv.data
     # the checkbox input should be checked so the client script can
     # initialize body class correctly
-    assert b'<input checked' in rv.data.split(b'name="dark_mode"')[0]
+    assert b"<input checked" in rv.data.split(b'name="dark_mode"')[0]
     m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
     assert m, "no body tag?"
     assert b"dark-mode" in m.group(1)
@@ -159,9 +166,10 @@ def test_settings_page_shows_enable_text_when_dark_mode_disabled(client, app):
     rv = client.get("/auth/settings")
     assert rv.status_code == 200
     assert b'id="darkModeLabel">Dark mode disabled<' in rv.data
-    assert b'data-all-choices=' in rv.data
+    assert b"data-all-choices=" in rv.data
     assert b"Changes save automatically." in rv.data
     assert b'id="darkModeSubmitBtn"' not in rv.data
+
 
 def test_settings_page_shows_vibe_toggle(client, app):
     make_user(app, dark_mode=False)
@@ -170,7 +178,7 @@ def test_settings_page_shows_vibe_toggle(client, app):
 
     rv = client.get("/auth/settings")
     assert rv.status_code == 200
-    assert b'Show vibe button in the navbar' in rv.data
+    assert b"Show vibe button in the navbar" in rv.data
 
 
 def test_vibe_button_preference_hides_nav(client, app):
@@ -211,9 +219,9 @@ def test_preferences_autosave_broadcast(client, app):
     with open("app/static/app.js", "r") as handle:
         script = handle.read()
     # verify our new storage key is mentioned and the live preview listener
-    assert 'userPrefsLastUpdate' in script
-    assert 'vibeToggle' in script
-    assert 'settingsVibePreview' in script
+    assert "userPrefsLastUpdate" in script
+    assert "vibeToggle" in script
+    assert "settingsVibePreview" in script
 
 
 def test_workspace_vibe_flag_overrides_user_vibe_button_preference(client, app):
@@ -236,8 +244,9 @@ def test_workspace_vibe_flag_overrides_user_vibe_button_preference(client, app):
 
     settings_page = client.get("/auth/settings")
     assert settings_page.status_code == 200
-    assert b'Show vibe button in the navbar' in settings_page.data
-    assert b'global control still hides the button for everyone' in settings_page.data
+    assert b"Show vibe button in the navbar" in settings_page.data
+    assert b"global control still hides the button for everyone" in settings_page.data
+
 
 def test_settings_page_disables_theme_when_vibe_feature_is_off(client, app):
     make_user(app, dark_mode=False)
@@ -253,10 +262,15 @@ def test_settings_page_disables_theme_when_vibe_feature_is_off(client, app):
     rv = client.get("/auth/settings")
     assert rv.status_code == 200
     assert b'id="vibe_index" name="vibe_index" disabled' in rv.data
-    assert b'Theme selection is disabled while the global vibe feature is turned off.' in rv.data
+    assert (
+        b"Theme selection is disabled while the global vibe feature is turned off."
+        in rv.data
+    )
 
 
-def test_dashboard_uses_compact_nav_state_when_vibe_and_quotes_are_disabled(client, app):
+def test_dashboard_uses_compact_nav_state_when_vibe_and_quotes_are_disabled(
+    client, app
+):
     make_user(app, dark_mode=False)
     with app.app_context():
         from app.models import FeatureFlags, SiteConfig
@@ -308,7 +322,6 @@ def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
             "dark_mode": True,
             "vibe_button_enabled": "y",
             "vibe_button_enabled_present": "1",
-
             "quotes_enabled": False,
             "quote_set": "engineering",
             "quote_interval": 30,
@@ -440,7 +453,7 @@ def test_settings_preview_hides_vibe_button(client, app):
     assert rv.status_code == 200
     # button should be present and not hidden
     assert b'id="settingsVibePreview"' in rv.data
-    assert b'hidden' not in rv.data.split(b'id="settingsVibePreview"')[1].split(b'>')[0]
+    assert b"hidden" not in rv.data.split(b'id="settingsVibePreview"')[1].split(b">")[0]
 
     # enable dark mode via user update, then log in again so the session
     # picks up the change.
@@ -455,7 +468,7 @@ def test_settings_preview_hides_vibe_button(client, app):
     assert rv2.status_code == 200
     # now the preview button markup should include hidden attribute
     assert b'id="settingsVibePreview"' in rv2.data
-    assert b'hidden' in rv2.data.split(b'id="settingsVibePreview"')[1].split(b'>')[0]
+    assert b"hidden" in rv2.data.split(b'id="settingsVibePreview"')[1].split(b">")[0]
 
     rv = login(client)
     assert rv.status_code == 200
@@ -491,8 +504,14 @@ def test_brand_adoption_keeps_native_dark_mode_with_brand_preset(client, app):
 
     settings_page = client.get("/auth/settings")
     assert settings_page.status_code == 200
-    assert b'This workspace is using an adopted brand theme. Native dark mode keeps the imported brand palette active automatically while personal vibe controls stay locked.' in settings_page.data
-    assert b'<label for="vibe_index" class="form-label">Theme</label>' not in settings_page.data
+    assert (
+        b"This workspace is using an adopted brand theme. Native dark mode keeps the imported brand palette active automatically while personal vibe controls stay locked."
+        in settings_page.data
+    )
+    assert (
+        b'<label for="vibe_index" class="form-label">Theme</label>'
+        not in settings_page.data
+    )
 
 
 def test_vibe_endpoint_persists_and_settings_reflect(client, app):

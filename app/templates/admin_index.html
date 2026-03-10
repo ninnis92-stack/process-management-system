@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'admin/_macros.html' import command_section, command_nav_card, command_toggle_card %}
 
 {% block content %}
   <section class="admin-hero surface-panel">
@@ -44,34 +45,7 @@
   </section>
 
   {% if current_user.onboarding_guidance_enabled|default(true) %}
-  <section class="surface-panel surface-panel-muted admin-orientation-panel">
-    <div class="admin-orientation-panel__header">
-      <div>
-        <p class="eyebrow-label">Start here</p>
-        <h2 class="h5 mb-1">First admin pass</h2>
-        <p class="text-muted mb-0">New admins learn fastest when routing, intake, and workspace presentation are configured in that order.</p>
-      </div>
-    </div>
-    <div class="admin-orientation-panel__grid">
-      <article class="admin-orientation-panel__item">
-        <strong>1. Model the route</strong>
-        <p class="small text-muted mb-0">Start in Process Flows so each request has a clear owner and next step before you tune anything else.</p>
-      </article>
-      <article class="admin-orientation-panel__item">
-        <strong>2. Teach the intake</strong>
-        <p class="small text-muted mb-0">Then adjust request forms and templates so submitters only see the fields the next team actually needs.</p>
-      </article>
-      <article class="admin-orientation-panel__item">
-        <strong>3. Publish the workspace</strong>
-        <p class="small text-muted mb-0">Finish with branding, dashboard, and notification settings once the operational model is already stable.</p>
-      </article>
-    </div>
-    <div class="d-flex flex-wrap gap-2 mt-3">
-      <a class="btn btn-sm btn-primary" href="{{ url_for('admin.list_workflows') }}">Start with process flows</a>
-      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.list_templates') }}">Open request forms</a>
-      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.site_config') }}">Review workspace defaults</a>
-    </div>
-  </section>
+    {% include 'admin/_orientation_panel.html' %}
   {% endif %}
 
   <section class="surface-panel surface-panel-muted admin-quicksearch">
@@ -105,144 +79,34 @@
   </div>
 
   <div class="admin-dashboard-panels">
-    <section class="surface-panel admin-section-panel" id="admin-section-configuration" data-admin-section>
-      <div class="admin-section__header">
-        <div>
-          <p class="eyebrow-label">Configuration</p>
-          <h3 class="admin-section__title">Playbooks & quick controls</h3>
-        </div>
-        <span class="admin-section__hint">Fast access to users, branding, and dashboards.</span>
-      </div>
-      <div class="admin-dashboard-grid">
-        <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_users') }}" onclick="window.location.assign('{{ url_for('admin.list_users') }}'); return false;">
-          <div class="tile-ico"><i class="fas fa-users"></i></div>
-          <div class="tile-title">Users</div>
-          <div class="tile-sub">Open account access, roles, and profile controls.</div>
-        </button>
-        <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_departments') }}" onclick="window.location.assign('{{ url_for('admin.list_departments') }}'); return false;">
-          <div class="tile-ico"><i class="fas fa-tags"></i></div>
-          <div class="tile-title">Departments</div>
-          <div class="tile-sub">Adjust department rules, labels, and ownership.</div>
-        </button>
-        <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.site_config') }}" onclick="window.location.assign('{{ url_for('admin.site_config') }}'); return false;">
-          <div class="tile-ico"><i class="fas fa-globe"></i></div>
-          <div class="tile-title">Workspace branding</div>
-          <div class="tile-sub">Update naming, theme, and shared workspace presentation.</div>
-        </button>
-        <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.site_config') }}#quotes-settings" onclick="window.location.assign('{{ url_for('admin.site_config') }}#quotes-settings'); return false;">
-          <div class="tile-ico"><i class="fas fa-quote-left"></i></div>
-          <div class="tile-title">Quotes</div>
-          <div class="tile-sub">Manage rotating quote sets and workspace messaging.</div>
-        </button>
-        <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.special_email') }}" onclick="window.location.assign('{{ url_for('admin.special_email') }}'); return false;">
-          <div class="tile-ico"><i class="fas fa-envelope"></i></div>
-          <div class="tile-title">Email Forms</div>
-          <div class="tile-sub">Configure inbound email intake and routing behavior.</div>
-        </button>
-        <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.monitor') }}" onclick="window.location.assign('{{ url_for('admin.monitor') }}'); return false;">
-          <div class="tile-ico"><i class="fas fa-chart-bar"></i></div>
-          <div class="tile-title">Monitoring</div>
-          <div class="tile-sub">Review live dashboards, activity, and support tooling.</div>
-        </button>
-      </div>
-    </section>
+    {% call command_section('admin-section-configuration', 'Configuration', 'Playbooks & quick controls', 'Fast access to users, branding, and dashboards.') %}
+      {{ command_nav_card(url_for('admin.list_users'), 'Users', 'Open account access, roles, and profile controls.', '<i class="fas fa-users"></i>', use_button=True) }}
+      {{ command_nav_card(url_for('admin.list_departments'), 'Departments', 'Adjust department rules, labels, and ownership.', '<i class="fas fa-tags"></i>', use_button=True) }}
+      {{ command_nav_card(url_for('admin.site_config'), 'Workspace branding', 'Update naming, theme, and shared workspace presentation.', '<i class="fas fa-globe"></i>', use_button=True) }}
+      {{ command_nav_card(url_for('admin.site_config') ~ '#quotes-settings', 'Quotes', 'Manage rotating quote sets and workspace messaging.', '<i class="fas fa-quote-left"></i>', use_button=True) }}
+      {{ command_nav_card(url_for('admin.special_email'), 'Email Forms', 'Configure inbound email intake and routing behavior.', '<i class="fas fa-envelope"></i>', use_button=True) }}
+      {{ command_nav_card(url_for('admin.monitor'), 'Monitoring', 'Review live dashboards, activity, and support tooling.', '<i class="fas fa-chart-bar"></i>', use_button=True) }}
+    {% endcall %}
 
-    <section class="surface-panel admin-section-panel" id="admin-section-flow" data-admin-section>
-      <div class="admin-section__header">
-        <div>
-          <p class="eyebrow-label">Process flow &amp; status</p>
-          <h3 class="admin-section__title">Routing controls that keep work moving</h3>
-        </div>
-        <span class="admin-section__hint">Statuses, process flows, and buckets stay in sync.</span>
-      </div>
-      <div class="admin-dashboard-grid">
-        <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_status_options') }}" onclick="window.location.assign('{{ url_for('admin.list_status_options') }}'); return false;">
-          <div class="tile-ico"><i class="fas fa-cogs"></i></div>
-          <div class="tile-title">Status Options</div>
-          <div class="tile-sub">Edit workflow statuses, labels, and transition defaults.</div>
-        </button>
-        <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_workflows') }}" onclick="window.location.assign('{{ url_for('admin.list_workflows') }}'); return false;">
-          <div class="tile-ico"><i class="fas fa-project-diagram"></i></div>
-          <div class="tile-title">Process Flows</div>
-          <div class="tile-sub">Shape request routing, handoffs, and approval paths.</div>
-        </button>
-        <button type="button" class="admin-tile admin-card" data-nav-url="{{ url_for('admin.list_buckets') }}" onclick="window.location.assign('{{ url_for('admin.list_buckets') }}'); return false;">
-          <div class="tile-ico"><i class="fas fa-folder-open"></i></div>
-          <div class="tile-title">Buckets</div>
-          <div class="tile-sub">Organize queue groupings shown on dashboards.</div>
-        </button>
-      </div>
-    </section>
+    {% call command_section('admin-section-flow', 'Process flow & status', 'Routing controls that keep work moving', 'Statuses, process flows, and buckets stay in sync.') %}
+      {{ command_nav_card(url_for('admin.list_status_options'), 'Status Options', 'Edit workflow statuses, labels, and transition defaults.', '<i class="fas fa-cogs"></i>', use_button=True) }}
+      {{ command_nav_card(url_for('admin.list_workflows'), 'Process Flows', 'Shape request routing, handoffs, and approval paths.', '<i class="fas fa-project-diagram"></i>', use_button=True) }}
+      {{ command_nav_card(url_for('admin.list_buckets'), 'Buckets', 'Organize queue groupings shown on dashboards.', '<i class="fas fa-folder-open"></i>', use_button=True) }}
+    {% endcall %}
 
-    <section class="surface-panel admin-section-panel" id="admin-section-utilities" data-admin-section>
-      <div class="admin-section__header">
-        <div>
-          <p class="eyebrow-label">Utilities</p>
-          <h3 class="admin-section__title">Daily ops & helpers</h3>
-        </div>
-        <span class="admin-section__hint">Switch contexts, toggle notifications, or jump into diagnostics.</span>
-      </div>
-      <div class="admin-dashboard-grid">
-        <a class="admin-tile admin-card" href="{{ url_for('auth.choose_dept') }}" data-nav-url="{{ url_for('auth.choose_dept') }}">
-          <div class="tile-ico"><i class="fas fa-exchange-alt"></i></div>
-          <div class="tile-title">Switch department</div>
-          <div class="tile-sub">Change the department context for your current session.</div>
-        </a>
-        <form method="post" action="{{ url_for('admin.toggle_notifications') }}" class="admin-tile admin-card admin-toggle-card admin-toggle-card--neutral{% if flags.enable_notifications %} active{% endif %} p-0 m-0" style="display:inline-block;">
-          <button type="submit" class="btn w-100 h-100 p-0">
-            <div class="tile-ico"><i class="fas fa-bell"></i></div>
-            <div class="tile-title">Notifications {{ 'on' if flags.enable_notifications else 'off' }}</div>
-            <div class="tile-sub">Turn the shared notification feed on or off.</div>
-          </button>
-        </form>
-        <a class="admin-tile admin-card" href="{{ url_for('admin.notifications_retention') }}" data-nav-url="{{ url_for('admin.notifications_retention') }}">
-          <div class="tile-ico"><i class="fas fa-bell"></i></div>
-          <div class="tile-title">Notification Retention</div>
-          <div class="tile-sub">Review retention windows and delivery routing.</div>
-        </a>
-        <a class="admin-tile admin-card" href="{{ url_for('admin.feature_flags') }}" data-nav-url="{{ url_for('admin.feature_flags') }}">
-          <div class="tile-ico">🚦</div>
-          <div class="tile-title">Flags & integrations</div>
-          <div class="tile-sub">Manage feature rollout, connections, and unmapped items.</div>
-        </a>
-        <a class="admin-tile admin-card" href="{{ url_for('admin.migration_status') }}" data-nav-url="{{ url_for('admin.migration_status') }}">
-          <div class="tile-ico">🛠️</div>
-          <div class="tile-title">Migrations</div>
-          <div class="tile-sub">Check schema readiness and migration health.</div>
-        </a>
-        <a class="admin-tile admin-card" href="{{ url_for('admin.debug_workspace') }}" data-nav-url="{{ url_for('admin.debug_workspace') }}">
-          <div class="tile-ico">🧰</div>
-          <div class="tile-title">Debug workspace</div>
-          <div class="tile-sub">Open diagnostics, helper tools, and troubleshooting views.</div>
-        </a>
-      </div>
-    </section>
+    {% call command_section('admin-section-utilities', 'Utilities', 'Daily ops & helpers', 'Switch contexts, toggle notifications, or jump into diagnostics.') %}
+      {{ command_nav_card(url_for('auth.choose_dept'), 'Switch department', 'Change the department context for your current session.', '<i class="fas fa-exchange-alt"></i>') }}
+      {{ command_toggle_card(url_for('admin.toggle_notifications'), flags.enable_notifications, 'Notifications on', 'Notifications off', 'Turn the shared notification feed on or off.', '<i class="fas fa-bell"></i>') }}
+      {{ command_nav_card(url_for('admin.notifications_retention'), 'Notification Retention', 'Review retention windows and delivery routing.', '<i class="fas fa-bell"></i>') }}
+      {{ command_nav_card(url_for('admin.feature_flags'), 'Flags & integrations', 'Manage feature rollout, connections, and unmapped items.', '🚦') }}
+      {{ command_nav_card(url_for('admin.migration_status'), 'Migrations', 'Check schema readiness and migration health.', '🛠️') }}
+      {{ command_nav_card(url_for('admin.debug_workspace'), 'Debug workspace', 'Open diagnostics, helper tools, and troubleshooting views.', '🧰') }}
+    {% endcall %}
 
-    <section class="surface-panel admin-section-panel" id="admin-section-foundation" data-admin-section>
-      <div class="admin-section__header">
-        <div>
-          <p class="eyebrow-label">SaaS foundation</p>
-          <h3 class="admin-section__title">Telemetry & boundary tooling</h3>
-        </div>
-        <span class="admin-section__hint">Tenant, job, and integration health in one glance.</span>
-      </div>
-      <div class="admin-dashboard-grid">
-        <a class="admin-tile admin-card" href="{{ url_for('admin.tenant_overview') }}" data-nav-url="{{ url_for('admin.tenant_overview') }}">
-          <div class="tile-ico"><i class="fas fa-building"></i></div>
-          <div class="tile-title">Tenants</div>
-          <div class="tile-sub">Inspect workspace boundaries and tenant-level setup.</div>
-        </a>
-        <a class="admin-tile admin-card" href="{{ url_for('admin.job_overview') }}" data-nav-url="{{ url_for('admin.job_overview') }}">
-          <div class="tile-ico"><i class="fas fa-tasks"></i></div>
-          <div class="tile-title">Jobs</div>
-          <div class="tile-sub">Review background task health and queue activity.</div>
-        </a>
-        <a class="admin-tile admin-card" href="{{ url_for('admin.integration_events') }}" data-nav-url="{{ url_for('admin.integration_events') }}">
-          <div class="tile-ico"><i class="fas fa-plug"></i></div>
-          <div class="tile-title">Integration Events</div>
-          <div class="tile-sub">Track outbound sync events and retry state.</div>
-        </a>
-      </div>
-    </section>
+    {% call command_section('admin-section-foundation', 'SaaS foundation', 'Telemetry & boundary tooling', 'Tenant, job, and integration health in one glance.') %}
+      {{ command_nav_card(url_for('admin.tenant_overview'), 'Tenants', 'Inspect workspace boundaries and tenant-level setup.', '<i class="fas fa-building"></i>') }}
+      {{ command_nav_card(url_for('admin.job_overview'), 'Jobs', 'Review background task health and queue activity.', '<i class="fas fa-tasks"></i>') }}
+      {{ command_nav_card(url_for('admin.integration_events'), 'Integration Events', 'Track outbound sync events and retry state.', '<i class="fas fa-plug"></i>') }}
+    {% endcall %}
   </div>
 {% endblock %}

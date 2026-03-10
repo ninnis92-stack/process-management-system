@@ -14,7 +14,6 @@ from werkzeug.security import generate_password_hash
 from ..extensions import db, get_or_404
 from ..models import User
 from .forms import SiteConfigForm, DepartmentForm
-from .forms import NotificationRetentionForm
 from ..models import Request as ReqModel, Artifact, Submission, SiteConfig, Department
 from ..models import StatusOption, DepartmentEditor
 from ..models import IntegrationConfig
@@ -57,7 +56,12 @@ from ..services.template_admin import (
     populate_requirement_form_from_rules,
     update_template_field_settings,
 )
-from ..services.tenant_context import get_current_tenant, tenant_role_for_user, user_has_permission, ensure_user_tenant_membership
+from ..services.tenant_context import (
+    get_current_tenant,
+    tenant_role_for_user,
+    user_has_permission,
+    ensure_user_tenant_membership,
+)
 from .utils import _is_admin_user
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -87,29 +91,17 @@ def _coerce_checkbox_like_value(value, default: bool = False) -> bool:
     raw = str(value).strip().lower()
     return raw not in ("", "0", "false", "off", "no", "null", "none")
 
+
 # Load auxiliary handlers to keep this file from growing even more.
 # Load auxiliary handlers to keep this file from growing even more.
 # ``tenants`` and ``users`` must be imported after ``admin_bp`` is defined so the
 # routes they declare can attach to the same blueprint.
 from . import tenants  # noqa: F401, E402
-from . import users    # noqa: F401, E402
+from . import users  # noqa: F401, E402
 from . import workflows  # noqa: F401, E402
 from . import guest_forms  # noqa: F401, E402
+from . import notifications  # noqa: F401, E402
 
-
-@admin_bp.route("/toggle_notifications", methods=["POST"])
-@login_required
-
-def toggle_notifications():
-    """Flip the global notifications flag and return to dashboard."""
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-    flags = FeatureFlags.get()
-    flags.enable_notifications = not bool(flags.enable_notifications)
-    db.session.commit()
-    flash(f"Notifications {'enabled' if flags.enable_notifications else 'disabled'}.", "success")
-    return redirect(url_for("admin.index"))
 
 @admin_bp.route("/")
 @login_required
@@ -265,15 +257,23 @@ def integration_events():
         flash("Access denied.", "danger")
         return redirect(url_for("requests.dashboard"))
 
-    events = IntegrationEvent.query.order_by(IntegrationEvent.created_at.desc()).limit(200).all()
+    events = (
+        IntegrationEvent.query.order_by(IntegrationEvent.created_at.desc())
+        .limit(200)
+        .all()
+    )
     summary = {
         "pending": IntegrationEvent.query.filter_by(status="pending").count(),
         "failed": IntegrationEvent.query.filter_by(status="failed").count(),
         "delivered": IntegrationEvent.query.filter_by(status="delivered").count(),
         "jobs_failed": JobRecord.query.filter_by(status="failed").count(),
-        "jobs_running": JobRecord.query.filter(JobRecord.status.in_(["queued", "running"])).count(),
+        "jobs_running": JobRecord.query.filter(
+            JobRecord.status.in_(["queued", "running"])
+        ).count(),
     }
-    return render_template("admin_integration_events.html", events=events, summary=summary)
+    return render_template(
+        "admin_integration_events.html", events=events, summary=summary
+    )
 
 
 @admin_bp.route("/integration_events/<int:event_id>/retry", methods=["POST"])
@@ -405,12 +405,12 @@ def site_config():
     try:
         keys = list((getattr(cfg, "rolling_quote_sets", {}) or {}).keys())
         if not keys:
-            keys = list(cfg.rolling_quote_sets.keys()) if cfg else ['default']
-        if 'default' not in keys:
-            keys.insert(0, 'default')
+            keys = list(cfg.rolling_quote_sets.keys()) if cfg else ["default"]
+        if "default" not in keys:
+            keys.insert(0, "default")
         form.active_quote_set.choices = [(k, k.title()) for k in keys]
     except Exception:
-        form.active_quote_set.choices = [('default', 'Default')]
+        form.active_quote_set.choices = [("default", "Default")]
 
     if flask_request.method == "GET" and cfg:
         form.import_url.data = getattr(cfg, "company_url", None)
@@ -453,14 +453,14 @@ def site_config():
             # populate choices for active set selector (also refresh data value)
             keys = list((getattr(cfg, "rolling_quote_sets", {}) or {}).keys())
             if not keys:
-                keys = list(cfg.rolling_quote_sets.keys()) if cfg else ['default']
-            if 'default' not in keys:
-                keys.insert(0, 'default')
+                keys = list(cfg.rolling_quote_sets.keys()) if cfg else ["default"]
+            if "default" not in keys:
+                keys.insert(0, "default")
             form.active_quote_set.choices = [(k, k.title()) for k in keys]
-            form.active_quote_set.data = getattr(cfg, 'active_quote_set', 'default')
+            form.active_quote_set.data = getattr(cfg, "active_quote_set", "default")
         except Exception:
-            form.active_quote_set.choices = [('default','Default')]
-            form.active_quote_set.data = getattr(cfg, 'active_quote_set', 'default')
+            form.active_quote_set.choices = [("default", "Default")]
+            form.active_quote_set.data = getattr(cfg, "active_quote_set", "default")
         form.show_banner.data = bool(
             getattr(cfg, "rolling_quotes_enabled", getattr(cfg, "show_banner", False))
         )
@@ -518,7 +518,10 @@ def site_config():
             except Exception:
                 db.session.rollback()
                 current_app.logger.exception("branding import failed")
-                flash("Branding import failed. The site configuration was not changed.", "danger")
+                flash(
+                    "Branding import failed. The site configuration was not changed.",
+                    "danger",
+                )
 
     if form.validate_on_submit():
         if not cfg:
@@ -532,7 +535,10 @@ def site_config():
         # only update rolling_quotes_enabled when the form actually
         # included the corresponding checkbox/key; otherwise we would turn
         # the feature off simply because the admin changed some other field.
-        if "show_banner" in flask_request.form or "rolling_enabled" in flask_request.form:
+        if (
+            "show_banner" in flask_request.form
+            or "rolling_enabled" in flask_request.form
+        ):
             rolling_enabled = bool(form.show_banner.data)
             if "rolling_enabled" in flask_request.form:
                 # legacy flag present means enable regardless of checkbox state
@@ -542,7 +548,10 @@ def site_config():
         # only consider updating rolling quotes if admin actually typed or
         # pasted something into the textarea (or provided the legacy CSV field).
         rolling_input = None
-        if 'rolling_quotes' in flask_request.form or 'rolling_csv' in flask_request.form:
+        if (
+            "rolling_quotes" in flask_request.form
+            or "rolling_csv" in flask_request.form
+        ):
             rolling_input = form.rolling_quotes.data
             if not rolling_input:
                 rolling_input = flask_request.form.get("rolling_csv")
@@ -579,10 +588,12 @@ def site_config():
             # preserve existing quotes when no data submitted
             cfg.rolling_quotes = rolling_input or None
         # allow admins to set the default advance interval (seconds)
-        if hasattr(form, 'rolling_quote_interval_default'):
+        if hasattr(form, "rolling_quote_interval_default"):
             try:
-                if 'rolling_quote_interval_default' in flask_request.form:
-                    cfg.rolling_quote_interval_default = int(form.rolling_quote_interval_default.data or 0)
+                if "rolling_quote_interval_default" in flask_request.form:
+                    cfg.rolling_quote_interval_default = int(
+                        form.rolling_quote_interval_default.data or 0
+                    )
             except Exception:
                 pass
         # save named quote sets if provided (expect JSON map string).  only
@@ -593,12 +604,16 @@ def site_config():
             # only update when admin has actually provided non-empty JSON in the
             # textarea; blank submissions (common when changing other settings) should
             # not erase previously configured sets.
-            if 'rolling_quote_sets' in flask_request.form:
-                raw = form.rolling_quote_sets.data or flask_request.form.get('rolling_quote_sets')
+            if "rolling_quote_sets" in flask_request.form:
+                raw = form.rolling_quote_sets.data or flask_request.form.get(
+                    "rolling_quote_sets"
+                )
                 if raw and raw.strip():
                     parsed = json.loads(raw)
                     if isinstance(parsed, dict):
-                        cfg._rolling_quote_sets = json.dumps(SiteConfig.normalize_quote_sets(parsed))
+                        cfg._rolling_quote_sets = json.dumps(
+                            SiteConfig.normalize_quote_sets(parsed)
+                        )
                     else:
                         cfg._rolling_quote_sets = None
                 # else: leave existing value alone
@@ -606,22 +621,26 @@ def site_config():
             # ignore invalid JSON, sanitize on next GET
             pass
         try:
-            cfg.active_quote_set = form.active_quote_set.data or 'default'
+            cfg.active_quote_set = form.active_quote_set.data or "default"
         except Exception:
-            cfg.active_quote_set = 'default'
+            cfg.active_quote_set = "default"
         # handle quote permissions
         try:
             perms = {"departments": {}, "users": {}}
-            raw_dept = form.quote_permissions_dept.data or flask_request.form.get('quote_permissions_dept')
-            raw_user = form.quote_permissions_user.data or flask_request.form.get('quote_permissions_user')
+            raw_dept = form.quote_permissions_dept.data or flask_request.form.get(
+                "quote_permissions_dept"
+            )
+            raw_user = form.quote_permissions_user.data or flask_request.form.get(
+                "quote_permissions_user"
+            )
             if raw_dept:
                 imported = json.loads(raw_dept)
                 if isinstance(imported, dict):
-                    perms['departments'] = imported
+                    perms["departments"] = imported
             if raw_user:
                 imported = json.loads(raw_user)
                 if isinstance(imported, dict):
-                    perms['users'] = imported
+                    perms["users"] = imported
             cfg.quote_permissions = json.dumps(perms)
         except Exception:
             # ignore invalid JSON, sanitize on next GET
@@ -632,6 +651,7 @@ def site_config():
             # record audit entry so changes are traceable
             try:
                 from app.models import AuditLog
+
                 entry = AuditLog(
                     actor_type="user",
                     actor_user_id=current_user.id,
@@ -642,18 +662,14 @@ def site_config():
                 db.session.add(entry)
                 db.session.commit()
             except Exception:
-                current_app.logger.exception(
-                    "failed to audit site config change"
-                )
+                current_app.logger.exception("failed to audit site config change")
         except Exception as exc:  # pragma: no cover - defensive
             current_app.logger.exception("failed to save site config")
             try:
                 db.session.rollback()
             except Exception:
                 pass
-            flash(
-                "Failed to save site configuration (database error).", "danger"
-            )
+            flash("Failed to save site configuration (database error).", "danger")
         return redirect(url_for("admin.site_config"))
 
     if flask_request.method == "POST" and form.errors:
@@ -683,21 +699,49 @@ def site_config_preview():
     raw_sets = None
     raw_quotes = None
     try:
-        raw_sets = flask_request.form.get("rolling_quote_sets") or flask_request.json and flask_request.json.get("rolling_quote_sets")
-        raw_quotes = flask_request.form.get("rolling_csv") or flask_request.form.get("rolling_quotes") or (flask_request.json and flask_request.json.get("rolling_quotes"))
+        raw_sets = (
+            flask_request.form.get("rolling_quote_sets")
+            or flask_request.json
+            and flask_request.json.get("rolling_quote_sets")
+        )
+        raw_quotes = (
+            flask_request.form.get("rolling_csv")
+            or flask_request.form.get("rolling_quotes")
+            or (flask_request.json and flask_request.json.get("rolling_quotes"))
+        )
     except Exception:
         raw_sets = None
         raw_quotes = None
 
-    active = flask_request.form.get("active_quote_set") or (flask_request.json and flask_request.json.get("active_quote_set")) or "default"
+    active = (
+        flask_request.form.get("active_quote_set")
+        or (flask_request.json and flask_request.json.get("active_quote_set"))
+        or "default"
+    )
 
     try:
         parsed = json.loads(raw_sets) if raw_sets else {}
     except Exception:
-        return jsonify({"error": "invalid_json", "message": "Could not parse rolling_quote_sets as JSON."}), 400
+        return (
+            jsonify(
+                {
+                    "error": "invalid_json",
+                    "message": "Could not parse rolling_quote_sets as JSON.",
+                }
+            ),
+            400,
+        )
 
     if not isinstance(parsed, dict):
-        return jsonify({"error": "invalid_type", "message": "rolling_quote_sets must be a JSON object."}), 400
+        return (
+            jsonify(
+                {
+                    "error": "invalid_type",
+                    "message": "rolling_quote_sets must be a JSON object.",
+                }
+            ),
+            400,
+        )
 
     if raw_quotes:
         parsed.setdefault(
@@ -709,7 +753,10 @@ def site_config_preview():
 
     active_list = parsed.get(active) or parsed.get(str(active)) or []
     if not isinstance(active_list, list):
-        return jsonify({"error": "invalid_set", "message": "Active set is not a list."}), 400
+        return (
+            jsonify({"error": "invalid_set", "message": "Active set is not a list."}),
+            400,
+        )
 
     sample = [s for s in active_list if isinstance(s, str)][:20]
     return jsonify({"active": active, "count": len(active_list), "sample": sample})
@@ -734,7 +781,7 @@ def _sanitize_banner_html(raw: str) -> str:
 
     s = str(raw or "")
     s = re.sub(r"```[\s\S]*?```", "", s)
-    s = s.replace('```', '')
+    s = s.replace("```", "")
 
     # Use bleach to perform a conservative HTML sanitization: allow a small
     # set of formatting tags and safe attributes, strip anything else (including
@@ -809,7 +856,7 @@ def _sanitize_banner_html(raw: str) -> str:
         # markup cannot hijack button clicks or navigate users to JS/CSS files.
         cleaned = re.sub(
             r'\s(?:href|src|action|formaction)=(["\'])/static/[^"\']*\1',
-            '',
+            "",
             cleaned,
             flags=re.IGNORECASE,
         )
@@ -822,49 +869,49 @@ def _sanitize_banner_html(raw: str) -> str:
         import re
 
         # strip script blocks
-        s2 = re.sub(r'<script[\s\S]*?</script>', '', s, flags=re.IGNORECASE)
+        s2 = re.sub(r"<script[\s\S]*?</script>", "", s, flags=re.IGNORECASE)
         # remove links/forms pointing at /static/ resources
         s2 = re.sub(
             r'\s(?:href|src|action|formaction)=(["\"])\/static\/[^"\']*\1',
-            '',
+            "",
             s2,
             flags=re.IGNORECASE,
         )
         return (s2 or "").strip()
 
 
-@admin_bp.route('/site_config/clean_banner', methods=['POST'])
+@admin_bp.route("/site_config/clean_banner", methods=["POST"])
 @login_required
 def clean_banner():
     if not _is_admin_user():
-        flash('Access denied.', 'danger')
-        return redirect(url_for('requests.dashboard'))
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
 
     cfg = SiteConfig.query.first()
-    if not cfg or not getattr(cfg, 'banner_html', None):
-        flash('No banner content found to clean.', 'info')
-        return redirect(url_for('admin.site_config'))
+    if not cfg or not getattr(cfg, "banner_html", None):
+        flash("No banner content found to clean.", "info")
+        return redirect(url_for("admin.site_config"))
 
-    cleaned = _sanitize_banner_html(cfg.banner_html or '')
-    if cleaned == (cfg.banner_html or ''):
-        flash('Banner content appears clean (no changes made).', 'info')
-        return redirect(url_for('admin.site_config'))
+    cleaned = _sanitize_banner_html(cfg.banner_html or "")
+    if cleaned == (cfg.banner_html or ""):
+        flash("Banner content appears clean (no changes made).", "info")
+        return redirect(url_for("admin.site_config"))
 
     try:
         cfg.banner_html = cleaned or None
         db.session.commit()
-        flash('Banner content cleaned successfully.', 'success')
+        flash("Banner content cleaned successfully.", "success")
     except Exception:
         try:
             db.session.rollback()
         except Exception:
             pass
-        flash('Failed to save cleaned banner content.', 'danger')
+        flash("Failed to save cleaned banner content.", "danger")
 
-    return redirect(url_for('admin.site_config'))
+    return redirect(url_for("admin.site_config"))
 
 
-@admin_bp.route('/site_config/preview_banner', methods=['POST'])
+@admin_bp.route("/site_config/preview_banner", methods=["POST"])
 @login_required
 def preview_banner():
     """Return a JSON preview of original vs cleaned banner HTML.
@@ -873,11 +920,15 @@ def preview_banner():
     committing changes.
     """
     if not _is_admin_user():
-        return jsonify({'error': 'access_denied'}), 403
+        return jsonify({"error": "access_denied"}), 403
 
-    raw = flask_request.form.get('banner') or flask_request.form.get('navbar_banner') or ''
+    raw = (
+        flask_request.form.get("banner")
+        or flask_request.form.get("navbar_banner")
+        or ""
+    )
     cleaned = _sanitize_banner_html(raw)
-    return jsonify({'original': raw, 'cleaned': cleaned})
+    return jsonify({"original": raw, "cleaned": cleaned})
 
 
 @admin_bp.route("/unmapped-submissions")
@@ -1233,7 +1284,9 @@ def edit_field_requirements(field_id: int):
         db.session.add(f)
         db.session.commit()
         flash("Conditional requirement rules saved.", "success")
-        return redirect(url_for("admin.edit_template_fields", template_id=f.template_id))
+        return redirect(
+            url_for("admin.edit_template_fields", template_id=f.template_id)
+        )
 
     return render_template(
         "admin_field_requirements.html",
@@ -1241,83 +1294,6 @@ def edit_field_requirements(field_id: int):
         field=f,
         **editor_context,
     )
-
-
-@admin_bp.route("/notifications_retention", methods=["GET", "POST"])
-@login_required
-def notifications_retention():
-    if not _is_admin_user():
-        flash("Access denied.", "danger")
-        return redirect(url_for("requests.dashboard"))
-
-    cfg = NotificationRetention.get()
-    form = NotificationRetentionForm()
-    if flask_request.method == "GET":
-        # prefill form
-        form.retain_until_eod.data = bool(getattr(cfg, "retain_until_eod", True))
-        if cfg and cfg.clear_after_read_seconds is not None:
-            secs = int(cfg.clear_after_read_seconds)
-            if secs == 0:
-                form.clear_after_choice.data = "immediate"
-            elif secs == 300:
-                form.clear_after_choice.data = "5m"
-            elif secs == 1800:
-                form.clear_after_choice.data = "30m"
-            elif secs == 3600:
-                form.clear_after_choice.data = "1h"
-            elif secs == 86400:
-                form.clear_after_choice.data = "24h"
-            else:
-                days = max(1, min(7, int(secs / 86400)))
-                form.clear_after_choice.data = "custom"
-                form.custom_days.data = days
-        else:
-            form.clear_after_choice.data = "eod"
-        form.max_notifications_per_user.data = int(
-            getattr(cfg, "max_notifications_per_user", 20) or 20
-        )
-
-    if form.validate_on_submit():
-        if not cfg:
-            cfg = NotificationRetention()
-            db.session.add(cfg)
-
-        cfg.retain_until_eod = bool(form.retain_until_eod.data)
-        choice = form.clear_after_choice.data
-        if choice == "eod":
-            cfg.clear_after_read_seconds = None
-        elif choice == "immediate":
-            cfg.clear_after_read_seconds = 0
-        elif choice == "5m":
-            cfg.clear_after_read_seconds = 300
-        elif choice == "30m":
-            cfg.clear_after_read_seconds = 1800
-        elif choice == "1h":
-            cfg.clear_after_read_seconds = 3600
-        elif choice == "24h":
-            cfg.clear_after_read_seconds = 86400
-        elif choice == "custom":
-            days = int(form.custom_days.data or 1)
-            if days < 1:
-                days = 1
-            if days > 7:
-                days = 7
-            cfg.clear_after_read_seconds = days * 86400
-            cfg.retain_until_eod = False
-
-        maxn = int(form.max_notifications_per_user.data or 20)
-        if maxn < 1:
-            maxn = 1
-        if maxn > 20:
-            maxn = 20
-        cfg.max_notifications_per_user = maxn
-        cfg.max_retention_days = 7
-
-        db.session.commit()
-        flash("Notification retention updated.", "success")
-        return redirect(url_for("admin.notifications_retention"))
-
-    return render_template("admin_notifications_retention.html", form=form, cfg=cfg)
 
 
 @admin_bp.route("/special_email", methods=["GET", "POST"])
@@ -1668,11 +1644,14 @@ def feature_flags():
     # fallback).  We'll treat all of them the same, then reply with JSON if the
     # caller looked like it was AJAX, otherwise perform a redirect so the
     # manual "Save" button still behaves.
-    if flask_request.method == 'POST':
+    if flask_request.method == "POST":
         # autosave/JSON requests are marked by the AJAX header inserted by
         # the global fetch wrapper; normal form submissions without that
         # header fall back to the familiar checkbox-coercion logic.
-        if flask_request.headers.get('X-Requested-With') == 'XMLHttpRequest' or flask_request.is_json:
+        if (
+            flask_request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            or flask_request.is_json
+        ):
             data = {}
             if flask_request.is_json:
                 data = flask_request.get_json(silent=True) or {}
@@ -1680,7 +1659,7 @@ def feature_flags():
                 data = flask_request.form.to_dict(flat=True)
             else:
                 # first try to interpret body as JSON
-                raw = flask_request.get_data(as_text=True) or ''
+                raw = flask_request.get_data(as_text=True) or ""
                 try:
                     data = json.loads(raw) if raw else {}
                 except Exception:
@@ -1688,6 +1667,7 @@ def feature_flags():
                 # if looks like urlencoded key=value pairs, parse those
                 if not data and raw:
                     from urllib.parse import parse_qs
+
                     parsed = parse_qs(raw, keep_blank_values=True)
                     data = {k: v[0] for k, v in parsed.items()}
 
@@ -1717,21 +1697,26 @@ def feature_flags():
                     pass
                 return jsonify({"ok": False, "error": "save_failed"}), 500
 
-            return jsonify({
-                "ok": True,
-                "flags": {f: bool(getattr(flags, f, False)) for f in (
-                    "enable_notifications",
-                    "enable_nudges",
-                    "allow_user_nudges",
-                    "vibe_enabled",
-                    "sso_admin_sync_enabled",
-                    "sso_department_sync_enabled",
-                    "enable_external_forms",
-                    "rolling_quotes_enabled",
-                    "guest_dashboard_enabled",
-                    "guest_submission_enabled",
-                )},
-            })
+            return jsonify(
+                {
+                    "ok": True,
+                    "flags": {
+                        f: bool(getattr(flags, f, False))
+                        for f in (
+                            "enable_notifications",
+                            "enable_nudges",
+                            "allow_user_nudges",
+                            "vibe_enabled",
+                            "sso_admin_sync_enabled",
+                            "sso_department_sync_enabled",
+                            "enable_external_forms",
+                            "rolling_quotes_enabled",
+                            "guest_dashboard_enabled",
+                            "guest_submission_enabled",
+                        )
+                    },
+                }
+            )
         else:
             # regular form submission; use original checkbox logic for
             # missing/unchecked values.
@@ -1797,13 +1782,9 @@ def feature_flags():
         )
 
     if form.validate_on_submit():
-        flags.enable_notifications = _submitted_checkbox_enabled(
-            "enable_notifications"
-        )
+        flags.enable_notifications = _submitted_checkbox_enabled("enable_notifications")
         flags.enable_nudges = _submitted_checkbox_enabled("enable_nudges")
-        flags.allow_user_nudges = _submitted_checkbox_enabled(
-            "allow_user_nudges"
-        )
+        flags.allow_user_nudges = _submitted_checkbox_enabled("allow_user_nudges")
         flags.vibe_enabled = _submitted_checkbox_enabled("vibe_enabled")
         flags.sso_admin_sync_enabled = _submitted_checkbox_enabled(
             "sso_admin_sync_enabled"
@@ -1845,7 +1826,9 @@ def metrics_config():
         allowed_depts = ["A", "B", "C"]
         range_key = (flask_request.args.get("range") or "weekly").lower()
         selected_dept = (flask_request.args.get("dept") or "").strip().upper()
-        visible_depts = [selected_dept] if selected_dept in allowed_depts else allowed_depts
+        visible_depts = (
+            [selected_dept] if selected_dept in allowed_depts else allowed_depts
+        )
         query = (flask_request.args.get("q") or "").strip()
         user_filters = flask_request.args.getlist("user")
 
@@ -1935,9 +1918,7 @@ def metrics_config():
             getattr(cfg, "track_status_changes", True)
         )
         form.lookback_days.data = int(getattr(cfg, "lookback_days", 30) or 30)
-        form.user_metrics_limit.data = int(
-            getattr(cfg, "user_metrics_limit", 15) or 15
-        )
+        form.user_metrics_limit.data = int(getattr(cfg, "user_metrics_limit", 15) or 15)
         form.target_completion_hours.data = int(
             getattr(cfg, "target_completion_hours", 48) or 48
         )
@@ -1947,13 +1928,9 @@ def metrics_config():
 
     if form.validate_on_submit():
         cfg.enabled = _submitted_checkbox_enabled("enabled")
-        cfg.track_request_created = _submitted_checkbox_enabled(
-            "track_request_created"
-        )
+        cfg.track_request_created = _submitted_checkbox_enabled("track_request_created")
         cfg.track_assignments = _submitted_checkbox_enabled("track_assignments")
-        cfg.track_status_changes = _submitted_checkbox_enabled(
-            "track_status_changes"
-        )
+        cfg.track_status_changes = _submitted_checkbox_enabled("track_status_changes")
         cfg.lookback_days = max(int(form.lookback_days.data or 30), 1)
         cfg.user_metrics_limit = max(int(form.user_metrics_limit.data or 15), 1)
         cfg.target_completion_hours = max(
@@ -1972,7 +1949,9 @@ def metrics_config():
         "admin_metrics_config.html",
         form=form,
         cfg=cfg,
-        snapshot=build_process_metrics_summary(range_key="weekly", depts=["A", "B", "C"]),
+        snapshot=build_process_metrics_summary(
+            range_key="weekly", depts=["A", "B", "C"]
+        ),
         explorer=explorer,
     )
 
@@ -2120,42 +2099,39 @@ def migration_status():
         inspector = db.inspect(db.engine)
     except Exception:
         current_app.logger.exception("Failed to inspect DB engine for migration status")
-        flash(
-            "Unable to inspect database engine. Check server logs.", "danger"
-        )
+        flash("Unable to inspect database engine. Check server logs.", "danger")
         return render_template("admin_migration_status.html", status=None)
 
     # gather migration scripts from migrations/versions
     import os
+
     versions_dir = os.path.join(current_app.root_path, "..", "migrations", "versions")
     migrations = []
     try:
         for fn in sorted(os.listdir(versions_dir)):
-            if fn.endswith('.py') and not fn.startswith('__'):
+            if fn.endswith(".py") and not fn.startswith("__"):
                 migrations.append(fn[:-3])
     except Exception:
         migrations = []
 
     db_versions = []
     try:
-        if inspector.has_table('alembic_version'):
-            res = db.session.execute('SELECT version_num FROM alembic_version')
+        if inspector.has_table("alembic_version"):
+            res = db.session.execute("SELECT version_num FROM alembic_version")
             db_versions = [r[0] for r in res.fetchall()]
     except Exception:
-        current_app.logger.exception('Failed to read alembic_version table')
+        current_app.logger.exception("Failed to read alembic_version table")
 
     status = {
-        'migration_files': migrations,
-        'db_versions': db_versions,
+        "migration_files": migrations,
+        "db_versions": db_versions,
     }
 
     # Determine if any migration files look unapplied by comparing names.
     unapplied = [m for m in migrations if m not in db_versions]
-    status['unapplied'] = unapplied
+    status["unapplied"] = unapplied
 
     return render_template("admin_migration_status.html", status=status)
-
-
 
 
 @admin_bp.route("/dept_editors")
@@ -2187,8 +2163,6 @@ def list_integrations():
     )
 
 
-
-
 @admin_bp.route("/integrations/new", methods=["GET", "POST"])
 @login_required
 def create_integration():
@@ -2199,13 +2173,22 @@ def create_integration():
 
     form = IntegrationConfigForm()
     try:
-        departments = Department.query.filter_by(is_active=True).order_by(Department.order.asc(), Department.code.asc()).all()
-        choices = [((row.code or "").strip().upper(), (row.label or row.code or "").strip()) for row in departments]
+        departments = (
+            Department.query.filter_by(is_active=True)
+            .order_by(Department.order.asc(), Department.code.asc())
+            .all()
+        )
+        choices = [
+            ((row.code or "").strip().upper(), (row.label or row.code or "").strip())
+            for row in departments
+        ]
         if choices:
             form.department.choices = choices
     except Exception:
         pass
-    selected_kind = form.kind.data or (form.kind.choices[0][0] if form.kind.choices else "webhook")
+    selected_kind = form.kind.data or (
+        form.kind.choices[0][0] if form.kind.choices else "webhook"
+    )
     if form.validate_on_submit():
         try:
             normalized = normalize_integration_config(
@@ -2254,9 +2237,18 @@ def edit_integration(int_id: int):
     ic = get_or_404(IntegrationConfig, int_id)
     form = IntegrationConfigForm(obj=ic)
     try:
-        departments = Department.query.filter_by(is_active=True).order_by(Department.order.asc(), Department.code.asc()).all()
-        choices = [((row.code or "").strip().upper(), (row.label or row.code or "").strip()) for row in departments]
-        if getattr(ic, "department", None) and ic.department not in {code for code, _label in choices}:
+        departments = (
+            Department.query.filter_by(is_active=True)
+            .order_by(Department.order.asc(), Department.code.asc())
+            .all()
+        )
+        choices = [
+            ((row.code or "").strip().upper(), (row.label or row.code or "").strip())
+            for row in departments
+        ]
+        if getattr(ic, "department", None) and ic.department not in {
+            code for code, _label in choices
+        }:
             choices.append((ic.department, ic.department))
         if choices:
             form.department.choices = choices
@@ -2368,7 +2360,9 @@ def create_department():
             notification_template=(form.notification_template.data or None),
             handoff_template_doc_url=(form.handoff_template_doc_url.data or None),
         )
-        d.handoff_template_checklist = (form.handoff_template_checklist.data or "").splitlines()
+        d.handoff_template_checklist = (
+            form.handoff_template_checklist.data or ""
+        ).splitlines()
         db.session.add(d)
         db.session.commit()
         flash("Department created.", "success")
@@ -2389,14 +2383,18 @@ def edit_department(dept_id: int):
         d.label = form.name.data
         d.order = int(form.order.data or 0)
         d.is_active = bool(form.active.data)
-        d.notification_template = (form.notification_template.data or None)
-        d.handoff_template_doc_url = (form.handoff_template_doc_url.data or None)
-        d.handoff_template_checklist = (form.handoff_template_checklist.data or "").splitlines()
+        d.notification_template = form.notification_template.data or None
+        d.handoff_template_doc_url = form.handoff_template_doc_url.data or None
+        d.handoff_template_checklist = (
+            form.handoff_template_checklist.data or ""
+        ).splitlines()
         db.session.commit()
         flash("Department updated.", "success")
         return redirect(url_for("admin.list_departments"))
     if flask_request.method == "GET":
-        form.handoff_template_checklist.data = "\n".join(getattr(d, "handoff_template_checklist", []) or [])
+        form.handoff_template_checklist.data = "\n".join(
+            getattr(d, "handoff_template_checklist", []) or []
+        )
     return render_template("admin_department_edit.html", form=form, dept=d)
 
 
