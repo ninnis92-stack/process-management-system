@@ -290,7 +290,8 @@ def test_admin_navigation_links_resolve(app, client):
     assert "Admin" in html
     assert "Guest Request Forms" in html
     assert "Metrics" in html
-    assert not re.search(r'<a class="nav-link[^"]*" href="/admin/">Admin</a>', html)
+    assert re.search(r'<a class="nav-link[^"]*" href="/admin/">Admin</a>', html)
+    assert not re.search(r'<a class="nav-link[^"]*" href="/admin/">Dashboard</a>', html)
     if "Retention" not in html:
         # dump for debugging
         print("ADMIN HTML:\n", html)
