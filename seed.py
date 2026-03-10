@@ -147,6 +147,20 @@ def main():
                             pass
                 except Exception:
                     pass
+            if "onboarding_guidance_enabled" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN onboarding_guidance_enabled BOOLEAN DEFAULT TRUE"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             if "backup_approver_user_id" not in cols:
                 try:
                     with engine.connect() as conn:

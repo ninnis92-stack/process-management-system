@@ -70,6 +70,10 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
     for label in expected_labels:
         assert label in html
 
+    assert "First admin pass" in html
+    assert "Model the route" in html
+    assert "Publish the workspace" in html
+
     urls = set(CARD_URL_RE.findall(html))
     expected_urls = {
         "/admin/users",
@@ -166,6 +170,29 @@ def test_admin_notifications_card_toggles_feature_flag(app, client):
         assert flags.enable_notifications is True
 
 
+def test_admin_can_hide_onboarding_guidance_panel(app, client):
+    with app.app_context():
+        admin = User(
+            email="admin-no-guide@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+            onboarding_guidance_enabled=False,
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+    rv = _login_admin(client, email="admin-no-guide@example.com")
+    assert rv.status_code == 200
+
+    rv = client.get("/admin/")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+    assert "First admin pass" not in html
+    assert "Workflow signal" not in html
+
+
 def test_user_settings_surface_expected_controls(app, client):
     with app.app_context():
         user = User(
@@ -190,7 +217,9 @@ def test_user_settings_surface_expected_controls(app, client):
     html = rv.get_data(as_text=True)
     for expected in (
         "Theme",
-        "Rolling Quote Set",
+        "Message set",
         "Rotating quotes enabled",
+        "Learning aids",
+        "Onboarding guidance enabled",
     ):
         assert expected in html

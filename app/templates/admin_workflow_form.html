@@ -98,6 +98,23 @@
           <li class="text-muted small">Add at least one step to preview the path.</li>
         </ul>
       </div>
+      <div class="surface-panel surface-panel-muted workflow-editor__assist-card">
+        <div class="eyebrow-label">Live path map</div>
+        <p class="small text-muted mb-2">Use this visual map to confirm the order, handoffs, and route length before saving.</p>
+        <div class="workflow-visual-summary mb-3">
+          <div class="workflow-visual-summary__metric">
+            <span class="workflow-visual-summary__label">Steps</span>
+            <strong id="workflowStepCount">0</strong>
+          </div>
+          <div class="workflow-visual-summary__metric">
+            <span class="workflow-visual-summary__label">Departments</span>
+            <strong id="workflowDepartmentCount">0</strong>
+          </div>
+        </div>
+        <div id="workflowVisualMap" class="workflow-visual-map" aria-live="polite">
+          <div class="workflow-visual-map__empty">Add at least one step to render the path map.</div>
+        </div>
+      </div>
     </div>
     <div id="workflow-steps" class="workflow-steps-list mb-2" aria-label="Workflow steps">
       {% if rendered_spec and rendered_spec.steps %}
@@ -264,6 +281,9 @@
         if(hidden) hidden.value = JSON.stringify(spec, null, 2);
 
         const preview = document.getElementById('workflowRoutePreview');
+        const visualMap = document.getElementById('workflowVisualMap');
+        const stepCountEl = document.getElementById('workflowStepCount');
+        const departmentCountEl = document.getElementById('workflowDepartmentCount');
         if(preview){
           preview.innerHTML = '';
           if(!steps.length){
@@ -281,6 +301,42 @@
               item.innerHTML = '<span class="workflow-route-preview__index">' + (index + 1) + '</span>' +
                 '<div><strong>' + status + '</strong><div class="small text-muted">Department ' + from + ' → Department ' + to + '</div></div>';
               preview.appendChild(item);
+            });
+          }
+        }
+        if(stepCountEl) stepCountEl.textContent = String(steps.length);
+        if(departmentCountEl){
+          const deptCount = new Set(
+            steps.flatMap(function(step){
+              return [step.from_dept || '', step.to_dept || ''].filter(Boolean);
+            })
+          ).size;
+          departmentCountEl.textContent = String(deptCount);
+        }
+        if(visualMap){
+          visualMap.innerHTML = '';
+          if(!steps.length){
+            const empty = document.createElement('div');
+            empty.className = 'workflow-visual-map__empty';
+            empty.textContent = 'Add at least one step to render the path map.';
+            visualMap.appendChild(empty);
+          } else {
+            steps.forEach(function(step, index){
+              const card = document.createElement('article');
+              card.className = 'workflow-visual-map__step';
+              card.innerHTML = '<div class="workflow-visual-map__step-index">' + (index + 1) + '</div>' +
+                '<div class="workflow-visual-map__step-body">' +
+                  '<strong>' + (step.status || 'Status') + '</strong>' +
+                  '<div class="small text-muted">Dept ' + (step.from_dept || 'Unassigned') + ' → Dept ' + (step.to_dept || step.from_dept || 'Unassigned') + '</div>' +
+                '</div>';
+              visualMap.appendChild(card);
+              if(index < steps.length - 1){
+                const connector = document.createElement('div');
+                connector.className = 'workflow-visual-map__connector';
+                connector.setAttribute('aria-hidden', 'true');
+                connector.textContent = '→';
+                visualMap.appendChild(connector);
+              }
             });
           }
         }

@@ -91,7 +91,7 @@ def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
     assert b'id="vibeBtn"' in rv.data
     assert rv.data.index(b'id="motivation"') < rv.data.index(b'id="vibeBtn"')
     assert cluster.index(b'</a>') < cluster.index(b'id="vibeBtn"')
-    assert b'Current vibe' in rv.data
+    assert b'Current theme' in rv.data
 
     # new CSS rules should make brand-stack sit above the banner and add spacing
     with open('app/static/styles.css', 'r') as f:

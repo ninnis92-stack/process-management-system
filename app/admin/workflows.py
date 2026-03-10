@@ -135,6 +135,49 @@ def _workflow_scope_label(wf):
     return "All departments"
 
 
+def _workflow_visual_summary(wf):
+    spec = _normalize_workflow_spec(getattr(wf, "spec", None), getattr(wf, "name", None))
+    raw_steps = spec.get("steps") if isinstance(spec, dict) else []
+    steps = []
+    departments = []
+    for index, step in enumerate(raw_steps or [], start=1):
+        if isinstance(step, str):
+            status = step.strip()
+            from_dept = ""
+            to_dept = ""
+        elif isinstance(step, dict):
+            status = str(step.get("status") or step.get("code") or "").strip()
+            from_dept = _normalize_department_code(step.get("from_dept") or step.get("from"))
+            to_dept = _normalize_department_code(step.get("to_dept") or step.get("to"))
+        else:
+            continue
+        if not status:
+            continue
+        if from_dept:
+            departments.append(from_dept)
+        if to_dept:
+            departments.append(to_dept)
+        steps.append(
+            {
+                "index": index,
+                "status": status,
+                "label": status.replace("_", " ").title(),
+                "from_dept": from_dept or "Unassigned",
+                "to_dept": to_dept or (from_dept or "Unassigned"),
+            }
+        )
+    seen_departments = []
+    for dept in departments:
+        if dept and dept not in seen_departments:
+            seen_departments.append(dept)
+    return {
+        "step_count": len(steps),
+        "departments": seen_departments,
+        "steps": steps[:5],
+        "has_more_steps": len(steps) > 5,
+    }
+
+
 def _parse_approval_stage_lines(raw_text):
     stages = []
     for line in (raw_text or "").splitlines():
@@ -178,10 +221,12 @@ def list_workflows():
         return redirect(url_for("requests.dashboard"))
     wfs = Workflow.query.order_by(Workflow.name.asc()).all()
     workflow_scope_labels = {wf.id: _workflow_scope_label(wf) for wf in wfs}
+    workflow_visuals = {wf.id: _workflow_visual_summary(wf) for wf in wfs}
     return render_template(
         "admin_workflows.html",
         workflows=wfs,
         workflow_scope_labels=workflow_scope_labels,
+        workflow_visuals=workflow_visuals,
     )
 
 

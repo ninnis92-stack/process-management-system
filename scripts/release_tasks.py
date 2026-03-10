@@ -226,6 +226,14 @@ def main():
                             )
                         )
                     print("schema_fix=user.notification_departments_json_added")
+                if "onboarding_guidance_enabled" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN onboarding_guidance_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+                            )
+                        )
+                    print("schema_fix=user.onboarding_guidance_enabled_added")
                 if "backup_approver_user_id" not in user_cols:
                     with engine.begin() as conn:
                         conn.execute(

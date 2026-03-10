@@ -45,6 +45,8 @@ def test_admin_index_links(client, app):
     assert "/admin/workflows" in html
     assert "Status Options" in html
     assert "Process Flows" in html
+    assert "First admin pass" in html
+    assert "Start with process flows" in html
     # FontAwesome stylesheet
     assert 'font-awesome' in html or 'fa-' in html
     # offcanvas toggle button appears for mobile sidebar
@@ -116,3 +118,5 @@ def test_workflow_editor_shows_compact_guidance_and_live_preview(client, app):
     assert "Progressive setup" in html
     assert "Terminology guide" in html
     assert "Process flow" in html
+    assert 'id="workflowVisualMap"' in html
+    assert "Live path map" in html

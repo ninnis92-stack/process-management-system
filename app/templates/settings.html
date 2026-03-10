@@ -18,6 +18,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="dark_mode_present" value="1">
     <input type="hidden" name="quotes_enabled_present" value="1">
+    <input type="hidden" name="onboarding_guidance_enabled_present" value="1">
 
     <div class="settings-grid">
       <section class="surface-panel settings-section">
@@ -52,13 +53,13 @@
                 <span class="theme-preview-card__swatch" data-vibe-preview-accent2></span>
               </div>
               <div>
-                <div class="theme-preview-card__label">Active vibe</div>
+                <div class="theme-preview-card__label">Active theme</div>
                 <div class="theme-preview-card__meta">
                   <div class="theme-preview-card__name" data-vibe-preview-name>Theme preview</div>
                 </div>
               </div>
             </div>
-            <div class="form-text">Choose your UI accent theme. When dark mode is enabled this control is disabled; adopted brand themes now carry their accent palette into native dark mode automatically.</div>
+            <div class="form-text">Choose your UI accent theme. Teams that prefer a neutral tone can leave this on the default setting. When dark mode is enabled this control is disabled; adopted brand themes still carry their accent palette into native dark mode automatically.</div>
             <div id="vibeDarkModeNote" class="form-text text-warning mt-1" {% if not dark_mode_enabled %}hidden{% endif %}>Theme selection is disabled while dark mode is active.</div>
             <div id="vibeFeatureNote" class="form-text text-warning mt-1" {% if vibe_feature_enabled %}hidden{% endif %}>Theme selection is disabled while the global vibe feature is turned off.</div>
           </div>
@@ -68,8 +69,8 @@
       <section class="surface-panel settings-section">
         <div class="section-heading section-heading-compact">
           <div>
-            <h2 class="section-heading__title">Quotes & workspace rhythm</h2>
-            <p class="section-heading__subtitle">Choose how motivational text appears and how often it updates while you work.</p>
+            <h2 class="section-heading__title">Workspace messages</h2>
+            <p class="section-heading__subtitle">Choose whether rotating quotes appear and how often they refresh. Neutral defaults remain available.</p>
           </div>
         </div>
 
@@ -77,13 +78,13 @@
 
         {% if form.quote_set %}
           <div class="mb-3">
-            <label for="quote_set" class="form-label">Rolling Quote Set</label>
+            <label for="quote_set" class="form-label">Message set</label>
             <select class="form-select" id="quote_set" name="quote_set">
               {% for val, label in form.quote_set.choices %}
                 <option value="{{ val }}" {% if (current_user.quote_set is not none and current_user.quote_set == val) or (form.quote_set.data is not none and form.quote_set.data == val) %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
-            <div class="form-text">Select which set of rolling quotes you'd like to see; leave blank to follow the site default.</div>
+            <div class="form-text">Select which rotating message set you want to see, or leave it blank to follow the site default.</div>
           </div>
         {% endif %}
 
@@ -98,6 +99,18 @@
             <div class="form-text">How often quotes should advance. Choose between 15 and 60 seconds in 5‑second steps.</div>
           </div>
         {% endif %}
+      </section>
+
+      <section class="surface-panel settings-section">
+        <div class="section-heading section-heading-compact">
+          <div>
+            <h2 class="section-heading__title">Learning aids</h2>
+            <p class="section-heading__subtitle">Show or hide the newcomer guidance panels on the dashboard and admin landing screens once you know the flow.</p>
+          </div>
+        </div>
+
+        {{ toggle_checkbox(form.onboarding_guidance_enabled, 'Onboarding guidance enabled', 'Onboarding guidance disabled') }}
+        <div class="form-text mt-2">This controls the guided "start here" panels on the main dashboard and the admin command center. Functional workflow previews still stay available where they are needed.</div>
       </section>
     </div>
 

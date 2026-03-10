@@ -2559,6 +2559,90 @@ button.admin-tile {
   overflow-wrap: anywhere;
 }
 
+.workflow-list-guide__grid,
+.admin-orientation-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.workflow-mini-map,
+.workflow-visual-map {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.workflow-mini-map__step,
+.workflow-visual-map__step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: var(--surface-muted);
+  min-width: 180px;
+  flex: 1 1 180px;
+}
+
+.workflow-mini-map__index,
+.workflow-visual-map__step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.workflow-mini-map__more,
+.workflow-visual-map__connector {
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.workflow-listing__meta {
+  overflow-wrap: anywhere;
+}
+
+.workflow-visual-summary {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.workflow-visual-summary__metric {
+  min-width: 120px;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.workflow-visual-summary__label {
+  display: block;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.workflow-visual-map__empty {
+  padding: 0.85rem 1rem;
+  border-radius: 0.95rem;
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+  color: #64748b;
+  width: 100%;
+}
+
 .next-action-list {
   display: grid;
   gap: 0.65rem;

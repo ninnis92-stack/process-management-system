@@ -189,6 +189,8 @@ def test_department_a_navigation_links_resolve(app, client):
     assert "New Request" in html
     assert "Guest Dashboard" in html
     assert "Guest Submit" in html
+    assert "Learn the workspace in three moves" in html
+    assert "Read the current status" in html
 
     links = _extract_nav_links(html)
     expected = {
@@ -255,6 +257,20 @@ def test_admin_navigation_links_resolve(app, client):
         assert resp.status_code in (200, 302), route
         location = resp.headers.get("Location", "")
         assert not location.endswith("/static/app.js"), route
+
+
+def test_settings_page_exposes_onboarding_guidance_toggle(app, client):
+    _create_user(app, email="guide-toggle@example.com", department="B")
+
+    rv = _login(client, "guide-toggle@example.com")
+    assert rv.status_code == 200
+
+    page = client.get("/auth/settings")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert "Learning aids" in html
+    assert 'name="onboarding_guidance_enabled_present"' in html
+    assert 'name="onboarding_guidance_enabled"' in html
 
 
 def test_navbar_department_dropdown_for_multi_dept_user(app, client):

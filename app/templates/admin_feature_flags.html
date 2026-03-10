@@ -10,7 +10,7 @@
         <div class="helper-card__icon" aria-hidden="true">🎛️</div>
         <div>
           <div class="helper-card__title">Experience switches</div>
-          <div class="helper-card__text">Use these toggles for the navbar banner, rotating quotes, and reminder behavior that users see across their account pages.</div>
+          <div class="helper-card__text">Use these toggles for the navbar appearance control, rotating messages, and reminder behavior shown across the app.</div>
         </div>
       </article>
       <article class="helper-card admin-feature-flags__intro-card">
@@ -34,18 +34,18 @@
         <div class="admin-feature-flags__options">
           <div class="admin-toggle-card admin-feature-flags__option{% if form.vibe_enabled.data %} active{% endif %}">
             <div class="form-check mb-0">
-              {{ form.vibe_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Vibe button UI enabled', 'data-toggle-text-unchecked': 'Vibe button UI disabled'}) }}
-              <label class="form-check-label" for="{{ form.vibe_enabled.id }}">{{ 'Vibe button UI enabled' if form.vibe_enabled.data else 'Vibe button UI disabled' }}</label>
+              {{ form.vibe_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Theme button enabled', 'data-toggle-text-unchecked': 'Theme button disabled'}) }}
+              <label class="form-check-label" for="{{ form.vibe_enabled.id }}">{{ 'Theme button enabled' if form.vibe_enabled.data else 'Theme button disabled' }}</label>
             </div>
-            <div class="admin-feature-flags__option-copy">Keeps the navbar `vibe` button available so users can change accent palettes from the banner area.</div>
+            <div class="admin-feature-flags__option-copy">Keeps the navbar appearance button available so users can change accent palettes from the banner area when your workspace uses that feature.</div>
           </div>
 
           <div class="admin-toggle-card admin-feature-flags__option{% if form.rolling_quotes_enabled.data %} active{% endif %}">
             <div class="form-check mb-0">
-              {{ form.rolling_quotes_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Rolling quotes enabled', 'data-toggle-text-unchecked': 'Rolling quotes disabled'}) }}
-              <label class="form-check-label" for="{{ form.rolling_quotes_enabled.id }}">{{ 'Rolling quotes enabled' if form.rolling_quotes_enabled.data else 'Rolling quotes disabled' }}</label>
+              {{ form.rolling_quotes_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Rotating messages enabled', 'data-toggle-text-unchecked': 'Rotating messages disabled'}) }}
+              <label class="form-check-label" for="{{ form.rolling_quotes_enabled.id }}">{{ 'Rotating messages enabled' if form.rolling_quotes_enabled.data else 'Rotating messages disabled' }}</label>
             </div>
-            <div class="admin-feature-flags__option-copy">When disabled, rotating quotes are removed from the navbar banner throughout the app.</div>
+            <div class="admin-feature-flags__option-copy">When disabled, rotating quote or message text is removed from the navbar banner throughout the app.</div>
           </div>
 
           <div class="admin-toggle-card admin-feature-flags__option{% if form.enable_notifications.data %} active{% endif %}">

@@ -3,6 +3,25 @@
 
 {% block content %}
 {{ page_header('Process Flows', url_for('admin.create_workflow'), 'New Process Flow', 'Workflow control', 'Review active process flows, scope them by department, and toggle them without leaving the page.') }}
+<section class="surface-panel surface-panel-muted workflow-list-guide mb-3">
+  <div class="workflow-list-guide__grid">
+    <article>
+      <div class="eyebrow-label">Start here</div>
+      <h3 class="h6 mb-1">Model the main path first</h3>
+      <p class="small text-muted mb-0">Capture the most common route from intake to completion before adding exception handling or branch-specific statuses.</p>
+    </article>
+    <article>
+      <div class="eyebrow-label">Keep it teachable</div>
+      <h3 class="h6 mb-1">Use labels request owners will recognize</h3>
+      <p class="small text-muted mb-0">Prefer human-readable status names and department handoffs so staff can follow the path without opening admin settings.</p>
+    </article>
+    <article>
+      <div class="eyebrow-label">Visual check</div>
+      <h3 class="h6 mb-1">Scan the path before editing</h3>
+      <p class="small text-muted mb-0">Each flow now shows a compact route map so admins can compare scope, length, and ownership at a glance.</p>
+    </article>
+  </div>
+</section>
 <section class="surface-panel table-shell">
   <div class="table-responsive">
     <table class="table align-middle mb-0 admin-workflows-table admin-data-table">
@@ -11,8 +30,40 @@
       </thead>
       <tbody>
       {% for wf in workflows %}
+        {% set visual = workflow_visuals.get(wf.id, {}) %}
         <tr id="wf-row-{{ wf.id }}">
-          <td>{{ wf.name }}</td>
+          <td>
+            <div class="workflow-listing">
+              <div class="fw-semibold">{{ wf.name }}</div>
+              {% if wf.description %}
+                <div class="small text-muted mt-1">{{ wf.description }}</div>
+              {% endif %}
+              {% if visual.step_count %}
+                <div class="workflow-listing__meta small text-muted mt-2">
+                  {{ visual.step_count }} step{{ '' if visual.step_count == 1 else 's' }}
+                  {% if visual.departments %}
+                    • {{ visual.departments|join(' → ') }}
+                  {% endif %}
+                </div>
+                <div class="workflow-mini-map mt-2" aria-label="Workflow route preview">
+                  {% for step in visual.steps %}
+                    <div class="workflow-mini-map__step">
+                      <span class="workflow-mini-map__index">{{ step.index }}</span>
+                      <div>
+                        <strong>{{ step.label }}</strong>
+                        <div class="small text-muted">Dept {{ step.from_dept }} → Dept {{ step.to_dept }}</div>
+                      </div>
+                    </div>
+                  {% endfor %}
+                  {% if visual.has_more_steps %}
+                    <div class="workflow-mini-map__more">+ more</div>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div class="small text-muted mt-2">No path defined yet.</div>
+              {% endif %}
+            </div>
+          </td>
           <td>{{ workflow_scope_labels.get(wf.id, wf.department_code or 'Global') }}</td>
           <td>
             <div class="form-check form-switch">

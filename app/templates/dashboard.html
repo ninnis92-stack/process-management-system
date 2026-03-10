@@ -60,6 +60,61 @@
   </div>
 </section>
 
+<section class="surface-panel surface-panel-muted mb-3">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+    <div>
+      <div class="eyebrow-label">How to work here</div>
+      <h4 class="mb-1">Learn the workspace in three moves</h4>
+      <p class="text-muted mb-0">
+        {% if mode == 'A' %}
+          Start a request, watch the current status, and reopen the request detail page whenever the next team needs more information.
+        {% elif mode == 'B' %}
+          Start from a bucket or saved view, open the next item that needs action, and update the status so the next team sees a clean handoff.
+        {% else %}
+          Start with the items waiting for review, decide whether they can move forward, and send them back with a clear status when changes are needed.
+        {% endif %}
+      </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if mode == 'A' %}
+        <a class="btn btn-sm btn-primary" href="{{ url_for('requests.request_new') }}">Create first request</a>
+      {% endif %}
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('requests.search_requests') }}">Search work</a>
+      {% if current_user.is_authenticated and current_user.is_admin %}
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.index') }}">Open command center</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="row g-3 mt-1">
+    <div class="col-md-4">
+      <div class="surface-panel bg-white h-100">
+        <strong>1. Start in the queue</strong>
+        <p class="small text-muted mb-0">
+          {% if mode == 'A' %}
+            Use New Request when work starts with your team.
+          {% elif mode == 'B' %}
+            Use buckets and saved views to narrow the queue before opening a request.
+          {% else %}
+            Use the approval snapshot or review queue to find the next item that needs signoff.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="surface-panel bg-white h-100">
+        <strong>2. Read the current status</strong>
+        <p class="small text-muted mb-0">The status tells you where the request is in the process flow and which team owns the next action.</p>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="surface-panel bg-white h-100">
+        <strong>3. Open the detail page for action</strong>
+        <p class="small text-muted mb-0">Use the request detail page to hand work forward, approve it, or return it with clearer notes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <form class="page-toolbar surface-panel dashboard-search" method="get" action="{{ url_for('requests.search_requests') }}">
   <label class="visually-hidden" for="searchInput">Search requests</label>
   <input id="searchInput" name="q" class="form-control me-2" type="search" placeholder="Search request #, title, part, or description" aria-label="Search requests" value="{{ request.args.get('q','') }}">

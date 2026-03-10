@@ -256,6 +256,9 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     # so the frontend can easily multiply by 1000.  When absent the default is
     # 15 seconds (the shortest allowable interval).
     quote_interval = db.Column(db.Integer, nullable=True, default=None)
+    # user preference: whether first-use guidance panels should appear on
+    # dashboard and admin landing surfaces.
+    onboarding_guidance_enabled = db.Column(db.Boolean, nullable=False, default=True)
 
     # admin-configurable allowance of manual nudges the user may initiate per
     # UTC day. Defaults to 1 and capped at 5. Used by the `/push_nudge` route

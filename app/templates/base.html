@@ -94,15 +94,15 @@
           <div class="brand-banner-row{% if not vibe_ui_enabled %} brand-banner-row--quotes-only{% endif %}" data-theme-banner>
             <div class="brand-banner-row__quote-panel" data-vibe-quote-panel>
               <div class="brand-banner-row__content">
-                <div class="brand-banner-row__eyebrow">{{ 'Dark-mode vibe' if dark_mode_active and vibe_ui_enabled else ('Current vibe' if vibe_ui_enabled else 'Workspace note') }}</div>
-                <div id="motivation" class="brand-quote" aria-live="polite">{{ initial_quote or 'Theme your workspace instantly.' }}</div>
+                <div class="brand-banner-row__eyebrow">{{ 'Dark-mode theme' if dark_mode_active and vibe_ui_enabled else ('Current theme' if vibe_ui_enabled else 'Workspace note') }}</div>
+                <div id="motivation" class="brand-quote" aria-live="polite">{{ initial_quote or 'Keep work moving with shared context.' }}</div>
               </div>
             </div>
             {% if vibe_ui_enabled %}
               <div class="brand-banner-row__control-panel" data-vibe-control-panel>
                 <div class="brand-banner-row__control-shell ui-control-shell ui-control-shell--banner" data-vibe-shell>
-                  <div class="brand-banner-row__control-label">Theme control</div>
-                  <button id="vibeBtn" data-vibe-trigger="navbar" type="button" class="btn btn-outline-light btn-sm brand-vibe-btn">Vibe · <span class="vibeLabel">—</span></button>
+                  <div class="brand-banner-row__control-label">Appearance</div>
+                  <button id="vibeBtn" data-vibe-trigger="navbar" type="button" class="btn btn-outline-light btn-sm brand-vibe-btn">Theme · <span class="vibeLabel">—</span></button>
                 </div>
               </div>
             {% endif %}
@@ -278,8 +278,9 @@
     {% endif %}
 
           <div class="page-shell{% if ep.startswith('admin') %} page-shell-admin{% endif %}">
+            {% set onboarding_guidance_enabled = current_user.onboarding_guidance_enabled|default(true) if current_user.is_authenticated else true %}
             {% set highlight_endpoints = ['requests.dashboard', 'admin.index', 'external.external_dashboard'] %}
-            {% if ep in highlight_endpoints %}
+            {% if ep in highlight_endpoints and onboarding_guidance_enabled %}
               <section class="hero-callouts" aria-label="Workflow guidance">
                 <div class="hero-callouts__intro">
                   <p class="hero-callouts__tag">Workflow signal</p>

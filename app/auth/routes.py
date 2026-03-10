@@ -96,6 +96,9 @@ def _sync_current_user_preferences(user):
     try:
         current_user.dark_mode = bool(getattr(user, "dark_mode", False))
         current_user.quotes_enabled = bool(getattr(user, "quotes_enabled", True))
+        current_user.onboarding_guidance_enabled = bool(
+            getattr(user, "onboarding_guidance_enabled", True)
+        )
         current_user.vibe_index = getattr(user, "vibe_index", None)
         current_user.quote_set = getattr(user, "quote_set", None)
         current_user.quote_interval = getattr(user, "quote_interval", None)
@@ -242,6 +245,14 @@ def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None,
     if _setting_present(payload, "quotes_enabled") or _setting_present(payload, "quotes_enabled_present"):
         user.quotes_enabled = _coerce_checkbox_value(payload.get("quotes_enabled"))
         updated["quotes_enabled"] = bool(user.quotes_enabled)
+
+    if _setting_present(payload, "onboarding_guidance_enabled") or _setting_present(payload, "onboarding_guidance_enabled_present"):
+        user.onboarding_guidance_enabled = _coerce_checkbox_value(
+            payload.get("onboarding_guidance_enabled")
+        )
+        updated["onboarding_guidance_enabled"] = bool(
+            user.onboarding_guidance_enabled
+        )
 
     if not external_theme_loaded and vibe_feature_enabled and _setting_present(payload, "vibe_index"):
         raw_vibe = payload.get("vibe_index")

@@ -13,6 +13,7 @@ class SettingsForm(FlaskForm):
     vibe_index = SelectField("Theme", coerce=int, choices=[], validate_choice=False)
     quote_set = SelectField("Quote set", coerce=str, choices=[], validate_choice=False)
     quotes_enabled = BooleanField("Show rotating quotes", default=True)
+    onboarding_guidance_enabled = BooleanField("Show onboarding guidance", default=True)
     # how often (in seconds) the displayed quote should advance
     quote_interval = SelectField(
         "Quote rotation interval", coerce=int, choices=[], validate_choice=False
