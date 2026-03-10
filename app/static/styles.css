@@ -1800,12 +1800,25 @@ a:hover { color: var(--accent-2); }
   gap: 1rem;
 }
 
+/* on larger screens, let dashboard panels sit side-by-side */
+@media (min-width: 992px) {
+  .admin-dashboard-panels {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .admin-dashboard-panels > * {
+    flex: 1 1 320px;
+  }
+}
+
 .admin-section-panel {
   border-radius: 1.5rem;
   border: none;
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
   padding: 1.4rem;
   scroll-margin-top: 7.75rem;
+  background: var(--surface-raised);
+  color: var(--body-text);
 }
 
 .admin-section__header {
@@ -3530,6 +3543,11 @@ pre,
     background: #ffffff !important;
     color: #111827 !important;
     box-shadow: none !important;
+  }
+
+  /* reinforce readable text on common containers */
+  .surface-panel, .page-shell, .admin-section-panel {
+    color: var(--body-text) !important;
   }
 
   body {
