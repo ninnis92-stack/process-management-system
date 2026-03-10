@@ -52,6 +52,7 @@ class AdminCreateUserForm(FlaskForm):
     # quote preferences for new user
     quote_set = SelectField("Initial quote set", choices=[], validators=[Optional()])
     quotes_enabled = BooleanField("Enable rotating quotes", default=True)
+    vibe_button_enabled = BooleanField("Enable vibe button", default=True)
     quote_interval = SelectField(
         "Quote rotation interval", coerce=int, choices=[], validators=[Optional()]
     )

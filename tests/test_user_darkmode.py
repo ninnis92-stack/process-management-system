@@ -163,6 +163,58 @@ def test_settings_page_shows_enable_text_when_dark_mode_disabled(client, app):
     assert b"Changes save automatically." in rv.data
     assert b'id="darkModeSubmitBtn"' not in rv.data
 
+def test_settings_page_shows_vibe_toggle(client, app):
+    make_user(app, dark_mode=False)
+    rv = login(client)
+    assert rv.status_code == 200
+
+    rv = client.get("/auth/settings")
+    assert rv.status_code == 200
+    assert b'Show vibe button in the navbar' in rv.data
+
+
+def test_vibe_button_preference_hides_nav(client, app):
+    make_user(app, dark_mode=False)
+    rv = login(client)
+    assert rv.status_code == 200
+    # initially vibe button should appear on dashboard
+    rv2 = client.get("/dashboard")
+    assert b'id="vibeBtn"' in rv2.data
+    # update preference to disable
+    rv = client.post(
+        "/auth/preferences",
+        json={"vibe_button_enabled": "", "vibe_button_enabled_present": "1"},
+    )
+    assert rv.status_code == 200
+    payload = rv.get_json()
+    assert payload["ok"] is True
+    assert payload["preferences"]["vibe_button_enabled"] is False
+    rv2 = client.get("/dashboard")
+    assert b'id="vibeBtn"' not in rv2.data
+
+
+def test_workspace_vibe_flag_overrides_user_vibe_button_preference(client, app):
+    make_user(app, dark_mode=False)
+    with app.app_context():
+        from app.models import FeatureFlags, User
+
+        user = User.query.filter_by(email="admin@example.com").first()
+        user.vibe_button_enabled = True
+        flags = FeatureFlags.get()
+        flags.vibe_enabled = False
+        db.session.commit()
+
+    rv = login(client)
+    assert rv.status_code == 200
+
+    dashboard = client.get("/dashboard")
+    assert dashboard.status_code == 200
+    assert b'id="vibeBtn"' not in dashboard.data
+
+    settings_page = client.get("/auth/settings")
+    assert settings_page.status_code == 200
+    assert b'Show vibe button in the navbar' in settings_page.data
+    assert b'global control still hides the button for everyone' in settings_page.data
 
 def test_settings_page_disables_theme_when_vibe_feature_is_off(client, app):
     make_user(app, dark_mode=False)
@@ -218,6 +270,9 @@ def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
         "/auth/preferences",
         json={
             "dark_mode": True,
+            "vibe_button_enabled": "y",
+            "vibe_button_enabled_present": "1",
+
             "quotes_enabled": False,
             "quote_set": "engineering",
             "quote_interval": 30,
@@ -228,6 +283,7 @@ def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
     payload = rv.get_json()
     assert payload["ok"] is True
     assert payload["preferences"]["dark_mode"] is True
+    assert payload["preferences"]["vibe_button_enabled"] is True
     assert payload["preferences"]["quotes_enabled"] is False
     assert payload["preferences"]["quote_set"] == "engineering"
     assert payload["preferences"]["quote_interval"] == 30
@@ -242,6 +298,7 @@ def test_generic_preferences_endpoint_updates_multiple_settings(client, app):
         assert user is not None
         assert user.dark_mode is True
         assert user.vibe_index is None
+        assert user.vibe_button_enabled is True
         assert user.quotes_enabled is False
         assert user.quote_set == "engineering"
         assert user.quote_interval == 30

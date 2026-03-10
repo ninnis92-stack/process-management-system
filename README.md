@@ -63,7 +63,7 @@ Key capabilities:
 - **Cleaner GitHub automation** with repaired CI/deploy workflows and a valid
   Codespaces prebuild workflow configuration
 - **SSO/OIDC support** with optional admin sync
-- **Theme/vibe system**, dark mode (now integrated with vibe accents) and explicit no‑vibe support. Dark mode disables personal vibe overrides and hides the vibe button, while adopted brand presets continue to tint the native dark palette so imported branding still looks natural. Importing branding from a website now suppresses the rolling-quote banner and locks accent/vibe controls; when the global vibe feature is turned off the UI switches to a unique neutral palette with its own slate‑toned accents rather than lingering on the last selected color. The theme dropdown is locked with explanatory text shown to the user, and the names of the built-in presets have been updated to match the softer accent palette: *Sky*, *Moss*, *Dawn*, and *Twilight* (replacing Ocean/Forest/Sunset/Midnight respectively). The navbar quote area and vibe control are separated so quotes stay visible even when the vibe button is absent, the vibe button itself now sits inside a distinct solid control shell instead of blending into the banner, shared action bars and control shells keep admin and monitor layouts uniform when controls are added or removed, and the quote slot now clamps long lines on desktop while still exposing the full text via tooltip/ARIA. A recent set of fixes ensures the brand title never gets obscured by the quote/vibe banner, adds extra spacing when the banner wraps on narrow screens, and widens the left gap further so the last letter and the entire brand string sit clear of the banner border. The login page now uses the shared `surface-panel`/`form-shell` layout and page header, delivering the same look and feel as the rest of the app. Recent UI polish also darkened the lighter preset accents so theme-controlled buttons and labels remain readable, replaced the older glassy treatment with a more solid shared surface system across login, dashboard, settings, and admin pages, and kept dashboard overview/badge accents aligned with surrounding cards instead of using an unrelated bright-blue emphasis. Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
+- **Theme/vibe system**, dark mode (now integrated with vibe accents) and explicit no‑vibe support. Dark mode disables personal vibe overrides and hides the vibe button, while adopted brand presets continue to tint the native dark palette so imported branding still looks natural. Importing branding from a website now suppresses the rolling-quote banner and locks accent/vibe controls; when the global vibe feature is turned off the UI switches to a unique neutral palette with its own slate‑toned accents rather than lingering on the last selected color. The theme dropdown is locked with explanatory text shown to the user, and the names of the built-in presets have been updated to match the softer accent palette: *Sky*, *Moss*, *Dawn*, and *Twilight* (replacing Ocean/Forest/Sunset/Midnight respectively). Users can now independently hide or show the navbar vibe button from their personal settings, with the preference defaulting to on for discoverability. The workspace-wide vibe feature flag still acts as a hard-off override for every account, but turning that global flag back on does not force the button back into user navbars unless each account still has its personal setting enabled. The navbar quote area and vibe control are separated so quotes stay visible even when the vibe button is absent, the vibe button itself now sits inside a distinct solid control shell instead of blending into the banner, shared action bars and control shells keep admin and monitor layouts uniform when controls are added or removed, and the quote slot now clamps long lines on desktop while still exposing the full text via tooltip/ARIA. A recent set of fixes ensures the brand title never gets obscured by the quote/vibe banner, adds extra spacing when the banner wraps on narrow screens, and widens the left gap further so the last letter and the entire brand string sit clear of the banner border. The login page now uses the shared `surface-panel`/`form-shell` layout and page header, delivering the same look and feel as the rest of the app. Recent UI polish also darkened the lighter preset accents so theme-controlled buttons and labels remain readable, replaced the older glassy treatment with a more solid shared surface system across login, dashboard, settings, and admin pages, and kept dashboard overview/badge accents aligned with surrounding cards instead of using an unrelated bright-blue emphasis. Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
 
 Everything is covered by a comprehensive test suite and deploys automatically
 using a release script that migrates the database, creates missing columns,
@@ -152,7 +152,7 @@ and default diff views.
    ```bash
    make smoke        # hit home, dashboard, and admin/site_config
    make smoke-clean  # erase local sqlite DB between runs
-  make test         # run pytest suite (currently 231 tests)
+  make test         # run pytest suite (currently 234 tests)
    ```
 
 6. **Clearing state**
@@ -187,7 +187,7 @@ and default diff views.
 
 8. **Tests**
    ```bash
-  make test          # runs full pytest suite (currently 231 tests)
+  make test          # runs full pytest suite (currently 234 tests)
   make test-postgres # start a temporary Postgres container and run the suite against it
    ```
 
@@ -585,7 +585,7 @@ page displays the last few steps and suggests next actions to the user.
 - Ticketing and webhook integrations can optionally emit a structured handoff
   bundle payload containing request metadata, submission details, and
   attachment descriptors whenever a department handoff is created.
-- **User settings**: dark mode (keeps adopted brand presets blended into the native dark palette while disabling personal vibes), theme/vibe selection, quote set, rotating
+- **User settings**: dark mode (keeps adopted brand presets blended into the native dark palette while disabling personal vibes), theme/vibe selection, navbar vibe button visibility, quote set, rotating
   quotes.
 - **Templates & requirements**: rich form editing with grouped fields, hints,
   and other metadata.

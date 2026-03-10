@@ -382,11 +382,13 @@ def _populate_admin_user_form(form: AdminCreateUserForm, user: Optional[User] = 
         form.backup_approver_user_id.data = (
             getattr(user, "backup_approver_user_id", None) or 0
         )
+        form.vibe_button_enabled.data = getattr(user, "vibe_button_enabled", True)
 
 
 def _apply_admin_user_settings(user: User, form: AdminCreateUserForm):
     user.quote_set = form.quote_set.data or None
     user.quotes_enabled = bool(form.quotes_enabled.data)
+    user.vibe_button_enabled = bool(getattr(form, 'vibe_button_enabled', False).data)
     try:
         user.daily_nudge_limit = int(form.daily_nudge_limit.data or 1)
     except Exception:

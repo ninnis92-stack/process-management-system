@@ -251,6 +251,8 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     quote_set = db.Column(db.String(80), nullable=True)
     # user preference: whether rotating quotes should appear on their dashboard
     quotes_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    # new user preference: show or hide the navbar vibe button
+    vibe_button_enabled = db.Column(db.Boolean, nullable=False, default=True)
     # user preference: interval (in seconds) between quote rotations; allowed
     # values are multiples of 5 between 15 and 60.  We store as integer seconds
     # so the frontend can easily multiply by 1000.  When absent the default is
