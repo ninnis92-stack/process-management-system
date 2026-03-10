@@ -64,7 +64,7 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
         "Tenants",
         "Jobs",
         "Integration Events",
-        "Open metrics suite",
+        "Open metrics overview",
         "Explore feature flags",
     }
     for label in expected_labels:
@@ -101,7 +101,7 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
         response = client.get(route, follow_redirects=False)
         assert response.status_code in (200, 302), route
 
-    for hero_url in ("/admin/metrics_config", "/admin/feature_flags"):
+    for hero_url in ("/admin/metrics_overview", "/admin/feature_flags"):
         response = client.get(hero_url, follow_redirects=False)
         assert response.status_code in (200, 302), hero_url
 

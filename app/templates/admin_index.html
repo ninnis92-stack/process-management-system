@@ -8,7 +8,7 @@
       <p class="admin-hero__lede">Track guest intake, dashboards, and core configuration with fast insights, quick actions, and clearer terminology.</p>
       <div class="admin-hero__actions ui-action-bar">
         <div class="ui-action-group">
-          <a class="btn btn-sm btn-primary" href="{{ url_for('admin.metrics_config') }}">Open metrics suite</a>
+          <a class="btn btn-sm btn-primary" href="{{ url_for('admin.metrics_overview') }}">Open metrics overview</a>
           <a class="btn btn-sm btn-outline-light" href="{{ url_for('admin.feature_flags') }}">Explore feature flags</a>
           {% if FeatureFlags.get().vibe_enabled and not current_user.dark_mode %}
             <div class="ui-control-shell ui-control-shell--compact" data-vibe-shell>
