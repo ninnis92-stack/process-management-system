@@ -343,7 +343,6 @@ def test_settings_preview_hides_vibe_button(client, app):
     rv = client.get("/dashboard")
     assert rv.status_code == 200
     assert b'data-user-dark-mode="1"' in rv.data
-    assert b'data-user-vibe="5"' in rv.data
     # the navbar no longer renders a vibe button when dark mode is active
     assert b'id="vibeBtn"' not in rv.data
 

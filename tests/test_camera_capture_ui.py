@@ -2,6 +2,8 @@ import pytest
 
 
 def login(client, email="user@example.com", password="secret"):
+    # clear existing session first
+    client.get('/auth/logout', follow_redirects=True)
     return client.post(
         "/auth/login",
         data={"email": email, "password": password},
@@ -48,13 +50,14 @@ def test_request_form_shows_camera_for_verified_field(app, client):
     """A request template with a verified text field renders a camera button."""
     with app.app_context():
         from app.extensions import db
-        # model is named FormTemplate in this repo
-        from app.models import FormTemplate as RequestTemplate, RequestField
-        # create simple template
-        tmpl = RequestTemplate(name="camtest")
+        # template model names
+        from app.models import FormTemplate, FormField, DepartmentFormAssignment, User
+        from werkzeug.security import generate_password_hash
+        # create simple template and field
+        tmpl = FormTemplate(name="camtest")
         db.session.add(tmpl)
         db.session.flush()
-        fld = RequestField(
+        fld = FormField(
             template_id=tmpl.id,
             name="serial",
             label="Serial",
@@ -62,8 +65,24 @@ def test_request_form_shows_camera_for_verified_field(app, client):
             verification={"enabled": True},
         )
         db.session.add(fld)
+        # assign template to department A so the form is available
+        db.session.add(DepartmentFormAssignment(template_id=tmpl.id, department_name="A"))
+        # add a regular user for test
+        u = User(
+            email="user@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="A",
+            is_active=True,
+            is_admin=False,
+        )
+        db.session.add(u)
         db.session.commit()
-    rv = client.get(f"/requests/new/{tmpl.id}")
+        user_id = u.id
+    # manually mark user as logged in via session
+    with client.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+
+    rv = client.get("/requests/new", follow_redirects=True)
     assert rv.status_code == 200
     assert b"data-camera-target=" in rv.data
     # button should appear next to the input name serial
