@@ -68,7 +68,7 @@
     <div class="col-12">
       <label class="form-label">Quick-access departments</label>
       {{ form.watched_departments(class="form-select", multiple=true, size=3) }}
-      <div class="form-text">These departments appear as dashboard shortcuts when the user is allowed to access them.</div>
+      <div class="form-text">These departments appear as dashboard shortcuts when the user is allowed to access them. For admin users, this list also narrows queue-style notification flow to the departments they are actively monitoring.</div>
     </div>
   </div>
 
@@ -92,7 +92,7 @@
     <div class="col-12">
       <label class="form-label">Notification routing departments</label>
       {{ form.notification_departments(class="form-select", multiple=true, size=3) }}
-      <div class="form-text">Send this user extra queue notifications for the selected departments, even when they are not the primary owner.</div>
+      <div class="form-text">Send this user extra queue notifications for the selected departments, even when they are not the primary owner. For admins, these departments are added on top of the monitored-department filter.</div>
     </div>
     <div class="col-12 d-flex flex-column gap-2">
       <div class="form-check">

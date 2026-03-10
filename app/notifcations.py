@@ -9,7 +9,7 @@ Keep the send path idempotent and non-blocking from request handlers.
 """
 
 from .extensions import db
-from .models import Notification, User, UserDepartment, SpecialEmailConfig, NotificationRetention
+from .models import FeatureFlags, Notification, User, UserDepartment, SpecialEmailConfig, NotificationRetention
 from .models import DepartmentFormAssignment, FormTemplate
 from flask import current_app
 from threading import Thread
@@ -136,10 +136,19 @@ def users_in_department(dept: str):
         .order_by(User.email.asc())
         .all()
     )
-    candidates = list(assignment_candidates) + list(routed_candidates)
+    watched_candidates = (
+        User.query.options(joinedload(User.departments))
+        .filter(User.is_active.is_(True))
+        .filter(User.is_admin.is_(True))
+        .filter(User.watched_departments_json.like(f'%"{normalized}"%'))
+        .order_by(User.email.asc())
+        .all()
+    )
+    candidates = list(assignment_candidates) + list(routed_candidates) + list(watched_candidates)
     recipients = []
     seen = set()
     for user in candidates:
+        watched_match = normalized in (getattr(user, "watched_departments", []) or [])
         primary_match = (getattr(user, "department", "") or "").strip().upper() == normalized
         routed_match = normalized in (getattr(user, "notification_departments", []) or [])
         assignment_match = any(
@@ -147,7 +156,20 @@ def users_in_department(dept: str):
             and getattr(assignment, "is_active_assignment", True)
             for assignment in (getattr(user, "departments", []) or [])
         )
-        if not (primary_match or routed_match or assignment_match):
+
+        # Admins can monitor a subset of departments from their user settings.
+        # When that list is configured, queue/broadcast notifications should
+        # follow the monitored departments instead of every department the admin
+        # could technically access; direct notifications still use explicit
+        # recipient lists elsewhere.
+        if getattr(user, "is_admin", False):
+            monitored_departments = list(getattr(user, "watched_departments", []) or [])
+            if monitored_departments:
+                if not (watched_match or routed_match):
+                    continue
+            elif not (primary_match or routed_match or assignment_match):
+                continue
+        elif not (primary_match or routed_match or assignment_match):
             continue
         if getattr(user, "id", None) in seen:
             continue
@@ -373,6 +395,13 @@ def notify_users(
     request_id=None,
     allow_email: bool = True,
 ):
+    try:
+        in_app_notifications_enabled = bool(
+            getattr(FeatureFlags.get(), "enable_notifications", True)
+        )
+    except Exception:
+        in_app_notifications_enabled = True
+
     # Decide whether to persist in-app notifications per-recipient.
     # If the app's EmailService is enabled and an email address exists for
     # a recipient, prefer sending email and skip creating an in-app row for
@@ -449,7 +478,7 @@ def notify_users(
                 "body": entry["body"],
                 "html": None,
             }
-        else:
+        elif in_app_notifications_enabled:
             db.session.add(
                 Notification(
                     user_id=entry["user_id"],
@@ -479,7 +508,7 @@ def notify_users(
             u = type("NotificationUser", (), {"id": entry["user_id"], "email": entry.get("email")})
             # only enforce for users that will have DB rows (email-disabled or no email)
             has_email = bool(getattr(u, "email", None))
-            if email_enabled and has_email and entry.get("allow_email", True):
+            if (email_enabled and has_email and entry.get("allow_email", True)) or not in_app_notifications_enabled:
                 continue
             count = Notification.query.filter_by(user_id=u.id).count()
             if count > max_per_user:

@@ -179,6 +179,29 @@ def test_notification_routing_and_backup_approver_receive_alerts(app):
         assert "backup approver for primary-alerts@example.com" in (backup_note.body or "")
 
 
+def test_admin_monitored_departments_filter_queue_notifications(app):
+    with app.app_context():
+        admin = User(
+            email="monitor-admin@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+            is_admin=True,
+        )
+        admin.watched_departments = ["A"]
+        admin.notification_departments = ["C"]
+        db.session.add(admin)
+        db.session.commit()
+
+        dept_a = {user.email for user in users_in_department("A")}
+        dept_b = {user.email for user in users_in_department("B")}
+        dept_c = {user.email for user in users_in_department("C")}
+
+        assert "monitor-admin@example.com" in dept_a
+        assert "monitor-admin@example.com" not in dept_b
+        assert "monitor-admin@example.com" in dept_c
+
+
 def test_admin_can_save_notification_routing_and_backup_approver(app, client):
     admin_id = _create_user(app, "coverage-admin@example.com", is_admin=True, department="B")
     user_id = _create_user(app, "coverage-user@example.com", department="A")

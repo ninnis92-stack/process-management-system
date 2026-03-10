@@ -1,6 +1,6 @@
 import pytest
 from app.extensions import db
-from app.models import FeatureFlags, RejectRequestConfig, User
+from app.models import FeatureFlags, Notification, RejectRequestConfig, User
 from werkzeug.security import generate_password_hash
 
 
@@ -226,3 +226,54 @@ def test_dashboard_notification_toggle(client, app):
     assert "Notifications on" in html
     # active class should be applied when flag is enabled
     assert 'admin-toggle-card active' in html
+
+
+def test_notifications_endpoints_respect_disabled_flag(client, app):
+    make_admin(app)
+    with app.app_context():
+        admin = User.query.filter_by(email="admin@example.com").first()
+        flags = FeatureFlags.get()
+        flags.enable_notifications = False
+        db.session.add(
+            Notification(
+                user_id=admin.id,
+                type="generic",
+                title="Hidden note",
+                body="Should not appear while notifications are off.",
+            )
+        )
+        db.session.commit()
+
+    rv = login_admin(client)
+    assert rv.status_code == 200
+
+    count_resp = client.get("/notifications/unread_count")
+    assert count_resp.status_code == 200
+    assert count_resp.get_json() == {"count": 0}
+
+    latest_resp = client.get("/notifications/latest")
+    assert latest_resp.status_code == 200
+    assert latest_resp.get_json() == []
+
+
+def test_notify_users_skips_in_app_rows_when_notifications_disabled(app):
+    from app import notifcations as notifications_module
+
+    with app.app_context():
+        user = User(
+            email="note-user@example.com",
+            password_hash=generate_password_hash("secret"),
+            department="B",
+            is_active=True,
+        )
+        db.session.add(user)
+        db.session.commit()
+
+        flags = FeatureFlags.get()
+        flags.enable_notifications = False
+        db.session.commit()
+
+        notifications_module.notify_users([user], "Test title", "Test body")
+        db.session.commit()
+
+        assert Notification.query.filter_by(user_id=user.id).count() == 0

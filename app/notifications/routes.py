@@ -3,10 +3,18 @@ from flask_login import login_required, current_user
 from ..extensions import db
 from ..models import Notification
 from ..models import NotificationRetention
+from ..models import FeatureFlags
 from sqlalchemy import or_
 from datetime import datetime, timedelta
 
 notifications_bp = Blueprint("notifications", __name__, url_prefix="/notifications")
+
+
+def _notifications_enabled() -> bool:
+    try:
+        return bool(getattr(FeatureFlags.get(), "enable_notifications", True))
+    except Exception:
+        return True
 
 
 @notifications_bp.get("/unread_count")
@@ -19,12 +27,18 @@ def unread_count():
         current_app.logger.exception("unread_count: error checking current_user")
         return jsonify({"count": 0})
 
+    if not _notifications_enabled():
+        return jsonify({"count": 0})
+
     count = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
     return jsonify({"count": count})
 
 
 @notifications_bp.get("/latest")
 def latest():
+    if not _notifications_enabled():
+        return jsonify([])
+
     # Only return notifications that are unread, or were read today.
     # Notifications marked read before start of today will no longer appear
     # in the dropdown.
@@ -81,6 +95,9 @@ def latest():
 @notifications_bp.post("/<int:notif_id>/read")
 @login_required
 def mark_read(notif_id: int):
+    if not _notifications_enabled():
+        return jsonify({"ok": True, "disabled": True})
+
     n = Notification.query.filter_by(
         id=notif_id, user_id=current_user.id
     ).first_or_404()
@@ -103,6 +120,9 @@ def mark_read(notif_id: int):
 @notifications_bp.post("/mark_all_read")
 @login_required
 def mark_all_read():
+    if not _notifications_enabled():
+        return jsonify({"ok": True, "disabled": True})
+
     # Mark all unread notifications for current user as read
     cfg = NotificationRetention.get()
     now = datetime.utcnow()

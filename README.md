@@ -43,7 +43,8 @@ Key capabilities:
   checklists, temporary cross-department coverage, coverage calendar search,
   and downloadable `.ics` exports
 - **Scalable notifications** with department-specific templates, backup
-  approver routing, and async fan-out for larger recipient groups
+  approver routing, admin-monitored department filtering, and async fan-out
+  for larger recipient groups
 - **Polished public sign-in** with clearer guest-path entry points and a more
   production-ready first impression for external users
 - **Command center** for users, departments, process flows, site config, integrations,
@@ -146,7 +147,7 @@ and default diff views.
    ```bash
    make smoke        # hit home, dashboard, and admin/site_config
    make smoke-clean  # erase local sqlite DB between runs
-  make test         # run pytest suite (currently 221 tests)
+  make test         # run pytest suite (currently 224 tests)
    ```
 
 6. **Clearing state**
@@ -181,7 +182,7 @@ and default diff views.
 
 8. **Tests**
    ```bash
-  make test          # runs full pytest suite (currently 221 tests)
+  make test          # runs full pytest suite (currently 224 tests)
   make test-postgres # start a temporary Postgres container and run the suite against it
    ```
 
