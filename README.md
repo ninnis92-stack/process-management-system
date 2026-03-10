@@ -20,7 +20,7 @@ lightweight Stimulus controllers for interactivity.
 
 ## Overview
 
-*Note: recent updates changed dark-mode behavior such that enabling dark mode disables personal vibe/theme controls. The navbar vibe button is removed and the theme selector is greyed out with a warning, but adopted brand presets now carry their accent palette into the app's native dark mode automatically. The navbar banner now keeps quotes in their own panel, with the vibe button rendered inside its own solid control shell so it stays visually separate and can disappear cleanly when disabled. If the global vibe feature toggle is turned off, the shell is removed while the quote banner remains in a quote-only layout. Shared action-shell styling is now used across the navbar, command center, and monitor views so controls can appear or disappear without breaking alignment. The old dark-mode-compatible subset preview UI was also removed so dark mode has a single, consistent presentation, and the broader dashboard/admin/login surfaces now use a cleaner solid-panel visual system instead of the older glassy treatment. Recent dashboard polish also toned down the launchpad accents so the Workspace overview eyebrow, badges, and queue counters now follow the same quieter theme language as surrounding cards rather than using a separate bright-blue treatment.*
+*Note: recent updates changed dark-mode behavior such that enabling dark mode disables personal vibe/theme controls. The navbar vibe button is removed and the theme selector is greyed out with a warning, but adopted brand presets now carry their accent palette into the app's native dark mode automatically. The navbar banner now keeps quotes in their own panel, with the vibe button rendered inside its own solid control shell so it stays visually separate and can disappear cleanly when disabled. If the global vibe feature toggle is turned off, the shell is removed while the quote banner remains in a quote-only layout. Shared action-shell styling is now used across the navbar, command center, and monitor views so controls can appear or disappear without breaking alignment. The old dark-mode-compatible subset preview UI was also removed so dark mode has a single, consistent presentation, and the broader dashboard/admin/login surfaces now use a cleaner solid-panel visual system instead of the older glassy treatment. Recent dashboard polish also toned down the launchpad accents so the Workspace overview eyebrow, badges, and queue counters now follow the same quieter theme language as surrounding cards rather than using a separate bright-blue treatment. The admin command center now also keeps a compact quick-route rail near the top of the page, letting operators jump between major sections while the existing search box collapses non-matching sections instead of leaving a long partially-empty page.*
 
 This prototype supports structured intake forms, multi‑step process flows, and an
 extensible admin interface.  Admins can build custom request templates,
@@ -48,7 +48,8 @@ Key capabilities:
 - **Polished public sign-in** with clearer guest-path entry points and a more
   production-ready first impression for external users
 - **Command center** for users, departments, process flows, site config, integrations,
-  guest request forms, feature flags, and more
+  guest request forms, feature flags, and more, now with a sticky quick-route bar,
+  section jump links, and section-aware search that collapses unrelated groups as you type
 - **Smarter navigation**: the client adds prefetch hints for hovered links so
   subsequent clicks feel faster without requiring any backend changes.
 - **Field verification** powered by third‑party tracker integrations

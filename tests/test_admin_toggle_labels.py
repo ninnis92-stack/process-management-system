@@ -146,6 +146,7 @@ def test_feature_flags_autosave_support(client, app):
     assert b"beforeunload" in base.data
     assert b"keepalive" in base.data
     assert b"form:autosaved" in base.data
+    assert b"card.classList.toggle('active', cb.checked);" in base.data
 
 
 def test_feature_flags_json_autosave_updates(client, app):
@@ -173,6 +174,31 @@ def test_feature_flags_json_autosave_updates(client, app):
         assert flags.vibe_enabled is True
         assert flags.enable_nudges is False
         assert flags.guest_submission_enabled is False
+
+
+def test_feature_flags_json_autosave_handles_string_booleans(client, app):
+    make_admin(app)
+    with app.app_context():
+        flags = FeatureFlags.get()
+        flags.enable_notifications = True
+        flags.guest_dashboard_enabled = True
+        db.session.commit()
+
+    rv = login_admin(client)
+    assert rv.status_code == 200
+    rv = client.post(
+        "/admin/feature_flags",
+        json={"enable_notifications": "false", "guest_dashboard_enabled": "0"},
+    )
+    assert rv.status_code == 200
+    payload = rv.get_json()
+    assert payload["flags"]["enable_notifications"] is False
+    assert payload["flags"]["guest_dashboard_enabled"] is False
+
+    with app.app_context():
+        flags = FeatureFlags.get()
+        assert flags.enable_notifications is False
+        assert flags.guest_dashboard_enabled is False
 
 
 def test_feature_flags_fallback_defaults_keep_vibe_enabled(app, monkeypatch):
@@ -227,6 +253,7 @@ def test_dashboard_notification_toggle(client, app):
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
     assert "Notifications off" in html
+    assert "admin-toggle-card--neutral" in html
 
     rv = client.post("/admin/toggle_notifications", follow_redirects=True)
     assert rv.status_code == 200
@@ -235,7 +262,8 @@ def test_dashboard_notification_toggle(client, app):
     html = rv.get_data(as_text=True)
     assert "Notifications on" in html
     # active class should be applied when flag is enabled
-    assert 'admin-toggle-card active' in html
+    assert 'admin-toggle-card--neutral' in html
+    assert 'admin-toggle-card--neutral active' in html
 
 
 def test_notifications_endpoints_respect_disabled_flag(client, app):

@@ -76,6 +76,17 @@ def _submitted_checkbox_enabled(field_name: str) -> bool:
     raw = (flask_request.form.get(field_name) or "").strip().lower()
     return raw not in ("", "0", "false", "off", "no")
 
+
+def _coerce_checkbox_like_value(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    raw = str(value).strip().lower()
+    return raw not in ("", "0", "false", "off", "no", "null", "none")
+
 # Load auxiliary handlers to keep this file from growing even more.
 # Load auxiliary handlers to keep this file from growing even more.
 # ``tenants`` and ``users`` must be imported after ``admin_bp`` is defined so the
@@ -1669,7 +1680,7 @@ def feature_flags():
         ):
             if field in data:
                 try:
-                    setattr(flags, field, bool(data[field]))
+                    setattr(flags, field, _coerce_checkbox_like_value(data[field]))
                 except Exception:
                     pass
         try:

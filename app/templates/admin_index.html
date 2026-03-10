@@ -77,12 +77,35 @@
   <section class="surface-panel surface-panel-muted admin-quicksearch">
     <div class="admin-quicksearch__toolbar">
       <input id="adminQuickSearch" class="form-control" placeholder="Search admin tiles or helpers" />
-      <span class="text-muted small">Filters as you type—tabs and cards stay contextual.</span>
+      <button type="button" class="btn btn-sm btn-outline-secondary admin-quicksearch__clear" id="adminQuickSearchClear" hidden>Clear</button>
+      <span class="text-muted small" id="adminQuickSearchStatus">Filters as you type. Sections collapse automatically when nothing matches.</span>
     </div>
   </section>
 
+  <section class="surface-panel admin-command-rail" aria-label="Command center shortcuts">
+    <div class="admin-command-rail__header">
+      <div>
+        <p class="eyebrow-label">Quick route</p>
+        <h2 class="admin-command-rail__title">Keep the command center within reach while you scroll.</h2>
+      </div>
+      <span class="admin-command-rail__meta">Jump between sections or narrow the page with search.</span>
+    </div>
+    <div class="admin-command-rail__actions">
+      <a class="admin-command-pill" href="#admin-section-configuration">Configuration</a>
+      <a class="admin-command-pill" href="#admin-section-flow">Process flow</a>
+      <a class="admin-command-pill" href="#admin-section-utilities">Utilities</a>
+      <a class="admin-command-pill" href="#admin-section-foundation">SaaS foundation</a>
+    </div>
+  </section>
+
+  <div class="surface-panel surface-panel-muted admin-search-empty-state" id="adminSearchEmptyState" hidden>
+    <p class="eyebrow-label">No matches</p>
+    <h3 class="admin-search-empty-state__title">No command-center cards matched that search.</h3>
+    <p class="mb-0 text-muted">Try a broader keyword like users, workflows, notifications, or monitor.</p>
+  </div>
+
   <div class="admin-dashboard-panels">
-    <section class="surface-panel admin-section-panel">
+    <section class="surface-panel admin-section-panel" id="admin-section-configuration" data-admin-section>
       <div class="admin-section__header">
         <div>
           <p class="eyebrow-label">Configuration</p>
@@ -124,7 +147,7 @@
       </div>
     </section>
 
-    <section class="surface-panel admin-section-panel">
+    <section class="surface-panel admin-section-panel" id="admin-section-flow" data-admin-section>
       <div class="admin-section__header">
         <div>
           <p class="eyebrow-label">Process flow &amp; status</p>
@@ -151,7 +174,7 @@
       </div>
     </section>
 
-    <section class="surface-panel admin-section-panel">
+    <section class="surface-panel admin-section-panel" id="admin-section-utilities" data-admin-section>
       <div class="admin-section__header">
         <div>
           <p class="eyebrow-label">Utilities</p>
@@ -165,7 +188,7 @@
           <div class="tile-title">Switch department</div>
           <div class="tile-sub">Change the department context for your current session.</div>
         </a>
-        <form method="post" action="{{ url_for('admin.toggle_notifications') }}" class="admin-tile admin-card admin-toggle-card{% if flags.enable_notifications %} active{% endif %} p-0 m-0" style="display:inline-block;">
+        <form method="post" action="{{ url_for('admin.toggle_notifications') }}" class="admin-tile admin-card admin-toggle-card admin-toggle-card--neutral{% if flags.enable_notifications %} active{% endif %} p-0 m-0" style="display:inline-block;">
           <button type="submit" class="btn w-100 h-100 p-0">
             <div class="tile-ico"><i class="fas fa-bell"></i></div>
             <div class="tile-title">Notifications {{ 'on' if flags.enable_notifications else 'off' }}</div>
@@ -195,7 +218,7 @@
       </div>
     </section>
 
-    <section class="surface-panel admin-section-panel">
+    <section class="surface-panel admin-section-panel" id="admin-section-foundation" data-admin-section>
       <div class="admin-section__header">
         <div>
           <p class="eyebrow-label">SaaS foundation</p>

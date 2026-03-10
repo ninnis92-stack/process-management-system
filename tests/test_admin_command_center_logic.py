@@ -73,6 +73,20 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
     assert "First admin pass" in html
     assert "Model the route" in html
     assert "Publish the workspace" in html
+    assert "Keep the command center within reach while you scroll." in html
+    assert 'id="admin-section-configuration"' in html
+    assert 'id="admin-section-flow"' in html
+    assert 'id="admin-section-utilities"' in html
+    assert 'id="admin-section-foundation"' in html
+    assert 'id="adminQuickSearchClear"' in html
+    assert 'id="adminSearchEmptyState"' in html
+    for anchor in (
+        '#admin-section-configuration',
+        '#admin-section-flow',
+        '#admin-section-utilities',
+        '#admin-section-foundation',
+    ):
+        assert f'href="{anchor}"' in html
 
     urls = set(CARD_URL_RE.findall(html))
     expected_urls = {

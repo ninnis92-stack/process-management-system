@@ -28,9 +28,9 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" integrity="sha512-p1Cm0QlW0FQvgw+Vxv0+H5a6uVgnF6V5u0Y2dd4AozqA3BsnF7mk/WvJL3Z8zUuNX1U4MZT+O2e2d3dH+pvGVHg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <!-- bump version after latest CSS changes to force clients to fetch new stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260309d') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260310b') }}">
   <!-- bundled frontend assets (built by Vite/ES modules) -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css', v='20260309d') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css', v='20260310a') }}">
   {% if active_theme_css %}
     <script id="active-theme-css-data" type="application/json">{{ active_theme_css|tojson }}</script>
     <script>
@@ -122,7 +122,7 @@
         <ul class="navbar-nav ms-3 me-auto mb-2 mb-lg-0">
           {% if current_user.is_authenticated %}
             {% if current_user.is_admin %}
-              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin') else '' }}" href="{{ url_for('admin.index') }}"><i class="fas fa-cogs" aria-hidden="true"></i><span class="visually-hidden">Admin</span></a></li>
+              <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin') else '' }}" href="{{ url_for('admin.index') }}"><i class="fas fa-cogs me-1" aria-hidden="true"></i><span>Admin</span></a></li>
             {% else %}
               <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('requests.dashboard') else '' }}" href="{{ url_for('requests.dashboard') }}">Dashboard</a></li>
             {% endif %}
@@ -415,7 +415,7 @@
   <script id="rolling-quotes-data" type="application/json" defer>{{ rolling_quotes|tojson }}</script>
   {% endif %}
   <script type="module" src="{{ url_for('static', filename='dist/app.js', v='20260308c') }}" defer></script>
-  <script src="{{ url_for('static', filename='app.js', v='20260309d') }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260310a') }}" defer></script>
   <script>
     (function(){
       try{
@@ -529,6 +529,10 @@
     (function(){
       const input = document.getElementById('adminQuickSearch');
       const cards = Array.from(document.querySelectorAll('.admin-card'));
+      const sections = Array.from(document.querySelectorAll('[data-admin-section]'));
+      const clearBtn = document.getElementById('adminQuickSearchClear');
+      const status = document.getElementById('adminQuickSearchStatus');
+      const emptyState = document.getElementById('adminSearchEmptyState');
       if (cards.length) {
         cards.forEach(card => {
           card.style.cursor = 'pointer';
@@ -557,24 +561,58 @@
           });
         });
       }
+      function syncSections(){
+        let visibleCards = 0;
+        sections.forEach(section => {
+          const sectionCards = Array.from(section.querySelectorAll('.admin-card'));
+          const visibleInSection = sectionCards.filter(card => !card.classList.contains('hidden-by-filter')).length;
+          section.hidden = visibleInSection === 0;
+          visibleCards += visibleInSection;
+        });
+        if (emptyState) emptyState.hidden = visibleCards !== 0;
+        return visibleCards;
+      }
+      function resetFilterState(){
+        cards.forEach(c => c.classList.remove('hidden-by-filter'));
+        sections.forEach(section => { section.hidden = false; });
+        if (clearBtn) clearBtn.hidden = true;
+        if (status) status.textContent = 'Filters as you type. Sections collapse automatically when nothing matches.';
+        if (emptyState) emptyState.hidden = true;
+      }
+      if (clearBtn && input) {
+        clearBtn.addEventListener('click', function(){
+          input.value = '';
+          resetFilterState();
+          input.focus();
+        });
+      }
       if (!input) return;
       input.addEventListener('input', function(){
         const q = (input.value || '').trim().toLowerCase();
         if (!q) {
-          cards.forEach(c => c.classList.remove('hidden-by-filter'));
+          resetFilterState();
           return;
         }
         cards.forEach(c => {
           const text = (c.textContent || '').toLowerCase();
           if (text.indexOf(q) === -1) c.classList.add('hidden-by-filter'); else c.classList.remove('hidden-by-filter');
         });
+        const visibleCards = syncSections();
+        if (clearBtn) clearBtn.hidden = false;
+        if (status) {
+          status.textContent = visibleCards
+            ? 'Showing ' + visibleCards + ' matching command-center card' + (visibleCards === 1 ? '' : 's') + '.'
+            : 'No command-center cards matched that search.';
+        }
       });
+      resetFilterState();
     })();
   </script>
   <!-- dynamic toggle labels -->
   <script>
     document.querySelectorAll('.form-check-input[data-toggle-text-checked]').forEach(cb=>{
       var form = cb.closest('.form-check');
+      var card = cb.closest('.admin-toggle-card');
       var lbl = form && form.querySelector('.form-check-label');
       if (lbl == null) return;
       var checkedLabel = cb.dataset.toggleTextChecked;
@@ -582,6 +620,7 @@
       var upd = ()=> {
         lbl.textContent = cb.checked ? checkedLabel : uncheckedLabel;
         form.classList.toggle('active', cb.checked);
+        if (card) card.classList.toggle('active', cb.checked);
       };
       cb.addEventListener('change', upd);
       upd();
