@@ -21,7 +21,7 @@ jobs:
       ADMIN_PASSWORD: ${{ secrets['PRODUCTION_ADMIN_PASSWORD'] || 'admin123' }}
       WEBHOOK_SHARED_SECRET: ${{ secrets['WEBHOOK_SHARED_SECRET'] }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
