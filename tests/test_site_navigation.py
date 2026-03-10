@@ -75,34 +75,54 @@ def test_public_navigation_links_resolve(client):
         assert not location.endswith("/static/app.js"), route
 
 
-def test_login_page_no_longer_shows_rolling_quote_banner(client, app):
-    # The login page (and any page) should not render a rolling-quote banner
-    # under the navbar.  Quotes are now injected only inside the nav element.
+def test_login_page_shows_motivational_quotes_by_default(client, app):
+    # The login page should always show motivational quotes in the navbar
+    # banner even when the admin has globally disabled rolling quotes.
+    # Custom admin-configured quote sets should not appear (we use the
+    # default motivational set so the login experience is always positive).
+    unique_custom_quote = "UNIQUE_CUSTOM_QUOTE_NOT_IN_MOTIVATIONAL_XYZ999"
     with app.app_context():
         cfg = SiteConfig.get()
         cfg.rolling_quotes_enabled = False
-        cfg.rolling_quotes = ["Progress, not perfection."]
+        cfg.rolling_quotes = [unique_custom_quote]
         cfg.banner_html = ''
+        cfg.logo_filename = None
+        cfg.theme_preset = 'default'
         db.session.add(cfg)
         db.session.commit()
 
     rv = client.get("/auth/login")
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
-    assert "Progress, not perfection." not in html
+    # The admin's custom non-motivational quote should NOT appear
+    assert unique_custom_quote not in html
+    # Banner text should still not appear (banner_html is empty)
     assert "Banner text" not in html
+    # At least one motivational quote should appear in the navbar
+    from app.models import SiteConfig as SC
+    motivational_quotes = SC.DEFAULT_QUOTE_SETS.get("motivational", [])
+    assert any(q in html for q in motivational_quotes), (
+        "Login page should always show at least one motivational quote"
+    )
 
     with app.app_context():
         cfg = SiteConfig.get()
         cfg.rolling_quotes_enabled = True
+        cfg.rolling_quotes = [unique_custom_quote]
         db.session.add(cfg)
         db.session.commit()
 
     rv = client.get("/auth/login")
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
-    assert "Progress, not perfection." not in html.split('<script')[0]
-    assert "Banner text" not in html.split('<script')[0]
+    # Custom quote still should not appear in the rendered HTML
+    assert unique_custom_quote not in html
+    # Motivational quotes should appear in the HTML (the nav area renders them)
+    from app.models import SiteConfig as SC
+    motivational_quotes = SC.DEFAULT_QUOTE_SETS.get("motivational", [])
+    assert any(q in html for q in motivational_quotes), (
+        "Login page should contain a motivational quote"
+    )
 
 
 def test_login_page_hides_quotes_when_external_branding_present(client, app):

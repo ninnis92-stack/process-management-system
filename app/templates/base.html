@@ -78,7 +78,7 @@
           {% endif %}
           <div class="brand-copy">
             <div class="brand-title">{{ site_brand_name or 'FreshProcess' }}</div>
-            <div class="brand-kicker">Process workspace</div>
+            <div class="brand-kicker">{% if current_user.is_authenticated %}Process workspace{% elif ep.startswith('external.') %}Guest portal{% else %}Request portal{% endif %}</div>
           </div>
         </a>
         {% if show_brand_banner %}
@@ -375,6 +375,7 @@
     {% endif %}
   </main>
 
+  {% if current_user.is_authenticated %}
   <!-- Department chooser modal (auto-shown for users with multiple departments) -->
   <div class="modal fade" id="chooseDeptModal" tabindex="-1" aria-labelledby="chooseDeptLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -397,6 +398,7 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
   <!-- User state provided via data attributes on <body> to avoid JS parser diagnostics in templates -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
@@ -413,6 +415,7 @@
       }catch(e){}
     })();
   </script>
+  {% if current_user.is_authenticated %}
   <script>
     (function(){
       try{
@@ -464,6 +467,20 @@
       }
     }
   </script>
+  {% else %}
+  <script>
+    function copyTextFromString(text, btn) {
+      try {
+        navigator.clipboard.writeText(String(text));
+        var orig = btn.innerText;
+        btn.innerText = 'Copied';
+        setTimeout(() => btn.innerText = orig, 1500);
+      } catch (e) {
+        console.warn('Copy failed', e);
+      }
+    }
+  </script>
+  {% endif %}
   <!-- cleanup any stray backdrops that might linger from unfinished modals/offcanvas or page-cache restores -->
   <script>
     function removeAllBackdrops(){

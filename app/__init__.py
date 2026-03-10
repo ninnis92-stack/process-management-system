@@ -510,12 +510,20 @@ def create_app():
                 if (
                     not current_user.is_authenticated
                     and request.endpoint == "auth.login"
-                    and rolling_quotes_enabled
+                    and not external_theme_loaded
                 ):
-                    rolling_quotes = SiteConfig.DEFAULT_QUOTE_SETS.get(
+                    # Always show motivational quotes on the login screen so
+                    # new visitors see encouraging copy even when the global
+                    # rolling-quotes feature is disabled by an admin.  Skip
+                    # when external branding is loaded so imported brand
+                    # identities are not mixed with FreshProcess copy.
+                    login_quotes = SiteConfig.DEFAULT_QUOTE_SETS.get(
                         "motivational",
                         [],
                     )
+                    if login_quotes:
+                        rolling_quotes = login_quotes
+                        rolling_quotes_enabled = True
             except Exception:
                 pass
 

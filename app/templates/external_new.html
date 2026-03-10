@@ -153,40 +153,48 @@
         {{ form.due_at(class="form-control", type="datetime-local") }}
       </div>
 
-      <div class="row">
-        <div class="col-md-4 mb-3">{{ form.request_type(class="form-select") }}</div>
-        <div class="col-md-4 mb-3">{{ form.priority(class="form-select") }}</div>
-        <div class="col-md-4 mb-3">{{ form.pricebook_status(class="form-select") }}</div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Sales list reference</label>
-        {{ form.sales_list_reference(class="form-control") }}
-        <div class="form-text">If you selected "On the sales list", provide the sales list SKU or reference.</div>
-      </div>
-
-      <div class="row">
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Donor Part Number</label>
-            {{ form.donor_part_number(class="form-control") }}
-        </div>
-
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Target Part Number</label>
-            {{ form.target_part_number(class="form-control") }}
-            <div class="form-text">Required for Method.</div>
-        </div>
-
-        <div class="col-md-6 mb-3">
-            <label class="form-label">If no donor, reason</label>
-            {{ form.no_donor_reason(class="form-select") }}
-            <div class="form-text">Only valid for Part Number requests when the part number needs to be created.</div>
-        </div>
-      </div>
-
       <div class="mb-3">
         <label class="form-label">Description (optional)</label>
         {{ form.description(class="form-control", rows="6", placeholder="Add background, expected outcome, and any links or context the team should know.") }}
       </div>
+
+      <details class="advanced-request-details mb-3"{% if form.errors %} open{% endif %}>
+        <summary class="advanced-request-details__toggle">
+          <span class="advanced-request-details__label">Advanced details</span>
+          <span class="advanced-request-details__hint text-muted small">Request type, priority, part numbers, and sales list fields — most guests can leave these at their defaults.</span>
+        </summary>
+        <div class="advanced-request-details__body mt-3">
+          <div class="row">
+            <div class="col-md-4 mb-3">{{ form.request_type(class="form-select") }}</div>
+            <div class="col-md-4 mb-3">{{ form.priority(class="form-select") }}</div>
+            <div class="col-md-4 mb-3">{{ form.pricebook_status(class="form-select") }}</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Sales list reference</label>
+            {{ form.sales_list_reference(class="form-control") }}
+            <div class="form-text">If you selected "On the sales list", provide the sales list SKU or reference.</div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Donor Part Number</label>
+                {{ form.donor_part_number(class="form-control") }}
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Target Part Number</label>
+                {{ form.target_part_number(class="form-control") }}
+                <div class="form-text">Required for Method.</div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <label class="form-label">If no donor, reason</label>
+                {{ form.no_donor_reason(class="form-select") }}
+                <div class="form-text">Only valid for Part Number requests when the part number needs to be created.</div>
+            </div>
+          </div>
+        </div>
+      </details>
 
       <div class="form-actions-bar">
         <div class="small text-muted">After submission, a tracking link will be shown so the request can be viewed again without signing in.</div>

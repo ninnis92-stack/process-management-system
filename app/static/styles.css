@@ -2232,6 +2232,53 @@ button.admin-tile {
   width: min(100%, 480px);
 }
 
+/* Collapsible "Advanced details" section in the guest submission form */
+.advanced-request-details {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2, #f4f7fb);
+  padding: 0;
+  overflow: hidden;
+}
+.advanced-request-details[open] {
+  padding-bottom: 1rem;
+}
+.advanced-request-details__toggle {
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  user-select: none;
+}
+.advanced-request-details__toggle::-webkit-details-marker {
+  display: none;
+}
+.advanced-request-details__toggle::before {
+  content: '▶';
+  font-size: 0.65rem;
+  color: var(--muted, #64748b);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+  margin-top: 0.05em;
+}
+.advanced-request-details[open] > .advanced-request-details__toggle::before {
+  transform: rotate(90deg);
+}
+.advanced-request-details__label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--body-text, #132033);
+}
+.advanced-request-details__hint {
+  font-size: 0.8rem;
+}
+.advanced-request-details__body {
+  padding: 0 1rem;
+}
+
 .request-detail-table th,
 .request-detail-table td {
   vertical-align: top;
