@@ -152,7 +152,28 @@ and default diff views.
    - In dev, simply delete the SQLite file under `instance/app.db` or remove Docker volumes.
    - For production, use `flask db downgrade base` or `python scripts/clear_db.py` (not included) to
      reset.  The `flask clear-open-requests` CLI command can close all active work items.
+6. **Deployment & smoke workflow**
+   After you've pushed changes to `main` and are ready to deploy, the repository provides
+a helper that runs tests, pushes your branch, and triggers a Fly.io deployment:
+   ```bash
+   make deploy-safe       # runs tests, git push, and flyctl deploy
+   ```
+   Set `FLY_APP` in your environment or `fly.toml` if not already configured.
 
+   Once the new release is live, run the basic smoke script against the target URL:
+   ```bash
+   ./scripts/smoke_test.sh https://your-app.fly.dev
+   ```
+   For staging environments the `scripts/clear_smoke_remote.py` helper logs in as the
+   seeded admin and posts to `/admin/debug/cleanup` to remove test records:
+   ```bash
+   python scripts/clear_smoke_remote.py --url https://your-app.fly.dev
+   ```
+   These steps are also documented in `docs/STAGING.md` under the existing checklist.
+
+   When hosting locally you can still exercise everything with `make run` and
+   `make smoke`/`make smoke-clean` as described above.  The `make deploy` target
+   simply does `git push` and `flyctl deploy -a $(FLY_APP)`.
 5. **Tests**
    ```bash
   make test          # runs full pytest suite (currently 215 tests)
