@@ -935,6 +935,8 @@ body.theme-preset-twilight:not(.dark-mode) {
 }
 .brand-banner-row--quotes-only .brand-banner-row__quote-panel {
   flex: 1 1 100%;
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
 }
 .brand-banner-row__content {
   min-width: 0;
@@ -942,10 +944,13 @@ body.theme-preset-twilight:not(.dark-mode) {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 0.18rem;
+  gap: 0.32rem;
   flex: 1 1 auto;
   width: 100%;
   overflow: hidden;
+}
+.brand-banner-row--quotes-only .brand-banner-row__content {
+  gap: 0.42rem;
 }
 .brand-banner-row__control-panel {
   flex: 0 0 auto;
@@ -978,6 +983,8 @@ body.theme-preset-twilight:not(.dark-mode) {
   letter-spacing: 0.14em;
   color: #52627a;
   font-weight: 700;
+  line-height: 1.15;
+  flex: 0 0 auto;
 }
 .brand-quote { 
   font-size: 0.86rem;
@@ -1004,7 +1011,7 @@ body.theme-preset-twilight:not(.dark-mode) {
 #motivation {
   display: inline-block;
   white-space: normal;
-  line-height: 1.25;
+  line-height: 1.32;
   max-width: 100%;
   overflow: hidden;
   pointer-events: auto;
@@ -1023,6 +1030,10 @@ body.theme-preset-twilight:not(.dark-mode) {
   -webkit-box-orient: vertical;
   line-clamp: 3;
   -webkit-line-clamp: 3;
+}
+
+.brand-banner-row--quotes-only #motivation {
+  min-height: 0;
 }
 
 /* Keep the navbar stable regardless of quote length; allow small flex so
