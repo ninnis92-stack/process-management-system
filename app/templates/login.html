@@ -24,9 +24,17 @@
     <div class="login-hero__aside">
       <div class="login-hero__aside-card">
         <div class="small text-uppercase text-muted fw-semibold mb-2">Quick paths</div>
-        <a class="btn btn-primary w-100 mb-2" href="{{ url_for('external.external_dashboard') }}">Open Guest Dashboard</a>
-        <a class="btn btn-outline-primary w-100" href="{{ url_for('external.external_new') }}">Start Guest Submission</a>
-        <div class="small text-muted mt-3">Need internal access? Use the department-linked account that owns your saved work and approval rights.</div>
+        {% if guest_dashboard_enabled %}
+          <a class="btn btn-primary w-100 mb-2" href="{{ url_for('external.external_dashboard') }}">Open Guest Dashboard</a>
+        {% endif %}
+        {% if guest_submission_enabled %}
+          <a class="btn btn-outline-primary w-100{% if guest_dashboard_enabled %} mb-0{% endif %}" href="{{ url_for('external.external_new') }}">Start Guest Submission</a>
+        {% endif %}
+        {% if not guest_dashboard_enabled and not guest_submission_enabled %}
+          <div class="small text-muted">Guest access is currently disabled by your administrator. Use an internal account for staff workflows.</div>
+        {% else %}
+          <div class="small text-muted mt-3">Need internal access? Use the department-linked account that owns your saved work and approval rights.</div>
+        {% endif %}
       </div>
     </div>
   </section>
@@ -68,7 +76,15 @@
           <button class="btn btn-primary w-100">Sign in with email</button>
         </form>
         <div class="login-form-panel__footer small text-muted">
-          Looking for a guest-facing experience instead? Use <a href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a> to track or <a href="{{ url_for('external.external_new') }}">Guest Submit</a> to open a new external request.
+          {% if guest_dashboard_enabled and guest_submission_enabled %}
+            Looking for a guest-facing experience instead? Use <a href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a> to track or <a href="{{ url_for('external.external_new') }}">Guest Submit</a> to open a new external request.
+          {% elif guest_dashboard_enabled %}
+            Looking for a guest-facing experience instead? Use <a href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a> to track an existing external request.
+          {% elif guest_submission_enabled %}
+            Looking for a guest-facing experience instead? Use <a href="{{ url_for('external.external_new') }}">Guest Submit</a> to open a new external request.
+          {% else %}
+            Guest access is currently unavailable. Sign in with an internal account to continue.
+          {% endif %}
         </div>
       </section>
     </div>
@@ -91,7 +107,13 @@
           <div class="helper-card__icon" aria-hidden="true">🧭</div>
           <div>
             <div class="helper-card__title">Guest access stays separate</div>
-            <div class="helper-card__text">External request tracking is still available from the Guest Dashboard in the top navigation.</div>
+            <div class="helper-card__text">
+              {% if guest_dashboard_enabled or guest_submission_enabled %}
+                External request flows stay separate from staff-only pages and appear only where guest access is enabled.
+              {% else %}
+                Guest-facing pages are currently disabled, so all request management stays inside the authenticated workspace.
+              {% endif %}
+            </div>
           </div>
         </div>
         <div class="helper-card">

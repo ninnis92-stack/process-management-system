@@ -11,7 +11,7 @@
 <section class="helper-grid mb-3">
   {{ helper_card('Submit without an internal account', 'Guest intake is designed for external collaborators, vendors, or requesters who should not sign in.', '🌐') }}
   {{ helper_card('Start with the owning department', 'Most guests only need to choose the team that should receive the request first. The extra routing options below are optional.', '🧭') }}
-  {{ helper_card('A tracking link is shown after submission', 'Save the confirmation link or request number so you can check status later.', '✅') }}
+  {{ helper_card('After submission', 'Save the confirmation link or request number so you can check status later.' if guest_dashboard_enabled else 'Save the request number shown after submission. Guest tracking pages are currently unavailable.', '✅') }}
 </section>
 <section class="surface-panel guest-form-shell {{ 'layout-' + selected_guest_form.layout if selected_guest_form and selected_guest_form.layout else '' }}" id="externalFormShell">
     <form method="post">

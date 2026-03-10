@@ -54,11 +54,14 @@
  </head>
  {% set ep = request.endpoint or '' %}
  {% set public_entry_screen = ep in ['auth.login', 'external.external_new', 'external.external_dashboard'] %}
+ {% set guest_dashboard_available = guest_dashboard_enabled|default(True) %}
+ {% set guest_submission_available = guest_submission_enabled|default(True) %}
  {% set global_no_vibe = (not FeatureFlags.get().vibe_enabled) %}
  {% set dark_mode_active = current_user.is_authenticated and (current_user.dark_mode or False) %}
  {% set vibe_ui_enabled = current_user.is_authenticated and FeatureFlags.get().vibe_enabled and not external_theme_loaded and not dark_mode_active %}
  {% set show_brand_banner = (rolling_quotes_enabled or vibe_ui_enabled) and not public_entry_screen %}
- <body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if dark_mode_active %} dark-mode{% endif %}{% if global_no_vibe %} no-vibe{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-endpoint="{{ ep }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if dark_mode_active else '0' }}" data-user-is-admin="{{ '1' if current_user.is_authenticated and current_user.is_admin else '0' }}">
+ {% set no_brand_banner = (not show_brand_banner) and (not public_entry_screen) %}
+ <body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if dark_mode_active %} dark-mode{% endif %}{% if global_no_vibe %} no-vibe{% endif %}{% if no_brand_banner %} no-brand-banner{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-endpoint="{{ ep }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if dark_mode_active else '0' }}" data-user-is-admin="{{ '1' if current_user.is_authenticated and current_user.is_admin else '0' }}">
   <a href="#content" class="skip-link">Skip to content</a>
 
   <nav class="navbar theme-nav navbar-expand-lg navbar-dark">
@@ -130,8 +133,12 @@
               <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('admin.guest_forms') else '' }}" href="{{ url_for('admin.list_guest_forms') }}">Guest Request Forms</a></li>
             {% endif %}
           {% endif %}
-          <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('external.external_dashboard') else '' }}" href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('external.external_new') else '' }}" href="{{ url_for('external.external_new') }}">Guest Submit</a></li>
+          {% if guest_dashboard_available %}
+            <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('external.external_dashboard') else '' }}" href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a></li>
+          {% endif %}
+          {% if guest_submission_available %}
+            <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('external.external_new') else '' }}" href="{{ url_for('external.external_new') }}">Guest Submit</a></li>
+          {% endif %}
         </ul>
 
         <div class="d-flex align-items-center nav-actions gap-2">
@@ -320,7 +327,17 @@
                       <li>Post attachments, watch OCR text populate, and keep status updates honest.</li>
                       <li>Share tracking links or notifications straight from this canvas.</li>
                     </ul>
-                    <a class="hero-callout-card__link btn btn-sm btn-outline-primary" data-hero-toggle="dashboard" data-state-open-label="{{ 'Open staff dashboard' if current_user.is_authenticated else 'Open guest dashboard' }}" data-state-close-label="{{ 'Close staff dashboard' if current_user.is_authenticated else 'Close guest dashboard' }}" data-state-open-url="{{ url_for('requests.dashboard') if current_user.is_authenticated else url_for('external.external_dashboard') }}" data-state-close-url="{{ url_for('admin.index') if current_user.is_authenticated else url_for('external.external_new') }}" href="{{ url_for('requests.dashboard') if current_user.is_authenticated else url_for('external.external_dashboard') }}">{{ 'Open staff dashboard' if current_user.is_authenticated else 'Open guest dashboard' }}</a>
+                    {% if current_user.is_authenticated %}
+                      <a class="hero-callout-card__link btn btn-sm btn-outline-primary" data-hero-toggle="dashboard" data-state-open-label="Open staff dashboard" data-state-close-label="Close staff dashboard" data-state-open-url="{{ url_for('requests.dashboard') }}" data-state-close-url="{{ url_for('admin.index') }}" href="{{ url_for('requests.dashboard') }}">Open staff dashboard</a>
+                    {% elif guest_dashboard_available or guest_submission_available %}
+                      {% set guest_open_url = url_for('external.external_dashboard') if guest_dashboard_available else url_for('external.external_new') %}
+                      {% set guest_close_url = url_for('external.external_new') if guest_submission_available else url_for('auth.login') %}
+                      {% set guest_open_label = 'Open guest dashboard' if guest_dashboard_available else 'Open guest submission' %}
+                      {% set guest_close_label = 'Close guest dashboard' if guest_dashboard_available else 'Close guest submission' %}
+                      <a class="hero-callout-card__link btn btn-sm btn-outline-primary" data-hero-toggle="dashboard" data-state-open-label="{{ guest_open_label }}" data-state-close-label="{{ guest_close_label }}" data-state-open-url="{{ guest_open_url }}" data-state-close-url="{{ guest_close_url }}" href="{{ guest_open_url }}">{{ guest_open_label }}</a>
+                    {% else %}
+                      <span class="hero-callout-card__link btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Guest access unavailable</span>
+                    {% endif %}
                   </article>
                 </div>
               </section>
@@ -341,7 +358,7 @@
             {% endif %}
           {% endwith %}
 
-          {% if tracking_link and created_req %}
+          {% if created_req and tracking_link %}
             <div class="mb-3">
               <div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
                 <div class="me-3 d-flex flex-column" style="min-width:0; max-width:72%;">
@@ -360,6 +377,13 @@
                   <a class="btn btn-sm btn-outline-light text-dark" href="{{ tracking_link }}" target="_blank" rel="noopener">Open Guest View</a>
                   <button class="btn btn-sm btn-light text-dark" type="button" onclick="copyTextFromString('{{ tracking_link }}', this)" aria-label="Copy tracking link">Copy</button>
                 </div>
+              </div>
+            </div>
+          {% elif created_req %}
+            <div class="mb-3">
+              <div class="alert alert-success" role="alert">
+                <strong>Request #{{ created_req.id }}</strong> was submitted with {{ created_req.guest_email or 'the provided email' }}.
+                <div class="small text-muted mt-1">Guest tracking pages are currently disabled, so no public tracking link was generated.</div>
               </div>
             </div>
           {% endif %}

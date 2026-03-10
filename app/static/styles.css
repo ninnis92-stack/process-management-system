@@ -881,11 +881,17 @@ body.theme-preset-twilight:not(.dark-mode) {
   justify-content: center;
 }
 
+body.no-brand-banner .brand-cluster {
+  gap: 0.35rem;
+}
+
 .brand-stack { flex-direction: row !important; align-items: center !important; gap: 10px !important; position: relative; z-index: 2; }
 .brand-copy {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  overflow: visible;
+  padding-block: 0.12rem;
 }
 .brand-kicker {
   font-size: 0.72rem;
@@ -893,6 +899,8 @@ body.theme-preset-twilight:not(.dark-mode) {
   letter-spacing: 0.16em;
   color: rgba(255, 255, 255, 0.68);
   margin-top: 0.28rem;
+  line-height: 1.25;
+  white-space: normal;
 }
 .brand-title { 
   font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
@@ -1051,8 +1059,8 @@ body.theme-preset-twilight:not(.dark-mode) {
 .theme-nav .navbar-brand {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 360px;
-  overflow: hidden;
+  max-width: 420px;
+  overflow: visible;
   margin-right: 0;
 }
 
@@ -1076,6 +1084,14 @@ body.theme-preset-twilight:not(.dark-mode) {
   margin-left: 1rem; /* small gap from the left-side content */
   min-width: 0;
   justify-content: flex-end;
+}
+
+body.no-brand-banner .nav-actions {
+  margin-left: 0.5rem;
+}
+
+body.no-brand-banner .theme-nav .navbar-brand {
+  max-width: 420px;
 }
 
 .nav-actions > * {

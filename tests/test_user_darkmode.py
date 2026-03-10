@@ -98,6 +98,7 @@ def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
         css = f.read()
     assert '.brand-stack' in css and 'z-index: 2' in css
     assert '.brand-banner-row' in css and 'margin-left: 0.5rem' in css
+    assert '.brand-kicker' in css and 'line-height: 1.25' in css
     assert '.brand-banner-row__control-shell' in css
     assert '.ui-control-shell--banner' in css
     # the button background now uses color-mix for readability
@@ -176,6 +177,30 @@ def test_settings_page_disables_theme_when_vibe_feature_is_off(client, app):
     assert rv.status_code == 200
     assert b'id="vibe_index" name="vibe_index" disabled' in rv.data
     assert b'Theme selection is disabled while the global vibe feature is turned off.' in rv.data
+
+
+def test_dashboard_uses_compact_nav_state_when_vibe_and_quotes_are_disabled(client, app):
+    make_user(app, dark_mode=False)
+    with app.app_context():
+        from app.models import FeatureFlags, SiteConfig
+
+        flags = FeatureFlags.get()
+        flags.vibe_enabled = False
+        flags.rolling_quotes_enabled = False
+        cfg = SiteConfig.get()
+        cfg.rolling_quotes_enabled = False
+        db.session.add_all([flags, cfg])
+        db.session.commit()
+
+    rv = login(client)
+    assert rv.status_code == 200
+    rv = client.get("/dashboard")
+    assert rv.status_code == 200
+    assert b'class="brand-banner-row' not in rv.data
+    m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
+    assert m, "no body tag?"
+    assert b"no-vibe" in m.group(1)
+    assert b"no-brand-banner" in m.group(1)
 
 
 def test_generic_preferences_endpoint_updates_multiple_settings(client, app):

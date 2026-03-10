@@ -1152,11 +1152,13 @@ def bulk_assign_departments():
         raw = form.emails.data or ""
         # Accept newline or comma separated
         parts = []
+        seen = set()
         for line in raw.splitlines():
             for token in line.split(","):
                 token = token.strip().lower()
-                if token:
+                if token and token not in seen:
                     parts.append(token)
+                    seen.add(token)
 
         report_assigned = []
         report_missing = []
@@ -1205,6 +1207,7 @@ def bulk_assign_departments():
             skipped_primary=report_skipped_primary,
             skipped_existing=report_skipped_existing,
             errors=report_errors,
+            submitted_count=len(parts),
         )
 
     return render_template("admin_bulk_assign_departments.html", form=form)

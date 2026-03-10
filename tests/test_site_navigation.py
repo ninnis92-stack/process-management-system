@@ -1,9 +1,10 @@
 import re
+from datetime import datetime, timedelta
 
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import User, SiteConfig, UserDepartment
+from app.models import User, SiteConfig, UserDepartment, FeatureFlags
 
 
 NAV_LINK_RE = re.compile(r'href="([^"]+)"')
@@ -76,6 +77,60 @@ def test_public_navigation_links_resolve(client):
         assert resp.status_code in (200, 302), route
         location = resp.headers.get("Location", "")
         assert not location.endswith("/static/app.js"), route
+
+
+def test_guest_navigation_hides_disabled_public_pages(client, app):
+    with app.app_context():
+        flags = FeatureFlags.get()
+        flags.guest_dashboard_enabled = False
+        flags.guest_submission_enabled = False
+        db.session.add(flags)
+        db.session.commit()
+
+    rv = client.get("/auth/login")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+    assert "Open Guest Dashboard" not in html
+    assert "Start Guest Submission" not in html
+    assert "Guest Dashboard" not in html
+    assert "Guest Submit" not in html
+
+    assert client.get("/external/dashboard").status_code == 404
+    assert client.get("/external/new").status_code == 404
+
+
+def test_guest_submission_without_dashboard_omits_tracking_link(client, app, monkeypatch):
+    with app.app_context():
+        flags = FeatureFlags.get()
+        flags.guest_dashboard_enabled = False
+        flags.guest_submission_enabled = True
+        db.session.add(flags)
+        db.session.commit()
+
+    monkeypatch.setattr("app.external.routes._send_guest_email", lambda *args, **kwargs: None)
+
+    rv = client.post(
+        "/external/new",
+        data={
+            "guest_email": "guest-toggle@example.com",
+            "guest_name": "Guest Toggle",
+            "title": "Guest toggle request",
+            "description": "Need help",
+            "request_type": "both",
+            "priority": "medium",
+            "pricebook_status": "unknown",
+            "owner_department": "B",
+            "donor_part_number": "D-1",
+            "target_part_number": "T-1",
+            "due_at": (datetime.utcnow() + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M"),
+        },
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+    assert "Request #" in html
+    assert "Guest tracking pages are currently disabled" in html
+    assert "topTrackingLink" not in html
 
 
 def test_public_guest_pages_do_not_render_department_modal(client):

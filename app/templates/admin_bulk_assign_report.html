@@ -1,10 +1,23 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <div class="container" style="max-width:800px;margin-top:24px;">
-    <h3>Bulk Assign Report — Dept {{ dept }}</h3>
+  <div class="container" style="max-width:960px;margin-top:24px;">
+    <section class="page-header mb-3">
+      <div>
+        <div class="page-header__eyebrow">Coverage summary</div>
+        <h1 class="page-header__title">Bulk Assign Report — Dept {{ dept }}</h1>
+        <p class="page-header__lede mb-0">Processed {{ submitted_count or 0 }} unique email{{ '' if (submitted_count or 0) == 1 else 's' }}.</p>
+      </div>
+    </section>
 
-    <div class="mb-3">
+    <div class="row g-3 mb-3">
+      <div class="col-sm-6 col-lg-3"><div class="surface-panel text-center"><div class="small text-muted">Assigned</div><div class="fs-4 fw-semibold">{{ assigned|length }}</div></div></div>
+      <div class="col-sm-6 col-lg-3"><div class="surface-panel text-center"><div class="small text-muted">Primary skipped</div><div class="fs-4 fw-semibold">{{ skipped_primary|length }}</div></div></div>
+      <div class="col-sm-6 col-lg-3"><div class="surface-panel text-center"><div class="small text-muted">Existing skipped</div><div class="fs-4 fw-semibold">{{ skipped_existing|length }}</div></div></div>
+      <div class="col-sm-6 col-lg-3"><div class="surface-panel text-center"><div class="small text-muted">Missing or failed</div><div class="fs-4 fw-semibold">{{ (missing|length) + (errors|length) }}</div></div></div>
+    </div>
+
+    <div class="surface-panel mb-3">
       <h5>Assigned ({{ assigned|length }})</h5>
       {% if assigned %}
         <ul>
@@ -17,7 +30,7 @@
       {% endif %}
     </div>
 
-    <div class="mb-3">
+    <div class="surface-panel mb-3">
       <h5>Skipped — Primary department ({{ skipped_primary|length }})</h5>
       {% if skipped_primary %}
         <ul>
@@ -30,7 +43,7 @@
       {% endif %}
     </div>
 
-    <div class="mb-3">
+    <div class="surface-panel mb-3">
       <h5>Skipped — Existing assignment ({{ skipped_existing|length }})</h5>
       {% if skipped_existing %}
         <ul>
@@ -43,7 +56,7 @@
       {% endif %}
     </div>
 
-    <div class="mb-3">
+    <div class="surface-panel mb-3">
       <h5>Missing emails ({{ missing|length }})</h5>
       {% if missing %}
         <ul>
@@ -56,7 +69,7 @@
       {% endif %}
     </div>
 
-    <div class="mb-3">
+    <div class="surface-panel mb-3">
       <h5>Errors ({{ errors|length }})</h5>
       {% if errors %}
         <ul>

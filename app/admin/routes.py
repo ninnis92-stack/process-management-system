@@ -1664,6 +1664,8 @@ def feature_flags():
             "sso_department_sync_enabled",
             "enable_external_forms",
             "rolling_quotes_enabled",
+            "guest_dashboard_enabled",
+            "guest_submission_enabled",
         ):
             if field in data:
                 try:
@@ -1690,6 +1692,8 @@ def feature_flags():
                 "sso_department_sync_enabled",
                 "enable_external_forms",
                 "rolling_quotes_enabled",
+                "guest_dashboard_enabled",
+                "guest_submission_enabled",
             )},
         })
 
@@ -1716,6 +1720,12 @@ def feature_flags():
         form.rolling_quotes_enabled.data = bool(
             getattr(flags, "rolling_quotes_enabled", True)
         )
+        form.guest_dashboard_enabled.data = bool(
+            getattr(flags, "guest_dashboard_enabled", True)
+        )
+        form.guest_submission_enabled.data = bool(
+            getattr(flags, "guest_submission_enabled", True)
+        )
 
     if form.validate_on_submit():
         flags.enable_notifications = _submitted_checkbox_enabled(
@@ -1737,6 +1747,12 @@ def feature_flags():
         )
         flags.rolling_quotes_enabled = _submitted_checkbox_enabled(
             "rolling_quotes_enabled"
+        )
+        flags.guest_dashboard_enabled = _submitted_checkbox_enabled(
+            "guest_dashboard_enabled"
+        )
+        flags.guest_submission_enabled = _submitted_checkbox_enabled(
+            "guest_submission_enabled"
         )
         db.session.commit()
         flash("Feature flags updated.", "success")

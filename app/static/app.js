@@ -1025,9 +1025,9 @@ document.addEventListener('DOMContentLoaded', function(){
   const btn = document.getElementById("notifBtn");
   const dd = document.getElementById("notifDropdown");
   const list = document.getElementById("notifList");
+  const pageList = document.getElementById("notificationsList");
   const badge = document.getElementById("notifBadge");
   const momentum = document.getElementById("notifMomentum");
-  if (!btn || !dd || !list || !badge) return;
 
   function setActive(hasUnread) {
     btn.classList.toggle("notif-active", !!hasUnread);
@@ -1078,19 +1078,48 @@ document.addEventListener('DOMContentLoaded', function(){
           ${n.url ? `<div class="small text-primary">Open</div>` : ""}
         </div>
       `).join("") || "<div class='text-muted'>No notifications.</div>";
+      // add link to full page at bottom
+      const viewAll = document.createElement('div');
+      viewAll.className = 'text-end mt-2';
+      viewAll.innerHTML = '<a href="/notifications/view">View all notifications</a>';
+      list.appendChild(viewAll);
     } catch (e) {
       list.innerHTML = "<div class='text-muted'>Unable to load notifications right now.</div>";
     }
   }
 
-  list.addEventListener("click", async (ev) => {
-    const item = ev.target.closest(".notif-item");
-    if (!item) return;
-    const id = item.dataset.id;
-    const url = item.dataset.url;
-    try { await fetch(`/notifications/${id}/read`, { method: "POST" }); } catch (e) {}
-    if (url) window.location.href = url;
-  });
+  function attachNotificationItemHandler(container) {
+    if (!container) return;
+    container.addEventListener("click", async (ev) => {
+      const item = ev.target.closest(".notif-item");
+      if (!item) return;
+      const id = item.dataset.id;
+      const url = item.dataset.url;
+      try { await fetch(`/notifications/${id}/read`, { method: "POST" }); } catch (e) {}
+      item.classList.add("opacity-75");
+      if (url) window.location.href = url;
+    });
+  }
+
+  attachNotificationItemHandler(list);
+  attachNotificationItemHandler(pageList);
+
+  // if a full-page mark-all button exists, hook it up
+  const markAllBtn = document.getElementById("markAllBtn");
+  if (markAllBtn) {
+    markAllBtn.addEventListener("click", async () => {
+      try {
+        await fetch('/notifications/mark_all_read', { method: 'POST' });
+        // visually mark items as read
+        document.querySelectorAll('.notif-item').forEach(i => i.classList.add('opacity-75'));
+        if (badge) badge.style.display = 'none';
+      } catch (e) {
+        console.warn('mark all read failed', e);
+      }
+    });
+  }
+
+  if (!btn || !dd || !list || !badge) return;
 
   btn.addEventListener("click", async () => {
     const willOpen = !dd.classList.contains("open");

@@ -1,6 +1,6 @@
 import pytest
 from werkzeug.security import generate_password_hash
-from app.models import FormTemplate, DepartmentFormAssignment, User
+from app.models import FormTemplate, DepartmentFormAssignment, User, UserDepartment
 from app.extensions import db
 
 
@@ -60,3 +60,45 @@ def test_department_assignment_crud(app, client):
     assert b"Assignment removed" in rv.data
     with app.app_context():
         assert db.session.get(DepartmentFormAssignment, aid) is None
+
+
+def test_bulk_assign_departments_deduplicates_and_reports_results(app, client):
+    with app.app_context():
+        admin = User(
+            email="admin-bulk-assign@example.com",
+            name="Admin Bulk Assign",
+            password_hash=generate_password_hash("secret"),
+            is_admin=True,
+            is_active=True,
+            department="B",
+        )
+        user = User(
+            email="person@example.com",
+            name="Person",
+            password_hash=generate_password_hash("secret"),
+            is_active=True,
+            department="A",
+        )
+        db.session.add_all([admin, user])
+        db.session.commit()
+
+    rv = login_admin(client, email="admin-bulk-assign@example.com")
+    assert rv.status_code == 200
+
+    rv = client.post(
+        "/admin/bulk_assign_departments",
+        data={
+            "department": "B",
+            "emails": "person@example.com\nperson@example.com\nmissing@example.com",
+        },
+        follow_redirects=True,
+    )
+    assert rv.status_code == 200
+    assert b"Processed 2 unique emails" in rv.data
+    assert b"person@example.com" in rv.data
+    assert b"missing@example.com" in rv.data
+
+    with app.app_context():
+        assignments = UserDepartment.query.filter_by(department="B").all()
+        assert len(assignments) == 1
+        assert assignments[0].user_id == user.id

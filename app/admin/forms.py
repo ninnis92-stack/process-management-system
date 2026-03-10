@@ -631,6 +631,12 @@ class FeatureFlagsForm(FlaskForm):
     rolling_quotes_enabled = BooleanField(
         "Enable rolling quotes in the header/footer", default=True
     )
+    guest_dashboard_enabled = BooleanField(
+        "Enable guest dashboard pages", default=True
+    )
+    guest_submission_enabled = BooleanField(
+        "Enable guest submission page", default=True
+    )
     submit = SubmitField("Save Flags")
 
 

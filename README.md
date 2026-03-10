@@ -43,8 +43,8 @@ Key capabilities:
   checklists, temporary cross-department coverage, coverage calendar search,
   and downloadable `.ics` exports
 - **Scalable notifications** with department-specific templates, backup
-  approver routing, admin-monitored department filtering, and async fan-out
-  for larger recipient groups
+  approver routing, admin-monitored department filtering, a dedicated
+  in-app notifications page, and async fan-out for larger recipient groups
 - **Polished public sign-in** with clearer guest-path entry points and a more
   production-ready first impression for external users
 - **Command center** for users, departments, process flows, site config, integrations,
@@ -56,6 +56,8 @@ Key capabilities:
   integrations so transfer packets can be mirrored externally without adding
   more core workflow form fields
 - **Guest submission and lookup** via external blueprints
+- **Guest access controls** so admins can independently turn guest lookup
+  pages and guest submission pages on or off from feature flags
 - **Per-form guest access policies** for public, SSO-linked, approved-organization,
   and unaffiliated-only intake paths
 - **Cleaner GitHub automation** with repaired CI/deploy workflows and a valid
@@ -110,6 +112,9 @@ and default diff views.
    default unless `RUN_SEED_ON_RELEASE=0`.  For Fly.io deployments the
    `release_command` in `fly.toml` invokes the same script, so the remote
    database is automatically migrated and seeded each time you `fly deploy`.
+  For faster workspace provisioning you can also bootstrap a tenant and its
+  initial admin with `flask onboard-tenant --slug <slug> --name <name> --admin-email <email>`
+  or the wrapper script `python scripts/onboard_tenant.py ...`.
    Run `python seed.py` locally if you need to resynchronize a development
    database or inspect the seeding logic.  The release script now also
    normalizes and validates quote sets so every built-in set has loadable
@@ -147,7 +152,7 @@ and default diff views.
    ```bash
    make smoke        # hit home, dashboard, and admin/site_config
    make smoke-clean  # erase local sqlite DB between runs
-  make test         # run pytest suite (currently 224 tests)
+  make test         # run pytest suite (currently 231 tests)
    ```
 
 6. **Clearing state**
@@ -182,7 +187,7 @@ and default diff views.
 
 8. **Tests**
    ```bash
-  make test          # runs full pytest suite (currently 224 tests)
+  make test          # runs full pytest suite (currently 231 tests)
   make test-postgres # start a temporary Postgres container and run the suite against it
    ```
 

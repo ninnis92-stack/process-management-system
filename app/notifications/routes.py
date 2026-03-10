@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, redirect, url_for, request, current_app
+from flask import Blueprint, jsonify, redirect, url_for, request, current_app, render_template
 from flask_login import login_required, current_user
 from ..extensions import db
 from ..models import Notification
@@ -141,3 +141,19 @@ def mark_all_read():
         )
     db.session.commit()
     return jsonify({"ok": True})
+
+
+@notifications_bp.get("/view")
+@login_required
+def view_all():
+    """Render a simple page listing recent notifications with read-state."""
+    if not _notifications_enabled():
+        notifications = []
+    else:
+        notifications = (
+            Notification.query.filter_by(user_id=current_user.id)
+            .order_by(Notification.created_at.desc())
+            .limit(100)
+            .all()
+        )
+    return render_template("notifications_page.html", notifications=notifications)

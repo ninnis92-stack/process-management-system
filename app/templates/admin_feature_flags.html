@@ -77,7 +77,7 @@
       <section class="admin-feature-flags__section">
         <div class="admin-feature-flags__section-header">
           <h3 class="section-heading__title mb-1">Identity & integrations</h3>
-          <p class="section-heading__subtitle mb-0">Controls for SSO role sync and external intake integrations.</p>
+          <p class="section-heading__subtitle mb-0">Controls for SSO role sync, guest-facing pages, and external intake integrations.</p>
         </div>
 
         <div class="admin-feature-flags__options">
@@ -103,6 +103,22 @@
               <label class="form-check-label" for="{{ form.enable_external_forms.id }}">{{ 'External forms enabled' if form.enable_external_forms.data else 'External forms disabled' }}</label>
             </div>
             <div class="admin-feature-flags__option-copy">Enables external request-form templates that redirect to third-party providers and accept webhook callbacks.</div>
+          </div>
+
+          <div class="admin-toggle-card admin-feature-flags__option{% if form.guest_dashboard_enabled.data %} active{% endif %}">
+            <div class="form-check mb-0">
+              {{ form.guest_dashboard_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Guest dashboard enabled', 'data-toggle-text-unchecked': 'Guest dashboard disabled'}) }}
+              <label class="form-check-label" for="{{ form.guest_dashboard_enabled.id }}">{{ 'Guest dashboard enabled' if form.guest_dashboard_enabled.data else 'Guest dashboard disabled' }}</label>
+            </div>
+            <div class="admin-feature-flags__option-copy">Controls public request lookup, tracking pages, and guest tracking links shown after submission.</div>
+          </div>
+
+          <div class="admin-toggle-card admin-feature-flags__option{% if form.guest_submission_enabled.data %} active{% endif %}">
+            <div class="form-check mb-0">
+              {{ form.guest_submission_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Guest submission enabled', 'data-toggle-text-unchecked': 'Guest submission disabled'}) }}
+              <label class="form-check-label" for="{{ form.guest_submission_enabled.id }}">{{ 'Guest submission enabled' if form.guest_submission_enabled.data else 'Guest submission disabled' }}</label>
+            </div>
+            <div class="admin-feature-flags__option-copy">Controls the public guest intake form and all entry points that start a new guest request.</div>
           </div>
         </div>
       </section>

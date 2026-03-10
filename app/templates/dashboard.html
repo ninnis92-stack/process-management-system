@@ -196,6 +196,9 @@
 {% if bucket_list %}
   <div class="page-toolbar surface-panel bucket-toolbar">
     <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('requests.dashboard', as_dept=request.args.get('as_dept')) }}">All</a>
+    {% if can_bulk_assign %}
+      <span class="text-muted small ms-2">Use the dropdown next to each bucket to assign every request in that bucket to a user.</span>
+    {% endif %}
     {% for b in bucket_list %}
       <a class="btn btn-sm btn-outline-primary" href="{{ url_for('requests.dashboard', bucket_id=b.id, as_dept=request.args.get('as_dept')) }}">{{ b.name }}{% if status_counts.get(b.id) is not none %} · {{ status_counts.get(b.id) }}{% endif %}</a>
       {% if can_bulk_assign %}
@@ -204,7 +207,7 @@
           <input type="hidden" name="bucket_id" value="{{ b.id }}">
           <input type="hidden" name="as_dept" value="{{ request.args.get('as_dept','') }}">
           {{ assignment_form.assignee(class="form-select form-select-sm d-inline-block", style="width:110px;") }}
-          <button class="btn btn-sm btn-outline-secondary">Go</button>
+          <button class="btn btn-sm btn-outline-secondary" title="Assign every request in {{ b.name }} to the selected user">Assign all</button>
         </form>
       {% endif %}
     {% endfor %}

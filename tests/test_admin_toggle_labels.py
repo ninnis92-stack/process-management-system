@@ -44,6 +44,8 @@ def test_feature_flags_render_correct_action_labels(client, app):
         flags.enable_notifications = True
         flags.enable_nudges = False
         flags.vibe_enabled = True
+        flags.guest_dashboard_enabled = True
+        flags.guest_submission_enabled = False
         db.session.commit()
 
     rv = login_admin(client)
@@ -57,6 +59,8 @@ def test_feature_flags_render_correct_action_labels(client, app):
     assert 'Notifications enabled' in html
     assert 'Automated reminders disabled' in html
     assert 'Theme button enabled' in html
+    assert 'Guest dashboard enabled' in html
+    assert 'Guest submission disabled' in html
     assert 'surface-panel admin-feature-flags-panel' in html
     assert 'admin-feature-flags__section' in html
     assert 'admin-toggle-card admin-feature-flags__option' in html
@@ -73,6 +77,8 @@ def test_feature_flags_render_correct_action_labels(client, app):
             "sso_department_sync_enabled": "",
             "enable_external_forms": "",
             "rolling_quotes_enabled": "y",
+            "guest_dashboard_enabled": "y",
+            "guest_submission_enabled": "y",
         },
         follow_redirects=True,
     )
@@ -120,6 +126,8 @@ def test_feature_flags_post_unchecked_boxes_disable_flags(client, app):
         assert flags.enable_notifications is False
         assert flags.enable_nudges is False
         assert flags.allow_user_nudges is False
+        assert flags.guest_dashboard_enabled is False
+        assert flags.guest_submission_enabled is False
 
 
 def test_feature_flags_autosave_support(client, app):
@@ -152,17 +160,19 @@ def test_feature_flags_json_autosave_updates(client, app):
     assert rv.status_code == 200
     rv = client.post(
         "/admin/feature_flags",
-        json={"vibe_enabled": True, "enable_nudges": False},
+        json={"vibe_enabled": True, "enable_nudges": False, "guest_submission_enabled": False},
     )
     assert rv.status_code == 200
     payload = rv.get_json()
     assert payload["ok"] is True
     assert payload["flags"]["vibe_enabled"] is True
     assert payload["flags"]["enable_nudges"] is False
+    assert payload["flags"]["guest_submission_enabled"] is False
     with app.app_context():
         flags = FeatureFlags.get()
         assert flags.vibe_enabled is True
         assert flags.enable_nudges is False
+        assert flags.guest_submission_enabled is False
 
 
 def test_feature_flags_fallback_defaults_keep_vibe_enabled(app, monkeypatch):

@@ -1083,6 +1083,8 @@ class FeatureFlags(TenantScopedMixin, db.Model):
     enable_external_forms = db.Column(db.Boolean, nullable=False, default=False)
     # Allow admins to enable/disable rolling quotes shown in the UI
     rolling_quotes_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    guest_dashboard_enabled = db.Column(db.Boolean, nullable=False, default=True)
+    guest_submission_enabled = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     DEFAULTS = {
@@ -1094,6 +1096,8 @@ class FeatureFlags(TenantScopedMixin, db.Model):
         "sso_department_sync_enabled": False,
         "enable_external_forms": False,
         "rolling_quotes_enabled": True,
+        "guest_dashboard_enabled": True,
+        "guest_submission_enabled": True,
     }
 
     @classmethod

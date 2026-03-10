@@ -160,6 +160,86 @@ def create_app():
             db.session.commit()
             click.echo(f"Created {email_n} in Dept {department.upper()}")
 
+    @app.cli.command("onboard-tenant")
+    @click.option("--slug", required=True, help="Tenant slug (unique identifier)")
+    @click.option("--name", required=True, help="Human-readable tenant name")
+    @click.option("--admin-email", required=True, help="Email address for initial admin user")
+    @click.option(
+        "--admin-password",
+        prompt=True,
+        hide_input=True,
+        confirmation_prompt=True,
+        help="Password for the new admin account",
+    )
+    def onboard_tenant(slug, name, admin_email, admin_password):
+        """Create a tenant with defaults and an initial admin user."""
+        from .models import Tenant, TenantMembership, User, FeatureFlags, Department
+        from .extensions import db
+
+        slug = slug.strip().lower()
+        name = name.strip()
+        tenant = Tenant.query.filter_by(slug=slug).first()
+        if not tenant:
+            tenant = Tenant(slug=slug, name=name, is_active=True)
+            db.session.add(tenant)
+            db.session.commit()
+            click.echo(f"Created tenant '{slug}'")
+        else:
+            click.echo(f"Tenant '{slug}' already exists, updating name")
+            tenant.name = name
+            tenant.is_active = True
+            db.session.commit()
+
+        # create default departments if missing
+        for code in ["A", "B", "C"]:
+            if not Department.query.filter_by(code=code).first():
+                db.session.add(
+                    Department(code=code, name=f"Dept {code}", order=0, is_active=True)
+                )
+        db.session.commit()
+
+        # attach default feature flags
+        ff = FeatureFlags.get()
+        ff.enable_notifications = True
+        db.session.add(ff)
+        db.session.commit()
+
+        # create or update admin user
+        user = User.query.filter_by(email=admin_email).first()
+        if not user:
+            user = User(
+                email=admin_email,
+                department="A",
+                password_hash=generate_password_hash(admin_password, method="pbkdf2:sha256"),
+                is_active=True,
+                is_admin=True,
+            )
+            db.session.add(user)
+            db.session.commit()
+            click.echo(f"Created admin user {admin_email}")
+        else:
+            user.password_hash = generate_password_hash(admin_password, method="pbkdf2:sha256")
+            user.is_active = True
+            user.is_admin = True
+            user.department = "A"
+            db.session.commit()
+            click.echo(f"Updated admin user {admin_email}")
+
+        # make membership record for tenant
+        if not TenantMembership.query.filter_by(tenant_id=tenant.id, user_id=user.id).first():
+            tm = TenantMembership(
+                tenant_id=tenant.id,
+                user_id=user.id,
+                role="admin",
+                is_active=True,
+                is_default=True,
+            )
+            db.session.add(tm)
+            db.session.commit()
+            click.echo(f"Added {admin_email} as tenant admin")
+        else:
+            click.echo(f"Admin membership for {admin_email} already exists")
+
     # Init OAuth (SSO)
     from .auth.sso import init_oauth
 
@@ -492,6 +572,8 @@ def create_app():
 
             # Respect the global feature flag as well (admin toggle).
             allow_user_reminders_enabled = False
+            guest_dashboard_enabled = True
+            guest_submission_enabled = True
             try:
                 ff = FeatureFlags.get()
                 # Respect the admin rolling-quotes flag independently from
@@ -502,6 +584,12 @@ def create_app():
                     rolling_quotes_enabled = False
                 allow_user_reminders_enabled = bool(
                     getattr(ff, "allow_user_nudges", False)
+                )
+                guest_dashboard_enabled = bool(
+                    getattr(ff, "guest_dashboard_enabled", True)
+                )
+                guest_submission_enabled = bool(
+                    getattr(ff, "guest_submission_enabled", True)
                 )
             except Exception:
                 try:
@@ -562,6 +650,8 @@ def create_app():
                     else (SiteConfig.DEFAULT_QUOTE_SETS.get('motivational', [None])[0])
                 ),
                 allow_user_reminders_enabled=allow_user_reminders_enabled,
+                guest_dashboard_enabled=guest_dashboard_enabled,
+                guest_submission_enabled=guest_submission_enabled,
                 external_theme_loaded=external_theme_loaded,
                 FeatureFlags=FeatureFlags,
             )
@@ -589,6 +679,8 @@ def create_app():
                 company_url=None,
                 initial_quote=None,
                 allow_user_reminders_enabled=False,
+                guest_dashboard_enabled=True,
+                guest_submission_enabled=True,
                 external_theme_loaded=False,
                 FeatureFlags=ff,
             )

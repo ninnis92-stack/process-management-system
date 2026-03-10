@@ -1,24 +1,43 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <div class="container" style="max-width:700px;margin-top:24px;">
-    <h3>Bulk Assign Departments</h3>
-    <p>Provide a list of user emails and select a department to assign. This creates additional department assignments (does not change users' primary department).</p>
-    <form method="post">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="mb-3">
-        <label class="form-label">Department</label>
-        {{ form.department(class="form-select") }}
+  <div class="container" style="max-width:860px;margin-top:24px;">
+    <section class="page-header mb-3">
+      <div>
+        <div class="page-header__eyebrow">Department coverage</div>
+        <h1 class="page-header__title">Bulk Assign Departments</h1>
+        <p class="page-header__lede mb-0">Assign shared department access to multiple users in one pass without changing their primary department.</p>
       </div>
-      <div class="mb-3">
-        <label class="form-label">User emails</label>
-        {{ form.emails(class="form-control", rows=8) }}
-        <small class="form-text text-muted">One email per line, or comma-separated values.</small>
+    </section>
+    <section class="surface-panel surface-panel-muted mb-3">
+      <div class="row g-3 align-items-start">
+        <div class="col-md-8">
+          <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+              <label class="form-label">Department</label>
+              {{ form.department(class="form-select") }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label">User emails</label>
+              {{ form.emails(class="form-control", rows=10, placeholder="alex@example.com\njamie@example.com\ncasey@example.com") }}
+              <small class="form-text text-muted">Use one email per line or comma-separated values. Duplicate emails are ignored automatically.</small>
+            </div>
+            <div class="d-flex justify-content-end gap-2">
+              <a class="btn btn-link" href="{{ url_for('admin.list_users') }}">Back</a>
+              <button class="btn btn-primary" type="submit">Create assignments</button>
+            </div>
+          </form>
+        </div>
+        <div class="col-md-4">
+          <div class="surface-panel h-100">
+            <div class="small text-uppercase text-muted fw-semibold mb-2">What happens</div>
+            <p class="small text-muted mb-2">Users keep their current home department.</p>
+            <p class="small text-muted mb-2">Existing assignments are skipped and reported back to you.</p>
+            <p class="small text-muted mb-0">The results page shows created, skipped, missing, and failed entries so cleanup is immediate.</p>
+          </div>
+        </div>
       </div>
-      <div class="text-end">
-        <a class="btn btn-link" href="{{ url_for('admin.list_users') }}">Back</a>
-        <button class="btn btn-primary" type="submit">Assign</button>
-      </div>
-    </form>
+    </section>
   </div>
 {% endblock %}

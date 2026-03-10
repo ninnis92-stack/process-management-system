@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="container mt-4" style="max-width:960px;">
+    <section class="page-header mb-3">
+      <div>
+        <div class="page-header__eyebrow">Inbox</div>
+        <h1 class="page-header__title">Notifications</h1>
+        <p class="page-header__lede mb-0">Review recent in-app alerts, open linked requests, and clear noise once you have handled it.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button id="markAllBtn" class="btn btn-sm btn-outline-secondary">Mark all read</button>
+      </div>
+    </section>
+    <section class="surface-panel">
+      <div id="notificationsList">
+      {% if notifications %}
+        {% for n in notifications %}
+          <div class="border rounded p-3 mb-2 notif-item {% if n.is_read %}opacity-75{% endif %}" data-id="{{ n.id }}" data-url="{{ n.url or '' }}">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+              <div>
+                <div><strong>{{ n.title }}</strong></div>
+                {% if n.body %}<div class="mt-1">{{ n.body }}</div>{% endif %}
+                <div class="small text-muted mt-2">{{ n.created_at.strftime("%b %d, %Y %I:%M %p") if n.created_at else "Recently" }}</div>
+              </div>
+              <div class="small text-primary text-nowrap">{% if n.url %}Open{% else %}Viewed here{% endif %}</div>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-muted">No notifications to display.</div>
+      {% endif %}
+      </div>
+    </section>
+  </div>
+{% endblock %}

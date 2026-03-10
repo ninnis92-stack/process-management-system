@@ -16,6 +16,7 @@ from ..extensions import db
 from sqlalchemy.exc import OperationalError
 from ..models import (
     Artifact,
+    FeatureFlags,
     Request as ReqModel,
     Comment,
     AuditLog,
@@ -34,6 +35,20 @@ from ..security import rate_limit
 from ..requests_bp.workflow import workflow_intake_preview
 
 external_bp = Blueprint("external", __name__, url_prefix="/external")
+
+
+def _guest_dashboard_enabled() -> bool:
+    try:
+        return bool(getattr(FeatureFlags.get(), "guest_dashboard_enabled", True))
+    except Exception:
+        return True
+
+
+def _guest_submission_enabled() -> bool:
+    try:
+        return bool(getattr(FeatureFlags.get(), "guest_submission_enabled", True))
+    except Exception:
+        return True
 
 
 def _resolve_guest_form_selection(guest_forms):
@@ -135,6 +150,9 @@ def _send_guest_email(to_email: str, subject: str, body: str) -> None:
 @external_bp.route("/new", methods=["GET", "POST"])
 @rate_limit("guest_submit", config_key="GUEST_SUBMIT_RATE_LIMIT", default="5/300")
 def external_new():
+    if not _guest_submission_enabled():
+        abort(404)
+
     form = ExternalNewRequestForm()
     # populate dynamic choices
     form.owner_department.choices = [("A", "A"), ("B", "B"), ("C", "C")]
@@ -326,16 +344,27 @@ def external_new():
         db.session.commit()
 
         # Email the guest with their request number and tracking link (best-effort)
-        link = url_for(
-            "external.external_detail", token=req.guest_access_token, _external=True
-        )
+        link = None
+        if _guest_dashboard_enabled():
+            link = url_for(
+                "external.external_detail", token=req.guest_access_token, _external=True
+            )
         _send_guest_email(
             req.guest_email,
             subject=f"Your request #{req.id}",
-            body=f"Thanks for submitting your request. Your request number is #{req.id}.\n\nTrack it here: {link}\n",
+            body=(
+                f"Thanks for submitting your request. Your request number is #{req.id}.\n\n"
+                f"Track it here: {link}\n"
+                if link
+                else f"Thanks for submitting your request. Your request number is #{req.id}.\n"
+            ),
         )
         flash(
-            f"Request #{req.id} submitted successfully. You can use this page to track updates.",
+            (
+                f"Request #{req.id} submitted successfully. You can use the guest tracking link to follow updates."
+                if link
+                else f"Request #{req.id} submitted successfully. Guest tracking pages are currently unavailable, so save the request number for support follow-up."
+            ),
             "success",
         )
         # Use Post-Redirect-Get so refresh doesn't resubmit the form. Redirect
@@ -383,6 +412,9 @@ def external_new():
 @external_bp.route("/dashboard", methods=["GET", "POST"])
 @rate_limit("guest_lookup", config_key="GUEST_LOOKUP_RATE_LIMIT", default="10/300")
 def external_dashboard():
+    if not _guest_dashboard_enabled():
+        abort(404)
+
     form = GuestLookupForm()
     if form.validate_on_submit():
         rid = form.request_id.data
@@ -420,6 +452,8 @@ def external_dashboard():
 
 
 def _get_req_by_token(token: str) -> ReqModel:
+    if not _guest_dashboard_enabled():
+        abort(404)
     req = ReqModel.query.filter_by(guest_access_token=token).first()
     if not req:
         abort(404)
