@@ -178,6 +178,54 @@ def main():
                             )
                         )
                     print("schema_fix=user.quote_set_added")
+                if "department_override" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN department_override BOOLEAN NOT NULL DEFAULT FALSE"
+                            )
+                        )
+                    print("schema_fix=user.department_override_added")
+                if "totp_secret" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN totp_secret VARCHAR(64)"
+                            )
+                        )
+                    print("schema_fix=user.totp_secret_added")
+                if "totp_enabled" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN totp_enabled BOOLEAN NOT NULL DEFAULT FALSE"
+                            )
+                        )
+                    print("schema_fix=user.totp_enabled_added")
+                if "vibe_index" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN vibe_index INTEGER DEFAULT 0"
+                            )
+                        )
+                    print("schema_fix=user.vibe_index_added")
+                if "quotes_enabled" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN quotes_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+                            )
+                        )
+                    print("schema_fix=user.quotes_enabled_added")
+                if "vibe_button_enabled" not in user_cols:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN vibe_button_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+                            )
+                        )
+                    print("schema_fix=user.vibe_button_enabled_added")
                 if "daily_nudge_limit" not in user_cols:
                     with engine.begin() as conn:
                         conn.execute(
@@ -779,6 +827,14 @@ def main():
                             with engine.begin() as conn:
                                 conn.execute(text('ALTER TABLE "user" ADD COLUMN dark_mode BOOLEAN DEFAULT FALSE'))
                             print("schema_fix=user.dark_mode_added")
+                        if "quotes_enabled" not in user_cols:
+                            with engine.begin() as conn:
+                                conn.execute(text('ALTER TABLE "user" ADD COLUMN quotes_enabled BOOLEAN NOT NULL DEFAULT TRUE'))
+                            print("schema_fix=user.quotes_enabled_added_late")
+                        if "vibe_button_enabled" not in user_cols:
+                            with engine.begin() as conn:
+                                conn.execute(text('ALTER TABLE "user" ADD COLUMN vibe_button_enabled BOOLEAN NOT NULL DEFAULT TRUE'))
+                            print("schema_fix=user.vibe_button_enabled_added_late")
                 except Exception:
                     # Don't fail the whole release if this ALTER can't be run;
                     # downstream steps will surface the error and be logged.

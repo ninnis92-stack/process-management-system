@@ -63,6 +63,90 @@ def main():
                             pass
                 except Exception:
                     pass
+            if "department_override" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN department_override BOOLEAN DEFAULT FALSE"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            if "totp_secret" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN totp_secret VARCHAR(64)"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            if "totp_enabled" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN totp_enabled BOOLEAN DEFAULT FALSE"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            if "vibe_index" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN vibe_index INTEGER DEFAULT 0"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            if "quotes_enabled" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN quotes_enabled BOOLEAN DEFAULT TRUE"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            if "vibe_button_enabled" not in cols:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE \"user\" ADD COLUMN vibe_button_enabled BOOLEAN DEFAULT TRUE"
+                            )
+                        )
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             if "daily_nudge_limit" not in cols:
                 try:
                     with engine.connect() as conn:
