@@ -487,6 +487,12 @@
     transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.12s ease;
   }
 
+  /* ensure all admin-card titles/subtitles use the same readable text color */
+  .admin-card .tile-title,
+  .admin-card .tile-sub {
+    color: var(--body-text) !important;
+  }
+
   .admin-card,
   .admin-grid,
   .admin-section,

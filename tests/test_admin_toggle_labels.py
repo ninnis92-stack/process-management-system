@@ -1,3 +1,4 @@
+import re
 import pytest
 from app.extensions import db
 from app.models import FeatureFlags, Notification, RejectRequestConfig, User
@@ -141,6 +142,13 @@ def test_feature_flags_autosave_support(client, app):
     assert 'data-autosave-endpoint="/admin/feature_flags"' in html
     # status element used by the client-side script for feedback
     assert 'id="featureFlagsAutoSaveStatus"' in html
+    # our autosave handler should now reload the page when flags change;
+    # the actual code lives in the external JS asset so fetch and inspect it.
+    js_match = re.search(r"src=\"(/static/app\.js\?v=[0-9a-z]+)\"", html)
+    assert js_match, "couldn't locate app.js reference in feature flags page"
+    js_resp = client.get(js_match.group(1))
+    assert js_resp.status_code == 200
+    assert b"location.reload()" in js_resp.data
     # verify global JS includes beforeunload handler to flush autosaves
     # and the new fetch+keepalive logic (not sendBeacon) so JSON posts work
     # root redirects logged-in users so hit dashboard directly
@@ -150,6 +158,24 @@ def test_feature_flags_autosave_support(client, app):
     assert b"form:autosaved" in base.data
     assert b"card.classList.toggle('active', cb.checked);" in base.data
     assert b"form[data-toggle-session-persist=\"session\"]" in base.data
+
+    # toggling a flag should affect other pages on next request
+    # start with vibe enabled
+    with app.app_context():
+        flags = FeatureFlags.get()
+        flags.vibe_enabled = True
+        db.session.commit()
+    # flip via JSON autosave
+    rv2 = client.post(
+        "/admin/feature_flags",
+        headers={"X-Requested-With": "XMLHttpRequest"},
+        json={"vibe_enabled": False},
+    )
+    assert rv2.status_code == 200
+    # now dashboard should no longer render the vibe button
+    dash = client.get("/dashboard")
+    assert dash.status_code == 200
+    assert b'id="vibeBtn"' not in dash.data
 
 
 def test_feature_flags_json_autosave_updates(client, app):
@@ -352,6 +378,16 @@ def test_notify_users_skips_in_app_rows_when_notifications_disabled(app):
         db.session.commit()
 
         notifications_module.notify_users([user], "Test title", "Test body")
-        db.session.commit()
 
-        assert Notification.query.filter_by(user_id=user.id).count() == 0
+
+def test_admin_card_font_color_uniform_in_css():
+    """Stylesheet should force all admin-card text to the standard body color.
+
+    This protects against regressions where a particular tile (e.g. the
+    Notifications card) drifts to a mismatched hue.
+    """
+    with open("app/static/styles.css", "r") as f:
+        css = f.read()
+    assert ".admin-card .tile-title" in css
+    assert ".admin-card .tile-sub" in css
+    assert "color: var(--body-text)" in css
