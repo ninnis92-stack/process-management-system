@@ -5,12 +5,12 @@
   <div>
     <div class="page-header__eyebrow">External intake</div>
     <h3 class="page-header__title mb-0">Guest Submission</h3>
-    <p class="page-header__lede mb-0">Complete the guest request form, review the routing preview, and receive a tracking link after submission.</p>
+    <p class="page-header__lede mb-0">Share the request details, confirm which team should receive it first, and save the tracking link shown after submission.</p>
   </div>
 </section>
 <section class="helper-grid mb-3">
   {{ helper_card('Submit without an internal account', 'Guest intake is designed for external collaborators, vendors, or requesters who should not sign in.', '🌐') }}
-  {{ helper_card('Choose the owning department carefully', 'This determines which team sees the request first and how it enters the queue.', '🧭') }}
+  {{ helper_card('Start with the owning department', 'Most guests only need to choose the team that should receive the request first. The extra routing options below are optional.', '🧭') }}
   {{ helper_card('A tracking link is shown after submission', 'Save the confirmation link or request number so you can check status later.', '✅') }}
 </section>
 <section class="surface-panel guest-form-shell {{ 'layout-' + selected_guest_form.layout if selected_guest_form and selected_guest_form.layout else '' }}" id="externalFormShell">
@@ -45,7 +45,7 @@
         <div class="intake-explainer__main">
           <div class="eyebrow-label">Before you submit</div>
           <h4 class="mb-1">Form, process flow, and department are separate choices</h4>
-          <p class="text-muted mb-0">The guest form controls access, the department controls who sees the request first, and the optional process flow controls the status path after submission.</p>
+          <p class="text-muted mb-0">The guest form controls access, the department controls who sees the request first, and the optional process flow controls the status path after submission. If you were not given special routing instructions, choose the department and leave the optional settings alone.</p>
         </div>
         <div class="intake-explainer__meta">
           <span class="badge text-bg-light border">Guest form</span>
@@ -54,94 +54,110 @@
         </div>
       </section>
 
-      {{ section_heading('Routing and process flow', 'Choose the department and optional process flow before adding the request details.', compact=True) }}
-
-      <div class="row">
-        <div class="col-12 mb-3">
-          <label class="form-label">Guest Form (optional)</label>
-          <select name="guest_form" id="guestFormSelect" class="form-select"
-                  data-default-name="{{ selected_guest_form.name if selected_guest_form else 'Default guest form' }}"
-                  data-default-policy-label="{{ selected_guest_form.access_policy_label if selected_guest_form else 'Anyone with the form link' }}"
-                  data-default-policy-hint="{{ selected_guest_form.access_policy_hint if selected_guest_form else 'Anyone with the link can submit this form.' }}"
-                  data-default-owner-department="{{ selected_guest_form.owner_department if selected_guest_form and selected_guest_form.slug else '' }}"
-                  data-default-domains="{{ (selected_guest_form.allowed_email_domain_list|join(', ')) if selected_guest_form else '' }}"
-                  data-default-credential-json="{{ selected_guest_form.credential_requirements_pretty_json if selected_guest_form else '' }}"
-                  data-default-layout="{{ selected_guest_form.layout if selected_guest_form else 'standard' }}"
-          >
-            <option value="">-- Use default form --</option>
-            {% for gf in (guest_forms or []) %}
-              <option value="{{ gf.slug }}"
-                      data-name="{{ gf.name }}"
-                      data-policy-label="{{ gf.access_policy_label }}"
-                      data-policy-hint="{{ gf.access_policy_hint }}"
-                      data-owner-department="{{ gf.owner_department or 'B' }}"
-                      data-domains="{{ gf.allowed_email_domain_list|join(', ') }}"
-                      data-credential-json="{{ gf.credential_requirements_pretty_json }}"
-                      data-layout="{{ gf.layout or 'standard' }}"
-                      {% if (request.form.get('guest_form') or request.args.get('guest_form')) == gf.slug %}selected{% endif %}>{{ gf.name }}</option>
-            {% endfor %}
-          </select>
-          <div class="form-text" id="guestFormRouteHint">Select a specific guest form if you have a link or want to use a pre-configured intake experience.</div>
-        </div>
-      </div>
-
-      <div class="guest-form-access-summary mb-4" id="guestFormSummary" aria-live="polite">
-        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-          <div>
-            <div class="eyebrow-label">Access summary</div>
-            <h4 class="h6 mb-1" id="guestFormSummaryName">{{ selected_guest_form.name if selected_guest_form else 'Default guest form' }}</h4>
-            <p class="text-muted small mb-2" id="guestFormSummaryHint">{{ selected_guest_form.access_policy_hint if selected_guest_form else 'Anyone with the link can submit this form.' }}</p>
-          </div>
-          <div class="guest-form-policy-badges" id="guestFormSummaryBadges">
-            <span class="badge text-bg-light border" id="guestFormSummaryPolicy">{{ selected_guest_form.access_policy_label if selected_guest_form else 'Anyone with the form link' }}</span>
-            <span class="badge text-bg-light border" id="guestFormSummaryDept">Routes to Dept {{ selected_guest_form.owner_department if selected_guest_form and selected_guest_form.slug else 'selected below' }}</span>
-          </div>
-        </div>
-        <div class="small text-muted" id="guestFormSummaryDomains">
-          {% if selected_guest_form and selected_guest_form.allowed_email_domain_list %}
-            Approved organizations: {{ selected_guest_form.allowed_email_domain_list|join(', ') }}
-          {% else %}
-            No organization domain filter is currently applied.
-          {% endif %}
-        </div>
-      </div>
+      {{ section_heading('Step 1: route this request', 'Choose the team that should receive this first. Open the optional routing settings only if your organization shared a specific guest form or process flow.', compact=True) }}
 
       <div class="row">
         <div class="col-md-6 mb-3">
           <label class="form-label">Owner Department</label>
           {{ form.owner_department(class="form-select") }}
-          <div class="form-text">Select which department should own this request.</div>
-        </div>
-        <div class="col-md-6 mb-3">
-          <label class="form-label">Workflow (optional)</label>
-          {{ form.workflow_id(class="form-select") }}
-          <div class="form-text">Optional: choose a process flow to apply to this request after it is created.</div>
+          <div class="form-text">Choose which department should review the request first.</div>
         </div>
       </div>
 
-      <div class="process-preview-card mb-4" id="guestProcessPreview" aria-live="polite"
-           data-default-preview='{{ default_process_preview|tojson }}'
-           data-workflow-previews='{{ workflow_previews|tojson }}'>
-        <div class="eyebrow-label">Process flow preview</div>
-        <h4 class="h6 mb-1" id="guestProcessPreviewName">{{ default_process_preview.name }}</h4>
-        <p class="text-muted small mb-2" id="guestProcessPreviewDescription">{{ default_process_preview.description }}</p>
-        <div class="small text-muted mb-2" id="guestProcessPreviewScope">{{ default_process_preview.scope }}</div>
-        <ol class="process-preview-list mb-0" id="guestProcessPreviewSteps">
-          {% if default_process_preview.steps %}
-            {% for step in default_process_preview.steps %}
-              <li>
-                <strong>{{ step.label }}</strong>
-                <span>{{ step.status }}</span>
-                <em>Department {{ step.from_department or selected_guest_form.owner_department or 'B' }} → Department {{ step.to_department or selected_guest_form.owner_department or 'B' }}</em>
-              </li>
-            {% endfor %}
-          {% else %}
-            <li><strong>Default routing</strong><span>NEW_FROM_A</span><em>Request is routed to the selected department first.</em></li>
-          {% endif %}
-        </ol>
-      </div>
+      {% set advanced_routing_open = request.form.get('guest_form') or request.args.get('guest_form') or form.workflow_id.data %}
+      <details class="workflow-editor__section mb-4"{% if advanced_routing_open %} open{% endif %}>
+        <summary>
+          <div>
+            <div class="eyebrow-label">Optional</div>
+            <strong>Guest form and process flow settings</strong>
+            <div class="text-muted small">Use these only when a shared link or admin instructions tell you to.</div>
+          </div>
+          <span class="badge text-bg-light border">Advanced routing</span>
+        </summary>
+        <div class="workflow-editor__section-body">
+          <div class="row">
+            <div class="col-12 mb-3">
+              <label class="form-label">Guest Form (optional)</label>
+              <select name="guest_form" id="guestFormSelect" class="form-select"
+                      data-default-name="{{ selected_guest_form.name if selected_guest_form else 'Default guest form' }}"
+                      data-default-policy-label="{{ selected_guest_form.access_policy_label if selected_guest_form else 'Anyone with the form link' }}"
+                      data-default-policy-hint="{{ selected_guest_form.access_policy_hint if selected_guest_form else 'Anyone with the link can submit this form.' }}"
+                      data-default-owner-department="{{ selected_guest_form.owner_department if selected_guest_form and selected_guest_form.slug else '' }}"
+                      data-default-domains="{{ (selected_guest_form.allowed_email_domain_list|join(', ')) if selected_guest_form else '' }}"
+                      data-default-credential-json="{{ selected_guest_form.credential_requirements_pretty_json if selected_guest_form else '' }}"
+                      data-default-layout="{{ selected_guest_form.layout if selected_guest_form else 'standard' }}"
+              >
+                <option value="">-- Use default form --</option>
+                {% for gf in (guest_forms or []) %}
+                  <option value="{{ gf.slug }}"
+                          data-name="{{ gf.name }}"
+                          data-policy-label="{{ gf.access_policy_label }}"
+                          data-policy-hint="{{ gf.access_policy_hint }}"
+                          data-owner-department="{{ gf.owner_department or 'B' }}"
+                          data-domains="{{ gf.allowed_email_domain_list|join(', ') }}"
+                          data-credential-json="{{ gf.credential_requirements_pretty_json }}"
+                          data-layout="{{ gf.layout or 'standard' }}"
+                          {% if (request.form.get('guest_form') or request.args.get('guest_form')) == gf.slug %}selected{% endif %}>{{ gf.name }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text" id="guestFormRouteHint">Select a specific guest form only if you were given one or need a pre-configured intake experience.</div>
+            </div>
+          </div>
 
-      {{ section_heading('Request details', 'Capture the title, timing, and type of work being requested.', compact=True) }}
+          <div class="guest-form-access-summary mb-4" id="guestFormSummary" aria-live="polite">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+              <div>
+                <div class="eyebrow-label">Access summary</div>
+                <h4 class="h6 mb-1" id="guestFormSummaryName">{{ selected_guest_form.name if selected_guest_form else 'Default guest form' }}</h4>
+                <p class="text-muted small mb-2" id="guestFormSummaryHint">{{ selected_guest_form.access_policy_hint if selected_guest_form else 'Anyone with the link can submit this form.' }}</p>
+              </div>
+              <div class="guest-form-policy-badges" id="guestFormSummaryBadges">
+                <span class="badge text-bg-light border" id="guestFormSummaryPolicy">{{ selected_guest_form.access_policy_label if selected_guest_form else 'Anyone with the form link' }}</span>
+                <span class="badge text-bg-light border" id="guestFormSummaryDept">Routes to Dept {{ selected_guest_form.owner_department if selected_guest_form and selected_guest_form.slug else 'selected below' }}</span>
+              </div>
+            </div>
+            <div class="small text-muted" id="guestFormSummaryDomains">
+              {% if selected_guest_form and selected_guest_form.allowed_email_domain_list %}
+                Approved organizations: {{ selected_guest_form.allowed_email_domain_list|join(', ') }}
+              {% else %}
+                No organization domain filter is currently applied.
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Process flow (optional)</label>
+              {{ form.workflow_id(class="form-select") }}
+              <div class="form-text">Choose this only when a specific status path was requested after submission.</div>
+            </div>
+          </div>
+
+          <div class="process-preview-card" id="guestProcessPreview" aria-live="polite"
+               data-default-preview='{{ default_process_preview|tojson }}'
+               data-workflow-previews='{{ workflow_previews|tojson }}'>
+            <div class="eyebrow-label">Process flow preview</div>
+            <h4 class="h6 mb-1" id="guestProcessPreviewName">{{ default_process_preview.name }}</h4>
+            <p class="text-muted small mb-2" id="guestProcessPreviewDescription">{{ default_process_preview.description }}</p>
+            <div class="small text-muted mb-2" id="guestProcessPreviewScope">{{ default_process_preview.scope }}</div>
+            <ol class="process-preview-list mb-0" id="guestProcessPreviewSteps">
+              {% if default_process_preview.steps %}
+                {% for step in default_process_preview.steps %}
+                  <li>
+                    <strong>{{ step.label }}</strong>
+                    <span>{{ step.status }}</span>
+                    <em>Department {{ step.from_department or selected_guest_form.owner_department or 'B' }} → Department {{ step.to_department or selected_guest_form.owner_department or 'B' }}</em>
+                  </li>
+                {% endfor %}
+              {% else %}
+                <li><strong>Default routing</strong><span>NEW_FROM_A</span><em>Request is routed to the selected department first.</em></li>
+              {% endif %}
+            </ol>
+          </div>
+        </div>
+      </details>
+
+      {{ section_heading('Step 2: describe the request', 'Capture the request basics first, then add part details only when they apply.', compact=True) }}
 
       <div class="mb-3">
         <label class="form-label">Title</label>
@@ -154,32 +170,47 @@
       </div>
 
       <div class="row">
-        <div class="col-md-4 mb-3">{{ form.request_type(class="form-select") }}</div>
-        <div class="col-md-4 mb-3">{{ form.priority(class="form-select") }}</div>
-        <div class="col-md-4 mb-3">{{ form.pricebook_status(class="form-select") }}</div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Request type</label>
+          {{ form.request_type(class="form-select") }}
+          <div class="form-text">Choose whether this request needs a part number, a method, or both.</div>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Priority</label>
+          {{ form.priority(class="form-select") }}
+          <div class="form-text">Select how urgently the receiving team should review it.</div>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Sales list status</label>
+          {{ form.pricebook_status(class="form-select") }}
+          <div class="form-text">Tell the team whether the item is already on the sales list.</div>
+        </div>
       </div>
       <div class="mb-3">
         <label class="form-label">Sales list reference</label>
         {{ form.sales_list_reference(class="form-control") }}
-        <div class="form-text">If you selected "On the sales list", provide the sales list SKU or reference.</div>
+        <div class="form-text">Only required when the item is already on the sales list.</div>
       </div>
+
+      {{ section_heading('Part details', 'Complete these fields only when the request involves donor or target part numbers.', compact=True) }}
 
       <div class="row">
         <div class="col-md-6 mb-3">
             <label class="form-label">Donor Part Number</label>
             {{ form.donor_part_number(class="form-control") }}
+            <div class="form-text">Enter the source part number when one already exists.</div>
         </div>
 
         <div class="col-md-6 mb-3">
             <label class="form-label">Target Part Number</label>
             {{ form.target_part_number(class="form-control") }}
-            <div class="form-text">Required for Method.</div>
+            <div class="form-text">Required when the request type is Method.</div>
         </div>
 
         <div class="col-md-6 mb-3">
             <label class="form-label">If no donor, reason</label>
             {{ form.no_donor_reason(class="form-select") }}
-            <div class="form-text">Only valid for Part Number requests when the part number needs to be created.</div>
+            <div class="form-text">Use this only for Part Number requests that need a new part number created.</div>
         </div>
       </div>
 

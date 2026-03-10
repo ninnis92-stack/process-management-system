@@ -32,6 +32,9 @@ Key capabilities:
 
 - **Dynamic request templates** with sections, verification‑prefill, and
   conditional requirements
+- **Clearer public entry flow** with a simplified guest intake path, no
+  public department-switch modal, and the default quote set used on the
+  login screen when rotating quotes are enabled
 - **Process-flow engine** with status transitions, path history and loop protection
 - **Priority and reminder controls** including `highest` priority, automated
   reminders, user-pushed reminders, and per-user daily reminder limits
@@ -53,13 +56,17 @@ Key capabilities:
 - **Guest submission and lookup** via external blueprints
 - **Per-form guest access policies** for public, SSO-linked, approved-organization,
   and unaffiliated-only intake paths
+- **Cleaner GitHub automation** with repaired CI/deploy workflows and a valid
+  Codespaces prebuild workflow configuration
 - **SSO/OIDC support** with optional admin sync
 - **Theme/vibe system**, dark mode (now integrated with vibe accents). Dark mode disables personal vibe overrides and hides the vibe button, while adopted brand presets continue to tint the native dark palette so branded imports still feel consistent. The theme dropdown is locked with explanatory text shown to the user, and the names of the built-in presets have been updated to match the softer accent palette: *Sky*, *Moss*, *Dawn*, and *Twilight* (replacing Ocean/Forest/Sunset/Midnight respectively). The navbar quote area and vibe control are separated so quotes stay visible even when the vibe button is absent, the vibe button itself now sits inside a distinct solid control shell instead of blending into the banner, disabling the global vibe feature leaves the banner in a quote-only state rather than removing it outright, shared action bars and control shells keep admin and monitor layouts uniform when controls are added or removed, the old dark-mode compatibility chips/previews are gone, recent UI polish replaced the older glassy treatment with a more solid shared surface system across login, dashboard, settings, and admin pages, and the dashboard overview/badge accents now stay aligned with the surrounding theme instead of using an unrelated bright-blue emphasis. Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
 
 Everything is covered by a comprehensive test suite and deploys automatically
 using a release script that migrates the database, creates missing columns,
 seeds baseline accounts, and backfills recent guest-form schema additions when
-needed.
+needed. Repository diff noise is also reduced with `.gitattributes`, which
+hides generated assets and vendored dependencies from GitHub language stats
+and default diff views.
 
 ---
 
@@ -138,7 +145,7 @@ needed.
    ```bash
    make smoke        # hit home, dashboard, and admin/site_config
    make smoke-clean  # erase local sqlite DB between runs
-  make test         # run pytest suite (currently 214 tests)
+  make test         # run pytest suite (currently 215 tests)
    ```
 
 8. **Clearing state**
@@ -148,7 +155,7 @@ needed.
 
 5. **Tests**
    ```bash
-   make test          # runs full pytest suite (≈100 tests)
+  make test          # runs full pytest suite (currently 215 tests)
    ```
 
 ---

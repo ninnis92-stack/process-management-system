@@ -5,14 +5,21 @@ on:
   schedule:
     - cron: '*/15 * * * *'
 
+env:
+  PRODUCTION_BASE_URL_SECRET_NAME: PRODUCTION_BASE_URL
+  PRODUCTION_ADMIN_EMAIL_SECRET_NAME: PRODUCTION_ADMIN_EMAIL
+  PRODUCTION_ADMIN_PASSWORD_SECRET_NAME: PRODUCTION_ADMIN_PASSWORD
+  WEBHOOK_SHARED_SECRET_NAME: WEBHOOK_SHARED_SECRET
+  PAGERDUTY_ROUTING_KEY_SECRET_NAME: PAGERDUTY_ROUTING_KEY
+
 jobs:
   monitor:
     runs-on: ubuntu-latest
     env:
-      APP_URL: ${{ secrets.PRODUCTION_BASE_URL || 'https://process-management-prototype-lingering-bush-6175.fly.dev' }}
-      ADMIN_EMAIL: ${{ secrets.PRODUCTION_ADMIN_EMAIL || 'admin@example.com' }}
-      ADMIN_PASSWORD: ${{ secrets.PRODUCTION_ADMIN_PASSWORD || 'admin123' }}
-      WEBHOOK_SHARED_SECRET: ${{ secrets.WEBHOOK_SHARED_SECRET }}
+      APP_URL: ${{ secrets['PRODUCTION_BASE_URL'] || 'https://process-management-prototype-lingering-bush-6175.fly.dev' }}
+      ADMIN_EMAIL: ${{ secrets['PRODUCTION_ADMIN_EMAIL'] || 'admin@example.com' }}
+      ADMIN_PASSWORD: ${{ secrets['PRODUCTION_ADMIN_PASSWORD'] || 'admin123' }}
+      WEBHOOK_SHARED_SECRET: ${{ secrets['WEBHOOK_SHARED_SECRET'] }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -42,6 +49,6 @@ jobs:
       - name: Trigger PagerDuty on failure
         if: failure()
         env:
-          PAGERDUTY_ROUTING_KEY: ${{ secrets.PAGERDUTY_ROUTING_KEY }}
+          PAGERDUTY_ROUTING_KEY: ${{ secrets[env.PAGERDUTY_ROUTING_KEY_SECRET_NAME] }}
         run: |
           python scripts/notify_pagerduty.py --summary "Process Management Prototype production monitoring failure" --details '{"app_url":"'"$APP_URL"'","workflow":"production-monitoring"}'

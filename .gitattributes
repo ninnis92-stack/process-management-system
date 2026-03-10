@@ -1,0 +1,11 @@
+# Hide generated and dependency files by default in GitHub diffs.
+package-lock.json linguist-generated=true
+frontend/package-lock.json linguist-generated=true
+app/static/dist/** linguist-generated=true
+cypress/screenshots/** linguist-generated=true
+cypress/videos/** linguist-generated=true
+docs/_build/** linguist-generated=true
+
+# Keep vendored dependencies out of GitHub language stats.
+node_modules/** linguist-vendored=true
+frontend/node_modules/** linguist-vendored=true

@@ -513,7 +513,7 @@ def create_app():
                     and rolling_quotes_enabled
                 ):
                     rolling_quotes = SiteConfig.DEFAULT_QUOTE_SETS.get(
-                        "motivational",
+                        "default",
                         [],
                     )
             except Exception:

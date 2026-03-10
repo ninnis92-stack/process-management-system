@@ -4,6 +4,9 @@ on:
   push:
     branches: [staging]
 
+env:
+  STAGING_BASE_URL_SECRET_NAME: STAGING_BASE_URL
+
 jobs:
   e2e:
     runs-on: ubuntu-latest
@@ -18,6 +21,6 @@ jobs:
           npm ci
       - name: Run Cypress smoke tests
         env:
-          CYPRESS_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          CYPRESS_BASE_URL: ${{ secrets[env.STAGING_BASE_URL_SECRET_NAME] }}
         run: |
-          npx cypress run --config baseUrl=${{ secrets.STAGING_BASE_URL }}
+          npx cypress run --config baseUrl="$CYPRESS_BASE_URL"

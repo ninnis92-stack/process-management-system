@@ -53,6 +53,7 @@ def test_public_navigation_links_resolve(client):
     assert "Start Guest Submission" in html
     assert "Guest Dashboard" in html
     assert "Guest Submit" in html
+    assert 'id="chooseDeptModal"' not in html
 
     # the form should come before the verbose hero copy to speed up repeat logins
     # look for the keyword rather than exact class attribute since multiple classes
@@ -73,6 +74,14 @@ def test_public_navigation_links_resolve(client):
         assert resp.status_code in (200, 302), route
         location = resp.headers.get("Location", "")
         assert not location.endswith("/static/app.js"), route
+
+
+def test_public_guest_pages_do_not_render_department_modal(client):
+    for route in ("/external/dashboard", "/external/new"):
+        rv = client.get(route)
+        assert rv.status_code == 200
+        html = rv.get_data(as_text=True)
+        assert 'id="chooseDeptModal"' not in html
 
 
 def test_login_page_no_longer_shows_rolling_quote_banner(client, app):
