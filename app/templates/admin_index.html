@@ -5,10 +5,10 @@
     <div class="admin-hero__content">
       <p class="eyebrow-label">Command center</p>
       <h1 class="admin-hero__title">Operate every process flow, request form, and department from one command center.</h1>
-      <p class="admin-hero__lede">Track guest intake, dashboards, and core configuration with fast insights, quick actions, and clearer terminology.</p>
+      <p class="admin-hero__lede">Watch live queues, handoffs, and guest intake first, then move into configuration only when the workspace needs intervention.</p>
       <div class="admin-hero__actions ui-action-bar">
         <div class="ui-action-group">
-          <a class="btn btn-sm btn-primary" href="{{ url_for('admin.metrics_overview') }}">Open metrics overview</a>
+          <a class="btn btn-sm btn-primary" href="{{ url_for('admin.monitor') }}">Open live monitor</a>
           <a class="btn btn-sm btn-outline-light" href="{{ url_for('admin.feature_flags') }}">Explore feature flags</a>
           {% if FeatureFlags.get().vibe_enabled and not current_user.dark_mode %}
             <div class="ui-control-shell ui-control-shell--compact" data-vibe-shell>
@@ -20,7 +20,7 @@
           {% if current_user.dark_mode %}
             <div class="ui-action-note ui-action-note--warning">Vibe controls are disabled while dark mode is active.</div>
           {% endif %}
-          <span class="ui-action-note admin-hero__hint">Command center syncs with each department automatically.</span>
+          <span class="ui-action-note admin-hero__hint">Start with live monitoring, then branch into configuration per department.</span>
         </div>
       </div>
     </div>
