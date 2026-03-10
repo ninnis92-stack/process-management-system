@@ -52,11 +52,17 @@
   const order = lines.slice();
   let idx = 0;
 
+  function applyQuoteText(text) {
+    slot.textContent = text;
+    slot.title = text;
+    slot.setAttribute('aria-label', `${text} Activate to show another message.`);
+  }
+
   // show text with optional animation
   function showQuote(i, animate = true) {
     if (!slot) return;
     if (prefersReduced || !animate) {
-      slot.textContent = order[i];
+      applyQuoteText(order[i]);
       slot.style.opacity = 1;
       slot.style.transform = 'translateY(0)';
       return;
@@ -64,7 +70,7 @@
     slot.style.opacity = 0;
     slot.style.transform = 'translateY(-6px)';
     setTimeout(() => {
-      slot.textContent = order[i];
+      applyQuoteText(order[i]);
       slot.style.transform = 'translateY(6px)';
       requestAnimationFrame(() => {
         slot.style.opacity = 1;
@@ -94,7 +100,7 @@
       ], { duration: 200, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
       out.onfinish = () => {
         idx = nextIdx;
-        slot.textContent = order[idx];
+        applyQuoteText(order[idx]);
         // animate in
         const _in = slot.animate([
           { opacity: 0, transform: 'translateY(8px)' },

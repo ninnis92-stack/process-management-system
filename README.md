@@ -59,7 +59,7 @@ Key capabilities:
 - **Cleaner GitHub automation** with repaired CI/deploy workflows and a valid
   Codespaces prebuild workflow configuration
 - **SSO/OIDC support** with optional admin sync
-- **Theme/vibe system**, dark mode (now integrated with vibe accents). Dark mode disables personal vibe overrides and hides the vibe button, while adopted brand presets continue to tint the native dark palette so branded imports still feel consistent. The theme dropdown is locked with explanatory text shown to the user, and the names of the built-in presets have been updated to match the softer accent palette: *Sky*, *Moss*, *Dawn*, and *Twilight* (replacing Ocean/Forest/Sunset/Midnight respectively). The navbar quote area and vibe control are separated so quotes stay visible even when the vibe button is absent, the vibe button itself now sits inside a distinct solid control shell instead of blending into the banner, disabling the global vibe feature leaves the banner in a quote-only state rather than removing it outright, shared action bars and control shells keep admin and monitor layouts uniform when controls are added or removed, the old dark-mode compatibility chips/previews are gone, recent UI polish replaced the older glassy treatment with a more solid shared surface system across login, dashboard, settings, and admin pages, and the dashboard overview/badge accents now stay aligned with the surrounding theme instead of using an unrelated bright-blue emphasis. Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
+- **Theme/vibe system**, dark mode (now integrated with vibe accents) and explicit no‑vibe support. Dark mode disables personal vibe overrides and hides the vibe button, while adopted brand presets continue to tint the native dark palette so imported branding still looks natural. Importing branding from a website now suppresses the rolling-quote banner and locks accent/vibe controls; when the global vibe feature is turned off the UI switches to a unique neutral palette rather than lingering on the last selected color. The theme dropdown is locked with explanatory text shown to the user, and the names of the built-in presets have been updated to match the softer accent palette: *Sky*, *Moss*, *Dawn*, and *Twilight* (replacing Ocean/Forest/Sunset/Midnight respectively). The navbar quote area and vibe control are separated so quotes stay visible even when the vibe button is absent, the vibe button itself now sits inside a distinct solid control shell instead of blending into the banner, shared action bars and control shells keep admin and monitor layouts uniform when controls are added or removed, and the quote slot now clamps long lines on desktop while still exposing the full text via tooltip/ARIA. Recent UI polish also darkened the lighter preset accents so theme-controlled buttons and labels remain readable, replaced the older glassy treatment with a more solid shared surface system across login, dashboard, settings, and admin pages, and kept dashboard overview/badge accents aligned with surrounding cards instead of using an unrelated bright-blue emphasis. Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
 
 Everything is covered by a comprehensive test suite and deploys automatically
 using a release script that migrates the database, creates missing columns,
@@ -115,7 +115,7 @@ and default diff views.
   also backfill the newer department notification-template and handoff-default
   columns so older installs can deploy without manual SQL.
 
-6. **Run the app (local deployment)**
+4. **Run the app (local deployment)**
    ```bash
    export FLASK_APP=run.py
    flask run
@@ -133,7 +133,7 @@ and default diff views.
    `python seed.py` may be run if you need to reseed the remote database for
    diagnostics.
 
-7. **Smoke testing**
+5. **Smoke testing**
    Once the server is running, verify the basics:
    - navigate to `/auth/login` and sign in with the seeded admin (`admin@example.com`/`password123`)
    - create a new request via the dashboard and confirm you can view/track it
@@ -145,16 +145,17 @@ and default diff views.
    ```bash
    make smoke        # hit home, dashboard, and admin/site_config
    make smoke-clean  # erase local sqlite DB between runs
-  make test         # run pytest suite (currently 215 tests)
+  make test         # run pytest suite (currently 217 tests)
    ```
 
-8. **Clearing state**
+6. **Clearing state**
    - In dev, simply delete the SQLite file under `instance/app.db` or remove Docker volumes.
    - For production, use `flask db downgrade base` or `python scripts/clear_db.py` (not included) to
      reset.  The `flask clear-open-requests` CLI command can close all active work items.
-6. **Deployment & smoke workflow**
+
+7. **Deployment & smoke workflow**
    After you've pushed changes to `main` and are ready to deploy, the repository provides
-a helper that runs tests, pushes your branch, and triggers a Fly.io deployment:
+  a helper that runs tests, pushes your branch, and triggers a Fly.io deployment:
    ```bash
    make deploy-safe       # runs tests, git push, and flyctl deploy
    ```
@@ -162,7 +163,7 @@ a helper that runs tests, pushes your branch, and triggers a Fly.io deployment:
 
    Once the new release is live, run the basic smoke script against the target URL:
    ```bash
-   ./scripts/smoke_test.sh https://your-app.fly.dev
+  bash scripts/smoke_test.sh https://your-app.fly.dev
    ```
    For staging environments the `scripts/clear_smoke_remote.py` helper logs in as the
    seeded admin and posts to `/admin/debug/cleanup` to remove test records:
@@ -174,9 +175,10 @@ a helper that runs tests, pushes your branch, and triggers a Fly.io deployment:
    When hosting locally you can still exercise everything with `make run` and
    `make smoke`/`make smoke-clean` as described above.  The `make deploy` target
    simply does `git push` and `flyctl deploy -a $(FLY_APP)`.
-5. **Tests**
+
+8. **Tests**
    ```bash
-  make test          # runs full pytest suite (currently 215 tests)
+  make test          # runs full pytest suite (currently 217 tests)
    ```
 
 ---

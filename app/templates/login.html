@@ -1,86 +1,19 @@
 {% extends "base.html" %}
 {% block body_class %}top-nav-layout no-vibe{% endblock %}
 {% block content %}
-<div class="row justify-content-center g-4 align-items-start login-grid">
-  <div class="col-lg-5 col-md-7">
-    <section class="surface-panel form-shell login-form-panel">
-      <div class="section-heading">
-        <div>
-          <h4 class="section-heading__title">Sign in</h4>
-          <p class="section-heading__subtitle">Choose your sign-in method. If your organization uses SSO, start there first.</p>
-        </div>
-      </div>
-      {% if config.SSO_ENABLED %}
-        <section class="login-auth-choice mb-3" aria-label="Single sign-on option">
-          <div class="eyebrow-label">Recommended</div>
-          <div class="login-auth-choice__title">Use your organization account</div>
-          <p class="login-auth-choice__text">If you normally sign in through your company identity provider, continue with SSO. You do not need a separate app password.</p>
-          <a class="btn btn-primary w-100 login-auth-choice__button" href="{{ url_for('auth.sso_login') }}">Continue with SSO</a>
-          <div class="login-auth-choice__hint">Use email and password only if an administrator gave you local credentials for this app.</div>
-        </section>
-        <div class="login-auth-divider" role="separator" aria-label="Or use local credentials">
-          <span>Or use local credentials</span>
-        </div>
-      {% endif %}
-      <form method="post" action="{{ url_for('auth.login') }}">
-        {{ form.csrf_token }}
-        {%- if request.args.get('next') -%}
-          <input type="hidden" name="next" value="{{ request.args.get('next') }}" />
-        {%- endif -%}
-        <div class="mb-3">
-          <label class="form-label">Email</label>
-          {{ form.email(class="form-control", autocomplete="off", autocapitalize="off", spellcheck="false") }}
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Password</label>
-          {{ form.password(class="form-control") }}
-        </div>
-        <button class="btn btn-outline-primary w-100">Sign in with email</button>
-      </form>
-      <div class="login-form-panel__footer small text-muted mt-3">
-        Looking for a guest-facing experience instead? Use <a href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a> to track or <a href="{{ url_for('external.external_new') }}">Guest Submit</a> to open a new external request.
-      </div>
-    </section>
-  </div>
-  <div class="col-lg-4 col-md-5">
-    <section class="surface-panel helper-stack login-panel-stack">
-      <div class="section-heading section-heading-compact mb-0">
-        <div>
-          <h4 class="section-heading__title">Before signing in</h4>
-          <p class="section-heading__subtitle">A few quick checkpoints for a smoother handoff into the app.</p>
-        </div>
-      </div>
-      <div class="helper-card">
-        <div class="helper-card__icon" aria-hidden="true">🔐</div>
-        <div>
-          <div class="helper-card__title">Use the correct account</div>
-          <div class="helper-card__text">{% if config.SSO_ENABLED %}If you usually use your work account, choose SSO first. Use local sign-in only when you were given a separate password for this app.{% else %}Sign in with the email tied to your department access and saved request activity.{% endif %}</div>
-        </div>
-      </div>
-      <div class="helper-card">
-        <div class="helper-card__icon" aria-hidden="true">🧭</div>
-        <div>
-          <div class="helper-card__title">Guest access stays separate</div>
-          <div class="helper-card__text">External request tracking is still available from the Guest Dashboard in the top navigation.</div>
-        </div>
-      </div>
-      <div class="helper-card">
-        <div class="helper-card__icon" aria-hidden="true">✨</div>
-        <div>
-          <div class="helper-card__title">What you can do after login</div>
-          <div class="helper-card__text">Review request history, update urgency, and keep owners aligned with reminders and clear status guidance.</div>
-        </div>
-      </div>
-    </section>
-  </div>
-</div>
+<div class="login-shell">
+  <section class="page-header login-page-header">
+    <div>
+      <div class="page-header__eyebrow">Access workspace</div>
+      <h1 class="page-header__title">Sign in to keep requests moving</h1>
+      <p class="page-header__lede">Use the same shared workspace surfaces, routing cues, and guest handoff paths from the moment you enter the app.</p>
+    </div>
+  </section>
 
-<details class="login-info mt-4">
-  <summary class="fw-semibold">Why sign in?</summary>
-  <section class="login-hero surface-panel mb-4">
+  <section class="login-hero surface-panel surface-panel-muted">
     <div class="login-hero__content">
       <div class="page-header__eyebrow">Welcome back</div>
-      <h1 class="login-hero__title">Sign in to keep requests moving</h1>
+      <h2 class="login-hero__title">Keep every path consistent from login onward</h2>
       <p class="login-hero__lede">Track handoffs, update priorities, send reminders, and manage guest-facing workflows from one shared workspace.</p>
       <div class="login-hero__chips" aria-label="Platform highlights">
         <span class="login-hero__chip">Priority controls</span>
@@ -97,5 +30,79 @@
       </div>
     </div>
   </section>
-</details>
+
+  <div class="row justify-content-center g-4 align-items-start login-grid">
+    <div class="col-lg-5 col-md-7">
+      <section class="surface-panel form-shell login-form-panel">
+        <div class="section-heading mb-0">
+          <div>
+            <h4 class="section-heading__title">Sign in</h4>
+            <p class="section-heading__subtitle">Choose your sign-in method. If your organization uses SSO, start there first.</p>
+          </div>
+        </div>
+        {% if config.SSO_ENABLED %}
+          <section class="login-auth-choice" aria-label="Single sign-on option">
+            <div class="eyebrow-label">Recommended</div>
+            <div class="login-auth-choice__title">Use your organization account</div>
+            <p class="login-auth-choice__text">If you normally sign in through your company identity provider, continue with SSO. You do not need a separate app password.</p>
+            <a class="btn btn-primary w-100 login-auth-choice__button" href="{{ url_for('auth.sso_login') }}">Continue with SSO</a>
+            <div class="login-auth-choice__hint">Use email and password only if an administrator gave you local credentials for this app.</div>
+          </section>
+          <div class="login-auth-divider" role="separator" aria-label="Or use local credentials">
+            <span>Or use local credentials</span>
+          </div>
+        {% endif %}
+        <form method="post" action="{{ url_for('auth.login') }}">
+          {{ form.csrf_token }}
+          {%- if request.args.get('next') -%}
+            <input type="hidden" name="next" value="{{ request.args.get('next') }}" />
+          {%- endif -%}
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            {{ form.email(class="form-control", autocomplete="off", autocapitalize="off", spellcheck="false") }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Password</label>
+            {{ form.password(class="form-control") }}
+          </div>
+          <button class="btn btn-primary w-100">Sign in with email</button>
+        </form>
+        <div class="login-form-panel__footer small text-muted">
+          Looking for a guest-facing experience instead? Use <a href="{{ url_for('external.external_dashboard') }}">Guest Dashboard</a> to track or <a href="{{ url_for('external.external_new') }}">Guest Submit</a> to open a new external request.
+        </div>
+      </section>
+    </div>
+    <div class="col-lg-4 col-md-5">
+      <section class="surface-panel helper-stack login-panel-stack">
+        <div class="section-heading section-heading-compact mb-0">
+          <div>
+            <h4 class="section-heading__title">Before signing in</h4>
+            <p class="section-heading__subtitle">A few quick checkpoints for a smoother handoff into the app.</p>
+          </div>
+        </div>
+        <div class="helper-card">
+          <div class="helper-card__icon" aria-hidden="true">🔐</div>
+          <div>
+            <div class="helper-card__title">Use the correct account</div>
+            <div class="helper-card__text">{% if config.SSO_ENABLED %}If you usually use your work account, choose SSO first. Use local sign-in only when you were given a separate password for this app.{% else %}Sign in with the email tied to your department access and saved request activity.{% endif %}</div>
+          </div>
+        </div>
+        <div class="helper-card">
+          <div class="helper-card__icon" aria-hidden="true">🧭</div>
+          <div>
+            <div class="helper-card__title">Guest access stays separate</div>
+            <div class="helper-card__text">External request tracking is still available from the Guest Dashboard in the top navigation.</div>
+          </div>
+        </div>
+        <div class="helper-card">
+          <div class="helper-card__icon" aria-hidden="true">✨</div>
+          <div>
+            <div class="helper-card__title">What you can do after login</div>
+            <div class="helper-card__text">Review request history, update urgency, and keep owners aligned with reminders and clear status guidance.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
 {% endblock %}

@@ -56,7 +56,7 @@ def test_feature_flags_render_correct_action_labels(client, app):
     assert 'data-toggle-text-checked="Notifications enabled"' in html
     assert 'Notifications enabled' in html
     assert 'Automated reminders disabled' in html
-    assert 'Vibe button UI enabled' in html
+    assert 'Theme button enabled' in html
     assert 'surface-panel admin-feature-flags-panel' in html
     assert 'admin-feature-flags__section' in html
     assert 'admin-toggle-card admin-feature-flags__option' in html

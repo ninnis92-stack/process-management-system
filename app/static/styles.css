@@ -72,6 +72,39 @@
   box-shadow: var(--shadow-md);
 }
 
+.login-shell {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.login-page-header {
+  margin-bottom: 0;
+}
+
+.login-grid {
+  align-items: stretch;
+}
+
+.login-form-panel,
+.login-panel-stack {
+  height: 100%;
+}
+
+.login-panel-stack {
+  justify-content: flex-start;
+}
+
+.login-form-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.login-form-panel form {
+  display: grid;
+  gap: 0.25rem;
+}
+
 .login-hero__title {
   margin: 0 0 0.65rem;
   font-size: clamp(1.8rem, 1.45rem + 1vw, 2.5rem);
@@ -671,28 +704,91 @@ body.theme-preset-twilight.dark-mode {
   per-user vibe. This should only affect light mode; dark-mode must keep
   its own palette tokens. */
 body.no-vibe:not(.dark-mode) {
-  --nav-bg: #162033;
-  --nav-text: #f8fbff;
-  --accent: #4f8cff;
-  --accent-2: #8b5cf6;
-  --page-bg: radial-gradient(circle at 18% 18%, rgba(96, 165, 250, 0.10), transparent 28%), radial-gradient(circle at 82% 0%, rgba(196, 181, 253, 0.12), transparent 26%), linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
-  --body-text: #132033;
-  --body-text-soft: #334155;
-  --muted: #64748b;
-  --border: rgba(15, 23, 42, 0.10);
-  --surface: #ffffff;
-  --surface-2: #f4f7fb;
-  --focus: rgba(59, 130, 246, 0.18);
+  --nav-bg: #1a2431;
+  --nav-text: #eef4f8;
+  --accent: #51677f;
+  --accent-2: #7d8da1;
+  --accent-rgb: 81, 103, 127;
+  --page-bg: radial-gradient(circle at 16% 14%, rgba(148, 163, 184, 0.15), transparent 26%),
+             radial-gradient(circle at 84% 0%, rgba(226, 232, 240, 0.72), transparent 24%),
+             linear-gradient(180deg, #f8fafc 0%, #edf2f6 100%);
+  --body-text: #162231;
+  --body-text-soft: #3a4b5f;
+  --body-text-muted: #66758a;
+  --muted: #66758a;
+  --border: rgba(15, 23, 42, 0.11);
+  --border-strong: rgba(15, 23, 42, 0.16);
+  --surface: #fbfdff;
+  --surface-2: #f2f5f8;
+  --surface-3: #e9eef3;
+  --surface-raised: #ffffff;
+  --surface-muted: #f4f7fa;
+  --surface-accent: #e7edf3;
+  --banner-bg: #e4ebf1;
+  --banner-border: rgba(81, 103, 127, 0.16);
+  --banner-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  --focus: rgba(81, 103, 127, 0.16);
 }
 
 body.no-vibe:not(.dark-mode) .admin-hero {
   background: var(--surface-raised);
 }
 
+body.no-vibe:not(.dark-mode) .theme-nav {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.16);
+}
+
+body.no-vibe:not(.dark-mode) .brand-banner-row {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08));
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.no-vibe:not(.dark-mode) .brand-banner-row__quote-panel,
+body.no-vibe:not(.dark-mode) .login-hero,
+body.no-vibe:not(.dark-mode) .login-hero__aside-card,
+body.no-vibe:not(.dark-mode) .login-auth-choice {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-accent) 72%, white 28%), var(--surface-raised));
+  border-color: rgba(81, 103, 127, 0.14);
+}
+
+body.no-vibe:not(.dark-mode) .login-hero__chip,
+body.no-vibe:not(.dark-mode) .dashboard-section-badge,
+body.no-vibe:not(.dark-mode) .search-hero__chip {
+  background: color-mix(in srgb, var(--surface-accent) 78%, white 22%);
+  border-color: rgba(81, 103, 127, 0.14);
+  color: color-mix(in srgb, var(--accent) 76%, var(--body-text) 24%);
+}
+
+body.no-vibe:not(.dark-mode) .dashboard-launchpad,
+body.no-vibe:not(.dark-mode) .search-hero {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-accent) 54%, white 46%), var(--surface-raised));
+  border-color: rgba(81, 103, 127, 0.14);
+}
+
+body.no-vibe:not(.dark-mode) .btn-primary {
+  background: color-mix(in srgb, var(--accent) 88%, #213042 12%);
+  border-color: color-mix(in srgb, var(--accent) 88%, #213042 12%);
+  color: #ffffff !important;
+}
+
+body.no-vibe:not(.dark-mode) .btn-outline-primary {
+  border-color: rgba(81, 103, 127, 0.32);
+  color: color-mix(in srgb, var(--accent) 82%, var(--body-text) 18%);
+}
+
+body.no-vibe:not(.dark-mode) .btn-outline-primary:hover,
+body.no-vibe:not(.dark-mode) .btn-outline-primary:focus-visible {
+  background: color-mix(in srgb, var(--surface-accent) 84%, white 16%);
+  border-color: rgba(81, 103, 127, 0.4);
+  color: var(--body-text);
+}
+
 body.theme-preset-sky:not(.dark-mode) {
   --nav-bg: #082032;
-  --accent: #3ec1d3;
-  --accent-2: #7ad7f0;
+  --accent: #1f8797;
+  --accent-2: #2f9eb0;
+  --accent-rgb: 31, 135, 151;
   --page-bg: radial-gradient(circle at 20% 20%, rgba(62,193,211,0.15), transparent 30%),
              radial-gradient(circle at 80% 0%, rgba(122,215,240,0.14), transparent 28%),
              #f1fbff;
@@ -700,8 +796,9 @@ body.theme-preset-sky:not(.dark-mode) {
 
 body.theme-preset-moss:not(.dark-mode) {
   --nav-bg: #1f3b2d;
-  --accent: #7bc96f;
-  --accent-2: #b6d7a8;
+  --accent: #4e8744;
+  --accent-2: #6a9a5f;
+  --accent-rgb: 78, 135, 68;
   --page-bg: radial-gradient(circle at 20% 20%, rgba(123,201,111,0.16), transparent 30%),
              radial-gradient(circle at 80% 0%, rgba(182,215,168,0.14), transparent 28%),
              #f4fbf5;
@@ -709,8 +806,9 @@ body.theme-preset-moss:not(.dark-mode) {
 
 body.theme-preset-dawn:not(.dark-mode) {
   --nav-bg: #3b1f2b;
-  --accent: #ff8a5b;
-  --accent-2: #ffb26b;
+  --accent: #c8643b;
+  --accent-2: #d48454;
+  --accent-rgb: 200, 100, 59;
   --page-bg: radial-gradient(circle at 20% 20%, rgba(255,138,91,0.16), transparent 30%),
              radial-gradient(circle at 80% 0%, rgba(255,178,107,0.14), transparent 28%),
              #fff8f3;
@@ -718,8 +816,9 @@ body.theme-preset-dawn:not(.dark-mode) {
 
 body.theme-preset-twilight:not(.dark-mode) {
   --nav-bg: #0a0f1f;
-  --accent: #8ea7ff;
-  --accent-2: #7a5cff;
+  --accent: #5f73c5;
+  --accent-2: #6f58d4;
+  --accent-rgb: 95, 115, 197;
   --page-bg: radial-gradient(circle at 20% 20%, rgba(142,167,255,0.15), transparent 30%),
              radial-gradient(circle at 80% 0%, rgba(122,92,255,0.14), transparent 28%),
              #eef1fb;
@@ -832,6 +931,7 @@ body.theme-preset-twilight:not(.dark-mode) {
   background: var(--surface-raised);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 .brand-banner-row--quotes-only .brand-banner-row__quote-panel {
   flex: 1 1 100%;
@@ -844,6 +944,8 @@ body.theme-preset-twilight:not(.dark-mode) {
   text-align: center;
   gap: 0.18rem;
   flex: 1 1 auto;
+  width: 100%;
+  overflow: hidden;
 }
 .brand-banner-row__control-panel {
   flex: 0 0 auto;
@@ -893,7 +995,7 @@ body.theme-preset-twilight:not(.dark-mode) {
   font-size: 0.76rem;
   line-height: 1.1;
   border-radius: 999px;
-  background: rgb(var(--accent-rgb, 79, 140, 255));
+  background: color-mix(in srgb, rgb(var(--accent-rgb, 79, 140, 255)) 82%, #0f172a 18%);
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: #ffffff !important;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.28);
@@ -903,10 +1005,8 @@ body.theme-preset-twilight:not(.dark-mode) {
   display: inline-block;
   white-space: normal;
   line-height: 1.25;
-  /* allow full width so long quotes aren't artificially truncated */
-  max-width: none;
-  overflow: visible;
-  /* remove line-clamp rules – every quote should wrap normally */
+  max-width: 100%;
+  overflow: hidden;
   pointer-events: auto;
   user-select: none;
   cursor: pointer;
@@ -916,15 +1016,21 @@ body.theme-preset-twilight:not(.dark-mode) {
   transition: opacity 0.35s ease, transform 0.35s ease;
   flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
+  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  line-clamp: 3;
+  -webkit-line-clamp: 3;
 }
 
 /* Keep the navbar stable regardless of quote length; allow small flex so
    narrow/tall phones (foldables) don't clip the bottom of the quote. */
 #motivation {
-  /* Reserve space for ~2 lines but allow slight expansion to avoid clipping */
-  min-height: 2.4rem;
-  max-height: 3.2rem;
-  overflow: visible; /* allow the quote to render without being cut off */
+  min-height: 3.4rem;
+  max-height: 4.1rem;
+  overflow: hidden;
 }
 
 /* Ensure brand area centers vertically and doesn't cause navbar resizing */
@@ -3591,10 +3697,17 @@ canvas {
 /* Typography/sizing tweaks for very small devices */
 @media (max-width: 420px) {
   .brand-title { font-size: 0.95rem; }
-  .brand-quote { display: none; }
   .nav-actions { gap: 0.25rem; }
   .card { padding: 0.75rem; }
   .btn { font-size: 0.85rem; }
+
+  #motivation {
+    font-size: 0.76rem;
+    min-height: 2rem;
+    max-height: 2.6rem;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+  }
 }
 
 @media (max-width: 576px) {
@@ -3605,6 +3718,10 @@ canvas {
   #motivation {
     max-width: 100%;
     font-size: 0.82rem;
+    min-height: 2.2rem;
+    max-height: 3rem;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
   }
 
   .nav-actions .btn,

@@ -34,7 +34,7 @@ def test_user_can_select_quote_set(app, client):
     # load settings page and verify quote_set field and toggle present
     rv = client.get("/auth/settings")
     assert rv.status_code == 200
-    assert b"Rolling Quote Set" in rv.data
+    assert b"Message set" in rv.data
     assert b"Rotating quotes enabled" in rv.data
 
     # select the engineering set and save
