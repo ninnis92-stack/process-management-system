@@ -387,9 +387,7 @@ document.addEventListener('DOMContentLoaded', function(){
       const closeUrl = btn.dataset.stateCloseUrl || openUrl;
 
       let shouldShowClose = false;
-      if(action === 'command-center'){
-        shouldShowClose = isAdminView;
-      } else if(action === 'dashboard'){
+      if(action === 'dashboard'){
         shouldShowClose = isDashboardView;
       }
 

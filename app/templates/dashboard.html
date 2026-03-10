@@ -80,9 +80,6 @@
         <a class="btn btn-sm btn-primary" href="{{ url_for('requests.request_new') }}">Create first request</a>
       {% endif %}
       <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('requests.search_requests') }}">Search work</a>
-      {% if current_user.is_authenticated and current_user.is_admin %}
-        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.index') }}">Open command center</a>
-      {% endif %}
     </div>
   </div>
   <div class="row g-3 mt-1">
