@@ -94,6 +94,11 @@
             </div>
           </div>
         </a>
+        {% if current_user.is_authenticated and current_user.is_admin %}
+          <div class="brand-banner-row__admin-button">
+            <a href="{{ url_for('admin.index') }}" class="btn btn-sm btn-outline-light brand-admin-btn" title="Admin dashboard">Admin</a>
+          </div>
+        {% endif %}
         {% if show_brand_banner %}
           <div class="brand-banner-row{% if not vibe_ui_enabled %} brand-banner-row--quotes-only{% endif %}" data-theme-banner>
             <div class="brand-banner-row__quote-panel" data-vibe-quote-panel>

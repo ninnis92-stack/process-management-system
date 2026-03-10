@@ -245,6 +245,7 @@ def test_department_a_navigation_links_resolve(app, client):
     page = client.get("/dashboard")
     assert page.status_code == 200
     html = page.get_data(as_text=True)
+    print(html)
 
     # non-admin pages should still include the attribute set to "0"
     assert 'data-user-is-admin="0"' in html
@@ -284,6 +285,7 @@ def test_admin_navigation_links_resolve(app, client):
     page = client.get("/admin/")
     assert page.status_code == 200
     html = page.get_data(as_text=True)
+    print(html)
 
     # admin pages should flag the user as an administrator so that client-
     # side logic (like the department picker modal) skips itself.
@@ -300,6 +302,9 @@ def test_admin_navigation_links_resolve(app, client):
     assert re.search(r'href="/admin/"', html)
     assert re.search(r'href="/admin/">\s*<i[^>]*></i><span>Admin</span></a>', html)
     assert not re.search(r'<a class="nav-link[^"]*" href="/admin/">Dashboard</a>', html)
+    # banner should include an explicit admin dashboard button for admins
+    assert 'class="brand-admin-btn"' in html
+    assert "Admin dashboard" in html or 'title="Admin dashboard"' in html
     # ensure breadcrumb isn’t itself a clickable Admin link
     assert not re.search(
         r'<ol class="breadcrumb[^"]*">[\s\S]*?<a[^>]+>Admin<\/a>', html
@@ -339,6 +344,7 @@ def test_settings_page_exposes_onboarding_guidance_toggle(app, client):
     page = client.get("/auth/settings")
     assert page.status_code == 200
     html = page.get_data(as_text=True)
+    print(html)
     assert "Learning aids" in html
     assert 'name="onboarding_guidance_enabled_present"' in html
     assert 'name="onboarding_guidance_enabled"' in html
@@ -384,6 +390,7 @@ def test_navbar_department_dropdown_for_multi_dept_user(app, client):
     page = client.get("/dashboard")
     assert page.status_code == 200
     html = page.get_data(as_text=True)
+    print(html)
     assert 'id="navbarDeptSelect"' in html
     assert 'data-bs-target="#chooseDeptModal"' not in html
     # inline script should skip the modal when the navbar dropdown exists
@@ -563,3 +570,10 @@ def test_toggle_persistence_script_present(client, app):
         script = handle.read()
     assert "toggle_states" in script
     assert "sessionStorage" in script
+def test_global_text_color_rule():
+    """Ensure stylesheet sets body text color for readability."""
+    import os, re
+    css_path = os.path.join(os.path.dirname(__file__), "..", "app", "static", "styles.css")
+    with open(css_path, encoding="utf-8") as f:
+        content = f.read()
+    assert re.search(r"body[^\{]*\{[^}]*color:\s*var\(--body-text\)", content), "global body color rule missing"

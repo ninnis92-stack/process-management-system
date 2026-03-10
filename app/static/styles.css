@@ -557,6 +557,21 @@ html {
   --shadow-lg: 0 18px 40px rgba(15, 23, 42, 0.12);
 }
 
+/* enforce readable text throughout the UI */
+body,
+.surface-panel,
+.page-shell,
+.admin-sidebar,
+.admin-sidebar-panel,
+.admin-hero,
+.hero-callout-card {
+  color: var(--body-text) !important;
+}
+
+.brand-admin-btn {
+  margin-right: 0.5rem;
+}
+
 /* Dark-mode variables and adjustments for improved contrast */
 .dark-mode {
   --nav-bg: #0b1220;
@@ -3499,6 +3514,14 @@ pre,
   .theme-body,
   .page-shell,
   .surface-panel,
+  .admin-sidebar,
+  .admin-sidebar-panel,
+  .admin-hero,
+  .hero-callout-card,
+  .admin-sidebar,
+  .admin-sidebar-panel,
+  .admin-hero,
+  .hero-callout-card,
   .printable-request-header,
   .printable-request-process,
   .printable-request-section,
@@ -3511,6 +3534,8 @@ pre,
 
   body {
     font-size: 12px;
+    /* ensure default text color is always legible */
+    color: var(--body-text) !important;
   }
 
   .main {

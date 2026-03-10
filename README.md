@@ -38,6 +38,7 @@ Key capabilities:
   second schema. The print view includes the shared intake fields, the
   template’s configured sections and options, the workflow preview, and the
   active workspace branding context.
+- **Admin dashboard quick link in navbar banner** so workspace operators can return to the command center with a single click. This control appears beside theme/vibe controls and is always visible to signed-in administrators, even when the workspace banner is disabled.
 - **Clearer public entry flow** with a simplified guest intake path, no
   public department-switch modal, and the default quote set used on the
   login screen when rotating quotes are enabled
@@ -102,7 +103,7 @@ and default diff views.
 
     Preference updates now also write a timestamp into `localStorage` (similar to feature flags) so that other open browser tabs will reload automatically and mirror your choices.  On the settings page the vibe‑button toggle has a tiny live preview that shows or hides the sample control immediately and the banner layout recomputes when quote or vibe visibility changes.
 
-  The admin command centre includes a Notifications card which flips a workspace-wide flag; the backend route at `/admin/toggle_notifications` and the `/notifications/*` API endpoints are fully implemented and covered by tests.  A recent style tweak ensures every admin card (including the bell) uses the standard body text colour so the dashboard looks cohesive in both light and dark modes.
+  The admin command centre includes a Notifications card which flips a workspace-wide flag; the backend route at `/admin/toggle_notifications` and the `/notifications/*` API endpoints are fully implemented and covered by tests.  A recent style tweak ensures every admin card (including the bell) uses the standard body text colour so the dashboard looks cohesive in both light and dark modes. A global CSS rule now ensures body text always defaults to the current theme’s readable color, preventing white‑on‑white cases.
 
   **Learning aids:** the “Workflow signal” hero panels on dashboard, admin landing and external dashboards are controlled by a per‑user toggle (`onboarding_guidance_enabled`).  The same flag is exposed on the settings page (and saved via the autosave machinery) so users can hide the guided “start here” panels once they’ve seen them; functional workflow previews still appear where they belong.  The toggle respects session persistence and broadcast logic just like other preferences.
 
