@@ -834,8 +834,14 @@ def dashboard():
                 db.session.rollback()
             except Exception:
                 pass
-        bucket_list = (
-            StatusBucket.query.filter(StatusBucket.active == True)
+        # load buckets along with their statuses to avoid N+1 queries when
+    # iterating over `bucket_list` below.  the Python-side sort mirrors the
+    # previous SQL `order_by` call on the relationship.
+    from sqlalchemy.orm import selectinload
+
+    bucket_list = (
+            StatusBucket.query.options(selectinload(StatusBucket.statuses))
+            .filter(StatusBucket.active == True)
             .filter(
                 (StatusBucket.department_name == None)
                 | (StatusBucket.department_name == "")
@@ -857,7 +863,9 @@ def dashboard():
             if namekey == "unassigned":
                 q = q.filter(ReqModel.assigned_to_user_id.is_(None))
             # apply status restrictions if bucket has statuses defined
-            scs = [s.status_code for s in b.statuses.order_by(BucketStatus.order.asc()).all()]
+            # statuses are already eager-loaded; sort in Python instead of
+            # issuing a new query for each bucket.
+            scs = [s.status_code for s in sorted(b.statuses, key=lambda s: s.order)]
             if scs:
                 q = q.filter(ReqModel.status.in_(scs))
             counts[b.id] = q.count()
@@ -868,7 +876,7 @@ def dashboard():
         selected_bucket_mode = True
         b = db.session.get(StatusBucket, int(bucket_id))
         if b:
-            status_codes = [s.status_code for s in b.statuses.order_by(BucketStatus.order.asc()).all()]
+            status_codes = [s.status_code for s in sorted(b.statuses, key=lambda s: s.order)]
             bucket_namekey = (b.name or "").strip().lower()
         else:
             status_codes = None

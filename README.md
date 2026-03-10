@@ -182,6 +182,31 @@ and default diff views.
   make test          # runs full pytest suite (currently 217 tests)
    ```
 
+9. **Performance & tuning**
+
+   This is a prototype but there are a few built‑in helpers and some
+   documentation if you start exercising it under load:
+
+   * see `docs/PROFILING.md` for a longer checklist on profiling, eager‑loading
+     relationships, pagination, and caching; the note at the bottom of that
+     file even contains a sample query showing `selectinload()` usage when you
+     need to avoid N+1 database round‑trips.
+   * the application already caches the dashboard, search results, and
+     metrics UI for a short time; templates use per‑request caches in
+     helpers such as `get_user_departments()` and `gravatar_url()` to avoid
+     repeating identical database or hashing work within a single request.
+   * performing a `make smoke` run or using `k6/load_test.js` while running a
+     profiler (e.g. `pyinstrument`) is the best way to identify the real
+     hotspots in your usage scenario.  Once you know where the delays are you
+     can apply any of the tactics listed earlier: eager loads, Redis or
+     lru_cache decorators, background jobs, database indexes, etc.
+
+   A “finish‑the‑job for you” implementation of all of the bullet points
+   listed earlier would require a detailed audit of every handler and model;
+   the repository provides the tools to make that audit easy, but it isn’t the
+   sort of change you can auto‑generate with a single patch.  Start by
+   measuring, optimize a few hot code paths, and iterate.  
+
 ---
 
 ## Database & migrations

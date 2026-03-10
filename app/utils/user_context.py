@@ -3,15 +3,28 @@ import hashlib
 from ..extensions import db
 
 
+from flask import g
+
+
 def gravatar_url(email, size=34, default="mp"):
+    # cache the result per-request in ``flask.g`` to avoid recomputing the
+    # md5 digest when the same address is rendered multiple times on a page.
+    key = f"gravatar:{email}:{size}:{default}"
+    if hasattr(g, key):
+        return getattr(g, key)
+
     if not email:
-        return f"https://www.gravatar.com/avatar/?d={default}&s={size}"
-    try:
-        normalized = email.strip().lower().encode("utf-8")
-        digest = hashlib.md5(normalized).hexdigest()
-        return f"https://www.gravatar.com/avatar/{digest}?d={default}&s={size}"
-    except Exception:
-        return f"https://www.gravatar.com/avatar/?d={default}&s={size}"
+        result = f"https://www.gravatar.com/avatar/?d={default}&s={size}"
+    else:
+        try:
+            normalized = email.strip().lower().encode("utf-8")
+            digest = hashlib.md5(normalized).hexdigest()
+            result = f"https://www.gravatar.com/avatar/{digest}?d={default}&s={size}"
+        except Exception:
+            result = f"https://www.gravatar.com/avatar/?d={default}&s={size}"
+
+    setattr(g, key, result)
+    return result
 
 
 def avatar_url_for(user, size=34):
@@ -24,9 +37,19 @@ def avatar_url_for(user, size=34):
 
 
 def get_user_departments(user):
-    """Return ordered department codes the user may act as."""
+    """Return ordered department codes the user may act as.
+
+    Results are cached on ``flask.g`` for the duration of the request so
+    repeated permission checks or template renders don't hit the database
+    multiple times.
+    """
     if not user:
         return []
+
+    cache_key = f"user_depts:{getattr(user, 'id', None)}"
+    if hasattr(g, cache_key):
+        return getattr(g, cache_key)
+
     try:
         from ..models import Department, UserDepartment
 
@@ -72,9 +95,12 @@ def get_user_departments(user):
                 for row in rows
                 if (row.code or "").strip()
             ]
-            return admin_depts or depts
+            result = admin_depts or depts
+        else:
+            result = depts
 
-        return depts
+        setattr(g, cache_key, result)
+        return result
     except Exception:
         try:
             db.session.rollback()
