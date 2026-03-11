@@ -85,18 +85,17 @@ def _default_workflow_spec():
 def main():
     app = create_app()
     with app.app_context():
-        # Run Alembic migrations to bring the DB schema up-to-date. This is
-        # the recommended production approach instead of `db.create_all()`.
+        # Report which database we're connected to and run Alembic migrations
+        from app import db
+        conn = db.engine.connect()
+        print("db_engine_url=", conn.engine.url)
+        conn.close()
+
         try:
-            # Prefer invoking the local `alembic` CLI so the virtualenv
-            # packaged in the deployment image runs the right code.
             rc = subprocess.run(["alembic", "upgrade", "head"], check=False)
             if rc.returncode == 0:
                 print("alembic_upgrade=ok")
             else:
-                # Some repos have multiple heads (merge commits). If the
-                # single 'head' target fails, attempt to upgrade all heads
-                # which is a safe idempotent fallback.
                 print("alembic_upgrade=head_failed", rc.returncode)
                 try:
                     rc2 = subprocess.run(["alembic", "upgrade", "heads"], check=False)
@@ -109,10 +108,17 @@ def main():
                 except Exception as exc2:
                     print("alembic_upgrade_heads_exception", exc2, file=sys.stderr)
         except FileNotFoundError:
-            # Alembic binary not available; skip with a warning.
             print("alembic not found; skipping migrations")
         except Exception as exc:
             print("alembic_upgrade_exception", exc, file=sys.stderr)
+
+        # ensure original_sender exists even if alembic misfires
+        try:
+            with db.engine.connect() as c:
+                c.execute(text("ALTER TABLE request ADD COLUMN IF NOT EXISTS original_sender VARCHAR(255)"))
+                print("ensured_column_original_sender")
+        except Exception as exc:
+            print("column_ensure_exception", exc, file=sys.stderr)
 
         # Safety net for environments where Alembic is not configured (e.g. no
         # alembic.ini in image) so deployments still converge on required schema.
