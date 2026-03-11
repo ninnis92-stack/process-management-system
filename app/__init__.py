@@ -46,6 +46,25 @@ def create_app():
         db_url = db_url.replace("postgres://", "postgresql://", 1)
     app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 
+    # Ensure critical schema exists on startup. This handles cases where
+    # Alembic migrations may not have run (e.g. secret/env misconfiguration).
+    # The `original_sender` column is referenced by the dashboard query.
+    try:
+        from sqlalchemy import inspect, text
+        db.init_app(app)
+        with app.app_context():
+            insp = inspect(db.engine)
+            if "request" in insp.get_table_names():
+                cols = [c["name"] for c in insp.get_columns("request")]
+                if "original_sender" not in cols:
+                    app.logger.warning("adding missing column original_sender on request")
+                    db.engine.execute(
+                        text("ALTER TABLE request ADD COLUMN IF NOT EXISTS original_sender VARCHAR(255)")
+                    )
+    except Exception:
+        # silently ignore any errors; will surface later if something truly wrong
+        pass
+
     @app.cli.command("notify-due")
     def notify_due():
         from .notifications.due import send_due_soon_notifications
