@@ -33,6 +33,18 @@ Common commands
   flyctl deploy -a <your-fly-app-name>
   ```
 
+  > **Note:** the first time you deploy, the app needs a Postgres volume named
+  > `pg_data`. Your Makefile (and `scripts/ensure_volume.sh`) will create it
+  > automatically, but you can also run this by hand:
+  >
+  > ```bash
+  > flyctl volume create pg_data -a <your-fly-app-name> --size 1
+  > ```
+  >
+  > After the volume exists, it is reused on every subsequent deploy; you only
+  > ever create it once. Teammates running the app locally should be aware of
+  > this step and can skip it once it’s done.
+
 Environment & secrets
 - For local work set `DATABASE_URL` (if using Postgres), `SECRET_KEY`, and any SMTP or SSO vars in your Codespaces secrets or by exporting in the terminal.
 

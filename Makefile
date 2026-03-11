@@ -21,6 +21,8 @@ migrate:
 
 deploy:
 	@git push origin HEAD
+	@echo "Ensuring pg_data volume exists for $(FLY_APP)"
+	@./scripts/ensure_volume.sh
 	@echo "Deploying to Fly app: $(FLY_APP)"
 	@flyctl deploy -a $(FLY_APP)
 
