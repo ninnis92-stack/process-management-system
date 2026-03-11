@@ -17,18 +17,11 @@ depends_on = None
 
 
 def upgrade():
+    from sqlalchemy import inspect
     conn = op.get_bind()
-    if conn.dialect.name == "sqlite":
-        with op.batch_alter_table("audit_log") as batch_op:
-            batch_op.add_column(
-                sa.Column(
-                    "event_ts",
-                    sa.DateTime(),
-                    nullable=False,
-                    server_default=sa.text("CURRENT_TIMESTAMP"),
-                )
-            )
-    else:
+    inspector = inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('audit_log')]
+    if 'event_ts' not in columns:
         op.add_column(
             "audit_log",
             sa.Column(

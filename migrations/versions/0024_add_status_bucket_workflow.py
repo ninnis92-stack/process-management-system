@@ -18,24 +18,27 @@ depends_on = None
 
 def upgrade():
     conn = op.get_bind()
+    insp = sa.inspect(conn)
+    columns = [col['name'] for col in insp.get_columns('status_bucket')]
     col = sa.Column("workflow_id", sa.Integer(), nullable=True)
-    if conn.dialect.name == "sqlite":
-        # use batch_alter_table for SQLite
-        with op.batch_alter_table("status_bucket") as batch_op:
-            batch_op.add_column(col)
-    else:
-        op.add_column("status_bucket", col)
-        # add FK constraint if DB supports it
-        try:
-            op.create_foreign_key(
-                "fk_status_bucket_workflow",
-                "status_bucket",
-                "workflow",
-                ["workflow_id"],
-                ["id"],
-            )
-        except Exception:
-            pass
+    if "workflow_id" not in columns:
+        if conn.dialect.name == "sqlite":
+            # use batch_alter_table for SQLite
+            with op.batch_alter_table("status_bucket") as batch_op:
+                batch_op.add_column(col)
+        else:
+            op.add_column("status_bucket", col)
+            # add FK constraint if DB supports it
+            try:
+                op.create_foreign_key(
+                    "fk_status_bucket_workflow",
+                    "status_bucket",
+                    "workflow",
+                    ["workflow_id"],
+                    ["id"],
+                )
+            except Exception:
+                pass
 
 
 def downgrade():

@@ -19,61 +19,23 @@ def upgrade():
     # change nudge interval and min delay to FLOAT so fractional hours are allowed
     bind = op.get_bind()
     if bind.dialect.name == "sqlite":
-        # SQLite doesn't support ALTER COLUMN, so use workaround: recreate table
+        # Dynamically recreate table with all columns, only changing nudge_interval_hours and nudge_min_delay_hours to FLOAT
+        import sqlalchemy
+        insp = sqlalchemy.inspect(bind)
+        columns = []
+        for col in insp.get_columns("special_email_config"):
+            name = col["name"]
+            if name == "nudge_interval_hours" or name == "nudge_min_delay_hours":
+                columns.append(sa.Column(name, sa.Float(), nullable=True))
+            else:
+                # Use original type and nullable
+                columns.append(sa.Column(name, col["type"], nullable=col["nullable"]))
         op.execute("PRAGMA foreign_keys=off")
         op.execute("BEGIN TRANSACTION")
-        op.execute(
-            "CREATE TABLE special_email_config_new AS SELECT * FROM special_email_config"
-        )
+        op.execute("CREATE TABLE special_email_config_new AS SELECT * FROM special_email_config")
         op.execute("DROP TABLE special_email_config")
-        op.create_table(
-            "special_email_config",
-            sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column(
-                "enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")
-            ),
-            sa.Column("help_email", sa.String(length=255), nullable=True),
-            sa.Column("request_form_email", sa.String(length=255), nullable=True),
-            sa.Column("request_form_first_message", sa.Text(), nullable=True),
-            sa.Column(
-                "help_user_id", sa.Integer(), sa.ForeignKey("user.id"), nullable=True
-            ),
-            sa.Column(
-                "request_form_user_id",
-                sa.Integer(),
-                sa.ForeignKey("user.id"),
-                nullable=True,
-            ),
-            sa.Column(
-                "email_override",
-                sa.Boolean(),
-                nullable=False,
-                server_default=sa.text("false"),
-            ),
-            sa.Column(
-                "ticketing_override",
-                sa.Boolean(),
-                nullable=False,
-                server_default=sa.text("false"),
-            ),
-            sa.Column(
-                "inventory_override",
-                sa.Boolean(),
-                nullable=False,
-                server_default=sa.text("false"),
-            ),
-            sa.Column(
-                "nudge_enabled",
-                sa.Boolean(),
-                nullable=False,
-                server_default=sa.text("false"),
-            ),
-            sa.Column("nudge_interval_hours", sa.Float(), nullable=True),
-            sa.Column("nudge_min_delay_hours", sa.Float(), nullable=True),
-        )
-        op.execute(
-            "INSERT INTO special_email_config SELECT * FROM special_email_config_new"
-        )
+        op.create_table("special_email_config", *columns)
+        op.execute("INSERT INTO special_email_config SELECT * FROM special_email_config_new")
         op.execute("DROP TABLE special_email_config_new")
         op.execute("PRAGMA foreign_keys=on")
         op.execute("COMMIT")

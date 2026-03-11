@@ -17,17 +17,20 @@ depends_on = None
 
 def upgrade():
     conn = op.get_bind()
-    col = sa.Column(
-        "request_form_auto_reject_oos_enabled",
-        sa.Boolean(),
-        nullable=False,
-        server_default=sa.text("0"),
-    )
-    if conn.dialect.name == "sqlite":
-        with op.batch_alter_table("special_email_config") as batch_op:
-            batch_op.add_column(col)
-    else:
-        op.add_column("special_email_config", col)
+    insp = sa.inspect(conn)
+    columns = [col['name'] for col in insp.get_columns('special_email_config')]
+    if "request_form_auto_reject_oos_enabled" not in columns:
+        col = sa.Column(
+            "request_form_auto_reject_oos_enabled",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("0"),
+        )
+        if conn.dialect.name == "sqlite":
+            with op.batch_alter_table("special_email_config") as batch_op:
+                batch_op.add_column(col)
+        else:
+            op.add_column("special_email_config", col)
 
 
 def downgrade():

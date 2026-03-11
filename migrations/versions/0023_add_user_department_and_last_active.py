@@ -17,24 +17,27 @@ depends_on = None
 
 def upgrade():
     conn = op.get_bind()
-
+    insp = sa.inspect(conn)
     # Add last_active_dept column to user
+    user_columns = [col['name'] for col in insp.get_columns('user')]
     col = sa.Column("last_active_dept", sa.String(length=2), nullable=True)
-    if conn.dialect.name == "sqlite":
-        with op.batch_alter_table("user") as batch_op:
-            batch_op.add_column(col)
-    else:
-        op.add_column("user", col)
+    if "last_active_dept" not in user_columns:
+        if conn.dialect.name == "sqlite":
+            with op.batch_alter_table("user") as batch_op:
+                batch_op.add_column(col)
+        else:
+            op.add_column("user", col)
 
-    # Create user_department table
-    op.create_table(
-        "user_department",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("user_id", sa.Integer(), sa.ForeignKey("user.id"), nullable=False),
-        sa.Column("department", sa.String(length=2), nullable=False, index=True),
-        sa.Column("created_at", sa.DateTime(), nullable=True),
-        sa.UniqueConstraint("user_id", "department", name="uq_user_department"),
-    )
+    # Create user_department table if not exists
+    if not insp.has_table("user_department"):
+        op.create_table(
+            "user_department",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column("user_id", sa.Integer(), sa.ForeignKey("user.id"), nullable=False),
+            sa.Column("department", sa.String(length=2), nullable=False, index=True),
+            sa.Column("created_at", sa.DateTime(), nullable=True),
+            sa.UniqueConstraint("user_id", "department", name="uq_user_department"),
+        )
 
 
 def downgrade():

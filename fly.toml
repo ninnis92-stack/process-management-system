@@ -39,10 +39,10 @@ primary_region = 'ord'
   web = "gunicorn -w 3 --threads 4 -k gthread -b 0.0.0.0:8080 run:app"
 
 [[vm]]
-  memory = '4gb'
+  memory = '2gb'
   cpu_kind = 'shared'
   cpus = 1
-  memory_mb = 4096
+  memory_mb = 2048
 
 [deploy]
   # Run a one-time migration / table-creation step during deploy so new

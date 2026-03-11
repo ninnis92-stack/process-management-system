@@ -55,23 +55,36 @@ DEPARTMENT_EDITOR_COLUMNS = [
 
 def upgrade():
     conn = op.get_bind()
+    inspector = sa.inspect(conn)
     if conn.dialect.name == "sqlite":
+        existing_user_cols = [col["name"] for col in inspector.get_columns("user")]
         with op.batch_alter_table("user") as batch_op:
             for column in USER_COLUMNS:
-                batch_op.add_column(column)
+                if column.name not in existing_user_cols:
+                    batch_op.add_column(column)
+        existing_user_department_cols = [col["name"] for col in inspector.get_columns("user_department")]
         with op.batch_alter_table("user_department") as batch_op:
             for column in USER_DEPARTMENT_COLUMNS:
-                batch_op.add_column(column)
+                if column.name not in existing_user_department_cols:
+                    batch_op.add_column(column)
+        existing_department_editor_cols = [col["name"] for col in inspector.get_columns("department_editor")]
         with op.batch_alter_table("department_editor") as batch_op:
             for column in DEPARTMENT_EDITOR_COLUMNS:
-                batch_op.add_column(column)
+                if column.name not in existing_department_editor_cols:
+                    batch_op.add_column(column)
     else:
+        existing_user_cols = [col["name"] for col in inspector.get_columns("user")]
         for column in USER_COLUMNS:
-            op.add_column("user", column)
+            if column.name not in existing_user_cols:
+                op.add_column("user", column)
+        existing_user_department_cols = [col["name"] for col in inspector.get_columns("user_department")]
         for column in USER_DEPARTMENT_COLUMNS:
-            op.add_column("user_department", column)
+            if column.name not in existing_user_department_cols:
+                op.add_column("user_department", column)
+        existing_department_editor_cols = [col["name"] for col in inspector.get_columns("department_editor")]
         for column in DEPARTMENT_EDITOR_COLUMNS:
-            op.add_column("department_editor", column)
+            if column.name not in existing_department_editor_cols:
+                op.add_column("department_editor", column)
 
 
 def downgrade():

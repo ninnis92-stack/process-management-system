@@ -17,18 +17,21 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table(
-        "integration_config",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("department", sa.String(2), nullable=False),
-        sa.Column("kind", sa.String(40), nullable=False),
-        sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.text("1")),
-        sa.Column("config", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=True),
-    )
-    op.create_unique_constraint(
-        "uq_dept_kind", "integration_config", ["department", "kind"]
-    )
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    if not insp.has_table("integration_config"):
+        op.create_table(
+            "integration_config",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column("department", sa.String(2), nullable=False),
+            sa.Column("kind", sa.String(40), nullable=False),
+            sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+            sa.Column("config", sa.Text(), nullable=True),
+            sa.Column("created_at", sa.DateTime(), nullable=True),
+        )
+        op.create_unique_constraint(
+            "uq_dept_kind", "integration_config", ["department", "kind"]
+        )
 
 
 def downgrade():

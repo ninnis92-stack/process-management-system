@@ -17,20 +17,11 @@ depends_on = None
 
 
 def upgrade():
+    from sqlalchemy import inspect
     conn = op.get_bind()
-    # Add integer column with default 0; use batch_alter_table for SQLite
-    if conn.dialect.name == "sqlite":
-        with op.batch_alter_table("user") as batch_op:
-            batch_op.add_column(
-                sa.Column(
-                    "vibe_index",
-                    sa.Integer(),
-                    nullable=True,
-                    server_default=sa.text("0"),
-                )
-            )
-            # Remove server_default after creation if desired by downstream migrations
-    else:
+    inspector = inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('user')]
+    if 'vibe_index' not in columns:
         op.add_column(
             "user",
             sa.Column(

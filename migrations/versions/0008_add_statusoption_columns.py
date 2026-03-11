@@ -18,61 +18,69 @@ depends_on = None
 
 def upgrade():
     conn = op.get_bind()
-    # Add boolean columns with safe defaults
+    insp = sa.inspect(conn)
+    columns = [col['name'] for col in insp.get_columns('status_option')]
+    # Add boolean columns with safe defaults if not exist
     if conn.dialect.name == "sqlite":
         with op.batch_alter_table("status_option") as batch_op:
-            batch_op.add_column(
+            if "screenshot_required" not in columns:
+                batch_op.add_column(
+                    sa.Column(
+                        "screenshot_required",
+                        sa.Boolean(),
+                        nullable=False,
+                        server_default=sa.text("0"),
+                    )
+                )
+            if "email_enabled" not in columns:
+                batch_op.add_column(
+                    sa.Column(
+                        "email_enabled",
+                        sa.Boolean(),
+                        nullable=False,
+                        server_default=sa.text("0"),
+                    )
+                )
+            if "notify_to_originator_only" not in columns:
+                batch_op.add_column(
+                    sa.Column(
+                        "notify_to_originator_only",
+                        sa.Boolean(),
+                        nullable=False,
+                        server_default=sa.text("0"),
+                    )
+                )
+    else:
+        if "screenshot_required" not in columns:
+            op.add_column(
+                "status_option",
                 sa.Column(
                     "screenshot_required",
                     sa.Boolean(),
                     nullable=False,
                     server_default=sa.text("0"),
-                )
+                ),
             )
-            batch_op.add_column(
+        if "email_enabled" not in columns:
+            op.add_column(
+                "status_option",
                 sa.Column(
                     "email_enabled",
                     sa.Boolean(),
                     nullable=False,
                     server_default=sa.text("0"),
-                )
+                ),
             )
-            batch_op.add_column(
+        if "notify_to_originator_only" not in columns:
+            op.add_column(
+                "status_option",
                 sa.Column(
                     "notify_to_originator_only",
                     sa.Boolean(),
                     nullable=False,
                     server_default=sa.text("0"),
-                )
+                ),
             )
-    else:
-        op.add_column(
-            "status_option",
-            sa.Column(
-                "screenshot_required",
-                sa.Boolean(),
-                nullable=False,
-                server_default=sa.text("0"),
-            ),
-        )
-        op.add_column(
-            "status_option",
-            sa.Column(
-                "email_enabled",
-                sa.Boolean(),
-                nullable=False,
-                server_default=sa.text("0"),
-            ),
-        )
-        op.add_column(
-            "status_option",
-            sa.Column(
-                "notify_to_originator_only",
-                sa.Boolean(),
-                nullable=False,
-                server_default=sa.text("0"),
-            ),
-        )
 
 
 def downgrade():

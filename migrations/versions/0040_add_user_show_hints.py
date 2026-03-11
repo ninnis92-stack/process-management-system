@@ -30,7 +30,8 @@ def upgrade():
             ),
         )
         # remove server default after backfilling
-        op.alter_column("user", "show_hints", server_default=None)
+        if conn.dialect.name != "sqlite":
+            op.alter_column("user", "show_hints", server_default=None)
 
 
 def downgrade():

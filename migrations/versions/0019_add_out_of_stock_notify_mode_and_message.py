@@ -16,21 +16,27 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        "special_email_config",
-        sa.Column(
-            "request_form_inventory_out_of_stock_notify_mode",
-            sa.String(length=20),
-            nullable=False,
-            server_default="email",
-        ),
-    )
-    op.add_column(
-        "special_email_config",
-        sa.Column(
-            "request_form_inventory_out_of_stock_message", sa.Text(), nullable=True
-        ),
-    )
+    # Skip adding columns if they already exist
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    columns = [col['name'] for col in insp.get_columns('special_email_config')]
+    if "request_form_inventory_out_of_stock_notify_mode" not in columns:
+        op.add_column(
+            "special_email_config",
+            sa.Column(
+                "request_form_inventory_out_of_stock_notify_mode",
+                sa.String(length=20),
+                nullable=False,
+                server_default="email",
+            ),
+        )
+    if "request_form_inventory_out_of_stock_message" not in columns:
+        op.add_column(
+            "special_email_config",
+            sa.Column(
+                "request_form_inventory_out_of_stock_message", sa.Text(), nullable=True
+            ),
+        )
 
 
 def downgrade():

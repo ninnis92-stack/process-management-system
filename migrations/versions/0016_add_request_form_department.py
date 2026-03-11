@@ -16,15 +16,20 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        "special_email_config",
-        sa.Column(
-            "request_form_department",
-            sa.String(length=2),
-            nullable=False,
-            server_default="A",
-        ),
-    )
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('special_email_config')]
+    if 'request_form_department' not in columns:
+        op.add_column(
+            "special_email_config",
+            sa.Column(
+                "request_form_department",
+                sa.String(length=2),
+                nullable=False,
+                server_default="A",
+            ),
+        )
 
 
 def downgrade():

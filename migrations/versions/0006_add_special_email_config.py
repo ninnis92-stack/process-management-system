@@ -16,25 +16,30 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table(
-        "special_email_config",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column(
-            "enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")
-        ),
-        sa.Column("help_email", sa.String(length=255), nullable=True),
-        sa.Column("request_form_email", sa.String(length=255), nullable=True),
-        sa.Column("request_form_first_message", sa.Text(), nullable=True),
-        sa.Column(
-            "help_user_id", sa.Integer(), sa.ForeignKey("user.id"), nullable=True
-        ),
-        sa.Column(
-            "request_form_user_id",
-            sa.Integer(),
-            sa.ForeignKey("user.id"),
-            nullable=True,
-        ),
-    )
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    tables = inspector.get_table_names()
+    if 'special_email_config' not in tables:
+        op.create_table(
+            "special_email_config",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column(
+                "enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")
+            ),
+            sa.Column("help_email", sa.String(length=255), nullable=True),
+            sa.Column("request_form_email", sa.String(length=255), nullable=True),
+            sa.Column("request_form_first_message", sa.Text(), nullable=True),
+            sa.Column(
+                "help_user_id", sa.Integer(), sa.ForeignKey("user.id"), nullable=True
+            ),
+            sa.Column(
+                "request_form_user_id",
+                sa.Integer(),
+                sa.ForeignKey("user.id"),
+                nullable=True,
+            ),
+        )
 
 
 def downgrade():

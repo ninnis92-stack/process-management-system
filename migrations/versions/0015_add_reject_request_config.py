@@ -16,28 +16,33 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table(
-        "reject_request_config",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column(
-            "button_label",
-            sa.String(length=120),
-            nullable=False,
-            server_default="Reject Request",
-        ),
-        sa.Column("rejection_message", sa.Text(), nullable=True),
-        sa.Column(
-            "dept_a_enabled", sa.Boolean(), nullable=False, server_default=sa.false()
-        ),
-        sa.Column(
-            "dept_b_enabled", sa.Boolean(), nullable=False, server_default=sa.true()
-        ),
-        sa.Column(
-            "dept_c_enabled", sa.Boolean(), nullable=False, server_default=sa.false()
-        ),
-        sa.Column("created_at", sa.DateTime(), nullable=True),
-    )
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    tables = inspector.get_table_names()
+    if 'reject_request_config' not in tables:
+        op.create_table(
+            "reject_request_config",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.true()),
+            sa.Column(
+                "button_label",
+                sa.String(length=120),
+                nullable=False,
+                server_default="Reject Request",
+            ),
+            sa.Column("rejection_message", sa.Text(), nullable=True),
+            sa.Column(
+                "dept_a_enabled", sa.Boolean(), nullable=False, server_default=sa.false()
+            ),
+            sa.Column(
+                "dept_b_enabled", sa.Boolean(), nullable=False, server_default=sa.true()
+            ),
+            sa.Column(
+                "dept_c_enabled", sa.Boolean(), nullable=False, server_default=sa.false()
+            ),
+            sa.Column("created_at", sa.DateTime(), nullable=True),
+        )
 
 
 def downgrade():

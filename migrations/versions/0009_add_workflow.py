@@ -16,16 +16,19 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table(
-        "workflow",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("name", sa.String(length=200), nullable=False),
-        sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("department_code", sa.String(length=2), nullable=True),
-        sa.Column("spec", sa.JSON(), nullable=True),
-        sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
-        sa.Column("created_at", sa.DateTime(), nullable=True),
-    )
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    if not insp.has_table("workflow"):
+        op.create_table(
+            "workflow",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column("name", sa.String(length=200), nullable=False),
+            sa.Column("description", sa.Text(), nullable=True),
+            sa.Column("department_code", sa.String(length=2), nullable=True),
+            sa.Column("spec", sa.JSON(), nullable=True),
+            sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+            sa.Column("created_at", sa.DateTime(), nullable=True),
+        )
 
 
 def downgrade():

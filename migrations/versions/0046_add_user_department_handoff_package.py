@@ -24,13 +24,18 @@ USER_DEPARTMENT_COLUMNS = [
 
 def upgrade():
     conn = op.get_bind()
+    import sqlalchemy
+    insp = sqlalchemy.inspect(conn)
+    existing_columns = [col['name'] for col in insp.get_columns('user_department')]
     if conn.dialect.name == "sqlite":
         with op.batch_alter_table("user_department") as batch_op:
             for column in USER_DEPARTMENT_COLUMNS:
-                batch_op.add_column(column)
+                if column.name not in existing_columns:
+                    batch_op.add_column(column)
     else:
         for column in USER_DEPARTMENT_COLUMNS:
-            op.add_column("user_department", column)
+            if column.name not in existing_columns:
+                op.add_column("user_department", column)
 
 
 def downgrade():

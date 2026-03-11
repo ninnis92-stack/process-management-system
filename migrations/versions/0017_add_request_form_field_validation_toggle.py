@@ -16,15 +16,20 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        "special_email_config",
-        sa.Column(
-            "request_form_field_validation_enabled",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.false(),
-        ),
-    )
+    # Skip adding column if it already exists
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    columns = [col['name'] for col in insp.get_columns('special_email_config')]
+    if "request_form_field_validation_enabled" not in columns:
+        op.add_column(
+            "special_email_config",
+            sa.Column(
+                "request_form_field_validation_enabled",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.false(),
+            ),
+        )
 
 
 def downgrade():

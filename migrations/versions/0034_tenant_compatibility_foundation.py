@@ -91,6 +91,7 @@ def _seed_default_plan_and_tenant(conn):
         {"code": "growth"},
     ).scalar()
     if growth_plan_id is None:
+        from datetime import datetime
         conn.execute(
             text(
                 """
@@ -101,7 +102,8 @@ def _seed_default_plan_and_tenant(conn):
                     max_users,
                     max_requests_per_month,
                     max_departments,
-                    active
+                    active,
+                    created_at
                 )
                 VALUES (
                     :code,
@@ -110,7 +112,8 @@ def _seed_default_plan_and_tenant(conn):
                     :max_users,
                     :max_requests_per_month,
                     :max_departments,
-                    :active
+                    :active,
+                    :created_at
                 )
                 """
             ),
@@ -122,6 +125,7 @@ def _seed_default_plan_and_tenant(conn):
                 "max_requests_per_month": 5000,
                 "max_departments": 12,
                 "active": True,
+                "created_at": datetime.utcnow(),
             },
         )
         growth_plan_id = conn.execute(
@@ -191,6 +195,7 @@ def _backfill_user_memberships(conn, tenant_id):
         if exists is not None:
             continue
 
+        from datetime import datetime
         conn.execute(
             text(
                 """
@@ -199,14 +204,16 @@ def _backfill_user_memberships(conn, tenant_id):
                     user_id,
                     role,
                     is_default,
-                    is_active
+                    is_active,
+                    created_at
                 )
                 VALUES (
                     :tenant_id,
                     :user_id,
                     :role,
                     :is_default,
-                    :is_active
+                    :is_active,
+                    :created_at
                 )
                 """
             ),
@@ -216,6 +223,7 @@ def _backfill_user_memberships(conn, tenant_id):
                 "role": "tenant_admin" if is_admin else "member",
                 "is_default": True,
                 "is_active": True,
+                "created_at": datetime.utcnow(),
             },
         )
 

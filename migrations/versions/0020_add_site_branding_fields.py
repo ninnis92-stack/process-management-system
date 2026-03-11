@@ -16,21 +16,28 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        "site_config", sa.Column("brand_name", sa.String(length=120), nullable=True)
-    )
-    op.add_column(
-        "site_config", sa.Column("logo_filename", sa.String(length=255), nullable=True)
-    )
-    op.add_column(
-        "site_config",
-        sa.Column(
-            "theme_preset",
-            sa.String(length=40),
-            nullable=False,
-            server_default="default",
-        ),
-    )
+    # Skip adding columns if they already exist
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    columns = [col['name'] for col in insp.get_columns('site_config')]
+    if "brand_name" not in columns:
+        op.add_column(
+            "site_config", sa.Column("brand_name", sa.String(length=120), nullable=True)
+        )
+    if "logo_filename" not in columns:
+        op.add_column(
+            "site_config", sa.Column("logo_filename", sa.String(length=255), nullable=True)
+        )
+    if "theme_preset" not in columns:
+        op.add_column(
+            "site_config",
+            sa.Column(
+                "theme_preset",
+                sa.String(length=40),
+                nullable=False,
+                server_default="default",
+            ),
+        )
 
 
 def downgrade():

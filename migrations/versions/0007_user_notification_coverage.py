@@ -24,10 +24,21 @@ USER_COLUMNS = [
 
 def upgrade():
     conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_user_cols = [col["name"] for col in inspector.get_columns("user")]
+
+    # clean up leftover temp table from earlier failed sqlite batch operations
+    if conn.dialect.name == "sqlite" and "_alembic_tmp_user" in inspector.get_table_names():
+        op.execute("DROP TABLE _alembic_tmp_user")
+
     if conn.dialect.name == "sqlite":
+        # add any missing columns first
         with op.batch_alter_table("user") as batch_op:
             for column in USER_COLUMNS:
-                batch_op.add_column(column)
+                if column.name not in existing_user_cols:
+                    batch_op.add_column(column)
+
+        # then constraints and indexes in a second batch
         with op.batch_alter_table("user") as batch_op:
             batch_op.create_foreign_key(
                 "fk_user_backup_approver_user_id_user",
@@ -35,27 +46,33 @@ def upgrade():
                 ["backup_approver_user_id"],
                 ["id"],
             )
-            batch_op.create_index(
+            existing_indexes = [ix["name"] for ix in inspector.get_indexes("user")]
+            if "ix_user_backup_approver_user_id" not in existing_indexes:
+                batch_op.create_index(
+                    "ix_user_backup_approver_user_id",
+                    ["backup_approver_user_id"],
+                    unique=False,
+                )
+    else:
+        # non-sqlite path: add columns, then fk/index once
+        for column in USER_COLUMNS:
+            if column.name not in existing_user_cols:
+                op.add_column("user", column)
+
+        existing_indexes = [ix["name"] for ix in inspector.get_indexes("user")]
+        if "ix_user_backup_approver_user_id" not in existing_indexes:
+            op.create_foreign_key(
+                "fk_user_backup_approver_user_id_user",
+                "user",
+                ["backup_approver_user_id"],
+                ["id"],
+            )
+            op.create_index(
                 "ix_user_backup_approver_user_id",
+                "user",
                 ["backup_approver_user_id"],
                 unique=False,
             )
-    else:
-        for column in USER_COLUMNS:
-            op.add_column("user", column)
-        op.create_foreign_key(
-            "fk_user_backup_approver_user_id_user",
-            "user",
-            "user",
-            ["backup_approver_user_id"],
-            ["id"],
-        )
-        op.create_index(
-            "ix_user_backup_approver_user_id",
-            "user",
-            ["backup_approver_user_id"],
-            unique=False,
-        )
 
 
 def downgrade():
