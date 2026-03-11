@@ -342,18 +342,16 @@ and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORIN
 ## Deployment
 
 - `make deploy-safe` builds, tests, and pushes the container to Fly.
-- The image’s `entrypoint.sh` ensures databases are available and optionally
-  seeds on boot (`SEED_ON_BOOT`, default `1`).
-- GitHub Actions now includes a scheduled production monitoring workflow that
-  runs health checks, seeded-user login, admin smoke, signed webhook smoke,
-  and cleanup against Fly.
-- Fly secrets to set:
-  `SECRET_KEY`, `DATABASE_URL`, `SESSION_COOKIE_SECURE=True`,
-  `PREFERRED_URL_SCHEME=https`, and any tracker auth tokens.
-- Optional but recommended monitoring/alerting secrets:
-  `SENTRY_DSN`, `SENTRY_ENVIRONMENT=production`, `WEBHOOK_SHARED_SECRET`,
-  `PAGERDUTY_ROUTING_KEY`, `PRODUCTION_BASE_URL`, `PRODUCTION_ADMIN_EMAIL`,
-  and `PRODUCTION_ADMIN_PASSWORD`.
+- The image’s `entrypoint.sh` ensures databases are available and optionally seeds on boot (`SEED_ON_BOOT`, default `1`).
+- **Automated DB migration:**
+    - During deployment, Fly.io runs the `release_command` specified in `fly.toml`, which executes `python scripts/release_tasks.py`.
+    - This script automatically applies Alembic migrations, performs safe schema repairs, and seeds baseline/demo records.
+    - No manual intervention is required for DB migrations; new tables and columns are created as needed.
+    - If deploying to a new environment or after schema changes, simply run `make deploy-safe` and the migration will be handled.
+    - For troubleshooting or reseeding, SSH into the deployed instance and run `python seed.py`.
+- GitHub Actions now includes a scheduled production monitoring workflow that runs health checks, seeded-user login, admin smoke, signed webhook smoke, and cleanup against Fly.
+- Fly secrets to set: `SECRET_KEY`, `DATABASE_URL`, `SESSION_COOKIE_SECURE=True`, `PREFERRED_URL_SCHEME=https`, and any tracker auth tokens.
+- Optional but recommended monitoring/alerting secrets: `SENTRY_DSN`, `SENTRY_ENVIRONMENT=production`, `WEBHOOK_SHARED_SECRET`, `PAGERDUTY_ROUTING_KEY`, `PRODUCTION_BASE_URL`, `PRODUCTION_ADMIN_EMAIL`, and `PRODUCTION_ADMIN_PASSWORD`.
 
 ### Request‑by‑email enhancements
 
