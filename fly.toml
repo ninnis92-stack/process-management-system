@@ -50,3 +50,8 @@ primary_region = 'ord'
   # this with your Alembic command (e.g. `alembic upgrade head`). The
   # `release_tasks.py` will also run `seed.py` unless `SSO_ENABLED` is set.
   release_command = "python scripts/release_tasks.py"
+
+# Volume mount configuration required by Fly.io
+[mounts]
+  source = "app_data"
+  destination = "/data"

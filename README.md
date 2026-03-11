@@ -21,10 +21,11 @@ lightweight Stimulus controllers for interactivity.
 ## Overview
 
 
+
 **Recent Improvements:**
 
 - Increased Fly.io memory allocation to 2GB to resolve OOM errors during deployment.
-- Documented requirement to add a `[mounts]` section to `fly.toml` if a volume is attached to the Fly.io machine.
+- Added `[mounts]` section to `fly.toml` for volume configuration. If you encounter errors about volume names (e.g., "can't update the attached volume app_data with name 'vol_xxx' by 'pg_data'"), check your Fly.io volume name and ensure it matches the `source` in `[mounts]`. You may need to detach or rename volumes in the Fly.io dashboard.
 - API endpoints now include versioning for future-proofing, robust input validation, and descriptive error messages with error codes.
 - Swagger UI features a dark mode toggle, links to docs/repo/support, improved mobile responsiveness, and interactive "Try It Out" functionality.
 - Subtext centering and UI polish for mobile screens.
