@@ -20,6 +20,23 @@ from app.services.request_creation import build_template_spec, group_template_sp
 
 app = create_app()
 
+# older modules may import this file directly; the application factory
+# takes care of registering the versioned blueprint.  We still import it here
+# so Python knows the module exists and any side-effects (route definitions)
+# are executed.
+from app.api.v1 import api_v1_bp  # noqa: F401
+
+
+# for backwards compatibility during migration we redirect unversioned
+# requests to the latest version.  This is intentionally simple and can be
+# removed once clients are updated.
+from flask import redirect
+
+@app.route("/api/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+def _api_catch_all(subpath):
+    # preserve query string automatically
+    return redirect(f"/api/v1/{subpath}", code=301)
+
 
 def _ensure_api_schema_ready():
     """Best-effort schema bootstrap for standalone API usage.

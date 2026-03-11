@@ -24,6 +24,7 @@ from ..requests_bp.workflow import (
     workflow_editor_sections,
     workflow_intake_preview,
 )
+from app import csrf
 
 
 # Helper logic related to workflows and status options, extracted from
@@ -213,6 +214,7 @@ def _format_approval_stage_lines(opt):
 # --- workflow CRUD -----------------------------------------------------------
 
 @admin_bp.route("/workflows")
+@admin_bp.route("/workflows/")
 @login_required
 
 def list_workflows():
@@ -437,6 +439,95 @@ def toggle_workflow_active(wf_id: int):
         except Exception:
             pass
         return jsonify({"ok": False}), 500
+
+
+    @admin_bp.route("/workflows/<int:wf_id>/visual", methods=["GET"])
+    @login_required
+    def visual_workflow(wf_id: int):
+        if not _is_admin_user():
+            flash("Access denied.", "danger")
+            return redirect(url_for("requests.dashboard"))
+        wf = get_or_404(Workflow, wf_id)
+        return render_template("admin_workflow_visual.html", wf=wf)
+
+
+    @admin_bp.route("/api/workflows/<int:wf_id>/spec", methods=["GET"])
+    @login_required
+    def api_get_workflow_spec(wf_id: int):
+        if not _is_admin_user():
+            return jsonify({"error": "access_denied"}), 403
+        wf = get_or_404(Workflow, wf_id)
+        return jsonify({"ok": True, "spec": (wf.spec or {})})
+
+
+    @admin_bp.route("/api/workflows/<int:wf_id>/spec", methods=["PUT"])
+    @login_required
+    @csrf.exempt
+    def api_update_workflow_spec(wf_id: int):
+        if not _is_admin_user():
+            return jsonify({"error": "access_denied"}), 403
+        wf = get_or_404(Workflow, wf_id)
+        try:
+            data = flask_request.get_json(force=True)
+        except Exception:
+            return jsonify({"ok": False, "error": "invalid_json"}), 400
+        if data is None:
+            return jsonify({"ok": False, "error": "missing_payload"}), 400
+        spec = data.get("spec") if isinstance(data, dict) else None
+        # allow null/empty to clear spec
+        if spec is None and "spec" in data and data.get("spec") is None:
+            wf.spec = None
+        elif isinstance(spec, dict):
+            wf.spec = spec
+        else:
+            return jsonify({"ok": False, "error": "invalid_spec"}), 400
+
+        # optional: implement status options (create missing) if requested
+        implement = bool(data.get("implement", False)) if isinstance(data, dict) else False
+        try:
+            db.session.add(wf)
+            db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "db_error"}), 500
+
+        if implement:
+            try:
+                from ..models import StatusOption
+
+                steps = []
+                if isinstance(wf.spec, dict):
+                    steps = wf.spec.get("steps") or []
+                for s in steps:
+                    code = None
+                    target_dept = None
+                    if isinstance(s, str):
+                        code = s
+                    elif isinstance(s, dict):
+                        code = s.get("status") or s.get("code")
+                        target_dept = s.get("to_dept") or s.get("to")
+                    if not code:
+                        continue
+                    existing = StatusOption.query.filter_by(code=code).first()
+                    if not existing:
+                        label = code.replace("_", " ").title()
+                        opt = StatusOption(code=code, label=label)
+                        if target_dept:
+                            opt.target_department = target_dept or None
+                        db.session.add(opt)
+                db.session.commit()
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                # non-fatal; return success but indicate warning
+                return jsonify({"ok": True, "spec": (wf.spec or {}), "warning": "failed_to_implement"}), 200
+
+        return jsonify({"ok": True, "spec": (wf.spec or {})})
 
 
 @admin_bp.route("/status_options")

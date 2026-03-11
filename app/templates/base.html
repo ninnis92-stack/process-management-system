@@ -1,5 +1,6 @@
 <!doctype html>
 <html>
+{% set ep = request.endpoint or '' %}
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -29,6 +30,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <!-- bump version after latest CSS changes to force clients to fetch new stylesheet -->
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260310c') }}">
+  {% if ep.startswith('admin') %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_theme.css', v='20260310a') }}">
+  {% endif %}
   <!-- bundled frontend assets (built by Vite/ES modules) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css', v='20260310a') }}">
   {% if active_theme_css %}
@@ -632,5 +636,8 @@
     });
   </script>
   <!-- autosave/session-persistence logic now ships from frontend/js/modules/autosave.js via Vite -->
+  {% if ep.startswith('admin') %}
+    <script src="{{ url_for('static', filename='admin_helpers.js', v='20260310a') }}"></script>
+  {% endif %}
 </body>
 </html>

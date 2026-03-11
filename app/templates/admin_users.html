@@ -1,16 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="page-header">
-  <div>
-    <div class="page-header__eyebrow">Administration</div>
-    <h3 class="page-header__title mb-0">Users</h3>
-    <p class="page-header__lede mb-0">Manage access, departments, backup coverage, and queue-routing preferences in one place.</p>
-  </div>
-  <div class="page-header__actions">
-    <a class="btn btn-outline-secondary" href="{{ url_for('admin.coverage_calendar') }}">Coverage calendar</a>
-    <a class="btn btn-primary" href="{{ url_for('admin.create_user') }}">Create / Update User</a>
-  </div>
-</section>
+{% from 'admin/_macros.html' import page_header %}
+{{ page_header('Users', new_url=url_for('admin.create_user'), new_label='Create / Update User', eyebrow='Administration', lede='Manage access, departments, backup coverage, and queue-routing preferences in one place.') }}
 
 {% if user_stats %}
 <section class="surface-panel surface-panel-muted mb-3">

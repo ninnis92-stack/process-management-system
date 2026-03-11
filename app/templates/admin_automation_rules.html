@@ -1,0 +1,31 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Automation Rules{% endblock %}
+
+{% block body %}
+<div class="container-fluid">
+  <h1>Automation Rules</h1>
+  <p><a class="btn btn-primary" href="{{ url_for('admin.create_automation_rule') }}">New Rule</a></p>
+  <table class="table">
+    <thead>
+      <tr><th>Name</th><th>Active</th><th>Triggers</th><th>Actions</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for r in rules %}
+      <tr>
+        <td>{{ r.name }}</td>
+        <td>{{ 'Yes' if r.is_active else 'No' }}</td>
+        <td>{{ (r.triggers_json or []) | join(', ') }}</td>
+        <td>{{ (r.actions_json or []) | length }}</td>
+        <td>
+          <a class="btn btn-sm btn-secondary" href="{{ url_for('admin.edit_automation_rule', rule_id=r.id) }}">Edit</a>
+          <form method="post" action="{{ url_for('admin.delete_automation_rule', rule_id=r.id) }}" style="display:inline">
+            <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this rule?')">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

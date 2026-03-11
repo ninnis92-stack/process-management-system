@@ -117,6 +117,12 @@
           <div class="key-value-item"><span class="key-value-item__label">Type</span><span class="key-value-item__value">{{ req.request_type }}</span></div>
           <div class="key-value-item"><span class="key-value-item__label">Sales list</span><span class="key-value-item__value">{{ req.pricebook_display }}</span></div>
           <div class="key-value-item"><span class="key-value-item__label">Created by</span><span class="key-value-item__value">{{ req.created_by_user.email if req.created_by_user else '—' }}</span></div>
+          {% if req.original_sender %}
+          <div class="key-value-item"><span class="key-value-item__label">Orig sender</span><span class="key-value-item__value">{{ req.original_sender }}</span></div>
+          {% endif %}
+          {% if req.watcher_emails %}
+          <div class="key-value-item"><span class="key-value-item__label">Watchers</span><span class="key-value-item__value">{{ req.watcher_emails|join(', ') }}</span></div>
+          {% endif %}
           <div class="key-value-item"><span class="key-value-item__label">Last updated</span><span class="key-value-item__value">{{ req.updated_at.strftime('%b %d, %Y %I:%M %p') if req.updated_at else '—' }}</span></div>
         </div>
         <div style="white-space:pre-wrap">{{ req.description }}</div>

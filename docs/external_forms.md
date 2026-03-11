@@ -12,7 +12,7 @@ How it works
 - When a department is assigned this template, users visiting the New Request page will be redirected or shown a link to the external form instead of the internal form.
 - The external provider must be configured to POST form responses to the webhook endpoint in this app: `/integrations/external-form-callback`.
 - The webhook uses an HMAC signature in the `X-Webhook-Signature` header (SHA256 hex) which is validated against the shared secret in `WEBHOOK_SHARED_SECRET` app config or environment variable.
-- The connected template can also be exported as generated JSON from `/api/templates/<template_id>/external-schema`, including its layout, grouped sections, and field spec so a third-party builder can render a matching UI.
+- The connected template can also be exported as generated JSON from `/api/v1/templates/<template_id>/external-schema`, including its layout, grouped sections, and field spec so a third-party builder can render a matching UI.
 
 Recommended webhook payload
 

@@ -274,6 +274,15 @@ def create_app():
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
 
+    # Initialize request lifecycle hooks (register listeners for Request create/update)
+    try:
+        from .services.request_hooks import init_request_hooks
+
+        init_request_hooks(app)
+    except Exception:
+        # If hooks can't be registered (e.g., during migrations), continue silently
+        pass
+
     try:
         from .services.tenant_context import init_tenant_context
 
@@ -446,6 +455,15 @@ def create_app():
     app.register_blueprint(notifications_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(integrations_bp)
+    # versioned public API
+    try:
+        from .api.v1 import api_v1_bp
+
+        app.register_blueprint(api_v1_bp)
+    except ImportError:
+        # during early bootstrap (tests, minimal env) the new api package
+        # may not yet be available; ignore and continue
+        pass
     # camera/ocr verification helper
     app.register_blueprint(verify_bp)
 
@@ -1123,4 +1141,15 @@ def create_app():
             return dict(avatar_url_for=avatar_url_for, user_has_multiple_departments=user_has_multiple_departments, can_view_metrics_for_user=can_view_metrics_for_user, get_user_departments=get_user_departments)
         except Exception:
             return dict(avatar_url_for=lambda u, size=34: gravatar_url(None, size), user_has_multiple_departments=lambda u: False, can_view_metrics_for_user=lambda u: False, get_user_departments=lambda u: [])
+
+    @app.cli.command("process-outbox")
+    def process_outbox():
+        """Process pending integration outbox events (development helper)."""
+        try:
+            from .services.connector_worker import process_pending_integration_events
+
+            count = process_pending_integration_events(limit=200)
+            click.echo(f"Processed {count} integration events")
+        except Exception as e:
+            click.echo(f"Failed to process outbox: {e}")
     return app

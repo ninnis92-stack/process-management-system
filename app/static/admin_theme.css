@@ -1,0 +1,68 @@
+/* Admin responsive theme overrides: simple, high-contrast, mobile-friendly */
+:root{
+  --admin-accent:#0d6efd;
+  --admin-bg:#0f1720;
+  --admin-surface:#0b1220;
+  --admin-text:#e6eef8;
+}
+body.admin-theme, body.theme-body.top-nav-layout{ }
+
+/* Increase tap targets and readable fonts on mobile */
+.navbar .nav-link, .navbar .btn{ padding-top:0.5rem; padding-bottom:0.5rem; }
+body{ font-family: Poppins, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+
+/* Admin-specific adjustments */
+.admin-layout .page-shell-admin{ padding: 0.5rem 0.5rem; }
+.admin-layout .col-md-3{ padding-left:0.25rem; padding-right:0.25rem; }
+.brand-cluster .brand-title{ font-weight:700; font-size:1.05rem; }
+
+/* Sidebar compact & responsive */
+#adminSidebar{ width:260px; }
+.admin-layout .offcanvas-body{ padding:0; }
+.sidebar .nav-link{ padding:0.6rem 1rem; font-weight:600; color:var(--admin-text); }
+
+/* Cards and lists comfortable spacing on mobile */
+.card, .hero-callout-card{ border-radius:10px; padding:1rem; box-shadow:0 2px 6px rgba(0,0,0,0.08); }
+
+/* Admin dashboard grid and tiles */
+.admin-dashboard-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; align-items:stretch; }
+.admin-tile{ display:block; text-decoration:none; color:var(--admin-text); background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02)); border-radius:10px; padding:12px; min-height:100px; transition:transform .08s ease, box-shadow .08s ease; border:1px solid rgba(255,255,255,0.03); }
+.admin-tile:hover, .admin-tile:focus{ transform:translateY(-3px); box-shadow:0 6px 18px rgba(0,0,0,0.12); }
+.admin-tile .tile-ico{ font-size:1.4rem; margin-bottom:6px; }
+.admin-tile .tile-title{ font-weight:700; font-size:1rem; margin-bottom:4px; }
+.admin-tile .tile-sub{ color:rgba(230,238,248,0.8); font-size:0.9rem; }
+
+/* Make action buttons full-width on small screens */
+@media (max-width:767px){
+  .admin-tile{ padding:14px; }
+  .admin-tile.btn, .admin-tile button{ width:100%; text-align:left; }
+}
+
+@media (max-width: 767px){
+  .navbar .brand-copy{ display:none; }
+  .brand-logo-img{ height:36px !important; }
+  .admin-layout .col-md-3{ display:none; }
+  .admin-layout .col-md-9{ width:100%; }
+  .hero-callouts__grid{ display:block; }
+}
+
+/* Accessibility: larger focus outlines */
+a:focus, button:focus, .btn:focus{ outline:3px solid rgba(13,110,253,0.25); outline-offset:2px; }
+
+/* Sidebar specifics */
+.admin-sidebar-list{ padding:0.5rem; margin:0; list-style:none; }
+.admin-sidebar-list .nav-heading{ display:block; font-weight:700; padding:0.75rem 1rem; color:var(--admin-text); }
+.admin-sidebar-list .nav-link{ display:block; padding:0.6rem 1rem; color:rgba(230,238,248,0.95); border-radius:6px; }
+.admin-sidebar-list .nav-link.active{ background:rgba(255,255,255,0.03); font-weight:700; }
+
+/* Offcanvas adjustments for small screens */
+.offcanvas-body .admin-sidebar{ padding:0.5rem; }
+.admin-sidebar-panel{ background:transparent; padding:12px; }
+
+/* Table -> mobile card transform for admin pages */
+.integrations-table.mobile-cards, .table.mobile-cards{ border-collapse: separate; }
+.integrations-table.mobile-cards tbody tr, .table.mobile-cards tbody tr{ display:block; margin-bottom:10px; background:rgba(255,255,255,0.02); border-radius:8px; padding:10px; }
+.integrations-table.mobile-cards tbody td, .table.mobile-cards tbody td{ display:block; width:100%; padding:0.25rem 0; }
+.integrations-table.mobile-cards thead, .table.mobile-cards thead{ display:none; }
+.integrations-table.mobile-cards tbody td pre{ white-space:pre-wrap; max-width:100%; }
+

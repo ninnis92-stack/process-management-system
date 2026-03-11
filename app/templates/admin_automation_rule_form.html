@@ -1,0 +1,40 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Automation Rule{% endblock %}
+
+{% block body %}
+<div class="container-fluid">
+  <h1>{{ rule.name if rule else 'New Automation Rule' }}</h1>
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+      {{ form.name.label }}
+      {{ form.name(class_='form-control') }}
+    </div>
+    <div class="mb-3">
+      {{ form.description.label }}
+      {{ form.description(class_='form-control', rows=3) }}
+    </div>
+    <div class="mb-3">
+      {{ form.triggers.label }}
+      {{ form.triggers(class_='form-control', rows=3) }}
+      <small class="form-text text-muted">One event name per line, or '*' to match all events.</small>
+    </div>
+    <div class="mb-3">
+      {{ form.conditions.label }}
+      {{ form.conditions(class_='form-control', rows=6) }}
+      <small class="form-text text-muted">JSON object of simple equality conditions.</small>
+    </div>
+    <div class="mb-3">
+      {{ form.actions.label }}
+      {{ form.actions(class_='form-control', rows=6) }}
+      <small class="form-text text-muted">JSON array of action objects. See docs.</small>
+    </div>
+    <div class="form-check mb-3">
+      {{ form.is_active() }} {{ form.is_active.label }}
+    </div>
+    <button class="btn btn-primary" type="submit">Save</button>
+    <a class="btn btn-secondary" href="{{ url_for('admin.list_automation_rules') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

@@ -1,13 +1,8 @@
 {% extends 'base.html' %}
 
 {% block content %}
-  <section class="page-header">
-    <div>
-      <div class="page-header__eyebrow">Integration control</div>
-      <h2 class="page-header__title mb-0">{{ 'Edit' if integration else 'New' }} Integration</h2>
-      <p class="page-header__lede mb-0">Maintain the normalized integration contract so future providers can share the same shape and admin workflow.</p>
-    </div>
-  </section>
+{% from 'admin/_macros.html' import page_header %}
+{{ page_header(( 'Edit' if integration else 'New' ) ~ ' Integration', eyebrow='Integration control', lede='Maintain the normalized integration contract so future providers can share the same shape and admin workflow.') }}
   {% if scaffold %}
     <div class="alert alert-info hero-note">
       <div><strong>{{ scaffold.label }}</strong></div>

@@ -830,12 +830,36 @@ def inbound_mail():
                 guest_name=(None if recognized_sso else sender.split("@")[0]),
                 due_at=due_at,
             )
+            # capture original sender if admin requested
+            if getattr(cfg, "request_form_add_original_sender", False):
+                req.original_sender = sender_norm
+
             if not recognized_sso:
                 req.ensure_guest_token()
 
             db.session.add(req)
             db.session.commit()
             created_request_id = req.id
+
+            # apply default watchers and notify them with a quick link
+            watchers = []
+            if getattr(cfg, "request_form_default_watchers", None):
+                try:
+                    watchers = [e.strip().lower() for e in getattr(cfg, "request_form_default_watchers") or [] if e and e.strip()]
+                except Exception:
+                    watchers = []
+            # optionally treat original sender itself as a watcher
+            if getattr(cfg, "request_form_add_original_sender", False) and sender_norm:
+                if sender_norm not in watchers:
+                    watchers.append(sender_norm)
+            if watchers:
+                req.watcher_emails = watchers
+                db.session.add(req)
+                db.session.commit()
+                try:
+                    notifications.send_request_link_email(watchers, req)
+                except Exception:
+                    current_app.logger.exception("Failed to notify watchers")
         except Exception:
             db.session.rollback()
             current_app.logger.exception("Failed to create request from inbound mail")

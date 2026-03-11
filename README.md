@@ -359,6 +359,19 @@ and a production monitoring runbook lives in [docs/MONITORING.md](docs/MONITORIN
   `PAGERDUTY_ROUTING_KEY`, `PRODUCTION_BASE_URL`, `PRODUCTION_ADMIN_EMAIL`,
   and `PRODUCTION_ADMIN_PASSWORD`.
 
+### Request‑by‑email enhancements
+
+The special‑email inbox (configured on the admin -> Email Forms page) can
+now optionally record the _original_ sender address and automatically notify
+additional watchers when a request is created.  For example, if your team
+forwards mail through a shared mailbox the form can still create the request
+for the true originator and keep them informed via email.  Administrators may
+also specify a comma‑separated list of default watcher addresses; each
+recipient will receive an email containing a direct link to the newly created
+request (`/admin/requests/<id>`).  These settings are completely optional and
+offline deployments without a configured inbox will continue to operate
+without change.
+
 > **Feature flag defaults:** flags are stored in the database and may initially
 > contain `NULL` values.  The application now treats `None` as a sensible
 > default (e.g. `rolling_quotes_enabled` defaults to `True`) instead of
@@ -480,14 +493,18 @@ Supported submitter access policies:
 Each guest form (and any internally managed template) now allows an
 **administrable layout** choice (`Standard`, `Compact`, or `Spacious`).
 This setting drives a CSS class applied to the intake page and is also
-returned by the `/api/templates` endpoint so third‑party clients can
+returned by the `/api/v1/templates` endpoint so third‑party clients can
 mirror the same spacing and width when rendering external copies of a
 form.  The layout is preserved when submissions from external providers
 are mapped back into the application.
 
+The public API is versioned under `/api/v1/...`. A generated OpenAPI
+document is available at `/api/v1/openapi.json` so external consumers can
+discover the current contract without reading route code.
+
 For connected third‑party forms, the app now also exposes a generated
 schema endpoint at `/integrations/templates/<template_id>/external-schema`
-(and the standalone API mirror at `/api/templates/<template_id>/external-schema`). That
+(and the standalone API mirror at `/api/v1/templates/<template_id>/external-schema`). That
 response includes the connected template layout, section grouping, and
 field specification so an external form builder can render a matching
 experience. When the provider posts back to

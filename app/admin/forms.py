@@ -1,5 +1,6 @@
 import json
 
+import re
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField,
@@ -372,6 +373,16 @@ class SpecialEmailConfigForm(FlaskForm):
     )
     request_form_first_message = TextAreaField(
         "First autoresponder message", validators=[Optional(), Length(max=4000)]
+    )
+    # new options related to email origin and watchers
+    request_form_add_original_sender = BooleanField(
+        "Record original sender and include in watcher notifications",
+        default=False,
+    )
+    request_form_default_watchers = TextAreaField(
+        "Default watcher emails (comma-separated)",
+        validators=[Optional(), Length(max=2000)],
+        description="Addresses that should always be notified when a request is created via email.",
     )
     request_form_department = SelectField(
         "SSO recognized sender department",
@@ -775,3 +786,25 @@ class StatusBucketForm(FlaskForm):
         "Bulk add statuses (one per line)", validators=[Optional()]
     )
     submit = SubmitField("Save Bucket")
+
+
+class AutomationRuleForm(FlaskForm):
+    name = StringField("Rule name", validators=[DataRequired(), Length(max=200)])
+    description = TextAreaField("Description", validators=[Optional(), Length(max=2000)])
+    triggers = TextAreaField(
+        "Triggers",
+        description="One event name per line, or '*' to match all events",
+        validators=[Optional(), Length(max=2000)],
+    )
+    conditions = TextAreaField(
+        "Conditions (JSON)",
+        description='JSON object of simple equality conditions, e.g. {"priority": "high"}',
+        validators=[Optional(), Length(max=4000)],
+    )
+    actions = TextAreaField(
+        "Actions (JSON)",
+        description='JSON array of action objects, e.g. [{"action": "escalate"}]',
+        validators=[Optional(), Length(max=4000)],
+    )
+    is_active = BooleanField("Active", default=True)
+    submit = SubmitField("Save Rule")

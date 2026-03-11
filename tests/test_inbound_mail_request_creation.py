@@ -5,6 +5,9 @@ from datetime import datetime, timedelta
 
 from app.extensions import db
 from app.models import SpecialEmailConfig, Request as ReqModel, User
+
+# reuse helpers from site navigation tests for login
+from tests.test_site_navigation import _create_user, _login
 from app.models import FormTemplate, FormField, DepartmentFormAssignment
 
 
@@ -20,6 +23,9 @@ def test_inbound_mail_creates_guest_request(app, client):
         cfg = SpecialEmailConfig.get()
         cfg.enabled = True
         cfg.request_form_email = "requests@example.com"
+        # ensure default watchers list is empty for this baseline test
+        cfg.request_form_default_watchers = None
+        cfg.request_form_add_original_sender = False
         db.session.commit()
 
     payload = {
@@ -46,6 +52,9 @@ def test_inbound_mail_creates_guest_request(app, client):
         assert req.submitter_type == "guest"
         assert req.guest_email == "guest.sender@example.com"
         assert req.title == "Email Guest Request"
+        # baseline test: original_sender and watchers should not be set
+        assert getattr(req, "original_sender", None) is None
+        assert getattr(req, "watcher_emails", None) in (None, [])
 
 
 def test_inbound_mail_creates_user_request_for_sso_sender(app, client):
@@ -99,6 +108,65 @@ def test_inbound_mail_creates_user_request_for_sso_sender(app, client):
         assert req.created_by_user_id == uid
         # Admin-configured department override for recognized sender is applied.
         assert user.department == "A"
+        # user test should not affect original/watcher defaults
+        assert getattr(req, "original_sender", None) is None
+        assert getattr(req, "watcher_emails", None) in (None, [])
+
+
+def test_inbound_mail_records_original_sender_and_notifies_watchers(app, client, monkeypatch):
+    secret = "test-secret"
+    app.config["WEBHOOK_SHARED_SECRET"] = secret
+
+    sent_emails = []
+
+    def fake_send_email(self, recipients, subject, text, html=None):
+        sent_emails.append({"to": recipients, "subject": subject, "body": text})
+        return {"ok": True, "skipped": [], "error": None}
+
+    monkeypatch.setattr("app.services.emailer.EmailService.send_email", fake_send_email)
+
+    with app.app_context():
+        cfg = SpecialEmailConfig.get()
+        cfg.enabled = True
+        cfg.request_form_email = "requests@example.com"
+        cfg.request_form_add_original_sender = True
+        cfg.request_form_default_watchers = ["watcher1@example.com", "watcher2@example.com"]
+        db.session.commit()
+
+    payload = {
+        "from": "orig@sender.com",
+        "to": "requests@example.com",
+        "subject": "title=Forwarded request;priority=low",
+        "body": "Please handle this",
+    }
+    raw = json.dumps(payload).encode("utf-8")
+
+    rv = client.post(
+        "/integrations/inbound-mail",
+        data=raw,
+        content_type="application/json",
+        headers={"X-Webhook-Signature": _sig(secret, raw)},
+    )
+    assert rv.status_code == 200
+    data = rv.get_json()
+    with app.app_context():
+        req = db.session.get(ReqModel, data["created_request_id"])
+        assert req.original_sender == "orig@sender.com"
+        assert set(req.watcher_emails or []) == {"watcher1@example.com", "watcher2@example.com", "orig@sender.com"}
+    # ensure notification emails were sent to all watchers
+    assert any("watcher1@example.com" in e["to"] for e in sent_emails)
+    assert any("orig@sender.com" in e["to"] for e in sent_emails)
+
+    # the request detail UI should expose the original sender and watcher list
+    # create and login an admin so we can view the admin detail page
+    _create_user(app, email="nav-admin@example.com", is_admin=True)
+    login_resp = _login(client, "nav-admin@example.com")
+    assert login_resp.status_code == 200
+    rv2 = client.get(f"/requests/{req.id}")
+    assert rv2.status_code == 200
+    html2 = rv2.get_data(as_text=True)
+    assert "Orig sender" in html2
+    assert "watcher1@example.com" in html2
 
 
 def test_inbound_mail_rejects_invalid_fields_when_validation_enabled(app, client):
@@ -322,6 +390,8 @@ def test_out_of_stock_email_only_mode_uses_custom_message(monkeypatch, app, clie
     assert calls["notify"] == 0
     assert calls["email"] == 1
     assert calls["message"] == "Custom OOS message:\n{out_of_stock_fields}"
+
+
 
 
 def test_inbound_mail_uses_sso_owner_email_when_inbox_not_set(app, client):

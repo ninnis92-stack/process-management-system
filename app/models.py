@@ -502,6 +502,48 @@ class WebhookSubscription(TenantScopedMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class AutomationRule(TenantScopedMixin, db.Model):
+    """Automation rules that evaluate request conditions and trigger actions.
+
+    Rules are stored as structured JSON to allow flexible condition/action
+    definitions without frequent schema changes. A separate rule engine
+    service will interpret `conditions_json` and `actions_json` to evaluate
+    and execute automations.
+    """
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    # JSON blob describing triggers (e.g. event names) and schedule
+    triggers_json = db.Column(db.JSON, nullable=True, default=list)
+    # JSON blob describing matching conditions (e.g. {"priority": "high"})
+    conditions_json = db.Column(db.JSON, nullable=True, default=dict)
+    # JSON blob describing actions to perform (e.g. [{"action": "escalate", "to_role": "manager"}])
+    actions_json = db.Column(db.JSON, nullable=True, default=list)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    def matches_request(self, request_obj) -> bool:
+        """Lightweight helper to test whether a given `Request` matches
+        the rule's conditions. The full rule engine will provide a richer
+        evaluator; this is a simple convenience for admin previews/tests.
+        """
+        try:
+            conds = self.conditions_json or {}
+            if not conds:
+                return True
+            for key, val in conds.items():
+                # simple equality checks for common fields
+                if getattr(request_obj, key, None) != val:
+                    return False
+            return True
+        except Exception:
+            return False
+
+
 class ProcessMetricEvent(TenantScopedMixin, db.Model):
     """Normalized process analytics event for request lifecycle tracking."""
 
@@ -602,6 +644,13 @@ class Request(TenantScopedMixin, db.Model):
         db.String(128), nullable=True, unique=True, index=True
     )
     guest_token_expires_at = db.Column(db.DateTime, nullable=True)
+
+    # feature: record the original sender address when the request was created
+    # by email (useful if intermediaries forward mail).
+    original_sender = db.Column(db.String(255), nullable=True)
+    # watcher emails stored as a list of lowercase strings; recipients will
+    # receive a link notification in addition to the normal department users.
+    watcher_emails = db.Column(db.JSON, nullable=True)
 
     due_at = db.Column(db.DateTime, nullable=False)
 
@@ -1025,6 +1074,14 @@ class SpecialEmailConfig(TenantScopedMixin, db.Model):
     request_form_field_validation_enabled = db.Column(
         db.Boolean, nullable=False, default=False
     )
+    # new option: if incoming email is forwarded by another system, keep the
+    # original "from" address on the request and optionally notify it.
+    request_form_add_original_sender = db.Column(db.Boolean, nullable=False, default=False)
+    # default list of additional email addresses that should always be
+    # copied/treated as "watchers" when a request is created by email. Stored
+    # as JSON array of strings.
+    request_form_default_watchers = db.Column(db.JSON, nullable=True)
+
     request_form_inventory_out_of_stock_notify_enabled = db.Column(
         db.Boolean, nullable=False, default=False
     )

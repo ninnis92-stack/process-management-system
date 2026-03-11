@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% from 'admin/_macros.html' import page_header %}
+
+{% block content %}
+{{ page_header((('Visual') ~ ' Process Flow Editor'), None, 'Back', 'Workflow visual editor', 'A lightweight visual editor for editing workflow specs.') }}
+
+<div class="surface-panel">
+  <h4 class="mb-2">{{ wf.name }}</h4>
+  <p class="text-muted">{{ wf.description or 'No description' }}</p>
+
+  <div id="editorAlert" role="status" aria-live="polite"></div>
+
+  <div class="mb-3">
+    <label class="form-label">Steps</label>
+    <div id="steps-list" class="mb-2"></div>
+    <div class="d-flex gap-2">
+      <select id="new-from" class="form-select form-select-sm w-auto">
+        <option value="">(From)</option>
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+      </select>
+      <select id="new-to" class="form-select form-select-sm w-auto">
+        <option value="">(To)</option>
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+      </select>
+      <input id="new-status" class="form-control form-control-sm" placeholder="Status code" />
+      <button id="add-step" class="btn btn-outline-primary btn-sm">Add</button>
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Preview</label>
+    <div id="visualMap" class="p-2 border rounded bg-light"></div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button id="save-draft" class="btn btn-secondary">Save Draft</button>
+    <button id="save-implement" class="btn btn-primary">Save & Implement</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.list_workflows') }}">Back</a>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+  (function(){
+    const wfId = {{ wf.id }};
+    const apiUrl = '/admin/api/workflows/' + wfId + '/spec';
+    const alertEl = document.getElementById('editorAlert');
+    const stepsList = document.getElementById('steps-list');
+    const visualMap = document.getElementById('visualMap');
+
+    function showAlert(msg, type='info'){
+      alertEl.innerHTML = '<div class="alert alert-' + (type==='error' ? 'danger' : (type==='success' ? 'success' : 'info')) + '">' + msg + '</div>';
+      setTimeout(()=>{ alertEl.innerHTML = ''; }, 4000);
+    }
+
+    function renderSteps(spec){
+      stepsList.innerHTML = '';
+      const steps = (spec && spec.steps) || [];
+      steps.forEach((s, i)=>{
+        const status = (typeof s === 'string') ? s : (s.status || '');
+        const from = (typeof s === 'object') ? (s.from_dept||s.from||'') : '';
+        const to = (typeof s === 'object') ? (s.to_dept||s.to||'') : '';
+        const row = document.createElement('div');
+        row.className = 'd-flex gap-2 align-items-center mb-1';
+        row.innerHTML = '<input class="form-control form-control-sm step-from w-auto" value="'+ (from||'') +'" placeholder="From" />'
+          + '<input class="form-control form-control-sm step-to w-auto" value="'+ (to||'') +'" placeholder="To" />'
+          + '<input class="form-control form-control-sm step-status" value="'+ (status||'') +'" placeholder="Status" />'
+          + '<div class="btn-group ms-2" role="group">'
+            + '<button class="btn btn-sm btn-light move-up">▲</button>'
+            + '<button class="btn btn-sm btn-light move-down">▼</button>'
+            + '<button class="btn btn-sm btn-outline-danger remove">Remove</button>'
+          + '</div>';
+        stepsList.appendChild(row);
+
+        row.querySelector('.move-up').addEventListener('click', ()=>{ if(i>0){ stepsList.insertBefore(row, stepsList.children[i-1]); updateVisual(); }});
+        row.querySelector('.move-down').addEventListener('click', ()=>{ if(i < stepsList.children.length-1){ stepsList.insertBefore(stepsList.children[i+1], row); updateVisual(); }});
+        row.querySelector('.remove').addEventListener('click', ()=>{ row.remove(); updateVisual(); });
+      });
+      updateVisual();
+    }
+
+    function buildSpecFromUI(){
+      const rows = Array.from(stepsList.children);
+      const steps = rows.map(r=>{
+        const from = r.querySelector('.step-from').value.trim();
+        const to = r.querySelector('.step-to').value.trim();
+        const status = r.querySelector('.step-status').value.trim();
+        return { from_dept: from || null, to_dept: to || null, status: status };
+      }).filter(s=>s.status);
+      const transitions = [];
+      for(let i=0;i+1<steps.length;i++){
+        transitions.push({ from_dept: steps[i].from_dept||'', to_dept: steps[i+1].to_dept||'', from_status: steps[i].status||'', to_status: steps[i+1].status||'' });
+      }
+      return { steps: steps, transitions: transitions };
+    }
+
+    function updateVisual(){
+      const spec = buildSpecFromUI();
+      visualMap.innerHTML = '';
+      if(!spec.steps.length){ visualMap.textContent = 'No steps'; return; }
+      spec.steps.forEach((s,i)=>{
+        const div = document.createElement('div'); div.className='mb-1'; div.innerHTML = '<strong>'+(s.status||'')+'</strong> <span class="text-muted">'+(s.from_dept||'')+' → '+(s.to_dept||'')+'</span>'; visualMap.appendChild(div);
+        if(i < spec.steps.length-1){ const arrow = document.createElement('div'); arrow.className='text-center text-muted'; arrow.textContent = '→'; visualMap.appendChild(arrow); }
+      });
+    }
+
+    function load(){
+      fetch(apiUrl, { credentials: 'same-origin' }).then(r=>r.json()).then(data=>{
+        if(!data || !data.ok) return showAlert('Failed to load workflow spec', 'error');
+        renderSteps(data.spec || {});
+      }).catch(()=> showAlert('Failed to load workflow spec', 'error'));
+    }
+
+    document.getElementById('add-step').addEventListener('click', ()=>{
+      const from = document.getElementById('new-from').value.trim();
+      const to = document.getElementById('new-to').value.trim();
+      const status = document.getElementById('new-status').value.trim();
+      if(!status) return showAlert('Enter a status code', 'error');
+      const row = document.createElement('div'); row.className='d-flex gap-2 align-items-center mb-1';
+      row.innerHTML = '<input class="form-control form-control-sm step-from w-auto" value="'+from+'" placeholder="From" />'
+        + '<input class="form-control form-control-sm step-to w-auto" value="'+to+'" placeholder="To" />'
+        + '<input class="form-control form-control-sm step-status" value="'+status+'" placeholder="Status" />'
+        + '<div class="btn-group ms-2" role="group">'
+            + '<button class="btn btn-sm btn-light move-up">▲</button>'
+            + '<button class="btn btn-sm btn-light move-down">▼</button>'
+            + '<button class="btn btn-sm btn-outline-danger remove">Remove</button>'
+          + '</div>';
+      stepsList.appendChild(row);
+      row.querySelector('.move-up').addEventListener('click', ()=>{ const idx = Array.from(stepsList.children).indexOf(row); if(idx>0) stepsList.insertBefore(row, stepsList.children[idx-1]); updateVisual(); });
+      row.querySelector('.move-down').addEventListener('click', ()=>{ const idx = Array.from(stepsList.children).indexOf(row); if(idx < stepsList.children.length-1) stepsList.insertBefore(stepsList.children[idx+1], row); updateVisual(); });
+      row.querySelector('.remove').addEventListener('click', ()=>{ row.remove(); updateVisual(); });
+      updateVisual();
+    });
+
+    function save(implement){
+      const payload = { spec: buildSpecFromUI(), implement: !!implement };
+      fetch(apiUrl, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(r=>r.json()).then(data=>{
+          if(!data || !data.ok) return showAlert('Save failed', 'error');
+          showAlert('Saved', 'success');
+        }).catch(()=> showAlert('Save failed', 'error'));
+    }
+
+    document.getElementById('save-draft').addEventListener('click', ()=> save(false));
+    document.getElementById('save-implement').addEventListener('click', ()=> save(true));
+
+    load();
+  })();
+  </script>
+{% endblock %}

@@ -74,6 +74,7 @@
           <td class="actions-cell">
             <div class="admin-actions-group">
               <a href="{{ url_for('admin.edit_workflow', wf_id=wf.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <a href="{{ url_for('admin.visual_workflow', wf_id=wf.id) }}" class="btn btn-sm btn-outline-secondary">Visual</a>
               <form class="admin-inline-form" method="post" action="{{ url_for('admin.delete_workflow', wf_id=wf.id) }}">
                 <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete process flow?')">Delete</button>
               </form>

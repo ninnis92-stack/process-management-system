@@ -4,8 +4,11 @@
 {% block content %}
 {{ page_header('Integrations', url_for('admin.create_integration'), 'New integration', 'Integration control', 'Review provider bindings, enabled state, and normalized configuration for every department.') }}
 <section class="surface-panel table-shell">
+<div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+  <input id="integrationSearch" class="form-control form-control-sm" placeholder="Search integrations (department, kind, provider)..." data-target=".integrations-table" />
+</div>
 <div class="table-responsive">
-<table class="table align-middle mb-0">
+<table class="table align-middle mb-0 integrations-table">
   <thead><tr><th>Department</th><th>Kind</th><th>Provider</th><th>Version</th><th>Enabled</th><th>Config</th><th>Actions</th></tr></thead>
   <tbody>
   {% for i in integrations %}

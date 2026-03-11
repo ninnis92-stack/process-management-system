@@ -11,7 +11,7 @@ Keep the send path idempotent and non-blocking from request handlers.
 from .extensions import db
 from .models import FeatureFlags, Notification, User, UserDepartment, SpecialEmailConfig, NotificationRetention
 from .models import DepartmentFormAssignment, FormTemplate
-from flask import current_app
+from flask import current_app, url_for
 from threading import Thread
 from typing import Optional
 
@@ -685,3 +685,29 @@ def send_request_form_inventory_out_of_stock_notice(
     subject = "Inventory notice: out-of-stock field values"
     _send_emails_async(recipients_map, subject, body)
     return True
+
+
+def send_request_link_email(recipients: list[str], request_obj) -> bool:
+    """Send a simple notification email containing a clickable link to a
+    request. Used for watcher addresses and other non-user recipients.
+
+    `recipients` is a list of email strings.  Returns True if an attempt was
+    made and the underlying email service returned ok; False otherwise.
+    """
+    if not recipients:
+        return False
+    try:
+        link = url_for("requests.request_detail", request_id=getattr(request_obj, "id", None), _external=True)
+    except Exception:
+        link = None
+    subject = f"Request #{getattr(request_obj, 'id', '')} created"
+    body = "A new request has been opened.\n"
+    if link:
+        body += f"View it here: {link}\n"
+    svc = EmailService()
+    try:
+        result = svc.send_email(recipients, subject, body)
+        return bool(result.get("ok"))
+    except Exception:
+        current_app.logger.exception("Failed to send request link email to watchers")
+        return False

@@ -47,6 +47,13 @@ All conditional rule changes should be made here first.
 - building requirement editor context
 - parsing and validating admin requirement form input
 
+### Public API services
+`app/services/public_api.py` owns versioned REST payload construction for `app/api/v1/`:
+- serializing template and request responses
+- resolving template verification and template-swap flows
+- wrapping integration fetch and webhook-subscription operations
+- exposing the OpenAPI contract used by external clients and future SDKs
+
 ## Rule model conventions
 
 Conditional requirements are stored as normalized JSON with this shape:
@@ -81,6 +88,7 @@ Conditional requirements are stored as normalized JSON with this shape:
 3. Keep conditional rule semantics in `requirement_rules.py`.
 4. Keep request intake orchestration in `request_intake.py`.
 5. Add tests for every new rule operator or branching behavior.
+6. Keep `/api/v1` route functions thin; reusable JSON payload logic belongs in `public_api.py`.
 
 ## Recommended next architectural steps
 

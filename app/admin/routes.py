@@ -1,3 +1,5 @@
+import re
+
 from flask import (
     Blueprint,
     render_template,
@@ -101,6 +103,7 @@ from . import users  # noqa: F401, E402
 from . import workflows  # noqa: F401, E402
 from . import guest_forms  # noqa: F401, E402
 from . import notifications  # noqa: F401, E402
+from . import automation_rules  # noqa: F401, E402
 
 
 @admin_bp.route("/")
@@ -1366,6 +1369,16 @@ def special_email():
         form.request_form_inventory_out_of_stock_message.data = getattr(
             cfg, "request_form_inventory_out_of_stock_message", None
         )
+        # populate new options
+        form.request_form_add_original_sender.data = bool(
+            getattr(cfg, "request_form_add_original_sender", False)
+        )
+        watchers = getattr(cfg, "request_form_default_watchers", None)
+        if isinstance(watchers, (list, tuple)):
+            form.request_form_default_watchers.data = ", ".join(watchers)
+        else:
+            form.request_form_default_watchers.data = None
+
         form.nudge_enabled.data = bool(getattr(cfg, "nudge_enabled", False))
         # convert stored float to string for the select field
         form.nudge_interval_hours.data = str(
@@ -1433,6 +1446,18 @@ def special_email():
         cfg.request_form_inventory_out_of_stock_message = (
             form.request_form_inventory_out_of_stock_message.data or ""
         ).strip() or None
+
+        # new email features
+        cfg.request_form_add_original_sender = bool(
+            form.request_form_add_original_sender.data
+        )
+        raw_watchers = (form.request_form_default_watchers.data or "")
+        # split on commas or whitespace
+        cfg.request_form_default_watchers = [
+            w.strip().lower()
+            for w in re.split(r"[,\s]+", raw_watchers)
+            if w.strip()
+        ] or None
 
         cfg.nudge_enabled = bool(form.nudge_enabled.data)
         # store value as float; the form supplies a string from the select

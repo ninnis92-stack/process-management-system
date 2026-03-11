@@ -303,7 +303,8 @@ def test_admin_navigation_links_resolve(app, client):
     assert re.search(r'href="/admin/">\s*<i[^>]*></i><span>Admin</span></a>', html)
     assert not re.search(r'<a class="nav-link[^"]*" href="/admin/">Dashboard</a>', html)
     # banner should include an explicit admin dashboard button for admins
-    assert 'class="brand-admin-btn"' in html
+    # allow other bootstrap classes alongside our custom class
+    assert re.search(r'class="[^"]*brand-admin-btn[^"]*"', html)
     assert "Admin dashboard" in html or 'title="Admin dashboard"' in html
     # ensure breadcrumb isn’t itself a clickable Admin link
     assert not re.search(

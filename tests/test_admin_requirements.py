@@ -116,7 +116,7 @@ def test_template_layout_persistence_and_api(app, client):
             db.create_all()
         api = api_app.test_client()
         headers = {"X-Api-Key": "test-key"}
-        rv = api.get("/api/templates", headers=headers)
+        rv = api.get("/api/v1/templates", headers=headers)
         data = rv.get_json()
         # find our template
         found = next((x for x in data.get("templates", []) if x.get("id") == t.id), None)

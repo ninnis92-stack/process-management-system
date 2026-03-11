@@ -43,21 +43,26 @@ def test_requests_api_and_webhook_subscription(client, app):
     api = api_app.test_client()
     headers = {"X-Api-Key": "test-key"}
 
-    rv = api.get("/api/requests", headers=headers)
+    # the versioned API is mounted at /api/v1; older unversioned
+    # endpoints are redirected by the catch-all handler shown above.
+    rv = api.get("/api/v1/requests", headers=headers)
     assert rv.status_code == 200
     assert b"Exportable Request" in rv.data
 
-    # ensure template listings include layout field
-    rv2 = api.get("/api/templates", headers=headers)
+    # ensure template listings include layout field and validate schema
+    from app.api.v1.schemas import TemplateSchema
+
+    rv2 = api.get("/api/v1/templates", headers=headers)
     assert rv2.status_code == 200
     data = rv2.get_json()
     assert data.get("ok") is True
-    # default templates list may be empty but fields should include layout keys
     if data.get("templates"):
         assert "layout" in data["templates"][0]
+        # run marshmallow sanity check
+        TemplateSchema(many=True).load(data["templates"])
 
     rv = api.post(
-        "/api/integrations/webhook-subscriptions",
+        "/api/v1/integrations/webhook-subscriptions",
         json={"url": "https://example.com/hook", "events": ["request.status_changed"]},
         headers=headers,
     )
@@ -69,7 +74,7 @@ def test_requests_api_and_webhook_subscription(client, app):
         assert sub.events == ["request.status_changed"]
 
     rv = api.post(
-        "/api/integrations/fetch",
+        "/api/v1/integrations/fetch",
         json={"provider": "echo", "config": {"source": "demo"}, "query": {"q": "abc"}},
         headers=headers,
     )
@@ -90,6 +95,21 @@ def test_integration_scaffold_normalization_defaults():
     assert normalized["version"] == "2026-03"
     assert normalized["endpoints"]["url"] == "https://example.com/hook"
     assert normalized["compatibility"]["signature_header"] == "X-Webhook-Signature"
+
+
+def test_versioned_openapi_document(client, app):
+    import importlib
+    import api.index as api_index
+
+    api_index = importlib.reload(api_index)
+    api = api_index.app.test_client()
+
+    rv = api.get("/api/v1/openapi.json")
+    assert rv.status_code == 200
+    data = rv.get_json()
+    assert data["openapi"] == "3.0.3"
+    assert "/templates" in data["paths"]
+    assert "/requests" in data["paths"]
 
 
 def test_admin_integration_edit_shows_scaffold(client, app):

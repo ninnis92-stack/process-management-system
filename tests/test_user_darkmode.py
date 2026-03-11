@@ -287,7 +287,11 @@ def test_dashboard_uses_compact_nav_state_when_vibe_and_quotes_are_disabled(
     assert rv.status_code == 200
     rv = client.get("/dashboard")
     assert rv.status_code == 200
-    assert b'class="brand-banner-row' not in rv.data
+    # ensure the banner row itself is omitted; the admin button sits
+    # outside of the row and its class prefix should not trigger this
+    # check.  matching the closing quote guarantees we don't hit
+    # `brand-banner-row__admin-button`.
+    assert b'<div class="brand-banner-row"' not in rv.data
     m = re.search(rb"<body[^>]*class=[\'\"]([^\'\"]*)[\'\"]", rv.data)
     assert m, "no body tag?"
     assert b"no-vibe" in m.group(1)

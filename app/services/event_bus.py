@@ -59,11 +59,18 @@ def mark_event_failed(event: IntegrationEvent, exc: Exception) -> None:
     now = datetime.utcnow()
     retry_count = int(getattr(event, "retry_count", 0) or 0) + 1
     backoff_minutes = min(5 * (2 ** max(retry_count - 1, 0)), 24 * 60)
-    event.status = "failed"
+    # After a configurable number of retries, mark as permanently failed
+    MAX_RETRIES = int(current_app.config.get("INTEGRATION_MAX_RETRIES", 5))
+    if retry_count >= MAX_RETRIES:
+        event.status = "permanent_failed"
+        event.next_retry_at = None
+    else:
+        event.status = "failed"
     event.last_error = str(exc)
     event.retry_count = retry_count
     event.last_attempt_at = now
-    event.next_retry_at = now + timedelta(minutes=backoff_minutes)
+    if getattr(event, "next_retry_at", None) is None and event.status != "permanent_failed":
+        event.next_retry_at = now + timedelta(minutes=backoff_minutes)
     db.session.add(event)
     db.session.commit()
     try:

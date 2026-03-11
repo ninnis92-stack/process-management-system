@@ -1,0 +1,28 @@
+<section class="surface-panel surface-panel-muted admin-orientation-panel">
+  <div class="admin-orientation-panel__header">
+    <div>
+      <p class="eyebrow-label">Start here</p>
+      <h2 class="h5 mb-1">First admin pass</h2>
+      <p class="text-muted mb-0">New admins learn fastest when routing, intake, and workspace presentation are configured in that order.</p>
+    </div>
+  </div>
+  <div class="admin-orientation-panel__grid">
+    <article class="admin-orientation-panel__item">
+      <strong>1. Model the route</strong>
+      <p class="small text-muted mb-0">Start in Process Flows so each request has a clear owner and next step before you tune anything else.</p>
+    </article>
+    <article class="admin-orientation-panel__item">
+      <strong>2. Teach the intake</strong>
+      <p class="small text-muted mb-0">Then adjust request forms and templates so submitters only see the fields the next team actually needs.</p>
+    </article>
+    <article class="admin-orientation-panel__item">
+      <strong>3. Publish the workspace</strong>
+      <p class="small text-muted mb-0">Finish with branding, dashboard, and notification settings once the operational model is already stable.</p>
+    </article>
+  </div>
+  <div class="d-flex flex-wrap gap-2 mt-3">
+    <a class="btn btn-sm btn-primary" href="{{ url_for('admin.list_workflows') }}">Start with process flows</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.list_templates') }}">Open request forms</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.site_config') }}">Review workspace defaults</a>
+  </div>
+</section>
