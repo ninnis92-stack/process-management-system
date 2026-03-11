@@ -17,6 +17,7 @@ RUN useradd --create-home --shell /usr/sbin/nologin appuser \
 	&& chown -R appuser:appuser /data /app
 
 COPY --chown=appuser:appuser . .
+COPY --chown=appuser:appuser scripts/ /app/scripts/
 RUN chmod +x /app/scripts/entrypoint.sh
 
 EXPOSE 8080

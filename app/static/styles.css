@@ -209,6 +209,61 @@
 }
 
 @media (max-width: 576px) {
+    .brand-cluster {
+      flex-direction: column;
+      align-items: center;
+      gap: 0.42rem !important;
+      min-width: 0;
+      justify-content: center;
+      width: 100%;
+      padding: 0.5rem 0.1rem;
+      background: linear-gradient(120deg, #eef4fb 80%, #dbeafe 100%);
+      border: 1.5px solid #b6c6e2;
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgba(15, 23, 42, 0.13);
+    }
+    .brand-stack {
+      flex-direction: column !important;
+      align-items: center !important;
+      gap: 0.22rem !important;
+      width: 100%;
+      margin-bottom: 0.22rem;
+    }
+    .brand-logo-img {
+      margin-right: 0 !important;
+      margin-bottom: 0.14rem !important;
+      height: 54px !important;
+      max-width: 90vw;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      box-shadow: 0 6px 24px rgba(15, 23, 42, 0.18);
+      border-radius: 14px;
+      background: #fff;
+      padding: 0.22rem 0.38rem;
+      border: 1px solid #e2e8f0;
+    }
+    .brand-title {
+      font-size: 1.22rem !important;
+      text-align: center;
+      margin: 0 auto;
+      line-height: 1.18;
+      font-weight: 900;
+      letter-spacing: 0.7px;
+      color: #1e293b;
+      text-shadow: 0 1px 2px rgba(148,163,184,0.12);
+    }
+    .brand-kicker {
+      margin-top: 0.22rem;
+      text-align: center;
+      font-size: 0.88rem;
+      color: #334155;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      line-height: 1.25;
+      text-shadow: 0 1px 2px rgba(148,163,184,0.10);
+    }
+  }
   .login-hero {
     padding: 1rem;
     border-radius: 1rem;
@@ -217,7 +272,41 @@
   .login-hero__chips {
     gap: 0.5rem;
   }
-}
+  .brand-cluster {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem !important;
+    min-width: 0;
+    justify-content: center;
+    width: 100%;
+    padding: 0.4rem 0;
+  }
+  .brand-stack {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 0.18rem !important;
+    width: 100%;
+    margin-bottom: 0.18rem;
+  }
+  .brand-logo-img {
+    margin-right: 0 !important;
+    margin-bottom: 0.12rem !important;
+    height: 36px !important;
+    max-width: 90vw;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .brand-title {
+    font-size: 1rem !important;
+    text-align: center;
+    margin: 0 auto;
+    line-height: 1.1;
+  }
+  .brand-kicker {
+    margin-top: 0.18rem;
+    text-align: center;
+    }
 
 .guest-form-config-grid {
   display: grid;
@@ -403,18 +492,19 @@
   padding: 0.85rem 1rem;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 0.9rem;
-  background: rgba(248, 250, 252, 0.9);
+  background: var(--surface-muted);
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .admin-toggle-card.active {
   background: var(--accent-2);
   border-color: var(--accent);
+  color: var(--nav-text);
 }
 
 .admin-toggle-card.active .form-check-label {
   font-weight: 600;
-  color: var(--nav-bg);
+  color: var(--nav-text);
 }
 
 .admin-toggle-card--neutral,
@@ -946,9 +1036,9 @@ body.no-brand-banner .brand-cluster {
   text-transform: uppercase;
   letter-spacing: 0.16em;
   color: rgba(255, 255, 255, 0.68);
-  margin-top: 0.28rem;
+  margin-top: 0.18rem;
+  text-align: center;
   line-height: 1.25;
-  white-space: normal;
 }
 .brand-title { 
   font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
@@ -1062,7 +1152,24 @@ body.no-brand-banner .brand-cluster {
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: #ffffff !important;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.28);
-}
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+  }
+
+  .brand-vibe-btn:active,
+  .brand-vibe-btn:focus,
+  .brand-vibe-btn.pressed {
+    background: color-mix(in srgb, rgb(var(--accent-rgb, 79, 140, 255)) 68%, #0f172a 32%);
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+    outline: 2px solid var(--accent-2);
+    outline-offset: 2px;
+  }
+
+  .brand-vibe-btn:hover {
+    background: color-mix(in srgb, rgb(var(--accent-rgb, 79, 140, 255)) 92%, #0f172a 8%);
+    color: #fff !important;
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.22);
+  }
 
 #motivation {
   display: inline-block;
@@ -1266,13 +1373,15 @@ a:hover { color: var(--accent-2); }
   font-weight: 600;
   color: var(--nav-text);
   border-color: rgba(255,255,255,0.24);
-  background: rgba(255,255,255,0.03);
+  background: var(--accent-2);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: background 0.2s, color 0.2s;
 }
 .nav-actions .btn:hover,
 .nav-actions .btn:focus-visible {
-  color: var(--nav-text);
-  border-color: rgba(255,255,255,0.28);
-  background: #24344f;
+  color: var(--nav-bg);
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 .theme-nav .btn-outline-light,

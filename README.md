@@ -1,3 +1,26 @@
+**Deployment Requirements:**
+- Fly.io requires a persistent volume for Postgres. Create the volume before deploying:
+  ```bash
+  flyctl volume create pg_data -r <region> -n 1
+  ```
+  Ensure the volume name matches the `source` in `[mounts]` in `fly.toml`.
+- Fly.io memory allocation is limited to 2048 MiB (2GB) for most plans. Set `memory_mb = 2048` in `fly.toml`.
+- Only Alembic migrations are run in production. Manual schema workarounds and `db.create_all()` have been removed from `scripts/release_tasks.py`.
+### Fly.io Migration Workflow
+
+1. Create the required volume before deploying:
+  ```bash
+  flyctl volume create pg_data -r <region> -n 1
+  ```
+2. Ensure `fly.toml` mounts section references `pg_data`.
+3. Set `memory_mb = 2048` in `fly.toml` to avoid deployment errors.
+4. Deploy with:
+  ```bash
+  flyctl deploy
+  ```
+5. The release command will run Alembic migrations and seed logic automatically.
+
+**Note:** Manual schema workarounds and `db.create_all()` are no longer used. All schema changes must be handled via Alembic migrations.
 # Process Management Prototype
 
 This repository contains a **Flask-based process management system** built as a prototype for handling
