@@ -3,9 +3,11 @@
   ```bash
   flyctl volume create pg_data -r <region> -n 1
   ```
-  Ensure the volume name matches the `source` in `[mounts]` in `fly.toml`.
+  Ensure the volume name matches the `source` in `[mounts]` in `fly.toml`.  For convenience the repo now includes an `ensure_volume.sh` helper and a `make deploy` target that will create `pg_data` automatically when it’s missing; see the **Getting started** section for details.
 - Fly.io memory allocation is limited to 2048 MiB (2GB) for most plans. Set `memory_mb = 2048` in `fly.toml`.
-- Only Alembic migrations are run in production. Manual schema workarounds and `db.create_all()` have been removed from `scripts/release_tasks.py`.
+- Only Alembic migrations are run in production. The release script (`scripts/release_tasks.py`) handles all schema changes and no longer contains any `db.create_all()` calls or manual SQL hacks.  It also has a couple of safety nets for older databases: if the
+  `original_sender` or `company_url` columns are missing from their tables, the script will add them automatically during every run.
+
 ### Fly.io Migration Workflow
 
 1. Create the required volume before deploying:
