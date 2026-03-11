@@ -33,17 +33,14 @@ body{ font-family: Poppins, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helve
 .admin-tile .tile-sub{ color:rgba(230,238,248,0.8); font-size:0.9rem; }
 
 /* Make action buttons full-width on small screens */
-@media (max-width:767px){
-  .admin-tile{ padding:14px; }
-  .admin-tile.btn, .admin-tile button{ width:100%; text-align:left; }
-}
-
-@media (max-width: 767px){
-  .navbar .brand-copy{ display:none; }
-  .brand-logo-img{ height:36px !important; }
-  .admin-layout .col-md-3{ display:none; }
-  .admin-layout .col-md-9{ width:100%; }
-  .hero-callouts__grid{ display:block; }
+@media (max-width: 767px) {
+  .admin-tile { padding: 14px; }
+  .admin-tile.btn, .admin-tile button { width: 100%; text-align: left; }
+  .navbar .brand-copy { display: none; }
+  .brand-logo-img { height: 36px !important; }
+  .admin-layout .col-md-3 { display: none; }
+  .admin-layout .col-md-9 { width: 100%; }
+  .hero-callouts__grid { display: block; }
 }
 
 /* Accessibility: larger focus outlines */

@@ -10,6 +10,7 @@ primary_region = 'ord'
   WAIT_FOR_DB = "true"
   RUN_SEED_ON_RELEASE = "1"
   SEED_ON_BOOT = "1"
+  DATABASE_URL = "sqlite:///app.db"
 
 [[services]]
   internal_port = 8080
@@ -39,10 +40,10 @@ primary_region = 'ord'
   web = "gunicorn -w 3 --threads 4 -k gthread -b 0.0.0.0:8080 run:app"
 
 [[vm]]
-  memory = '2gb'
-  cpu_kind = 'shared'
-  cpus = 1
-  memory_mb = 2048
+  memory = '4gb'
+  cpu_kind = 'performance'
+  cpus = 2
+  memory_mb = 4096
 
 [deploy]
   # Run a one-time migration / table-creation step during deploy so new

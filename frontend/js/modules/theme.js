@@ -444,13 +444,29 @@ function initThemeEngine() {
   const startIdx = Number.isFinite(stored) ? stored % palettes.length : (dailySeed % palettes.length);
   window.applyVibeTheme = applyTheme;
   window.syncVibeThemeState = syncVibeControlAvailability;
+
+  // On mobile, always add a .vibe-active class to body if Vibe is enabled and not dark mode
+  function updateVibeBodyClass() {
+    const isMobile = window.matchMedia('(max-width: 640px)').matches;
+    if (isMobile && isVibeFeatureEnabled() && !isDarkModeEnabled()) {
+      document.body.classList.add('vibe-active');
+    } else {
+      document.body.classList.remove('vibe-active');
+    }
+  }
+
+  window.addEventListener('resize', updateVibeBodyClass);
+  updateVibeBodyClass();
+
   if (!isVibeFeatureEnabled()) {
     syncVibeControlAvailability();
     clearThemeOverrides();
+    updateVibeBodyClass();
     return;
   }
 
   applyTheme(startIdx);
+  updateVibeBodyClass();
 
   function advanceVibe() {
     if (isDarkModeEnabled()) {
@@ -462,12 +478,18 @@ function initThemeEngine() {
   }
 
   vibeButtons.forEach((button) => {
+    // Click event for desktop and most browsers
     button.addEventListener('click', (event) => {
       if (button.tagName === 'A') {
         event.preventDefault();
       }
       advanceVibe();
     });
+    // Touch event for mobile browsers
+    button.addEventListener('touchstart', (event) => {
+      event.preventDefault();
+      advanceVibe();
+    }, { passive: false });
   });
 }
 

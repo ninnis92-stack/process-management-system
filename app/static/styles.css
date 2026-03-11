@@ -1,3 +1,12 @@
+/* --- Global style cleanup: removed redundant and repeated rules, unified spacing, font, and color usage. --- */
+.admin-hero__title, .admin-hero__lede {
+  font-size: 1.05rem;
+  line-height: 1.25;
+  padding: 0.2rem 0.1rem;
+  word-break: break-word;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .template-intake-summary {
   display: flex;
   justify-content: space-between;
@@ -202,100 +211,64 @@
   background: var(--border);
 }
 
-@media (max-width: 992px) {
-  .login-hero {
+@media (max-width: 640px) {
+  .admin-hero {
     grid-template-columns: 1fr;
+    padding: 1.1rem;
+    min-height: auto;
+    border-radius: 1.2rem;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    color: var(--body-text);
   }
-}
-
-@media (max-width: 576px) {
-    .brand-cluster {
-      flex-direction: column;
-      align-items: center;
-      gap: 0.42rem !important;
-      min-width: 0;
-      justify-content: center;
-      width: 100%;
-      padding: 0.5rem 0.1rem;
-      background: linear-gradient(120deg, #eef4fb 80%, #dbeafe 100%);
-      border: 1.5px solid #b6c6e2;
-      border-radius: 16px;
-      box-shadow: 0 6px 24px rgba(15, 23, 42, 0.13);
-    }
-    .brand-stack {
-      flex-direction: column !important;
-      align-items: center !important;
-      gap: 0.22rem !important;
-      width: 100%;
-      margin-bottom: 0.22rem;
-    }
-    .brand-logo-img {
-      margin-right: 0 !important;
-      margin-bottom: 0.14rem !important;
-      height: 54px !important;
-      max-width: 90vw;
-      display: block;
-      margin-left: auto;
-      margin-right: auto;
-      box-shadow: 0 6px 24px rgba(15, 23, 42, 0.18);
-      border-radius: 14px;
-      background: #fff;
-      padding: 0.22rem 0.38rem;
-      border: 1px solid #e2e8f0;
-    }
-    .brand-title {
-      font-size: 1.22rem !important;
-      text-align: center;
-      margin: 0 auto;
-      line-height: 1.18;
-      font-weight: 900;
-      letter-spacing: 0.7px;
-      color: #1e293b;
-      text-shadow: 0 1px 2px rgba(148,163,184,0.12);
-    }
-    .brand-kicker {
-      margin-top: 0.22rem;
-      text-align: center;
-      font-size: 0.88rem;
-      color: #334155;
-      font-weight: 700;
-      letter-spacing: 0.22em;
-      line-height: 1.25;
-      text-shadow: 0 1px 2px rgba(148,163,184,0.10);
-    }
+  .page-shell, .page-shell-admin {
+    background: var(--surface);
+    border-radius: 1.1rem;
+    color: var(--body-text);
   }
-  .login-hero {
-    padding: 1rem;
-    border-radius: 1rem;
+  .theme-nav, .navbar, .navbar .nav-link, .navbar .btn {
+    background: var(--nav-bg);
+    color: var(--nav-text);
+    border-bottom: 1px solid var(--border);
   }
-
-  .login-hero__chips {
-    gap: 0.5rem;
+  .brand-vibe-btn {
+    background: color-mix(in srgb, rgb(var(--accent-rgb, 79, 140, 255)) 82%, #0f172a 18%);
+    color: #fff;
+    border: 1px solid var(--accent-2);
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.18);
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
   }
-  .brand-cluster {
+  .brand-vibe-btn:active,
+  .brand-vibe-btn:focus,
+  .brand-vibe-btn.pressed {
+    background: color-mix(in srgb, rgb(var(--accent-rgb, 79, 140, 255)) 68%, #0f172a 32%);
+    color: #fff;
+    outline: 2px solid var(--accent-2);
+    outline-offset: 2px;
+  }
+  .brand-vibe-btn:hover {
+    background: color-mix(in srgb, rgb(var(--accent-rgb, 79, 140, 255)) 92%, #0f172a 8%);
+    color: #fff;
+  }
+  .brand-banner-row, .brand-banner-row__quote-panel {
+    background: var(--banner-bg);
+    border-color: var(--banner-border);
+    color: var(--body-text);
+  }
+  .brand-cluster, .brand-stack {
     flex-direction: column;
     align-items: center;
-    gap: 0.35rem !important;
-    min-width: 0;
+    gap: 0.25rem;
+    width: 100%;
     justify-content: center;
-    width: 100%;
     padding: 0.4rem 0;
-  }
-  .brand-stack {
-    flex-direction: column !important;
-    align-items: center !important;
-    gap: 0.18rem !important;
-    width: 100%;
     margin-bottom: 0.18rem;
   }
   .brand-logo-img {
-    margin-right: 0 !important;
-    margin-bottom: 0.12rem !important;
+    margin: 0 auto 0.12rem auto !important;
     height: 36px !important;
     max-width: 90vw;
     display: block;
-    margin-left: auto;
-    margin-right: auto;
   }
   .brand-title {
     font-size: 1rem !important;
@@ -306,7 +279,15 @@
   .brand-kicker {
     margin-top: 0.18rem;
     text-align: center;
-    }
+  }
+  .login-hero {
+    padding: 1rem;
+    border-radius: 1rem;
+  }
+  .login-hero__chips {
+    gap: 0.5rem;
+  }
+}
 
 .guest-form-config-grid {
   display: grid;
@@ -1234,7 +1215,22 @@ body.no-brand-banner .brand-cluster {
 
   .brand-banner-row {
     width: min(100%, 560px);
-    margin-top: 0.3rem; /* give a bit of vertical separation when wrapping */
+    margin-top: 0.3rem;
+    padding: 0.2rem 0.5rem;
+    min-height: 32px;
+  }
+  .brand-banner-row__eyebrow {
+    font-size: 0.85rem;
+    padding: 0.1rem 0;
+    margin-bottom: 0.1rem;
+  }
+  .brand-banner-row__content {
+    padding: 0.1rem 0;
+  }
+  #motivation.brand-quote {
+    font-size: 0.95rem;
+    line-height: 1.2;
+    padding: 0.1rem 0;
   }
 }
 
@@ -3392,11 +3388,36 @@ pre {
   }
 }
 
-.notif-btn { transition: transform .15s ease, box-shadow .15s ease; border-color: rgba(255,255,255,0.28); color: var(--nav-text); background: rgba(255,255,255,0.03); }
-.notif-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.18); color: var(--nav-text); background: rgba(255,255,255,0.12); }
-.notif-ico { display: inline-flex; align-items: center; justify-content: center; }
-.notif-btn.open .notif-ico { color: #ffc107; }
-.notif-btn.notif-active { border-color: rgba(255,193,7,0.7); box-shadow: 0 0 0 6px rgba(255,193,7,0.18), 0 10px 24px rgba(0,0,0,0.22); color: #ffd566; }
+
+.notif-btn {
+  transition: transform .15s ease, box-shadow .15s ease;
+  border-color: var(--accent-2, rgba(255,255,255,0.28));
+  color: var(--nav-text);
+  background: var(--surface-2, rgba(255,255,255,0.03));
+  box-shadow: 0 2px 8px rgba(15,23,42,0.10);
+}
+.notif-btn:hover, .notif-btn:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  color: var(--accent);
+  background: var(--surface-3, rgba(255,255,255,0.12));
+  border-color: var(--accent);
+}
+.notif-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  transition: color 0.18s;
+}
+.notif-btn.open .notif-ico {
+  color: var(--accent-2, #ffc107);
+}
+.notif-btn.notif-active {
+  border-color: var(--accent, #ffd566);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent 82%), 0 10px 24px rgba(0,0,0,0.22);
+  color: var(--accent);
+}
 
 .notif-dropdown { 
   position: fixed;

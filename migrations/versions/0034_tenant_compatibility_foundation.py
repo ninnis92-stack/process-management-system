@@ -141,8 +141,8 @@ def _seed_default_plan_and_tenant(conn):
         conn.execute(
             text(
                 """
-                INSERT INTO tenant (slug, name, plan_id, is_active)
-                VALUES (:slug, :name, :plan_id, :is_active)
+                INSERT INTO tenant (slug, name, plan_id, is_active, created_at)
+                VALUES (:slug, :name, :plan_id, :is_active, :created_at)
                 """
             ),
             {
@@ -150,6 +150,7 @@ def _seed_default_plan_and_tenant(conn):
                 "name": "Default Workspace",
                 "plan_id": growth_plan_id,
                 "is_active": True,
+                "created_at": datetime.utcnow(),
             },
         )
         tenant_id = conn.execute(

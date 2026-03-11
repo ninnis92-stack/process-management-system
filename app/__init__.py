@@ -45,6 +45,31 @@ def create_app():
     if isinstance(db_url, str) and db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
     app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+    # Improved error logging: log exceptions to stdout
+    import logging
+    import sys
+    import traceback
+    from flask import got_request_exception, jsonify
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.ERROR)
+    app.logger.addHandler(handler)
+    app.logger.setLevel(logging.ERROR)
+    def log_exception(sender, exception, **extra):
+        sender.logger.error("Exception occurred", exc_info=exception)
+    got_request_exception.connect(log_exception, app)
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        logging.error("Internal Server Error: %s", error)
+        logging.error(traceback.format_exc())
+        return jsonify({"error": "Internal Server Error", "details": str(error)}), 500
+
+    # Optionally, log all exceptions
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        logging.error("Unhandled Exception: %s", e)
+        logging.error(traceback.format_exc())
+        return jsonify({"error": "Unhandled Exception", "details": str(e)}), 500
 
     # We will perform a one-time schema check (original_sender column) after
     # the database extension is initialized later in this function.  Doing it

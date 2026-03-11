@@ -17,41 +17,49 @@ depends_on = None
 
 def upgrade():
     # special_email_config additions
-    op.add_column(
-        "special_email_config",
-        sa.Column(
-            "request_form_add_original_sender",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.text("0"),
-        ),
-    )
-    op.add_column(
-        "special_email_config",
-        sa.Column(
-            "request_form_default_watchers",
-            sa.JSON(),
-            nullable=True,
-        ),
-    )
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_columns = [col["name"] for col in inspector.get_columns("special_email_config")]
+    if "request_form_add_original_sender" not in existing_columns:
+        op.add_column(
+            "special_email_config",
+            sa.Column(
+                "request_form_add_original_sender",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("0"),
+            ),
+        )
+    if "request_form_default_watchers" not in existing_columns:
+        op.add_column(
+            "special_email_config",
+            sa.Column(
+                "request_form_default_watchers",
+                sa.JSON(),
+                nullable=True,
+            ),
+        )
 
     # request table additions
-    op.add_column(
-        "request",
-        sa.Column(
-            "original_sender",
-            sa.String(length=255),
-            nullable=True,
-        ),
-    )
-    op.add_column(
-        "request",
-        sa.Column(
-            "watcher_emails",
-            sa.JSON(),
-            nullable=True,
-        ),
-    )
+    request_columns = [col["name"] for col in inspector.get_columns("request")]
+    if "original_sender" not in request_columns:
+        op.add_column(
+            "request",
+            sa.Column(
+                "original_sender",
+                sa.String(length=255),
+                nullable=True,
+            ),
+        )
+    if "watcher_emails" not in request_columns:
+        op.add_column(
+            "request",
+            sa.Column(
+                "watcher_emails",
+                sa.JSON(),
+                nullable=True,
+            ),
+        )
 
 
 def downgrade():

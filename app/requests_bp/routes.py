@@ -1495,7 +1495,9 @@ def assign_bucket():
     new_assignee = None
     if selected_id != -1:
         new_assignee = User.query.filter_by(
-            id=selected_id, department=dept, is_active=True
+            id=selected_id,
+            department=current_user.department,
+            is_active=True,
         ).first()
         if not new_assignee:
             flash("Invalid assignee for your department.", "danger")
@@ -2012,6 +2014,8 @@ def metrics():
     try:
         payload, content_type = metrics_module.metrics_output()
         return Response(payload, content_type=content_type)
+    except PermissionError:
+        abort(403)
     except Exception:
         current_app.logger.exception("Failed to generate Prometheus metrics")
         abort(500)
@@ -2056,6 +2060,8 @@ def metrics_json():
             "allowed_departments": allowed_depts,
         }
         return jsonify(payload)
+    except PermissionError:
+        abort(403)
     except Exception:
         current_app.logger.exception("Failed to render JSON metrics")
         abort(500)
@@ -2965,11 +2971,7 @@ def reset_workflow_requests(workflow_id: int):
             pass
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"ok": False, "message": "Failed to reset requests"}), 500
-        flash("Failed to reset workflow requests.", "danger")
-
-    ref_id = request.form.get("ref_request_id")
-    if ref_id:
-        return redirect(url_for("requests.request_detail", request_id=ref_id))
+        abort(500)
     return redirect(url_for("requests.request_list"))
 
 
@@ -3883,9 +3885,13 @@ def do_transition(request_id: int):
                                 headers["Authorization"] = (
                                     f"Bearer {cfg_data.get('token')}"
                                 )
-                            payload["event"] = (
-                                bundle_options.get("event_name") or "handoff_bundle"
-                            )
+                            payload = {
+                                "event": "status_change",
+                                "request_id": req.id,
+                                "from_status": from_status,
+                                "to_status": to_status,
+                                "department": req.owner_department,
+                            }
                             requests.post(
                                 target_url,
                                 json=payload,

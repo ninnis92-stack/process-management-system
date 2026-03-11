@@ -30,7 +30,6 @@
             <p class="section-heading__subtitle">Keep the interface comfortable while preserving all existing theme and vibe rules.</p>
           </div>
         </div>
-
         <div class="form-check mb-3">
           {{ form.dark_mode(class_='form-check-input') }}
           <label class="form-check-label" for="dark_mode" id="darkModeLabel">{{ 'Dark mode enabled' if dark_mode_enabled else 'Dark mode disabled' }}</label>
@@ -41,15 +40,13 @@
           <label class="form-check-label" for="vibe_button_enabled">Show vibe button in the navbar</label>
           <div class="form-text">You can hide the vibe button if you prefer to change themes from the settings page only. If the workspace-wide vibe feature is turned off, that global control still hides the button for everyone until it is re-enabled.</div>
         </div>
-
         {% if external_theme %}
           <div class="form-text mt-2">This workspace is using an adopted brand theme. Native dark mode keeps the imported brand palette active automatically while personal vibe controls stay locked.</div>
         {% endif %}
-
         {% if not external_theme and form.vibe_index %}
           <div class="mb-0">
             <label for="vibe_index" class="form-label">Theme</label>
-            <select class="form-select" id="vibe_index" name="vibe_index" {% if dark_mode_enabled or not vibe_feature_enabled %}disabled{% endif %} data-all-choices='{{ all_vibe_choices|tojson }}'>
+            <select class="form-select" id="vibe_index" name="vibe_index" {% if dark_mode_enabled or not vibe_feature_enabled %}disabled{% endif %} data-all-choices='{{ all_vibe_choices|tojson }}' style="max-width:100%; min-width:0;">
               {% for val, label in form.vibe_index.choices %}
                 <option value="{{ val }}" {% if (current_user.vibe_index is not none and current_user.vibe_index == val) or (form.vibe_index.data is not none and form.vibe_index.data == val) %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -64,17 +61,18 @@
                 <div class="theme-preview-card__meta">
                   <div class="theme-preview-card__name" data-vibe-preview-name>Theme preview</div>
                 </div>
-                <!-- mimic navbar vibe button so preview reflects its disappearance in dark mode -->
-                <button type="button" id="settingsVibePreview" class="btn btn-outline-secondary mt-2" {% if dark_mode_enabled or not vibe_feature_enabled or not vibe_button_enabled %}hidden{% endif %}>Vibe</button>
+                {# Settings preview vibe button logic for tests: hidden if dark mode, brand adoption, or feature flag off #}
+                {% set preview_external_theme = active_theme_css is defined and active_theme_css %}
+                {% set preview_show_vibe_btn = vibe_feature_enabled and vibe_button_enabled and not dark_mode_enabled and not preview_external_theme %}
+                <button type="button" id="settingsVibePreview" class="btn btn-outline-secondary mt-2 brand-vibe-btn" style="width:100%;max-width:320px;" {% if not preview_show_vibe_btn %}hidden{% endif %}>Vibe</button>
               </div>
             </div>
-            <div class="form-text">Choose your UI accent theme. Teams that prefer a neutral tone can leave this on the default setting. When dark mode is enabled this control is disabled; adopted brand themes still carry their accent palette into native dark mode automatically.</div>
+            <div class="form-text">Choose your UI accent theme. Teams that prefer a neutral tone can leave this on the default setting. When dark mode is enabled this control is disabled; adopted brand themes still carry their accent palette into native dark mode automatically. <span class="d-block d-md-none text-info">Theme controls are mobile-friendly.</span></div>
             <div id="vibeDarkModeNote" class="form-text text-warning mt-1" {% if not dark_mode_enabled %}hidden{% endif %}>Theme selection is disabled while dark mode is active.</div>
             <div id="vibeFeatureNote" class="form-text text-warning mt-1" {% if vibe_feature_enabled %}hidden{% endif %}>Theme selection is disabled while the global vibe feature is turned off.</div>
           </div>
         {% endif %}
       </section>
-
       <section class="surface-panel settings-section">
         <div class="section-heading section-heading-compact">
           <div>
@@ -82,13 +80,17 @@
             <p class="section-heading__subtitle">Choose whether rotating quotes appear and how often they refresh. Neutral defaults remain available.</p>
           </div>
         </div>
-
-        {{ toggle_checkbox(form.quotes_enabled, 'Rotating quotes enabled', 'Rotating quotes disabled') }}
-
+        <div class="form-check form-switch mb-2" style="max-width:100%;">
+          {{ form.quotes_enabled(class_='form-check-input', id='quotes_enabled_switch') }}
+          <label class="form-check-label" for="quotes_enabled_switch">Rotating quotes enabled</label>
+        </div>
+        {% if form.quotes_enabled.data is not none and not form.quotes_enabled.data %}
+          <div class="form-text text-warning">Rotating quotes disabled</div>
+        {% endif %}
         {% if form.quote_set %}
           <div class="mb-3">
             <label for="quote_set" class="form-label">Message set</label>
-            <select class="form-select" id="quote_set" name="quote_set">
+            <select class="form-select" id="quote_set" name="quote_set" style="max-width:100%; min-width:0;">
               {% for val, label in form.quote_set.choices %}
                 <option value="{{ val }}" {% if (current_user.quote_set is not none and current_user.quote_set == val) or (form.quote_set.data is not none and form.quote_set.data == val) %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -96,70 +98,36 @@
             <div class="form-text">Select which rotating message set you want to see, or leave it blank to follow the site default.</div>
           </div>
         {% endif %}
-
         {% if form.quote_interval %}
           <div class="mb-0">
             <label for="quote_interval" class="form-label">Quote rotation interval</label>
-            <select class="form-select" id="quote_interval" name="quote_interval">
+            <select class="form-select" id="quote_interval" name="quote_interval" style="max-width:100%; min-width:0;">
               {% for val, label in form.quote_interval.choices %}
                 <option value="{{ val }}" {% if (current_user.quote_interval is not none and current_user.quote_interval == val) or (form.quote_interval.data is not none and form.quote_interval.data == val) %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
-            <div class="form-text">How often quotes should advance. Choose between 15 and 60 seconds in 5‑second steps.</div>
+            <div class="form-text">How often quotes should advance. Choose between 15 and 60 seconds in 5‑second steps. <span class="d-block d-md-none text-info">Quote controls are mobile-friendly.</span></div>
           </div>
         {% endif %}
+        <div class="mb-3" id="cameraDemoSection">
+          <label for="cameraDemoInput" class="form-label">Camera capture demo</label>
+          <input type="file" accept="image/*" capture="environment" class="form-control" id="cameraDemoInput" name="camera_demo" data-camera-target>
+          <div class="form-text">Try capturing a photo using your device camera. This is a demo field and does not upload or store images.</div>
+        </div>
       </section>
-
       <section class="surface-panel settings-section">
         <div class="section-heading section-heading-compact">
           <div>
             <h2 class="section-heading__title">Learning aids</h2>
-            <p class="section-heading__subtitle">Show or hide the newcomer guidance panels on the dashboard and admin landing screens once you know the flow.</p>
+            <p class="section-heading__subtitle">Enable or disable onboarding guidance and helper tips.</p>
           </div>
         </div>
-
-        {{ toggle_checkbox(form.onboarding_guidance_enabled, 'Onboarding guidance enabled', 'Onboarding guidance disabled') }}
-        <div class="form-text mt-2">This controls the guided "start here" panels on the main dashboard and the admin command center. Functional workflow previews still stay available where they are needed.</div>
-      </section>
-
-      <section class="surface-panel settings-section">
-        <div class="section-heading section-heading-compact">
-          <div>
-            <h2 class="section-heading__title">Camera capture demo</h2>
-            <p class="section-heading__subtitle">Capture handwritten or printed text using your device camera.</p>
-          </div>
-        </div>
-        <div class="mb-3">
-          <label for="demo_field" class="form-label">Sample field</label>
-          <div class="input-group">
-            <input type="text" name="demo_field" id="demo_field" class="form-control" placeholder="Captured value" autocomplete="off">
-            <button type="button" class="btn btn-outline-secondary" data-camera-target="[name='demo_field']">📷</button>
-          </div>
-          <div class="form-text">Press the camera button to take a photo; returned text will fill the field.</div>
+        <div class="form-check mb-3">
+          {{ form.onboarding_guidance_enabled(class_='form-check-input') }}
+          <label class="form-check-label" for="onboarding_guidance_enabled">Onboarding guidance enabled</label>
         </div>
       </section>
     </div>
-
-    <div id="settingsAutoSaveStatus" class="ui-action-note settings-autosave-note mt-3" aria-live="polite">Changes save automatically.</div>
-    <noscript>
-      <button class="btn btn-primary mt-3" type="submit">Save settings</button>
-    </noscript>
-  </form>
-
-  <script>
-    // Only settings page needs the live preview logic for dark mode / labels
-    (function () {
-      const checkbox = document.getElementById('dark_mode');
-      const label = document.getElementById('darkModeLabel');
-      const statusEl = document.getElementById('settingsAutoSaveStatus');
-      const vibeSelect = document.getElementById('vibe_index');
-      const vibeDarkModeNote = document.getElementById('vibeDarkModeNote');
-      const vibeFeatureNote = document.getElementById('vibeFeatureNote');
-      const themePreviewCard = document.getElementById('userThemePreview');
-      if (!checkbox || !label || !statusEl) return;
-
-      const syncDarkModeText = () => {
-        label.textContent = checkbox.checked ? 'Dark mode enabled' : 'Dark mode disabled';
       };
       const syncBodyClass = () => {
         document.body.classList.toggle('dark-mode', checkbox.checked);
@@ -235,5 +203,4 @@
       }
     })();
   </script>
-
 {% endblock %}
