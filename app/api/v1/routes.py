@@ -35,10 +35,14 @@ def _check_api_key(req):
 @api_v1_bp.route("/templates", methods=["GET"])
 def templates_list():
     try:
-        templates = list_templates_payload()
-        if not isinstance(templates, list):
-            return jsonify({"ok": False, "error": "invalid_response", "code": 500, "message": "Templates payload must be a list."}), 500
-        return jsonify({"ok": True, "templates": templates})
+        payload = list_templates_payload()
+        # Accept both legacy and new return format
+        if isinstance(payload, dict) and "templates" in payload:
+            return jsonify(payload)
+        elif isinstance(payload, list):
+            return jsonify({"ok": True, "templates": payload})
+        else:
+            return jsonify({"ok": False, "error": "invalid_response", "code": 500, "message": "Templates payload must be a list or dict with 'templates'."}), 500
     except Exception as exc:
         return jsonify({"ok": False, "error": "internal_error", "code": 500, "message": str(exc)}), 500
 
