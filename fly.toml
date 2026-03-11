@@ -53,5 +53,5 @@ primary_region = 'ord'
 
 # Volume mount configuration required by Fly.io
 [mounts]
-  source = "app_data"
+  source = "pg_data"
   destination = "/data"
