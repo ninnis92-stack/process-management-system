@@ -112,11 +112,20 @@ def main():
         except Exception as exc:
             print("alembic_upgrade_exception", exc, file=sys.stderr)
 
-        # ensure original_sender exists even if alembic misfires
+        # ensure certain columns exist even if alembic misfires
         try:
             with db.engine.connect() as c:
-                c.execute(text("ALTER TABLE request ADD COLUMN IF NOT EXISTS original_sender VARCHAR(255)"))
-                print("ensured_column_original_sender")
+                insp = inspect(c)
+                # request.original_sender
+                cols = [col['name'] for col in insp.get_columns('request')]
+                if 'original_sender' not in cols:
+                    c.execute(text("ALTER TABLE request ADD COLUMN original_sender VARCHAR(255)"))
+                    print("added_column original_sender")
+                # site_config.company_url
+                cols2 = [col['name'] for col in insp.get_columns('site_config')]
+                if 'company_url' not in cols2:
+                    c.execute(text("ALTER TABLE site_config ADD COLUMN company_url VARCHAR(255)"))
+                    print("added_column company_url")
         except Exception as exc:
             print("column_ensure_exception", exc, file=sys.stderr)
 
