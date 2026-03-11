@@ -1,8 +1,9 @@
-from flask import Blueprint, request, jsonify
-from PIL import Image
 import pytesseract
+from flask import Blueprint, jsonify, request
+from PIL import Image
 
 verify_bp = Blueprint("verify", __name__)
+
 
 @verify_bp.route("/verify/camera", methods=["POST"])
 def verify_camera():

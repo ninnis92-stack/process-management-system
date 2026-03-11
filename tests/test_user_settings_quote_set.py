@@ -1,7 +1,8 @@
 import pytest
-from app.extensions import db
-from app.models import User, SiteConfig
 from werkzeug.security import generate_password_hash
+
+from app.extensions import db
+from app.models import SiteConfig, User
 
 
 def login(client, email="user@example.com", password="secret"):
@@ -144,7 +145,10 @@ def test_external_branding_hides_theme_picker_and_preserves_existing_vibe(app, c
 
         settings_page = client.get("/auth/settings")
         assert settings_page.status_code == 200
-        assert b"<label for=\"vibe_index\" class=\"form-label\">Theme</label>" not in settings_page.data
+        assert (
+            b'<label for="vibe_index" class="form-label">Theme</label>'
+            not in settings_page.data
+        )
 
         rv = client.post(
             "/auth/settings",

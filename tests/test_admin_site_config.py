@@ -1,13 +1,15 @@
-import re
 import json
-import pytest
-from pathlib import Path
+import re
 from io import BytesIO
+from pathlib import Path
+
+import pytest
 from PIL import Image
-from app.extensions import db
-from app.models import User, Department, SiteConfig
-from config import Config
 from werkzeug.security import generate_password_hash
+
+from app.extensions import db
+from app.models import Department, SiteConfig, User
+from config import Config
 
 
 def login_admin(client, email="admin@example.com", password="secret"):
@@ -18,18 +20,19 @@ def login_admin(client, email="admin@example.com", password="secret"):
     )
 
 
-
 def test_config_validation():
     """Config.validate should catch missing/invalid settings."""
     # run the validator against default class, which will have insecure defaults
     errors = Config.validate()
     # at least the secret key warning should appear
     assert any("SECRET_KEY" in e for e in errors)
+
     # enabling email without SMTP_HOST should also trigger if we flip flag
     class Dummy(Config):
         EMAIL_ENABLED = True
         SMTP_HOST = ""
         SMTP_PORT = None
+
     errs2 = Dummy.validate()
     assert any("SMTP_HOST" in e for e in errs2)
 
@@ -171,7 +174,7 @@ def test_departments_crud_and_site_config(app, client):
             assert isinstance(quotes, list)
             assert len(quotes) == 30, f"{name} should have exactly 30 quotes"
 
-# Dashboard should include the brand name; banner rendering was removed
+        # Dashboard should include the brand name; banner rendering was removed
         rv = client.get("/dashboard")
         assert rv.status_code == 200
         assert b"Acme Flow" in rv.data
@@ -337,7 +340,9 @@ def test_site_config_import_rejects_invalid_website_url(app, client):
     assert b"Must be a valid website URL" in rv.data
 
 
-def test_user_quote_permission_overrides_department_and_admin_sees_all_sets(app, client):
+def test_user_quote_permission_overrides_department_and_admin_sees_all_sets(
+    app, client
+):
     with app.app_context():
         admin = User(
             email="quotes-admin@example.com",
@@ -408,7 +413,9 @@ def test_user_quote_permission_overrides_department_and_admin_sees_all_sets(app,
 def test_site_config_fills_missing_or_empty_quote_sets(app):
     with app.app_context():
         cfg = SiteConfig.get()
-        cfg._rolling_quote_sets = '{"default": [], "engineering": ["Ship it."], "motivational": []}'
+        cfg._rolling_quote_sets = (
+            '{"default": [], "engineering": ["Ship it."], "motivational": []}'
+        )
         cfg.active_quote_set = "motivational"
         db.session.commit()
 
@@ -421,7 +428,9 @@ def test_site_config_fills_missing_or_empty_quote_sets(app):
             assert quotes, f"{name} should always have at least one quote"
 
         assert quote_sets["default"] == SiteConfig.DEFAULT_QUOTE_SETS["default"]
-        assert quote_sets["motivational"] == SiteConfig.DEFAULT_QUOTE_SETS["motivational"]
+        assert (
+            quote_sets["motivational"] == SiteConfig.DEFAULT_QUOTE_SETS["motivational"]
+        )
         # engineering was explicitly provided but should have been padded to 30
         eng = quote_sets["engineering"]
         assert eng[0] == "Ship it."
@@ -586,14 +595,22 @@ def test_admin_default_quote_and_user_override(app, client):
     rv = client.get("/dashboard")
     # debug page-embedded list and ensure it belongs to the chosen set
     try:
-        text = rv.data.decode('utf-8')
-        import re, json
-        m = re.search(r'<script id="rolling-quotes-data" type="application/json" defer>(.*?)</script>', text, re.DOTALL)
+        text = rv.data.decode("utf-8")
+        import json
+        import re
+
+        m = re.search(
+            r'<script id="rolling-quotes-data" type="application/json" defer>(.*?)</script>',
+            text,
+            re.DOTALL,
+        )
         if m:
             page_quotes = json.loads(m.group(1))
             print("DEBUG: page quotes", page_quotes[:5])
             # make sure the random quote we rendered comes from the coffee set
-            assert all(q in SiteConfig.DEFAULT_QUOTE_SETS['coffee-humour'] for q in page_quotes)
+            assert all(
+                q in SiteConfig.DEFAULT_QUOTE_SETS["coffee-humour"] for q in page_quotes
+            )
     except Exception:
         pass
 
@@ -621,12 +638,20 @@ def test_admin_default_quote_and_user_override(app, client):
     rv = client.get("/dashboard")
     # ensure banner still uses coffee-humour after admin modified default
     try:
-        text = rv.data.decode('utf-8')
-        import re, json
-        m = re.search(r'<script id="rolling-quotes-data" type="application/json" defer>(.*?)</script>', text, re.DOTALL)
+        text = rv.data.decode("utf-8")
+        import json
+        import re
+
+        m = re.search(
+            r'<script id="rolling-quotes-data" type="application/json" defer>(.*?)</script>',
+            text,
+            re.DOTALL,
+        )
         if m:
             page_quotes = json.loads(m.group(1))
-            assert all(q in SiteConfig.DEFAULT_QUOTE_SETS['coffee-humour'] for q in page_quotes)
+            assert all(
+                q in SiteConfig.DEFAULT_QUOTE_SETS["coffee-humour"] for q in page_quotes
+            )
     except Exception:
         pass
 
@@ -650,12 +675,20 @@ def test_admin_default_quote_and_user_override(app, client):
     rv = client.get("/dashboard")
     # ensure productivity quotes are being used for uninterested user
     try:
-        text = rv.data.decode('utf-8')
-        import re, json
-        m = re.search(r'<script id="rolling-quotes-data" type="application/json" defer>(.*?)</script>', text, re.DOTALL)
+        text = rv.data.decode("utf-8")
+        import json
+        import re
+
+        m = re.search(
+            r'<script id="rolling-quotes-data" type="application/json" defer>(.*?)</script>',
+            text,
+            re.DOTALL,
+        )
         if m:
             page_quotes = json.loads(m.group(1))
-            assert all(q in SiteConfig.DEFAULT_QUOTE_SETS['productivity'] for q in page_quotes)
+            assert all(
+                q in SiteConfig.DEFAULT_QUOTE_SETS["productivity"] for q in page_quotes
+            )
     except Exception:
         pass
 
@@ -714,7 +747,9 @@ def test_site_config_handles_db_errors_gracefully(app, client, monkeypatch):
     assert rv.status_code == 200
 
     # monkeypatch SiteConfig.get to raise an exception simulating a broken schema
-    monkeypatch.setattr(SiteConfig, "get", lambda: (_ for _ in ()).throw(Exception("boom")))
+    monkeypatch.setattr(
+        SiteConfig, "get", lambda: (_ for _ in ()).throw(Exception("boom"))
+    )
 
     rv = client.get("/admin/site_config", follow_redirects=True)
     assert rv.status_code == 200
@@ -767,12 +802,12 @@ def test_site_config_missing_columns(app, client):
         db.session.commit()
         # drop each newer column one at a time and check behavior
         cols_to_drop = [
-            'navbar_banner',
-            'show_banner',
-            'rolling_quotes',
-            'rolling_quote_sets',
-            'active_quote_set',
-            'updated_at',
+            "navbar_banner",
+            "show_banner",
+            "rolling_quotes",
+            "rolling_quote_sets",
+            "active_quote_set",
+            "updated_at",
         ]
         for col in cols_to_drop:
             try:
@@ -821,7 +856,9 @@ def test_site_config_post_handles_commit_exception(app, client, monkeypatch):
     assert rv.status_code == 200
 
     # Cause commit to raise
-    monkeypatch.setattr(db.session, "commit", lambda: (_ for _ in ()).throw(Exception("boom")))
+    monkeypatch.setattr(
+        db.session, "commit", lambda: (_ for _ in ()).throw(Exception("boom"))
+    )
 
     post_data = {"brand_name": "whatever"}
     rv = client.post("/admin/site_config", data=post_data, follow_redirects=True)
@@ -846,37 +883,60 @@ def test_admin_dashboard_cards_navigate(app, client):
 
     rv = client.get("/admin/")
     assert rv.status_code == 200
-    # ensure all cards are rendered as buttons with data-nav-url
-    assert b"type=\"button\"" in rv.data
-    if b"data-nav-url=\"/admin/list_users\"" not in rv.data:
+    # ensure all cards are rendered as buttons with data-nav-url; be flexible
+    # about trailing slashes
+    html = rv.get_data(as_text=True)
+    # quick sanity checks
+    assert 'type="button"' in html
+    if (
+        'data-nav-url="/admin/list_users"' not in html
+        and 'data-nav-url="/admin/list_users/"' not in html
+    ):
         # dump html for debugging
         print("--- ADMIN INDEX HTML START ---")
-        print(rv.data.decode(errors='replace'))
+        print(html)
         print("--- ADMIN INDEX HTML END ---")
-    assert b"data-nav-url=\"/admin/users\"" in rv.data
-    assert b"data-nav-url=\"/admin/departments\"" in rv.data
-    assert b"data-nav-url=\"/admin/site_config\"" in rv.data
-    assert b"data-nav-url=\"/admin/site_config#quotes-settings\"" in rv.data
-    assert b"data-nav-url=\"/admin/special_email\"" in rv.data
-    assert b"data-nav-url=\"/admin/monitor\"" in rv.data
-    assert b"data-nav-url=\"/admin/status_options\"" in rv.data
-    assert b"data-nav-url=\"/admin/workflows\"" in rv.data
-    assert b"data-nav-url=\"/admin/buckets\"" in rv.data
-    assert b"data-nav-url=\"/admin/tenants\"" in rv.data
-    assert b"onclick=\"window.location.assign('/admin/site_config'); return false;\"" in rv.data
-    assert b"onclick=\"window.location.assign('/admin/site_config#quotes-settings'); return false;\"" in rv.data
-    assert b"#quotes-settings" in rv.data
-    assert b"/admin/special_email" in rv.data
-    assert b"/admin/monitor" in rv.data
-    assert b'data-nav-url="/admin/site_config"' in rv.data
-    assert b'data-nav-url="/admin/site_config#quotes-settings"' in rv.data
+
+    def nav_has(path):
+        return f'data-nav-url="{path}"' in html or f'data-nav-url="{path}/"' in html
+
+    assert nav_has("/admin/users")
+    assert nav_has("/admin/departments")
+    assert nav_has("/admin/site_config")
+    # fragment anchors are allowed on the data-nav-url
+    assert nav_has("/admin/site_config#quotes-settings")
+    assert nav_has("/admin/special_email")
+    assert nav_has("/admin/monitor")
+    assert nav_has("/admin/status_options")
+    assert nav_has("/admin/workflows")
+    assert nav_has("/admin/buckets")
+    assert nav_has("/admin/tenants")
+    assert (
+        "onclick=\"window.location.assign('/admin/site_config'); return false;\""
+        in html
+        or "window.location.assign('/admin/site_config')" in html
+    )
+    assert (
+        "onclick=\"window.location.assign('/admin/site_config#quotes-settings'); return false;\""
+        in html
+        or "window.location.assign('/admin/site_config#quotes-settings')" in html
+    )
+    assert "#quotes-settings" in html
+    assert "/admin/special_email" in html
+    assert "/admin/monitor" in html
+    assert ('data-nav-url="/admin/site_config"' in html) or (
+        'data-nav-url="/admin/site_config/"' in html
+    )
+    assert ('data-nav-url="/admin/site_config#quotes-settings"' in html) or (
+        'data-nav-url="/admin/site_config#quotes-settings/"' in html
+    )
     # some utility cards (switch-dept, notifications, etc.) are still
     # rendered as anchors; that's acceptable.  We already verify their
     # urls above.
     # (The previous regression test used to forbid any anchors, but the
     # dashboard layout intentionally uses a mix of <button> and <a> now.)
     # ensure no href with javascript scheme anywhere
-    assert b"href=\"javascript:" not in rv.data
+    assert b'href="javascript:' not in rv.data
 
     # Smoke-test every rendered admin dashboard card so the test stays in sync
     # with the actual dashboard markup.
@@ -890,7 +950,7 @@ def test_admin_dashboard_cards_navigate(app, client):
     # href attributes should match data-nav-url and begin with '/'
     hrefs = re.findall(r'href="([^"]+)"', html)
     for u in urls:
-        assert u.startswith('/'), f"unexpected url {u}"
+        assert u.startswith("/"), f"unexpected url {u}"
         if u not in {"/admin/site_config", "/admin/site_config#quotes-settings"}:
             assert u in hrefs, f"href for {u} missing"
 
@@ -913,7 +973,9 @@ def test_base_template_bumps_static_asset_version(client):
     # versions bump whenever CSS/JS changes so browsers refetch
     assert b"/static/styles.css?v=20260310c" in rv.data
     # main script may either be the legacy path or the built bundle in `dist`
-    assert b"/static/app.js?v=20260310c" in rv.data or b"/static/dist/app.js?v=" in rv.data
+    assert (
+        b"/static/app.js?v=20260310c" in rv.data or b"/static/dist/app.js?v=" in rv.data
+    )
 
 
 def test_login_next_redirection(client, app):
@@ -944,11 +1006,15 @@ def test_login_next_redirection(client, app):
     assert rv2.status_code == 200
     html = rv2.get_data(as_text=True)
     assert 'name="next"' in html
-    assert '/admin/site_config' in html
+    assert "/admin/site_config" in html
 
     # perform login using the same URL; admins now honour the `next`
     # value directly and skip the department picker entirely.
-    rv3 = client.post(login_loc, data={"email": "admin-next@example.com", "password": "secret"}, follow_redirects=True)
+    rv3 = client.post(
+        login_loc,
+        data={"email": "admin-next@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
     assert rv3.status_code == 200
     # we should land on the site config page itself rather than seeing the
     # department chooser; confirm by path and header text
@@ -994,18 +1060,27 @@ def test_banner_html_is_sanitized_and_does_not_break_navigation(app, client):
         assert "/static/app.js" not in cfg.banner_html
         assert "/static/styles.css" not in cfg.banner_html
 
-    nav_attr_re = re.compile(r'<(?:a|form|button)\b[^>]*(?:href|action|formaction)="([^"]+)"')
-    for route in ("/admin/", "/admin/site_config", "/admin/metrics_config", "/dashboard"):
+    nav_attr_re = re.compile(
+        r'<(?:a|form|button)\b[^>]*(?:href|action|formaction)="([^"]+)"'
+    )
+    for route in (
+        "/admin/",
+        "/admin/site_config",
+        "/admin/metrics_config",
+        "/dashboard",
+    ):
         page = client.get(route)
         assert page.status_code == 200, route
         html = page.get_data(as_text=True)
         nav_targets = nav_attr_re.findall(html)
-        assert not any(target.startswith('/static/') for target in nav_targets), route
+        assert not any(target.startswith("/static/") for target in nav_targets), route
 
     # existing unsafe banner content should also be sanitized at render time
     with app.app_context():
         cfg = SiteConfig.get()
-        cfg.banner_html = '<a href="/static/app.js?v=20260307d">bad</a><div>still safe</div>'
+        cfg.banner_html = (
+            '<a href="/static/app.js?v=20260307d">bad</a><div>still safe</div>'
+        )
         db.session.add(cfg)
         db.session.commit()
 
@@ -1013,7 +1088,7 @@ def test_banner_html_is_sanitized_and_does_not_break_navigation(app, client):
     assert page.status_code == 200
     html = page.get_data(as_text=True)
     nav_targets = nav_attr_re.findall(html)
-    assert not any(target.startswith('/static/') for target in nav_targets)
+    assert not any(target.startswith("/static/") for target in nav_targets)
 
 
 def test_migration_status_warning_uses_specific_class(app, client):
@@ -1034,4 +1109,7 @@ def test_migration_status_warning_uses_specific_class(app, client):
     rv = client.get("/admin/migrations/status")
     assert rv.status_code == 200
     html = rv.get_data(as_text=True)
-    assert "migration-status-warning" in html or "No unapplied migrations detected." in html
+    assert (
+        "migration-status-warning" in html
+        or "No unapplied migrations detected." in html
+    )

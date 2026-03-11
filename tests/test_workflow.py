@@ -1,4 +1,5 @@
 import json
+
 from app.extensions import db
 from app.models import Workflow
 from app.requests_bp.workflow import transition_allowed

@@ -1,16 +1,12 @@
+from datetime import datetime, timedelta
+
+from werkzeug.security import generate_password_hash
+
 from app import create_app
 from app.extensions import db
-from app.models import (
-    User,
-    Request as ReqModel,
-    FormTemplate,
-    FormField,
-    DepartmentFormAssignment,
-    StatusBucket,
-    BucketStatus,
-)
-from werkzeug.security import generate_password_hash
-from datetime import datetime, timedelta
+from app.models import BucketStatus, DepartmentFormAssignment, FormField, FormTemplate
+from app.models import Request as ReqModel
+from app.models import StatusBucket, User
 
 app = create_app()
 app.config.update(TESTING=True, WTF_CSRF_ENABLED=False, SERVER_NAME="localhost")

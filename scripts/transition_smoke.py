@@ -9,8 +9,8 @@ notifications.
 """
 
 import os
-from datetime import datetime, timedelta
 import time
+from datetime import datetime, timedelta
 
 smoke_db_path = os.path.join(os.getcwd(), "test_smoke.db")
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{smoke_db_path}")
@@ -23,10 +23,13 @@ try:
 except Exception:
     pass
 
+from werkzeug.security import generate_password_hash
+
 from app import create_app
 from app.extensions import db
-from werkzeug.security import generate_password_hash
-from app.models import User, Request as ReqModel, Notification
+from app.models import Notification
+from app.models import Request as ReqModel
+from app.models import User
 
 app = create_app()
 app.config["WTF_CSRF_ENABLED"] = False

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
 
 from flask import current_app
 
@@ -27,5 +27,7 @@ class SlackService:
             current_app.logger.info("SlackService: posted message to webhook")
             return {"ok": True}
         except (HTTPError, URLError) as exc:
-            current_app.logger.exception("SlackService: failed to post message: %s", exc)
+            current_app.logger.exception(
+                "SlackService: failed to post message: %s", exc
+            )
             return {"ok": False, "error": str(exc)}

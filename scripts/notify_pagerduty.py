@@ -14,8 +14,12 @@ import requests
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--routing-key", default=os.getenv("PAGERDUTY_ROUTING_KEY") or "")
-    parser.add_argument("--summary", default="Process Management Prototype monitoring failure")
+    parser.add_argument(
+        "--routing-key", default=os.getenv("PAGERDUTY_ROUTING_KEY") or ""
+    )
+    parser.add_argument(
+        "--summary", default="Process Management Prototype monitoring failure"
+    )
     parser.add_argument("--severity", default="error")
     parser.add_argument("--source", default=socket.gethostname())
     parser.add_argument("--component", default="production-monitoring")

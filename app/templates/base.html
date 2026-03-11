@@ -638,6 +638,11 @@
   <!-- autosave/session-persistence logic now ships from frontend/js/modules/autosave.js via Vite -->
   {% if ep.startswith('admin') %}
     <script src="{{ url_for('static', filename='admin_helpers.js', v='20260310a') }}"></script>
+    <script src="{{ url_for('static', filename='admin_accessibility.js', v='20260310a') }}" defer></script>
+  {% endif %}
+  {% if current_user.is_authenticated and onboarding_guidance_enabled %}
+    {% include 'onboarding/_modal.html' %}
+    <script src="{{ url_for('static', filename='onboarding.js', v='20260310a') }}" defer></script>
   {% endif %}
 </body>
 </html>

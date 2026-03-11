@@ -1,5 +1,6 @@
-from flask import flash, redirect, render_template, url_for
+from flask import flash, redirect, render_template
 from flask import request as flask_request
+from flask import url_for
 from flask_login import login_required
 
 from ..extensions import db

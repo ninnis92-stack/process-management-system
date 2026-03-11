@@ -6,9 +6,9 @@ small and robust to exceptions since they run outside of request
 contexts.
 """
 
-from .services.emailer import EmailService
 from .extensions import db
 from .models import Notification, NotificationRetention
+from .services.emailer import EmailService
 
 
 def send_emails_task(recipients_map, subject, body, html=None, request_id=None):
@@ -121,7 +121,9 @@ def fanout_notifications_task(notification_entries, request_id=None):
     if persisted_user_ids:
         try:
             cfg = NotificationRetention.get()
-            max_per_user = min(int(getattr(cfg, "max_notifications_per_user", 20) or 20), 20)
+            max_per_user = min(
+                int(getattr(cfg, "max_notifications_per_user", 20) or 20), 20
+            )
         except Exception:
             max_per_user = 20
         for user_id in set(persisted_user_ids):
@@ -136,10 +138,16 @@ def fanout_notifications_task(notification_entries, request_id=None):
                     .all()
                 ]
                 if old:
-                    Notification.query.filter(Notification.id.in_(old)).delete(synchronize_session=False)
+                    Notification.query.filter(Notification.id.in_(old)).delete(
+                        synchronize_session=False
+                    )
 
     db.session.commit()
 
     if recipients_map:
         send_emails_task(recipients_map, None, None, request_id=request_id)
-    return {"count": len(notification_entries), "emailed": len(recipients_map), "persisted": len(persisted_user_ids)}
+    return {
+        "count": len(notification_entries),
+        "emailed": len(recipients_map),
+        "persisted": len(persisted_user_ids),
+    }

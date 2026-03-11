@@ -3,7 +3,9 @@ from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import User, Request as ReqModel, Comment, RejectRequestConfig
+from app.models import Comment, RejectRequestConfig
+from app.models import Request as ReqModel
+from app.models import User
 
 
 def _login(client, email="b_assignee@example.com", password="secret"):

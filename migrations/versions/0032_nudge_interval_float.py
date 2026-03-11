@@ -5,8 +5,8 @@ Revises: 0031_merge_guest_form_head
 Create Date: 2026-03-07 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0032_nudge_interval_float"
@@ -29,16 +29,45 @@ def upgrade():
         op.create_table(
             "special_email_config",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column(
+                "enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")
+            ),
             sa.Column("help_email", sa.String(length=255), nullable=True),
             sa.Column("request_form_email", sa.String(length=255), nullable=True),
             sa.Column("request_form_first_message", sa.Text(), nullable=True),
-            sa.Column("help_user_id", sa.Integer(), sa.ForeignKey("user.id"), nullable=True),
-            sa.Column("request_form_user_id", sa.Integer(), sa.ForeignKey("user.id"), nullable=True),
-            sa.Column("email_override", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-            sa.Column("ticketing_override", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-            sa.Column("inventory_override", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-            sa.Column("nudge_enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column(
+                "help_user_id", sa.Integer(), sa.ForeignKey("user.id"), nullable=True
+            ),
+            sa.Column(
+                "request_form_user_id",
+                sa.Integer(),
+                sa.ForeignKey("user.id"),
+                nullable=True,
+            ),
+            sa.Column(
+                "email_override",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
+            sa.Column(
+                "ticketing_override",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
+            sa.Column(
+                "inventory_override",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
+            sa.Column(
+                "nudge_enabled",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
             sa.Column("nudge_interval_hours", sa.Float(), nullable=True),
             sa.Column("nudge_min_delay_hours", sa.Float(), nullable=True),
         )
@@ -78,16 +107,45 @@ def downgrade():
         op.create_table(
             "special_email_config",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column(
+                "enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")
+            ),
             sa.Column("help_email", sa.String(length=255), nullable=True),
             sa.Column("request_form_email", sa.String(length=255), nullable=True),
             sa.Column("request_form_first_message", sa.Text(), nullable=True),
-            sa.Column("help_user_id", sa.Integer(), sa.ForeignKey("user.id"), nullable=True),
-            sa.Column("request_form_user_id", sa.Integer(), sa.ForeignKey("user.id"), nullable=True),
-            sa.Column("email_override", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-            sa.Column("ticketing_override", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-            sa.Column("inventory_override", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-            sa.Column("nudge_enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column(
+                "help_user_id", sa.Integer(), sa.ForeignKey("user.id"), nullable=True
+            ),
+            sa.Column(
+                "request_form_user_id",
+                sa.Integer(),
+                sa.ForeignKey("user.id"),
+                nullable=True,
+            ),
+            sa.Column(
+                "email_override",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
+            sa.Column(
+                "ticketing_override",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
+            sa.Column(
+                "inventory_override",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
+            sa.Column(
+                "nudge_enabled",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
             sa.Column("nudge_interval_hours", sa.Integer(), nullable=True),
             sa.Column("nudge_min_delay_hours", sa.Integer(), nullable=True),
         )

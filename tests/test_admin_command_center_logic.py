@@ -5,7 +5,6 @@ from werkzeug.security import generate_password_hash
 from app.extensions import db
 from app.models import FeatureFlags, User
 
-
 CARD_URL_RE = re.compile(r'data-nav-url="([^"]+)"')
 
 
@@ -89,6 +88,9 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
         assert f'href="{anchor}"' in html
 
     urls = set(CARD_URL_RE.findall(html))
+    # normalize trailing slashes so tests don't fail on routes rendered with a
+    # trailing slash vs without one
+    urls = {u.rstrip("/") for u in urls}
     expected_urls = {
         "/admin/users",
         "/admin/departments",

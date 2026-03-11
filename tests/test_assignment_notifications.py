@@ -1,10 +1,11 @@
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import User, Request as ReqModel
-
+from app.models import Request as ReqModel
+from app.models import User
 
 # reuse helpers from other tests
 from tests.test_site_navigation import _login
@@ -58,9 +59,15 @@ def test_assigned_user_notified_on_status_change(monkeypatch, app, client):
     monkeypatch.setattr("app.requests_bp.routes.notify_users", mock_notify)
 
     # perform a simple status transition that is allowed for dept B
-    rv = client.post(f"/requests/{req.id}/transition", data={"to_status": "B_IN_PROGRESS"}, follow_redirects=True)
+    rv = client.post(
+        f"/requests/{req.id}/transition",
+        data={"to_status": "B_IN_PROGRESS"},
+        follow_redirects=True,
+    )
     assert rv.status_code in (200, 302)
 
     # confirm that the assigned user was included in a notification call
     all_ids = [uid for group in called for uid in group]
-    assert assignee.id in all_ids, f"Assigned user {assignee.id} should have been notified; got calls {called}"
+    assert (
+        assignee.id in all_ids
+    ), f"Assigned user {assignee.id} should have been notified; got calls {called}"

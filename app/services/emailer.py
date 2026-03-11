@@ -1,6 +1,7 @@
 import smtplib
 from email.message import EmailMessage
 from typing import List, Optional
+
 from flask import current_app
 
 

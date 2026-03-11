@@ -5,10 +5,9 @@ Revises: 0033_add_metrics_tracking_and_dept_head_role
 Create Date: 2026-03-07 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy import inspect, text
-
 
 # revision identifiers, used by Alembic.
 revision = "0034_tenant_compatibility_foundation"
@@ -159,7 +158,9 @@ def _seed_default_plan_and_tenant(conn):
 
 def _backfill_tenant_ids(conn, tenant_id):
     for table_name in TENANT_SCOPED_TABLES:
-        if not _has_table(conn, table_name) or not _has_column(conn, table_name, "tenant_id"):
+        if not _has_table(conn, table_name) or not _has_column(
+            conn, table_name, "tenant_id"
+        ):
             continue
         conn.execute(
             text(
@@ -173,7 +174,9 @@ def _backfill_user_memberships(conn, tenant_id):
     if not _has_table(conn, "user"):
         return
 
-    users = conn.execute(text('SELECT id, COALESCE(is_admin, false) AS is_admin FROM "user"')).fetchall()
+    users = conn.execute(
+        text('SELECT id, COALESCE(is_admin, false) AS is_admin FROM "user"')
+    ).fetchall()
     for user_id, is_admin in users:
         exists = conn.execute(
             text(
@@ -234,12 +237,23 @@ def upgrade():
                 nullable=False,
                 server_default="2000",
             ),
-            sa.Column("max_departments", sa.Integer(), nullable=False, server_default="10"),
+            sa.Column(
+                "max_departments", sa.Integer(), nullable=False, server_default="10"
+            ),
             sa.Column("feature_flags_json", sa.JSON(), nullable=True),
-            sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-            sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+            sa.Column(
+                "active", sa.Boolean(), nullable=False, server_default=sa.text("true")
+            ),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.func.now(),
+            ),
         )
-        op.create_index("ix_subscription_plan_code", "subscription_plan", ["code"], unique=True)
+        op.create_index(
+            "ix_subscription_plan_code", "subscription_plan", ["code"], unique=True
+        )
 
     if not _has_table(conn, "tenant"):
         op.create_table(
@@ -248,8 +262,18 @@ def upgrade():
             sa.Column("slug", sa.String(length=120), nullable=False),
             sa.Column("name", sa.String(length=200), nullable=False),
             sa.Column("plan_id", sa.Integer(), nullable=True),
-            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-            sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+            sa.Column(
+                "is_active",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("true"),
+            ),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.func.now(),
+            ),
         )
         op.create_index("ix_tenant_slug", "tenant", ["slug"], unique=True)
 
@@ -259,14 +283,43 @@ def upgrade():
             sa.Column("id", sa.Integer(), primary_key=True),
             sa.Column("tenant_id", sa.Integer(), nullable=False),
             sa.Column("user_id", sa.Integer(), nullable=False),
-            sa.Column("role", sa.String(length=40), nullable=False, server_default="member"),
-            sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-            sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
-            sa.UniqueConstraint("tenant_id", "user_id", name="uq_tenant_user_membership"),
+            sa.Column(
+                "role", sa.String(length=40), nullable=False, server_default="member"
+            ),
+            sa.Column(
+                "is_default",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
+            sa.Column(
+                "is_active",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("true"),
+            ),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.func.now(),
+            ),
+            sa.UniqueConstraint(
+                "tenant_id", "user_id", name="uq_tenant_user_membership"
+            ),
         )
-        op.create_index("ix_tenant_membership_tenant_id", "tenant_membership", ["tenant_id"], unique=False)
-        op.create_index("ix_tenant_membership_user_id", "tenant_membership", ["user_id"], unique=False)
+        op.create_index(
+            "ix_tenant_membership_tenant_id",
+            "tenant_membership",
+            ["tenant_id"],
+            unique=False,
+        )
+        op.create_index(
+            "ix_tenant_membership_user_id",
+            "tenant_membership",
+            ["user_id"],
+            unique=False,
+        )
 
     for table_name in TENANT_SCOPED_TABLES:
         _ensure_tenant_id_column(conn, table_name)

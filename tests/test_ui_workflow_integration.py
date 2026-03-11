@@ -1,7 +1,10 @@
-from werkzeug.security import generate_password_hash
-from app.extensions import db
-from app.models import User, Workflow, Request as ReqModel
 from datetime import datetime, timedelta
+
+from werkzeug.security import generate_password_hash
+
+from app.extensions import db
+from app.models import Request as ReqModel
+from app.models import User, Workflow
 
 
 def test_request_detail_shows_workflow_limited_transitions(app, client):
@@ -76,7 +79,9 @@ def test_request_detail_shows_workflow_limited_transitions(app, client):
 
 
 def test_transition_loop_guard_blocks_ping_pong(app, client):
-    from app.models import User, Request as ReqModel, AuditLog
+    from app.models import AuditLog
+    from app.models import Request as ReqModel
+    from app.models import User
 
     with app.app_context():
         b = User(
@@ -153,18 +158,32 @@ def test_transition_loop_guard_blocks_ping_pong(app, client):
         assert refreshed.status == "B_IN_PROGRESS"
 
 
-def test_request_detail_shows_target_department_dropdown_for_multi_route_status(app, client):
+def test_request_detail_shows_target_department_dropdown_for_multi_route_status(
+    app, client
+):
     with app.app_context():
         spec = {
             "steps": [
                 {"code": "B_ROUTE_REVIEW", "label": "Route review"},
             ],
             "transitions": [
-                {"from": "B_IN_PROGRESS", "to": "B_ROUTE_REVIEW", "from_dept": "B", "to_dept": "A"},
-                {"from": "B_IN_PROGRESS", "to": "B_ROUTE_REVIEW", "from_dept": "B", "to_dept": "C"},
+                {
+                    "from": "B_IN_PROGRESS",
+                    "to": "B_ROUTE_REVIEW",
+                    "from_dept": "B",
+                    "to_dept": "A",
+                },
+                {
+                    "from": "B_IN_PROGRESS",
+                    "to": "B_ROUTE_REVIEW",
+                    "from_dept": "B",
+                    "to_dept": "C",
+                },
             ],
         }
-        wf = Workflow(name="B Route Picker", department_code="B", spec=spec, active=True)
+        wf = Workflow(
+            name="B Route Picker", department_code="B", spec=spec, active=True
+        )
         db.session.add(wf)
 
         b = User(
@@ -217,11 +236,23 @@ def test_transition_uses_selected_target_department_for_multi_route_status(app, 
                 {"code": "B_ROUTE_REVIEW", "label": "Route review"},
             ],
             "transitions": [
-                {"from": "B_IN_PROGRESS", "to": "B_ROUTE_REVIEW", "from_dept": "B", "to_dept": "A"},
-                {"from": "B_IN_PROGRESS", "to": "B_ROUTE_REVIEW", "from_dept": "B", "to_dept": "C"},
+                {
+                    "from": "B_IN_PROGRESS",
+                    "to": "B_ROUTE_REVIEW",
+                    "from_dept": "B",
+                    "to_dept": "A",
+                },
+                {
+                    "from": "B_IN_PROGRESS",
+                    "to": "B_ROUTE_REVIEW",
+                    "from_dept": "B",
+                    "to_dept": "C",
+                },
             ],
         }
-        wf = Workflow(name="B Route Picker Submit", department_code="B", spec=spec, active=True)
+        wf = Workflow(
+            name="B Route Picker Submit", department_code="B", spec=spec, active=True
+        )
         db.session.add(wf)
 
         b = User(

@@ -5,8 +5,8 @@ Revises: 0005_add_vibe_index
 Create Date: 2026-03-05 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0006_add_special_email_config"

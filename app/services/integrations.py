@@ -13,8 +13,7 @@ from flask import current_app
 from ..extensions import db
 from ..models import Request as ReqModel
 from ..models import WebhookSubscription
-from .event_bus import publish_event, mark_event_delivered, mark_event_failed
-
+from .event_bus import mark_event_delivered, mark_event_failed, publish_event
 
 INTEGRATION_KIND_SCAFFOLDS: dict[str, dict[str, Any]] = {
     "ticketing": {
@@ -26,9 +25,23 @@ INTEGRATION_KIND_SCAFFOLDS: dict[str, dict[str, Any]] = {
             "capabilities": ["create", "sync_status", "attach_notes"],
             "auth": {"type": "token", "token_env": "", "username_env": ""},
             "endpoints": {"base_url": "", "create": "", "update": "", "lookup": ""},
-            "mapping": {"title": "title", "description": "description", "priority": "priority", "status": "status"},
-            "handoff_bundle": {"enabled": False, "include_submission": True, "include_attachments": True, "create_ticket": True},
-            "compatibility": {"request_format": "json", "response_format": "json", "supports_webhooks": True},
+            "mapping": {
+                "title": "title",
+                "description": "description",
+                "priority": "priority",
+                "status": "status",
+            },
+            "handoff_bundle": {
+                "enabled": False,
+                "include_submission": True,
+                "include_attachments": True,
+                "create_ticket": True,
+            },
+            "compatibility": {
+                "request_format": "json",
+                "response_format": "json",
+                "supports_webhooks": True,
+            },
         },
     },
     "webhook": {
@@ -41,8 +54,17 @@ INTEGRATION_KIND_SCAFFOLDS: dict[str, dict[str, Any]] = {
             "auth": {"type": "hmac", "secret_env": "WEBHOOK_SHARED_SECRET"},
             "endpoints": {"url": "", "retry_url": ""},
             "mapping": {"event": "event", "payload": "payload", "sent_at": "sent_at"},
-            "handoff_bundle": {"enabled": False, "include_submission": True, "include_attachments": True, "event_name": "handoff_bundle"},
-            "compatibility": {"request_format": "json", "signature_header": "X-Webhook-Signature", "supports_retries": True},
+            "handoff_bundle": {
+                "enabled": False,
+                "include_submission": True,
+                "include_attachments": True,
+                "event_name": "handoff_bundle",
+            },
+            "compatibility": {
+                "request_format": "json",
+                "signature_header": "X-Webhook-Signature",
+                "supports_retries": True,
+            },
         },
     },
     "inventory": {
@@ -51,11 +73,28 @@ INTEGRATION_KIND_SCAFFOLDS: dict[str, dict[str, Any]] = {
         "default_config": {
             "version": "2026-03",
             "provider": "generic_inventory",
-            "capabilities": ["validate_part_number", "validate_sales_list", "lookup_stock"],
+            "capabilities": [
+                "validate_part_number",
+                "validate_sales_list",
+                "lookup_stock",
+            ],
             "auth": {"type": "token", "token_env": ""},
-            "endpoints": {"base_url": "", "part_lookup": "", "sales_lookup": "", "stock_lookup": ""},
-            "mapping": {"part_number": "part_number", "sales_list_number": "sales_list_number", "available_count": "available_count"},
-            "compatibility": {"request_format": "json", "response_format": "json", "supports_bulk_lookup": True},
+            "endpoints": {
+                "base_url": "",
+                "part_lookup": "",
+                "sales_lookup": "",
+                "stock_lookup": "",
+            },
+            "mapping": {
+                "part_number": "part_number",
+                "sales_list_number": "sales_list_number",
+                "available_count": "available_count",
+            },
+            "compatibility": {
+                "request_format": "json",
+                "response_format": "json",
+                "supports_bulk_lookup": True,
+            },
         },
     },
     "verification": {
@@ -76,7 +115,11 @@ INTEGRATION_KIND_SCAFFOLDS: dict[str, dict[str, Any]] = {
                 "body_template": {},
                 "headers": {},
             },
-            "response": {"ok_path": "ok", "detail_path": "details", "reason_path": "reason"},
+            "response": {
+                "ok_path": "ok",
+                "detail_path": "details",
+                "reason_path": "reason",
+            },
             "routing": {
                 "default_tracker": "default",
                 "rules": [
@@ -95,18 +138,32 @@ INTEGRATION_KIND_SCAFFOLDS: dict[str, dict[str, Any]] = {
                     "request": {
                         "method": "GET",
                         "payload_location": "query",
-                        "query_template": {"value": "{value}", "field": "{external_key}"},
+                        "query_template": {
+                            "value": "{value}",
+                            "field": "{external_key}",
+                        },
                     },
-                    "response": {"ok_path": "ok", "detail_path": "details", "reason_path": "reason"},
+                    "response": {
+                        "ok_path": "ok",
+                        "detail_path": "details",
+                        "reason_path": "reason",
+                    },
                 }
             },
-            "compatibility": {"request_format": "json", "response_format": "json", "supports_bulk_lookup": True, "supports_content_routing": True},
+            "compatibility": {
+                "request_format": "json",
+                "response_format": "json",
+                "supports_bulk_lookup": True,
+                "supports_content_routing": True,
+            },
         },
     },
 }
 
 
-def _deep_merge_dicts(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+def _deep_merge_dicts(
+    base: dict[str, Any], overrides: dict[str, Any]
+) -> dict[str, Any]:
     merged: dict[str, Any] = dict(base)
     for key, value in (overrides or {}).items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
@@ -135,7 +192,9 @@ def get_integration_scaffold(kind: str) -> dict[str, Any]:
     }
 
 
-def normalize_integration_config(kind: str, raw_config: str | dict[str, Any] | None) -> dict[str, Any]:
+def normalize_integration_config(
+    kind: str, raw_config: str | dict[str, Any] | None
+) -> dict[str, Any]:
     scaffold = get_integration_scaffold(kind)
     defaults = scaffold.get("default_config") or {}
 
@@ -158,9 +217,15 @@ def normalize_integration_config(kind: str, raw_config: str | dict[str, Any] | N
     return normalized
 
 
-def integration_config_summary(raw_config: str | dict[str, Any] | None) -> dict[str, Any]:
+def integration_config_summary(
+    raw_config: str | dict[str, Any] | None,
+) -> dict[str, Any]:
     try:
-        parsed = json.loads(raw_config) if isinstance(raw_config, str) and raw_config else (raw_config or {})
+        parsed = (
+            json.loads(raw_config)
+            if isinstance(raw_config, str) and raw_config
+            else (raw_config or {})
+        )
     except Exception:
         parsed = {}
     if not isinstance(parsed, dict):
@@ -177,7 +242,9 @@ class ExternalDataProvider:
 
     provider_name = "base"
 
-    def fetch(self, *, config: dict[str, Any], query: dict[str, Any] | None = None) -> dict[str, Any]:
+    def fetch(
+        self, *, config: dict[str, Any], query: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         raise NotImplementedError
 
 
@@ -186,7 +253,9 @@ class EchoProvider(ExternalDataProvider):
 
     provider_name = "echo"
 
-    def fetch(self, *, config: dict[str, Any], query: dict[str, Any] | None = None) -> dict[str, Any]:
+    def fetch(
+        self, *, config: dict[str, Any], query: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         return {
             "provider": self.provider_name,
             "config": config or {},
@@ -207,7 +276,12 @@ def get_provider(name: str) -> ExternalDataProvider:
     return provider
 
 
-def fetch_external_data(provider_name: str, *, config: dict[str, Any] | None = None, query: dict[str, Any] | None = None) -> dict[str, Any]:
+def fetch_external_data(
+    provider_name: str,
+    *,
+    config: dict[str, Any] | None = None,
+    query: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     provider = get_provider(provider_name)
     return provider.fetch(config=config or {}, query=query or {})
 
@@ -218,7 +292,9 @@ def _json_default(value: Any):
     return str(value)
 
 
-def build_handoff_bundle_payload(request_obj: ReqModel, submission_obj: Any) -> dict[str, Any]:
+def build_handoff_bundle_payload(
+    request_obj: ReqModel, submission_obj: Any
+) -> dict[str, Any]:
     attachments = []
     for attachment in list(getattr(submission_obj, "attachments", []) or []):
         attachments.append(
@@ -258,7 +334,9 @@ def _sign_payload(payload: bytes, secret: str | None) -> str | None:
     return hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
 
 
-def _post_json(url: str, body: dict[str, Any], *, secret: str | None = None, timeout: int = 5) -> None:
+def _post_json(
+    url: str, body: dict[str, Any], *, secret: str | None = None, timeout: int = 5
+) -> None:
     payload = json.dumps(body, default=_json_default).encode("utf-8")
     req = Request(url, data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
@@ -266,7 +344,9 @@ def _post_json(url: str, body: dict[str, Any], *, secret: str | None = None, tim
     signature = _sign_payload(payload, secret)
     if signature:
         req.add_header("X-Webhook-Signature", signature)
-    with urlopen(req, timeout=timeout) as resp:  # nosec B310 - admin configured destinations only
+    with urlopen(
+        req, timeout=timeout
+    ) as resp:  # nosec B310 - admin configured destinations only
         resp.read()
 
 
@@ -312,7 +392,9 @@ def emit_webhook_event(event_name: str, payload: dict[str, Any]) -> None:
             )
             mark_event_delivered(boundary_event)
         except (HTTPError, URLError, TimeoutError, ValueError):
-            mark_event_failed(boundary_event, Exception(f"Delivery failed for {sub.url}"))
+            mark_event_failed(
+                boundary_event, Exception(f"Delivery failed for {sub.url}")
+            )
             try:
                 current_app.logger.exception(
                     "Failed delivering webhook event '%s' to %s", event_name, sub.url

@@ -57,7 +57,9 @@ def test_admin_can_set_department_override(client, app):
         assert user.department_override is True
 
 
-def test_sso_callback_updates_primary_department_when_not_overridden(client, app, monkeypatch):
+def test_sso_callback_updates_primary_department_when_not_overridden(
+    client, app, monkeypatch
+):
     app.config.update(
         SSO_DEPARTMENT_SYNC_ENABLED=True,
         SSO_DEPARTMENT_CLAIM="profile.department",

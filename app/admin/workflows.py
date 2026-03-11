@@ -1,34 +1,24 @@
-from flask import (
-    render_template,
-    redirect,
-    url_for,
-    flash,
-    current_app,
-    jsonify,
-    request as flask_request,
-)
+from flask import current_app, flash, jsonify, redirect, render_template
+from flask import request as flask_request
+from flask import url_for
 from flask_login import login_required
-from .utils import _is_admin_user
+
+from app import csrf
 
 from ..extensions import db, get_or_404
-from ..models import (
-    Workflow,
-    StatusOption,
-    StatusBucket,
-    BucketStatus,
-)
-from .routes import admin_bp
-from .forms import WorkflowForm, StatusBucketForm, StatusOptionForm
+from ..models import BucketStatus, StatusBucket, StatusOption, Workflow
 from ..requests_bp.workflow import (
     owner_for_status,
     workflow_editor_sections,
     workflow_intake_preview,
 )
-from app import csrf
-
+from .forms import StatusBucketForm, StatusOptionForm, WorkflowForm
+from .routes import admin_bp
+from .utils import _is_admin_user
 
 # Helper logic related to workflows and status options, extracted from
 # the monolithic routes.py.  Keeping these private to this module.
+
 
 def _normalize_department_code(value):
     raw = (value or "").strip()
@@ -78,7 +68,9 @@ def _normalize_workflow_spec(spec, workflow_name=None):
     ):
         return spec
 
-    statuses = [str(step).strip() for step in steps if isinstance(step, str) and step.strip()]
+    statuses = [
+        str(step).strip() for step in steps if isinstance(step, str) and step.strip()
+    ]
     if not statuses:
         return spec
 
@@ -125,7 +117,9 @@ def _build_status_options_map(wf=None):
                 code = step.get("status") or step.get("code")
             if code and code not in opts:
                 # create a temporary placeholder
-                opts[code] = StatusOption(code=code, label=code.replace("_", " ").title())
+                opts[code] = StatusOption(
+                    code=code, label=code.replace("_", " ").title()
+                )
     return opts
 
 
@@ -137,7 +131,9 @@ def _workflow_scope_label(wf):
 
 
 def _workflow_visual_summary(wf):
-    spec = _normalize_workflow_spec(getattr(wf, "spec", None), getattr(wf, "name", None))
+    spec = _normalize_workflow_spec(
+        getattr(wf, "spec", None), getattr(wf, "name", None)
+    )
     raw_steps = spec.get("steps") if isinstance(spec, dict) else []
     steps = []
     departments = []
@@ -148,7 +144,9 @@ def _workflow_visual_summary(wf):
             to_dept = ""
         elif isinstance(step, dict):
             status = str(step.get("status") or step.get("code") or "").strip()
-            from_dept = _normalize_department_code(step.get("from_dept") or step.get("from"))
+            from_dept = _normalize_department_code(
+                step.get("from_dept") or step.get("from")
+            )
             to_dept = _normalize_department_code(step.get("to_dept") or step.get("to"))
         else:
             continue
@@ -213,10 +211,10 @@ def _format_approval_stage_lines(opt):
 
 # --- workflow CRUD -----------------------------------------------------------
 
+
 @admin_bp.route("/workflows")
 @admin_bp.route("/workflows/")
 @login_required
-
 def list_workflows():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -234,7 +232,6 @@ def list_workflows():
 
 @admin_bp.route("/workflows/new", methods=["GET", "POST"])
 @login_required
-
 def create_workflow():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -269,41 +266,44 @@ def create_workflow():
                 wf.spec = {"steps": steps, "transitions": transitions}
         db.session.add(wf)
         db.session.commit()
-        action = flask_request.form.get('action') or 'save'
+        action = flask_request.form.get("action") or "save"
         # If admin chose to implement, create any missing StatusOption rows
-        if action == 'implement':
+        if action == "implement":
             try:
                 from ..models import StatusOption
 
                 steps = []
                 if isinstance(wf.spec, dict):
-                    steps = wf.spec.get('steps') or []
+                    steps = wf.spec.get("steps") or []
                 for s in steps:
                     code = None
                     target_dept = None
                     if isinstance(s, str):
                         code = s
                     elif isinstance(s, dict):
-                        code = s.get('status') or s.get('code')
-                        target_dept = s.get('to_dept') or s.get('to')
+                        code = s.get("status") or s.get("code")
+                        target_dept = s.get("to_dept") or s.get("to")
                     if not code:
                         continue
                     existing = StatusOption.query.filter_by(code=code).first()
                     if not existing:
-                        label = code.replace('_', ' ').title()
+                        label = code.replace("_", " ").title()
                         opt = StatusOption(code=code, label=label)
                         if target_dept:
                             opt.target_department = target_dept or None
                         db.session.add(opt)
                 db.session.commit()
-                flash('Workflow created and status options implemented.', 'success')
+                flash("Workflow created and status options implemented.", "success")
             except Exception:
                 try:
                     db.session.rollback()
                 except Exception:
                     pass
-                flash('Workflow created but failed to implement status options.', 'warning')
-            return redirect(url_for('admin.list_workflows'))
+                flash(
+                    "Workflow created but failed to implement status options.",
+                    "warning",
+                )
+            return redirect(url_for("admin.list_workflows"))
         flash("Workflow created.", "success")
         return redirect(url_for("admin.list_workflows"))
     return render_template(
@@ -317,7 +317,6 @@ def create_workflow():
 
 @admin_bp.route("/workflows/<int:wf_id>/edit", methods=["GET", "POST"])
 @login_required
-
 def edit_workflow(wf_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -361,40 +360,43 @@ def edit_workflow(wf_id: int):
             else:
                 wf.spec = None
         db.session.commit()
-        action = flask_request.form.get('action') or 'save'
-        if action == 'implement':
+        action = flask_request.form.get("action") or "save"
+        if action == "implement":
             try:
                 from ..models import StatusOption
 
                 steps = []
                 if isinstance(wf.spec, dict):
-                    steps = wf.spec.get('steps') or []
+                    steps = wf.spec.get("steps") or []
                 for s in steps:
                     code = None
                     target_dept = None
                     if isinstance(s, str):
                         code = s
                     elif isinstance(s, dict):
-                        code = s.get('status') or s.get('code')
-                        target_dept = s.get('to_dept') or s.get('to')
+                        code = s.get("status") or s.get("code")
+                        target_dept = s.get("to_dept") or s.get("to")
                     if not code:
                         continue
                     existing = StatusOption.query.filter_by(code=code).first()
                     if not existing:
-                        label = code.replace('_', ' ').title()
+                        label = code.replace("_", " ").title()
                         opt = StatusOption(code=code, label=label)
                         if target_dept:
                             opt.target_department = target_dept or None
                         db.session.add(opt)
                 db.session.commit()
-                flash('Workflow updated and status options implemented.', 'success')
+                flash("Workflow updated and status options implemented.", "success")
             except Exception:
                 try:
                     db.session.rollback()
                 except Exception:
                     pass
-                flash('Workflow updated but failed to implement status options.', 'warning')
-            return redirect(url_for('admin.list_workflows'))
+                flash(
+                    "Workflow updated but failed to implement status options.",
+                    "warning",
+                )
+            return redirect(url_for("admin.list_workflows"))
         flash("Workflow updated.", "success")
         return redirect(url_for("admin.list_workflows"))
     return render_template(
@@ -403,14 +405,15 @@ def edit_workflow(wf_id: int):
         wf=wf,
         editor_spec=_normalize_workflow_spec(wf.spec, wf.name),
         status_options_map=_build_status_options_map(wf),
-        editor_sections=workflow_editor_sections(_normalize_workflow_spec(wf.spec, wf.name), wf.department_code),
+        editor_sections=workflow_editor_sections(
+            _normalize_workflow_spec(wf.spec, wf.name), wf.department_code
+        ),
         workflow_preview=workflow_intake_preview(wf, wf.department_code),
     )
 
 
 @admin_bp.route("/workflows/<int:wf_id>/delete", methods=["POST"])
 @login_required
-
 def delete_workflow(wf_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -424,7 +427,6 @@ def delete_workflow(wf_id: int):
 
 @admin_bp.route("/workflows/<int:wf_id>/toggle", methods=["POST"])
 @login_required
-
 def toggle_workflow_active(wf_id: int):
     if not _is_admin_user():
         return jsonify({"error": "access_denied"}), 403
@@ -440,7 +442,6 @@ def toggle_workflow_active(wf_id: int):
             pass
         return jsonify({"ok": False}), 500
 
-
     @admin_bp.route("/workflows/<int:wf_id>/visual", methods=["GET"])
     @login_required
     def visual_workflow(wf_id: int):
@@ -450,7 +451,6 @@ def toggle_workflow_active(wf_id: int):
         wf = get_or_404(Workflow, wf_id)
         return render_template("admin_workflow_visual.html", wf=wf)
 
-
     @admin_bp.route("/api/workflows/<int:wf_id>/spec", methods=["GET"])
     @login_required
     def api_get_workflow_spec(wf_id: int):
@@ -458,7 +458,6 @@ def toggle_workflow_active(wf_id: int):
             return jsonify({"error": "access_denied"}), 403
         wf = get_or_404(Workflow, wf_id)
         return jsonify({"ok": True, "spec": (wf.spec or {})})
-
 
     @admin_bp.route("/api/workflows/<int:wf_id>/spec", methods=["PUT"])
     @login_required
@@ -483,7 +482,9 @@ def toggle_workflow_active(wf_id: int):
             return jsonify({"ok": False, "error": "invalid_spec"}), 400
 
         # optional: implement status options (create missing) if requested
-        implement = bool(data.get("implement", False)) if isinstance(data, dict) else False
+        implement = (
+            bool(data.get("implement", False)) if isinstance(data, dict) else False
+        )
         try:
             db.session.add(wf)
             db.session.commit()
@@ -525,14 +526,22 @@ def toggle_workflow_active(wf_id: int):
                 except Exception:
                     pass
                 # non-fatal; return success but indicate warning
-                return jsonify({"ok": True, "spec": (wf.spec or {}), "warning": "failed_to_implement"}), 200
+                return (
+                    jsonify(
+                        {
+                            "ok": True,
+                            "spec": (wf.spec or {}),
+                            "warning": "failed_to_implement",
+                        }
+                    ),
+                    200,
+                )
 
         return jsonify({"ok": True, "spec": (wf.spec or {})})
 
 
 @admin_bp.route("/status_options")
 @login_required
-
 def list_status_options():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -621,14 +630,15 @@ def list_status_options():
                 opts = StatusOption.query.order_by(StatusOption.code).all()
         except Exception:
             # if something goes wrong here just log and continue with empty list
-            current_app.logger.exception("Failed to bootstrap status options from workflows")
+            current_app.logger.exception(
+                "Failed to bootstrap status options from workflows"
+            )
 
     return render_template("admin_status_options.html", status_options=opts)
 
 
 @admin_bp.route("/status_options/new", methods=["GET", "POST"])
 @login_required
-
 def create_status_option():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -676,7 +686,6 @@ def create_status_option():
 
 @admin_bp.route("/status_options/<int:opt_id>/edit", methods=["GET", "POST"])
 @login_required
-
 def edit_status_option(opt_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -726,7 +735,6 @@ def edit_status_option(opt_id: int):
 
 @admin_bp.route("/status_options/<int:opt_id>/delete", methods=["POST"])
 @login_required
-
 def delete_status_option(opt_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -740,7 +748,6 @@ def delete_status_option(opt_id: int):
 
 @admin_bp.route("/status_options/<int:opt_id>/toggle_screenshot", methods=["POST"])
 @login_required
-
 def toggle_status_screenshot(opt_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -758,7 +765,6 @@ def toggle_status_screenshot(opt_id: int):
 
 @admin_bp.route("/status_options/<int:opt_id>/toggle_notify_scope", methods=["POST"])
 @login_required
-
 def toggle_status_notify_scope(opt_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -778,7 +784,6 @@ def toggle_status_notify_scope(opt_id: int):
 
 @admin_bp.route("/status_options/<int:opt_id>/toggle_email", methods=["POST"])
 @login_required
-
 def toggle_status_email(opt_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -796,9 +801,9 @@ def toggle_status_email(opt_id: int):
 
 # --- buckets -----------------------------------------------------------------
 
+
 @admin_bp.route("/buckets/import_default", methods=["POST"])
 @login_required
-
 def import_default_buckets():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -807,9 +812,13 @@ def import_default_buckets():
     # Recommended default buckets for Dept B (used by tests)
     try:
         # Unassigned bucket (no statuses - catch-all filter applied at dashboard)
-        ua = StatusBucket.query.filter_by(name="Unassigned", department_name="B").first()
+        ua = StatusBucket.query.filter_by(
+            name="Unassigned", department_name="B"
+        ).first()
         if not ua:
-            ua = StatusBucket(name="Unassigned", department_name="B", order=0, active=True)
+            ua = StatusBucket(
+                name="Unassigned", department_name="B", order=0, active=True
+            )
             db.session.add(ua)
 
         # In Progress bucket
@@ -847,7 +856,6 @@ def import_default_buckets():
 
 @admin_bp.route("/buckets")
 @login_required
-
 def list_buckets():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -860,7 +868,6 @@ def list_buckets():
 
 @admin_bp.route("/buckets/new", methods=["GET", "POST"])
 @login_required
-
 def buckets_new():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -900,7 +907,6 @@ def buckets_new():
 
 @admin_bp.route("/buckets/<int:bucket_id>/edit", methods=["GET", "POST"])
 @login_required
-
 def buckets_edit(bucket_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -1026,7 +1032,6 @@ def buckets_edit(bucket_id: int):
 
 @admin_bp.route("/buckets/<int:bucket_id>/delete", methods=["POST"])
 @login_required
-
 def buckets_delete(bucket_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -1042,7 +1047,6 @@ def buckets_delete(bucket_id: int):
     "/buckets/<int:bucket_id>/status/<int:status_id>/delete", methods=["POST"]
 )
 @login_required
-
 def buckets_status_delete(bucket_id: int, status_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -1056,7 +1060,6 @@ def buckets_status_delete(bucket_id: int, status_id: int):
 
 @admin_bp.route("/buckets/<int:bucket_id>/reorder_statuses", methods=["POST"])
 @login_required
-
 def buckets_reorder_statuses(bucket_id: int):
     if not _is_admin_user():
         return jsonify({"error": "access_denied"}), 403

@@ -2,26 +2,25 @@ import os
 import re
 import time
 from datetime import datetime, timedelta, timezone
-from flask import Blueprint, request, current_app, abort, jsonify
+
+from flask import Blueprint, abort, current_app, jsonify, request
+from flask_wtf.csrf import generate_csrf
 
 from app import csrf
-from flask_wtf.csrf import generate_csrf
+
+from .. import notifcations as notifications
 from ..extensions import db
 from ..models import (
-    SpecialEmailConfig,
-    User,
-    Request as ReqModel,
-    REQUEST_TYPES,
     PRIORITIES,
-)
-from ..models import (
-    DepartmentFormAssignment,
-    FormTemplate,
-    EmailRouting,
-    Submission,
+    REQUEST_TYPES,
     Artifact,
+    DepartmentFormAssignment,
+    EmailRouting,
+    FormTemplate,
 )
-from .. import notifcations as notifications
+from ..models import Request as ReqModel
+from ..models import SpecialEmailConfig, Submission, User
+from ..security import rate_limit, verify_webhook_request
 from ..services.inventory import InventoryService
 from ..services.request_creation import (
     apply_submission_data_to_request,
@@ -30,7 +29,6 @@ from ..services.request_creation import (
     create_form_submission,
     group_template_spec_by_section,
 )
-from ..security import rate_limit, verify_webhook_request
 
 integrations_bp = Blueprint("integrations_bp", __name__, url_prefix="/integrations")
 
@@ -74,10 +72,15 @@ def external_form_schema(template_id: int):
     if not template or not getattr(template, "external_enabled", False):
         return jsonify({"ok": False, "error": "template_not_external"}), 404
 
-    fields = sorted(list(getattr(template, "fields", []) or []), key=lambda field: getattr(field, "order", 0))
+    fields = sorted(
+        list(getattr(template, "fields", []) or []),
+        key=lambda field: getattr(field, "order", 0),
+    )
     spec = build_template_spec(
         fields,
-        verification_prefill_enabled=bool(getattr(template, "verification_prefill_enabled", False)),
+        verification_prefill_enabled=bool(
+            getattr(template, "verification_prefill_enabled", False)
+        ),
     )
     return jsonify(
         {
@@ -432,9 +435,13 @@ def external_form_callback():
         form_submission = create_form_submission(template, req, form_data, None)
         form_submission.from_department = None
         form_submission.to_department = owner_dept
-        form_submission.summary = form_data.get("summary") or form_data.get("title") or None
+        form_submission.summary = (
+            form_data.get("summary") or form_data.get("title") or None
+        )
         form_submission.details = description
-        form_submission.created_by_guest_email = form_data.get("guest_email") if isinstance(form_data, dict) else None
+        form_submission.created_by_guest_email = (
+            form_data.get("guest_email") if isinstance(form_data, dict) else None
+        )
         db.session.commit()
         created_request_id = req.id
     except Exception:
@@ -845,7 +852,11 @@ def inbound_mail():
             watchers = []
             if getattr(cfg, "request_form_default_watchers", None):
                 try:
-                    watchers = [e.strip().lower() for e in getattr(cfg, "request_form_default_watchers") or [] if e and e.strip()]
+                    watchers = [
+                        e.strip().lower()
+                        for e in getattr(cfg, "request_form_default_watchers") or []
+                        if e and e.strip()
+                    ]
                 except Exception:
                     watchers = []
             # optionally treat original sender itself as a watcher

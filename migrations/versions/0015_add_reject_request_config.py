@@ -5,8 +5,8 @@ Revises: 0014_add_form_submission
 Create Date: 2026-03-05 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0015_add_reject_request_config"

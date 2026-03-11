@@ -1,5 +1,6 @@
-from flask_login import current_user
 from flask import current_app
+from flask_login import current_user
+
 from ..models import Request, Submission
 from ..services.tenant_context import get_current_tenant_id, user_can_access_tenant
 

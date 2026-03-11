@@ -1,10 +1,11 @@
 import pytest
-from app.extensions import db
-from app.models import User
 from werkzeug.security import generate_password_hash
 
+from app.extensions import db
+from app.models import User
 
 # reuse helpers similar to other tests
+
 
 def make_admin(app):
     with app.app_context():

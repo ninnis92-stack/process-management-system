@@ -1,9 +1,12 @@
 from functools import wraps
-from flask import current_app, abort
+
+from flask import abort, current_app
 from flask_login import current_user
-from ..extensions import db
-from ..models import Request as ReqModel, Submission
 from sqlalchemy import or_, select
+
+from ..extensions import db
+from ..models import Request as ReqModel
+from ..models import Submission
 
 
 def scope_requests_for_department(query, dept: str):

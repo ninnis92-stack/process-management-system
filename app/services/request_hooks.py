@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
+
 from sqlalchemy import event, inspect
 
 from ..extensions import db

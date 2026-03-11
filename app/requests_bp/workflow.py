@@ -1,4 +1,5 @@
 from typing import Optional, Tuple
+
 from ..models import StatusOption, Workflow
 
 OWNER_BY_STATUS = {
@@ -126,7 +127,8 @@ def _transition_entries_from_spec(spec: dict) -> list[dict]:
                     {
                         "from": source,
                         "to": target,
-                        "from_dept": item.get("from_dept") or item.get("from_department"),
+                        "from_dept": item.get("from_dept")
+                        or item.get("from_department"),
                         "to_dept": item.get("to_dept") or item.get("to_department"),
                     }
                 )
@@ -145,7 +147,9 @@ def workflow_scope_summary(workflow) -> str:
     return f"Department {dept} only" if dept else "All departments"
 
 
-def workflow_step_summary(step: dict, fallback_department: Optional[str] = None) -> dict:
+def workflow_step_summary(
+    step: dict, fallback_department: Optional[str] = None
+) -> dict:
     code = (
         step.get("status")
         or step.get("code")
@@ -154,10 +158,9 @@ def workflow_step_summary(step: dict, fallback_department: Optional[str] = None)
         or ""
     )
     label = step.get("label") or step.get("title") or code.replace("_", " ").title()
-    from_department = (
-        _normalize_route_department(step.get("from_dept") or step.get("from_department"))
-        or _normalize_route_department(fallback_department)
-    )
+    from_department = _normalize_route_department(
+        step.get("from_dept") or step.get("from_department")
+    ) or _normalize_route_department(fallback_department)
     to_department = (
         _normalize_route_department(step.get("to_dept") or step.get("to_department"))
         or _normalize_route_department(fallback_department)
@@ -169,12 +172,16 @@ def workflow_step_summary(step: dict, fallback_department: Optional[str] = None)
         "from_department": from_department,
         "to_department": to_department,
         "summary": (
-            f"{label} ({code})" if code and label != code else (label or code or "Unconfigured step")
+            f"{label} ({code})"
+            if code and label != code
+            else (label or code or "Unconfigured step")
         ),
     }
 
 
-def workflow_editor_sections(spec: Optional[dict], fallback_department: Optional[str] = None) -> list[dict]:
+def workflow_editor_sections(
+    spec: Optional[dict], fallback_department: Optional[str] = None
+) -> list[dict]:
     steps = []
     if isinstance(spec, dict):
         steps = spec.get("steps") or []
@@ -200,12 +207,18 @@ def workflow_editor_sections(spec: Optional[dict], fallback_department: Optional
     return sections
 
 
-def workflow_intake_preview(workflow, fallback_department: Optional[str] = None, max_steps: int = 4) -> dict:
+def workflow_intake_preview(
+    workflow, fallback_department: Optional[str] = None, max_steps: int = 4
+) -> dict:
     if not workflow:
         default_department = _normalize_route_department(fallback_department)
         return {
             "name": "Default process flow",
-            "scope": f"Starts in Department {default_department}" if default_department else "Default routing",
+            "scope": (
+                f"Starts in Department {default_department}"
+                if default_department
+                else "Default routing"
+            ),
             "description": "Requests follow the standard status path configured for this department.",
             "steps": [],
             "has_multiple_routes": False,
@@ -217,23 +230,40 @@ def workflow_intake_preview(workflow, fallback_department: Optional[str] = None,
     step_summaries = []
     for raw_step in raw_steps[:max_steps]:
         if isinstance(raw_step, dict):
-            step_summaries.append(workflow_step_summary(raw_step, getattr(workflow, "department_code", None) or fallback_department))
+            step_summaries.append(
+                workflow_step_summary(
+                    raw_step,
+                    getattr(workflow, "department_code", None) or fallback_department,
+                )
+            )
         elif isinstance(raw_step, str):
             step_summaries.append(
-                workflow_step_summary({"status": raw_step}, getattr(workflow, "department_code", None) or fallback_department)
+                workflow_step_summary(
+                    {"status": raw_step},
+                    getattr(workflow, "department_code", None) or fallback_department,
+                )
             )
 
     routes = _transition_entries_from_spec(spec)
     route_count = len(routes)
     unique_targets = {
-        (_normalize_route_department(route.get("from_dept")), _normalize_route_department(route.get("to_dept")), route.get("to"))
+        (
+            _normalize_route_department(route.get("from_dept")),
+            _normalize_route_department(route.get("to_dept")),
+            route.get("to"),
+        )
         for route in routes
     }
-    has_multiple_routes = len(unique_targets) != len({route.get("to") for route in routes}) if routes else False
+    has_multiple_routes = (
+        len(unique_targets) != len({route.get("to") for route in routes})
+        if routes
+        else False
+    )
     return {
         "name": getattr(workflow, "name", None) or "Default process flow",
         "scope": workflow_scope_summary(workflow),
-        "description": getattr(workflow, "description", None) or "Requests follow this process flow after submission.",
+        "description": getattr(workflow, "description", None)
+        or "Requests follow this process flow after submission.",
         "steps": step_summaries,
         "has_multiple_routes": has_multiple_routes,
         "route_count": route_count,
@@ -356,7 +386,9 @@ def allowed_transitions_with_labels(dept: str, from_status: str) -> list:
     choices = []
     label_map = {}
     try:
-        label_map = _status_label_map_from_workflow(_active_workflow_for_department(dept))
+        label_map = _status_label_map_from_workflow(
+            _active_workflow_for_department(dept)
+        )
     except Exception:
         pass
 
@@ -451,7 +483,9 @@ def allowed_transition_routes(dept: str, from_status: str) -> list[dict]:
                 matching_entries = [{"from": from_status, "to": to_status}]
 
             for entry in matching_entries:
-                target_department = _normalize_route_department(entry.get("to_dept")) or owner_for_status(to_status)
+                target_department = _normalize_route_department(
+                    entry.get("to_dept")
+                ) or owner_for_status(to_status)
                 route_key = (to_status, target_department)
                 if route_key in seen:
                     continue
@@ -470,7 +504,10 @@ def allowed_transition_routes(dept: str, from_status: str) -> list[dict]:
                     {
                         "to_status": to_status,
                         "label": label,
-                        "from_department": _normalize_route_department(entry.get("from_dept")) or dept,
+                        "from_department": _normalize_route_department(
+                            entry.get("from_dept")
+                        )
+                        or dept,
                         "to_department": target_department,
                     }
                 )

@@ -27,11 +27,11 @@ def _guest_form_from_form(
         guest_form.access_policy in {"sso_linked", "approved_sso_domains"}
     )
     guest_form.allowed_email_domains = (
-        (form.allowed_email_domains.data or "").strip() or None
-    )
+        form.allowed_email_domains.data or ""
+    ).strip() or None
     guest_form.credential_requirements_json = (
-        (form.credential_requirements_json.data or "").strip() or None
-    )
+        form.credential_requirements_json.data or ""
+    ).strip() or None
     guest_form.owner_department = form.owner_department.data or "B"
     guest_form.layout = form.layout.data or "standard"
     guest_form.is_default = bool(form.is_default.data)

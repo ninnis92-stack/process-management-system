@@ -6,9 +6,9 @@ Usage:
 
 Prints the hex digest to stdout.
 """
-import sys
-import hmac
 import hashlib
+import hmac
+import sys
 
 
 def main():

@@ -54,7 +54,9 @@ def init_runtime_middleware(app):
 
                 log_level = "warning"
                 if response.status_code < 400:
-                    slow_threshold = int(app.config.get("SLOW_REQUEST_THRESHOLD_MS", 750))
+                    slow_threshold = int(
+                        app.config.get("SLOW_REQUEST_THRESHOLD_MS", 750)
+                    )
                     log_level = (
                         "info"
                         if duration_ms is None or duration_ms < slow_threshold
@@ -70,7 +72,9 @@ def init_runtime_middleware(app):
                         "status_code": response.status_code,
                         "duration_ms": duration_ms,
                         "user_id": user_id,
-                        "remote_addr": request.headers.get("X-Forwarded-For", request.remote_addr),
+                        "remote_addr": request.headers.get(
+                            "X-Forwarded-For", request.remote_addr
+                        ),
                     },
                 )
         return response

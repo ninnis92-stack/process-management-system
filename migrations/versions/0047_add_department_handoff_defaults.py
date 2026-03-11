@@ -6,9 +6,8 @@ Create Date: 2026-03-10 00:45:00.000000
 
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision = "0047_add_department_handoff_defaults"
 down_revision = "0046_add_user_department_handoff_package"

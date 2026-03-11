@@ -14,9 +14,7 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-fallback")
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "/data/uploads")
     REQUEST_ID_HEADER = os.getenv("REQUEST_ID_HEADER", "X-Request-ID")
-    REQUEST_LOGGING_ENABLED = (
-        os.getenv("REQUEST_LOGGING_ENABLED", "True") == "True"
-    )
+    REQUEST_LOGGING_ENABLED = os.getenv("REQUEST_LOGGING_ENABLED", "True") == "True"
     REQUEST_LOGGING_SKIP_PATHS = [
         p.strip()
         for p in os.getenv("REQUEST_LOGGING_SKIP_PATHS", "/static/").split(",")
@@ -133,7 +131,9 @@ class Config:
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
     # OCR providers and ordering. Admins may iterate through these until one succeeds.
-    OCR_PROVIDER_ORDER = os.getenv("OCR_PROVIDER_ORDER", "tesseract,google_vision,aws_textract").split(",")
+    OCR_PROVIDER_ORDER = os.getenv(
+        "OCR_PROVIDER_ORDER", "tesseract,google_vision,aws_textract"
+    ).split(",")
     OCR_GOOGLE_VISION_CONFIG = {
         "project_id": os.getenv("OCR_GOOGLE_PROJECT_ID"),
         "credentials": os.getenv("OCR_GOOGLE_CREDENTIALS"),
@@ -247,16 +247,25 @@ class Config:
         errors = []
         # basic secrets
         if cls.SECRET_KEY == "dev-fallback":
-            errors.append("SECRET_KEY is using the insecure default; set a strong secret in production")
+            errors.append(
+                "SECRET_KEY is using the insecure default; set a strong secret in production"
+            )
 
         # SSO/OIDC
         if cls.SSO_ENABLED:
-            for key in ("OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_DISCOVERY_URL", "OIDC_REDIRECT_URI"):
+            for key in (
+                "OIDC_CLIENT_ID",
+                "OIDC_CLIENT_SECRET",
+                "OIDC_DISCOVERY_URL",
+                "OIDC_REDIRECT_URI",
+            ):
                 if not getattr(cls, key, None):
                     errors.append(f"{key} must be set when SSO_ENABLED is True")
             # optionally warn if SSO_ADMIN_SYNC_* flags are inconsistent
             if cls.SSO_ADMIN_SYNC_ENABLED and not cls.SSO_ADMIN_CLAIM:
-                errors.append("SSO_ADMIN_CLAIM cannot be empty when SSO_ADMIN_SYNC_ENABLED is True")
+                errors.append(
+                    "SSO_ADMIN_CLAIM cannot be empty when SSO_ADMIN_SYNC_ENABLED is True"
+                )
 
         # email
         if cls.EMAIL_ENABLED:
@@ -268,9 +277,13 @@ class Config:
         # ticketing
         if cls.TICKETING_ENABLED:
             if not cls.TICKETING_URL:
-                errors.append("TICKETING_URL is required when TICKETING_ENABLED is True")
+                errors.append(
+                    "TICKETING_URL is required when TICKETING_ENABLED is True"
+                )
             if not cls.TICKETING_TOKEN:
-                errors.append("TICKETING_TOKEN is required when TICKETING_ENABLED is True")
+                errors.append(
+                    "TICKETING_TOKEN is required when TICKETING_ENABLED is True"
+                )
 
         # Redis/DB
         if cls.RATE_LIMIT_ENABLED and not cls.REDIS_URL:

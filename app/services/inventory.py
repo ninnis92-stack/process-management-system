@@ -7,6 +7,7 @@ application continues to behave as a prototype.
 """
 
 from typing import Optional
+
 from flask import current_app
 
 

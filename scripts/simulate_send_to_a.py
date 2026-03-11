@@ -1,8 +1,10 @@
 from app import create_app
 from app.extensions import db
-from app.models import User, Request as ReqModel, Submission, Notification
-from app.requests_bp.workflow import owner_for_status
+from app.models import Notification
+from app.models import Request as ReqModel
+from app.models import Submission, User
 from app.requests_bp.routes import notify_users, users_in_department
+from app.requests_bp.workflow import owner_for_status
 
 app = create_app()
 

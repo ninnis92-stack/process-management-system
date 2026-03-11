@@ -1,39 +1,27 @@
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional
-import uuid
 
-from flask import (
-    render_template,
-    redirect,
-    url_for,
-    flash,
-    session,
-    request as flask_request,
-    current_app,
-    Response,
-)
-from flask_login import login_required, current_user
+from flask import Response, current_app, flash, redirect, render_template
+from flask import request as flask_request
+from flask import session, url_for
+from flask_login import current_user, login_required
 from werkzeug.security import generate_password_hash
 
-from .routes import admin_bp
-from .forms import (
-    AdminCreateUserForm,
-    SSOAssignForm,
-    BulkDepartmentAssignForm,
-)
 from ..extensions import db, get_or_404
 from ..models import (
-    User,
-    Tenant,
-    UserDepartment,
     AuditLog,
-    DepartmentEditor,
     Department,
+    DepartmentEditor,
+    Tenant,
+    User,
+    UserDepartment,
 )
 from ..services.tenant_context import ensure_user_tenant_membership
 from ..utils.user_context import get_user_departments
+from .forms import AdminCreateUserForm, BulkDepartmentAssignForm, SSOAssignForm
+from .routes import admin_bp
 from .utils import _is_admin_user
-
 
 DEPARTMENT_CHOICES = [("A", "A"), ("B", "B"), ("C", "C")]
 
@@ -41,7 +29,11 @@ DEPARTMENT_CHOICES = [("A", "A"), ("B", "B"), ("C", "C")]
 def _available_department_codes(include_codes=None) -> list[str]:
     codes = []
     try:
-        rows = Department.query.filter_by(is_active=True).order_by(Department.order.asc(), Department.code.asc()).all()
+        rows = (
+            Department.query.filter_by(is_active=True)
+            .order_by(Department.order.asc(), Department.code.asc())
+            .all()
+        )
         codes.extend((row.code or "").strip().upper() for row in rows)
     except Exception:
         pass
@@ -77,7 +69,9 @@ def _department_metadata_map(include_codes=None) -> dict[str, Department]:
     return {(row.code or "").strip().upper(): row for row in rows}
 
 
-def _coverage_entry_matches_query(entry: dict, query: str, department_meta: dict[str, Department]) -> bool:
+def _coverage_entry_matches_query(
+    entry: dict, query: str, department_meta: dict[str, Department]
+) -> bool:
     raw = str(query or "").strip().lower()
     if not raw:
         return True
@@ -97,7 +91,9 @@ def _coverage_entry_matches_query(entry: dict, query: str, department_meta: dict
     return raw in haystack
 
 
-def _coverage_pair_matches_query(pair: dict, query: str, department_meta: dict[str, Department]) -> bool:
+def _coverage_pair_matches_query(
+    pair: dict, query: str, department_meta: dict[str, Department]
+) -> bool:
     raw = str(query or "").strip().lower()
     if not raw:
         return True
@@ -136,14 +132,21 @@ def _assignment_windows_overlap(start_a, end_a, start_b, end_b) -> bool:
     return start_a < end_b and start_b < end_a
 
 
-def _temporary_assignment_conflicts(user: User, starts_at, ends_at, exclude_assignment_id=None):
+def _temporary_assignment_conflicts(
+    user: User, starts_at, ends_at, exclude_assignment_id=None
+):
     if not user or not starts_at or not ends_at:
         return []
     conflicts = []
     for assignment in getattr(user, "departments", []) or []:
         if getattr(assignment, "id", None) == exclude_assignment_id:
             continue
-        if str(getattr(assignment, "assignment_kind", "shared") or "shared").strip().lower() != "temporary":
+        if (
+            str(getattr(assignment, "assignment_kind", "shared") or "shared")
+            .strip()
+            .lower()
+            != "temporary"
+        ):
             continue
         other_end = getattr(assignment, "expires_at", None)
         if not other_end or getattr(assignment, "is_active_assignment", True) is False:
@@ -175,7 +178,9 @@ def _coverage_entry_conflicts(entries) -> list[dict]:
         for other in entries:
             if entry is other:
                 continue
-            if getattr(entry["assignment"], "id", None) == getattr(other["assignment"], "id", None):
+            if getattr(entry["assignment"], "id", None) == getattr(
+                other["assignment"], "id", None
+            ):
                 continue
             if getattr(entry["user"], "id", None) != getattr(other["user"], "id", None):
                 continue
@@ -214,13 +219,12 @@ def _sync_user_workflow_profile(user: User):
     ]
     config = _workflow_profile_config(getattr(user, "workflow_role_profile", "member"))
     existing_rows = list(getattr(user, "dept_editor_roles", []) or [])
-    existing_rows.extend(
-        DepartmentEditor.query.filter_by(user_id=user.id).all()
-    )
+    existing_rows.extend(DepartmentEditor.query.filter_by(user_id=user.id).all())
     existing_rows.extend(
         obj
         for obj in db.session.new
-        if isinstance(obj, DepartmentEditor) and getattr(obj, "user_id", None) == user.id
+        if isinstance(obj, DepartmentEditor)
+        and getattr(obj, "user_id", None) == user.id
     )
     existing_rows_by_department = {}
     for row in existing_rows:
@@ -251,7 +255,9 @@ def _sync_user_workflow_profile(user: User):
     for dept in departments:
         row = managed_rows.get(dept) or existing_rows_by_department.get(dept)
         if not row:
-            row = DepartmentEditor(user_id=user.id, department=dept, managed_by_profile=True)
+            row = DepartmentEditor(
+                user_id=user.id, department=dept, managed_by_profile=True
+            )
             db.session.add(row)
         row.can_edit = bool(config.get("can_edit", False))
         row.can_view_metrics = bool(config.get("can_view_metrics", False))
@@ -272,7 +278,10 @@ def _dedupe_department_editor_rows(user: User):
             obj
             for obj in db.session.new
             if isinstance(obj, DepartmentEditor)
-            and (getattr(obj, "user_id", None) == user.id or getattr(obj, "user", None) is user)
+            and (
+                getattr(obj, "user_id", None) == user.id
+                or getattr(obj, "user", None) is user
+            )
         )
 
     rows_by_department = {}
@@ -286,21 +295,27 @@ def _dedupe_department_editor_rows(user: User):
         if len(dept_rows) < 2:
             continue
 
-        kept_row = next((row for row in dept_rows if getattr(row, "id", None)), dept_rows[0])
+        kept_row = next(
+            (row for row in dept_rows if getattr(row, "id", None)), dept_rows[0]
+        )
         for duplicate_row in dept_rows:
             if duplicate_row is kept_row:
                 continue
             kept_row.department = dept_key
-            kept_row.can_edit = bool(getattr(duplicate_row, "can_edit", False) or kept_row.can_edit)
+            kept_row.can_edit = bool(
+                getattr(duplicate_row, "can_edit", False) or kept_row.can_edit
+            )
             kept_row.can_view_metrics = bool(
-                getattr(duplicate_row, "can_view_metrics", False) or kept_row.can_view_metrics
+                getattr(duplicate_row, "can_view_metrics", False)
+                or kept_row.can_view_metrics
             )
             kept_row.can_change_priority = bool(
                 getattr(duplicate_row, "can_change_priority", False)
                 or kept_row.can_change_priority
             )
             kept_row.managed_by_profile = bool(
-                getattr(duplicate_row, "managed_by_profile", False) or kept_row.managed_by_profile
+                getattr(duplicate_row, "managed_by_profile", False)
+                or kept_row.managed_by_profile
             )
             if getattr(duplicate_row, "id", None):
                 db.session.delete(duplicate_row)
@@ -313,14 +328,22 @@ def _populate_admin_user_form(form: AdminCreateUserForm, user: Optional[User] = 
         from ..models import SiteConfig
 
         cfg = SiteConfig.get()
-        sets = list(cfg.rolling_quote_sets.keys()) if cfg and cfg.rolling_quote_sets else list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
-        form.quote_set.choices = [("", "(use site default)")] + [(s, s.capitalize()) for s in sets]
+        sets = (
+            list(cfg.rolling_quote_sets.keys())
+            if cfg and cfg.rolling_quote_sets
+            else list(SiteConfig.DEFAULT_QUOTE_SETS.keys())
+        )
+        form.quote_set.choices = [("", "(use site default)")] + [
+            (s, s.capitalize()) for s in sets
+        ]
         interval_default = getattr(cfg, "rolling_quote_interval_default", 20)
     except Exception:
         form.quote_set.choices = [("", "(use site default)")]
         interval_default = 20
 
-    active_choices = _available_department_choices(include_codes=get_user_departments(user) if user is not None else None)
+    active_choices = _available_department_choices(
+        include_codes=get_user_departments(user) if user is not None else None
+    )
     form.department.choices = list(active_choices)
     form.watched_departments.choices = list(active_choices)
     form.notification_departments.choices = list(active_choices)
@@ -329,12 +352,12 @@ def _populate_admin_user_form(form: AdminCreateUserForm, user: Optional[User] = 
     if user is not None:
         allowed_depts = get_user_departments(user)
     else:
-        seeded_dept = (getattr(form.department, "data", None) or "A")
+        seeded_dept = getattr(form.department, "data", None) or "A"
         allowed_depts = [str(seeded_dept).strip().upper()]
     posted_primary = str(getattr(form.department, "data", "") or "").strip().upper()
-    posted_preferred = str(
-        getattr(form.preferred_start_department, "data", "") or ""
-    ).strip().upper()
+    posted_preferred = (
+        str(getattr(form.preferred_start_department, "data", "") or "").strip().upper()
+    )
     if posted_primary:
         allowed_depts.append(posted_primary)
     if posted_preferred:
@@ -342,19 +365,29 @@ def _populate_admin_user_form(form: AdminCreateUserForm, user: Optional[User] = 
     available_codes = set(_available_department_codes(include_codes=allowed_depts))
     allowed_depts = [dept for dept in allowed_depts if dept in available_codes]
     allowed_depts = list(dict.fromkeys(allowed_depts))
-    preferred_choices = [("", "Use active department")] + [(dept, dept) for dept in allowed_depts]
+    preferred_choices = [("", "Use active department")] + [
+        (dept, dept) for dept in allowed_depts
+    ]
     if len(preferred_choices) == 1:
-        preferred_choices.extend((dept, label) for dept, label in active_choices if dept not in allowed_depts)
+        preferred_choices.extend(
+            (dept, label) for dept, label in active_choices if dept not in allowed_depts
+        )
     form.preferred_start_department.choices = preferred_choices
     form.quote_interval.choices = [(i, f"{i} seconds") for i in range(15, 61, 5)]
 
     backup_users = []
     try:
-        backup_users = User.query.filter_by(is_active=True).order_by(User.email.asc()).all()
+        backup_users = (
+            User.query.filter_by(is_active=True).order_by(User.email.asc()).all()
+        )
     except Exception:
         backup_users = []
-    selected_backup_id = getattr(user, "backup_approver_user_id", None) if user is not None else None
-    if selected_backup_id and not any(candidate.id == selected_backup_id for candidate in backup_users):
+    selected_backup_id = (
+        getattr(user, "backup_approver_user_id", None) if user is not None else None
+    )
+    if selected_backup_id and not any(
+        candidate.id == selected_backup_id for candidate in backup_users
+    ):
         selected_backup = db.session.get(User, selected_backup_id)
         if selected_backup is not None:
             backup_users.append(selected_backup)
@@ -371,11 +404,21 @@ def _populate_admin_user_form(form: AdminCreateUserForm, user: Optional[User] = 
     form.backup_approver_user_id.choices = backup_choices
 
     if flask_request.method == "GET":
-        form.quote_interval.data = getattr(user, "quote_interval", None) or interval_default
-        form.workflow_role_profile.data = getattr(user, "workflow_role_profile", None) or "member"
-        form.preferred_start_page.data = getattr(user, "preferred_start_page", None) or "dashboard"
-        form.preferred_start_department.data = getattr(user, "preferred_start_department", None) or ""
-        form.watched_departments.data = list(getattr(user, "watched_departments", []) or [])
+        form.quote_interval.data = (
+            getattr(user, "quote_interval", None) or interval_default
+        )
+        form.workflow_role_profile.data = (
+            getattr(user, "workflow_role_profile", None) or "member"
+        )
+        form.preferred_start_page.data = (
+            getattr(user, "preferred_start_page", None) or "dashboard"
+        )
+        form.preferred_start_department.data = (
+            getattr(user, "preferred_start_department", None) or ""
+        )
+        form.watched_departments.data = list(
+            getattr(user, "watched_departments", []) or []
+        )
         form.notification_departments.data = list(
             getattr(user, "notification_departments", []) or []
         )
@@ -388,7 +431,7 @@ def _populate_admin_user_form(form: AdminCreateUserForm, user: Optional[User] = 
 def _apply_admin_user_settings(user: User, form: AdminCreateUserForm):
     user.quote_set = form.quote_set.data or None
     user.quotes_enabled = bool(form.quotes_enabled.data)
-    user.vibe_button_enabled = bool(getattr(form, 'vibe_button_enabled', False).data)
+    user.vibe_button_enabled = bool(getattr(form, "vibe_button_enabled", False).data)
     try:
         user.daily_nudge_limit = int(form.daily_nudge_limit.data or 1)
     except Exception:
@@ -401,7 +444,11 @@ def _apply_admin_user_settings(user: User, form: AdminCreateUserForm):
     user.preferred_start_page = form.preferred_start_page.data or "dashboard"
     preferred_dept = (form.preferred_start_department.data or "").strip().upper()
     user.preferred_start_department = preferred_dept or None
-    watched = [str(dept or "").strip().upper() for dept in (form.watched_departments.data or []) if str(dept or "").strip()]
+    watched = [
+        str(dept or "").strip().upper()
+        for dept in (form.watched_departments.data or [])
+        if str(dept or "").strip()
+    ]
     user.watched_departments = watched
     routed = [
         str(dept or "").strip().upper()
@@ -414,14 +461,17 @@ def _apply_admin_user_settings(user: User, form: AdminCreateUserForm):
         selected_backup_id = int(backup_user_id.data or 0) if backup_user_id else 0
     except Exception:
         selected_backup_id = 0
-    if selected_backup_id and getattr(user, "id", None) and selected_backup_id == user.id:
+    if (
+        selected_backup_id
+        and getattr(user, "id", None)
+        and selected_backup_id == user.id
+    ):
         selected_backup_id = 0
     user.backup_approver_user_id = selected_backup_id or None
 
 
 @admin_bp.route("/users")
 @login_required
-
 def list_users():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -451,12 +501,18 @@ def list_users():
     expiring_loans = 0
     multi_dept_users = 0
     for user in users:
-        active_assignments = [assignment for assignment in (getattr(user, "departments", []) or []) if getattr(assignment, "is_active_assignment", True)]
+        active_assignments = [
+            assignment
+            for assignment in (getattr(user, "departments", []) or [])
+            if getattr(assignment, "is_active_assignment", True)
+        ]
         if active_assignments:
             multi_dept_users += 1
         if any(
             getattr(assignment, "expires_at", None)
-            and now <= getattr(assignment, "expires_at", None) <= now + timedelta(days=3)
+            and now
+            <= getattr(assignment, "expires_at", None)
+            <= now + timedelta(days=3)
             for assignment in active_assignments
         ):
             expiring_loans += 1
@@ -477,7 +533,6 @@ def list_users():
 
 @admin_bp.route("/users/new", methods=["GET", "POST"])
 @login_required
-
 def create_user():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -495,7 +550,9 @@ def create_user():
         is_admin = (getattr(form, "role", None) and form.role.data == "admin") or bool(
             form.is_admin.data
         )
-        department_override = bool(getattr(form, "department_override", None) and form.department_override.data)
+        department_override = bool(
+            getattr(form, "department_override", None) and form.department_override.data
+        )
 
         existing = User.query.filter_by(email=email).first()
         if existing:
@@ -539,7 +596,6 @@ def create_user():
 
 @admin_bp.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
 @login_required
-
 def edit_user(user_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -578,7 +634,6 @@ def edit_user(user_id: int):
 
 @admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])
 @login_required
-
 def delete_user(user_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -599,7 +654,6 @@ def delete_user(user_id: int):
 
 @admin_bp.route("/users/<int:user_id>/departments", methods=["GET", "POST"])
 @login_required
-
 def manage_user_departments(user_id: int):
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -626,21 +680,33 @@ def manage_user_departments(user_id: int):
         for dept in selected:
             if dept == getattr(u, "department", None):
                 continue
-            assignment_kind = (flask_request.form.get(f"assignment_kind_{dept}") or "shared").strip().lower()
+            assignment_kind = (
+                (flask_request.form.get(f"assignment_kind_{dept}") or "shared")
+                .strip()
+                .lower()
+            )
             if assignment_kind not in {"shared", "temporary"}:
                 assignment_kind = "shared"
-            note = (flask_request.form.get(f"assignment_note_{dept}") or "").strip() or None
-            handoff_doc_url = (flask_request.form.get(f"assignment_handoff_doc_url_{dept}") or "").strip() or None
+            note = (
+                flask_request.form.get(f"assignment_note_{dept}") or ""
+            ).strip() or None
+            handoff_doc_url = (
+                flask_request.form.get(f"assignment_handoff_doc_url_{dept}") or ""
+            ).strip() or None
             handoff_checklist = [
                 line.strip()
-                for line in (flask_request.form.get(f"assignment_handoff_checklist_{dept}") or "").splitlines()
+                for line in (
+                    flask_request.form.get(f"assignment_handoff_checklist_{dept}") or ""
+                ).splitlines()
                 if line.strip()
             ]
             template = department_meta.get(dept)
             if not handoff_doc_url and template is not None:
                 handoff_doc_url = getattr(template, "handoff_template_doc_url", None)
             if not handoff_checklist and template is not None:
-                handoff_checklist = list(getattr(template, "handoff_template_checklist", []) or [])
+                handoff_checklist = list(
+                    getattr(template, "handoff_template_checklist", []) or []
+                )
             expires_at = None
             raw_expires = flask_request.form.get(f"assignment_expires_at_{dept}")
             if raw_expires:
@@ -648,7 +714,9 @@ def manage_user_departments(user_id: int):
                     expires_at = _parse_datetime_local(raw_expires)
                 except ValueError as exc:
                     flash(f"{dept}: {exc}", "warning")
-                    return redirect(url_for("admin.manage_user_departments", user_id=u.id))
+                    return redirect(
+                        url_for("admin.manage_user_departments", user_id=u.id)
+                    )
 
             row = existing.get(dept)
             if not row:
@@ -688,13 +756,18 @@ def manage_user_departments(user_id: int):
 
         return redirect(url_for("admin.list_users"))
 
-    assigned_rows = {
-        ud.department: ud for ud in getattr(u, "departments", [])
-    }
-    assigned = [dept for dept, row in assigned_rows.items() if getattr(row, "is_active_assignment", True)]
+    assigned_rows = {ud.department: ud for ud in getattr(u, "departments", [])}
+    assigned = [
+        dept
+        for dept, row in assigned_rows.items()
+        if getattr(row, "is_active_assignment", True)
+    ]
     overlap_map = {}
     for dept, row in assigned_rows.items():
-        if str(getattr(row, "assignment_kind", "shared") or "shared").strip().lower() != "temporary":
+        if (
+            str(getattr(row, "assignment_kind", "shared") or "shared").strip().lower()
+            != "temporary"
+        ):
             continue
         starts_at = getattr(row, "created_at", None)
         ends_at = getattr(row, "expires_at", None)
@@ -737,8 +810,12 @@ def bulk_update_users():
         return redirect(url_for("admin.list_users"))
 
     changed = 0
-    target_department = (flask_request.form.get("bulk_department") or "").strip().upper()
-    target_profile = (flask_request.form.get("bulk_role_profile") or "member").strip().lower() or "member"
+    target_department = (
+        (flask_request.form.get("bulk_department") or "").strip().upper()
+    )
+    target_profile = (
+        flask_request.form.get("bulk_role_profile") or "member"
+    ).strip().lower() or "member"
     for user in users:
         if action == "activate":
             user.is_active = True
@@ -748,9 +825,15 @@ def bulk_update_users():
                 continue
             user.is_active = False
             changed += 1
-        elif action == "set_primary_department" and target_department in set(_available_department_codes(include_codes=[target_department])):
+        elif action == "set_primary_department" and target_department in set(
+            _available_department_codes(include_codes=[target_department])
+        ):
             user.department = target_department
-            if getattr(user, "preferred_start_department", None) and user.preferred_start_department not in set(get_user_departments(user)):
+            if getattr(
+                user, "preferred_start_department", None
+            ) and user.preferred_start_department not in set(
+                get_user_departments(user)
+            ):
                 user.preferred_start_department = target_department
             _sync_user_workflow_profile(user)
             _dedupe_department_editor_rows(user)
@@ -811,7 +894,9 @@ def coverage_calendar():
 
     now = datetime.utcnow()
     horizon_end = now + timedelta(days=horizon_days)
-    department_meta = _department_metadata_map(include_codes=[dept_filter] if dept_filter else None)
+    department_meta = _department_metadata_map(
+        include_codes=[dept_filter] if dept_filter else None
+    )
     all_loans = (
         UserDepartment.query.join(User, User.id == UserDepartment.user_id)
         .filter(UserDepartment.assignment_kind == "temporary")
@@ -841,14 +926,22 @@ def coverage_calendar():
                 "ends_at": ends_at,
                 "note": getattr(assignment, "note", None),
                 "handoff_doc_url": getattr(assignment, "handoff_doc_url", None),
-                "handoff_checklist": list(getattr(assignment, "handoff_checklist", []) or []),
-                "backup_approver": getattr(getattr(assignment, "user", None), "backup_approver", None),
+                "handoff_checklist": list(
+                    getattr(assignment, "handoff_checklist", []) or []
+                ),
+                "backup_approver": getattr(
+                    getattr(assignment, "user", None), "backup_approver", None
+                ),
             }
         )
 
     loan_entries = _coverage_entry_conflicts(loan_entries)
     if coverage_query:
-        loan_entries = [entry for entry in loan_entries if _coverage_entry_matches_query(entry, coverage_query, department_meta)]
+        loan_entries = [
+            entry
+            for entry in loan_entries
+            if _coverage_entry_matches_query(entry, coverage_query, department_meta)
+        ]
 
     # if client requested an iCalendar export, generate and return it now
     if flask_request.args.get("format") == "ics":
@@ -871,18 +964,22 @@ def coverage_calendar():
                 description_lines.append(f"Handoff doc: {entry.get('handoff_doc_url')}")
             if entry.get("handoff_checklist"):
                 description_lines.append("Checklist:")
-                description_lines.extend(f"- {item}" for item in entry.get("handoff_checklist") or [])
+                description_lines.extend(
+                    f"- {item}" for item in entry.get("handoff_checklist") or []
+                )
             desc = "\\n".join(description_lines)
-            lines.extend([
-                "BEGIN:VEVENT",
-                f"UID:{uid}",
-                f"DTSTAMP:{now.strftime('%Y%m%dT%H%M%SZ')}",
-                f"DTSTART:{dtstart}",
-                f"DTEND:{dtend}",
-                f"SUMMARY:{summary}",
-                f"DESCRIPTION:{desc}",
-                "END:VEVENT",
-            ])
+            lines.extend(
+                [
+                    "BEGIN:VEVENT",
+                    f"UID:{uid}",
+                    f"DTSTAMP:{now.strftime('%Y%m%dT%H%M%SZ')}",
+                    f"DTSTART:{dtstart}",
+                    f"DTEND:{dtend}",
+                    f"SUMMARY:{summary}",
+                    f"DESCRIPTION:{desc}",
+                    "END:VEVENT",
+                ]
+            )
         lines.append("END:VCALENDAR")
         ics_text = "\r\n".join(lines)
         return Response(
@@ -893,7 +990,9 @@ def coverage_calendar():
 
     calendar_days = []
     for offset in range(horizon_days):
-        day_start = (now + timedelta(days=offset)).replace(hour=0, minute=0, second=0, microsecond=0)
+        day_start = (now + timedelta(days=offset)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         day_end = day_start + timedelta(days=1)
         entries = [
             entry
@@ -908,8 +1007,21 @@ def coverage_calendar():
         )
 
     backup_pairs = []
-    for user in User.query.filter(User.backup_approver_user_id.isnot(None), User.is_active.is_(True)).order_by(User.department.asc(), User.email.asc()).all():
-        departments = [dept for dept in get_user_departments(user) if dept in set(_available_department_codes(include_codes=get_user_departments(user)))]
+    for user in (
+        User.query.filter(
+            User.backup_approver_user_id.isnot(None), User.is_active.is_(True)
+        )
+        .order_by(User.department.asc(), User.email.asc())
+        .all()
+    ):
+        departments = [
+            dept
+            for dept in get_user_departments(user)
+            if dept
+            in set(
+                _available_department_codes(include_codes=get_user_departments(user))
+            )
+        ]
         if dept_filter and dept_filter not in departments:
             continue
         backup_pairs.append(
@@ -917,17 +1029,25 @@ def coverage_calendar():
                 "user": user,
                 "backup": getattr(user, "backup_approver", None),
                 "departments": departments,
-                "notification_departments": list(getattr(user, "notification_departments", []) or []),
+                "notification_departments": list(
+                    getattr(user, "notification_departments", []) or []
+                ),
             }
         )
     if coverage_query:
-        backup_pairs = [pair for pair in backup_pairs if _coverage_pair_matches_query(pair, coverage_query, department_meta)]
+        backup_pairs = [
+            pair
+            for pair in backup_pairs
+            if _coverage_pair_matches_query(pair, coverage_query, department_meta)
+        ]
 
     active_loans = [
         entry for entry in loan_entries if entry["starts_at"] <= now <= entry["ends_at"]
     ]
     ending_soon = [
-        entry for entry in loan_entries if now <= entry["ends_at"] <= now + timedelta(days=3)
+        entry
+        for entry in loan_entries
+        if now <= entry["ends_at"] <= now + timedelta(days=3)
     ]
     conflicting_loans = [entry for entry in loan_entries if entry.get("has_conflict")]
 
@@ -944,7 +1064,9 @@ def coverage_calendar():
             "backup_pairs": len(backup_pairs),
             "conflicts": len(conflicting_loans),
         },
-        department_choices=_available_department_choices(include_codes=[dept_filter] if dept_filter else None),
+        department_choices=_available_department_choices(
+            include_codes=[dept_filter] if dept_filter else None
+        ),
         coverage_query=coverage_query,
         filters_saved=bool(session.get("admin_coverage_filters")),
         now=now,
@@ -953,7 +1075,6 @@ def coverage_calendar():
 
 @admin_bp.route("/users/<int:user_id>/impersonate", methods=["POST"])
 @login_required
-
 def impersonate_user(user_id: int):
     if not current_app.config.get("ALLOW_IMPERSONATION"):
         flash("Impersonation feature is disabled.", "danger")
@@ -996,7 +1117,6 @@ def impersonate_user(user_id: int):
 
 @admin_bp.route("/impersonate/dept", methods=["POST"])
 @login_required
-
 def impersonate_dept():
     if not current_app.config.get("ALLOW_IMPERSONATION"):
         flash("Impersonation feature is disabled.", "danger")
@@ -1034,9 +1154,8 @@ def impersonate_dept():
     return redirect(url_for("requests.dashboard"))
 
 
-@admin_bp.route("/impersonate/stop", methods=["GET","POST"])
+@admin_bp.route("/impersonate/stop", methods=["GET", "POST"])
 @login_required
-
 def stop_impersonation():
     # allow GET so users who manually visit the URL (e.g. via bookmark)
     if not current_app.config.get("ALLOW_IMPERSONATION"):
@@ -1075,7 +1194,6 @@ def stop_impersonation():
 
 @admin_bp.route("/set_self_admin", methods=["POST"])
 @login_required
-
 def set_self_admin():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -1100,7 +1218,6 @@ def set_self_admin():
 
 @admin_bp.route("/assign_sso", methods=["GET", "POST"])
 @login_required
-
 def assign_sso():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -1142,7 +1259,6 @@ def assign_sso():
 
 @admin_bp.route("/bulk_assign_departments", methods=["GET", "POST"])
 @login_required
-
 def bulk_assign_departments():
     if not _is_admin_user():
         flash("Access denied.", "danger")
@@ -1190,7 +1306,9 @@ def bulk_assign_departments():
                 continue
 
             try:
-                ud = UserDepartment(user_id=u.id, department=dept, assignment_kind="shared")
+                ud = UserDepartment(
+                    user_id=u.id, department=dept, assignment_kind="shared"
+                )
                 db.session.add(ud)
                 db.session.commit()
                 report_assigned.append(em)

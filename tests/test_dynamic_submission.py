@@ -1,16 +1,18 @@
 import io
 from datetime import datetime, timedelta
+
 from werkzeug.security import generate_password_hash
+
 from app.extensions import db
 from app.models import (
-    User,
-    FormTemplate,
+    Attachment,
+    DepartmentFormAssignment,
     FormField,
     FormFieldOption,
-    DepartmentFormAssignment,
-    Submission,
-    Attachment,
+    FormTemplate,
     SiteConfig,
+    Submission,
+    User,
 )
 
 
@@ -140,7 +142,11 @@ def test_conditional_requirement_makes_target_field_required(app, client):
             "mode": "all",
             "message": "Supporting Context is required once Request Reason is populated.",
             "rules": [
-                {"source_type": "field", "source": "request_reason", "operator": "populated"}
+                {
+                    "source_type": "field",
+                    "source": "request_reason",
+                    "operator": "populated",
+                }
             ],
         },
     )
@@ -164,7 +170,9 @@ def test_conditional_requirement_makes_target_field_required(app, client):
         follow_redirects=True,
     )
     assert rv.status_code == 200
-    assert b"Supporting Context is required once Request Reason is populated." in rv.data
+    assert (
+        b"Supporting Context is required once Request Reason is populated." in rv.data
+    )
 
     rv = client.post(
         "/requests/new",
@@ -221,7 +229,12 @@ def test_conditional_section_requirement_can_require_upload_section(app, client)
             "mode": "all",
             "message": "Upload the supporting files section when Request Type Detail equals requires_upload.",
             "rules": [
-                {"source_type": "field", "source": "request_type_detail", "operator": "equals", "value": "requires_upload"}
+                {
+                    "source_type": "field",
+                    "source": "request_type_detail",
+                    "operator": "equals",
+                    "value": "requires_upload",
+                }
             ],
         },
     )
@@ -237,7 +250,10 @@ def test_conditional_section_requirement_can_require_upload_section(app, client)
         follow_redirects=True,
     )
     assert rv.status_code == 200
-    assert b"Upload the supporting files section when Request Type Detail equals requires_upload." in rv.data
+    assert (
+        b"Upload the supporting files section when Request Type Detail equals requires_upload."
+        in rv.data
+    )
 
     rv = client.post(
         "/requests/new",
@@ -296,7 +312,9 @@ def test_printable_department_form_renders_branding_and_template_fields(app, cli
             FormFieldOption(field_id=select_field.id, value="crate", label="Crate"),
         ]
     )
-    db.session.add(DepartmentFormAssignment(template_id=template.id, department_name="A"))
+    db.session.add(
+        DepartmentFormAssignment(template_id=template.id, department_name="A")
+    )
     cfg = SiteConfig.get()
     cfg.brand_name = "Acme Field Ops"
     cfg.theme_preset = "moss"

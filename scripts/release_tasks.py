@@ -6,8 +6,8 @@ once per deployment before new instances receive traffic. It will create
 tables (via `db.create_all()`) and run `seed.py` when SSO is not enabled in
 the app config (so demo accounts are present for non-SSO deployments).
 """
-import sys
 import os
+import sys
 
 sys.path.append("/app")
 
@@ -17,10 +17,12 @@ from pathlib import Path
 # Ensure project root is on sys.path so `from app import create_app` works
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import create_app
-import subprocess
-from sqlalchemy import inspect, text
 import json
+import subprocess
+
+from sqlalchemy import inspect, text
+
+from app import create_app
 
 
 def _ensure_quote_sets_ready():
@@ -29,13 +31,18 @@ def _ensure_quote_sets_ready():
     from app.models import SiteConfig
 
     cfg = SiteConfig.get()
-    normalized_sets = SiteConfig.normalize_quote_sets(getattr(cfg, "rolling_quote_sets", None))
+    normalized_sets = SiteConfig.normalize_quote_sets(
+        getattr(cfg, "rolling_quote_sets", None)
+    )
 
     if normalized_sets != (getattr(cfg, "rolling_quote_sets", None) or {}):
         cfg._rolling_quote_sets = json.dumps(normalized_sets)
         print("quote_sets=normalized")
 
-    active = str(getattr(cfg, "active_quote_set", None) or "").strip().lower() or "motivational"
+    active = (
+        str(getattr(cfg, "active_quote_set", None) or "").strip().lower()
+        or "motivational"
+    )
     if active not in normalized_sets or active == "default":
         active = "motivational" if "motivational" in normalized_sets else "default"
         cfg.active_quote_set = active
@@ -46,7 +53,9 @@ def _ensure_quote_sets_ready():
         raise RuntimeError(f"quote sets missing content: {', '.join(sorted(missing))}")
 
     db.session.commit()
-    print(f"quote_sets=ok total={len(normalized_sets)} active={active} active_count={len(normalized_sets.get(active) or [])}")
+    print(
+        f"quote_sets=ok total={len(normalized_sets)} active={active} active_count={len(normalized_sets.get(active) or [])}"
+    )
 
 
 def _default_workflow_spec():
@@ -173,16 +182,14 @@ def main():
                 if "quote_set" not in user_cols:
                     with engine.begin() as conn:
                         conn.execute(
-                            text(
-                                "ALTER TABLE \"user\" ADD COLUMN quote_set VARCHAR(80)"
-                            )
+                            text('ALTER TABLE "user" ADD COLUMN quote_set VARCHAR(80)')
                         )
                     print("schema_fix=user.quote_set_added")
                 if "department_override" not in user_cols:
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN department_override BOOLEAN NOT NULL DEFAULT FALSE"
+                                'ALTER TABLE "user" ADD COLUMN department_override BOOLEAN NOT NULL DEFAULT FALSE'
                             )
                         )
                     print("schema_fix=user.department_override_added")
@@ -190,7 +197,7 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN totp_secret VARCHAR(64)"
+                                'ALTER TABLE "user" ADD COLUMN totp_secret VARCHAR(64)'
                             )
                         )
                     print("schema_fix=user.totp_secret_added")
@@ -198,7 +205,7 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN totp_enabled BOOLEAN NOT NULL DEFAULT FALSE"
+                                'ALTER TABLE "user" ADD COLUMN totp_enabled BOOLEAN NOT NULL DEFAULT FALSE'
                             )
                         )
                     print("schema_fix=user.totp_enabled_added")
@@ -206,7 +213,7 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN vibe_index INTEGER DEFAULT 0"
+                                'ALTER TABLE "user" ADD COLUMN vibe_index INTEGER DEFAULT 0'
                             )
                         )
                     print("schema_fix=user.vibe_index_added")
@@ -214,7 +221,7 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN quotes_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+                                'ALTER TABLE "user" ADD COLUMN quotes_enabled BOOLEAN NOT NULL DEFAULT TRUE'
                             )
                         )
                     print("schema_fix=user.quotes_enabled_added")
@@ -222,7 +229,7 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN vibe_button_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+                                'ALTER TABLE "user" ADD COLUMN vibe_button_enabled BOOLEAN NOT NULL DEFAULT TRUE'
                             )
                         )
                     print("schema_fix=user.vibe_button_enabled_added")
@@ -230,7 +237,7 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN daily_nudge_limit INTEGER NOT NULL DEFAULT 1"
+                                'ALTER TABLE "user" ADD COLUMN daily_nudge_limit INTEGER NOT NULL DEFAULT 1'
                             )
                         )
                     print("schema_fix=user.daily_nudge_limit_added")
@@ -246,7 +253,7 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN preferred_start_department VARCHAR(2)"
+                                'ALTER TABLE "user" ADD COLUMN preferred_start_department VARCHAR(2)'
                             )
                         )
                     print("schema_fix=user.preferred_start_department_added")
@@ -254,7 +261,7 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN watched_departments_json TEXT"
+                                'ALTER TABLE "user" ADD COLUMN watched_departments_json TEXT'
                             )
                         )
                     print("schema_fix=user.watched_departments_json_added")
@@ -270,7 +277,7 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN notification_departments_json TEXT"
+                                'ALTER TABLE "user" ADD COLUMN notification_departments_json TEXT'
                             )
                         )
                     print("schema_fix=user.notification_departments_json_added")
@@ -278,7 +285,7 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN onboarding_guidance_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+                                'ALTER TABLE "user" ADD COLUMN onboarding_guidance_enabled BOOLEAN NOT NULL DEFAULT TRUE'
                             )
                         )
                     print("schema_fix=user.onboarding_guidance_enabled_added")
@@ -286,7 +293,7 @@ def main():
                     with engine.begin() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN backup_approver_user_id INTEGER"
+                                'ALTER TABLE "user" ADD COLUMN backup_approver_user_id INTEGER'
                             )
                         )
                     print("schema_fix=user.backup_approver_user_id_added")
@@ -298,7 +305,7 @@ def main():
                         with engine.begin() as conn:
                             conn.execute(
                                 text(
-                                    "ALTER TABLE \"department\" ADD COLUMN notification_template TEXT"
+                                    'ALTER TABLE "department" ADD COLUMN notification_template TEXT'
                                 )
                             )
                         print("schema_fix=department.notification_template_added")
@@ -306,7 +313,7 @@ def main():
                         with engine.begin() as conn:
                             conn.execute(
                                 text(
-                                    "ALTER TABLE \"department\" ADD COLUMN handoff_template_doc_url VARCHAR(500)"
+                                    'ALTER TABLE "department" ADD COLUMN handoff_template_doc_url VARCHAR(500)'
                                 )
                             )
                         print("schema_fix=department.handoff_template_doc_url_added")
@@ -314,10 +321,12 @@ def main():
                         with engine.begin() as conn:
                             conn.execute(
                                 text(
-                                    "ALTER TABLE \"department\" ADD COLUMN handoff_template_checklist_json TEXT"
+                                    'ALTER TABLE "department" ADD COLUMN handoff_template_checklist_json TEXT'
                                 )
                             )
-                        print("schema_fix=department.handoff_template_checklist_json_added")
+                        print(
+                            "schema_fix=department.handoff_template_checklist_json_added"
+                        )
 
                 if "user_department" in insp.get_table_names():
                     ud_cols = {c["name"] for c in insp.get_columns("user_department")}
@@ -369,7 +378,9 @@ def main():
                 )
                 # ensure department_editor has change priority flag
                 if "department_editor" in insp.get_table_names():
-                    dept_cols = {c["name"] for c in insp.get_columns("department_editor")}
+                    dept_cols = {
+                        c["name"] for c in insp.get_columns("department_editor")
+                    }
                     if "can_change_priority" not in dept_cols:
                         with engine.begin() as conn:
                             conn.execute(
@@ -423,7 +434,9 @@ def main():
                                     "ALTER TABLE special_email_config ALTER COLUMN nudge_interval_hours TYPE FLOAT"
                                 )
                             )
-                        print("schema_fix=special_email_config.nudge_interval_hours_float")
+                        print(
+                            "schema_fix=special_email_config.nudge_interval_hours_float"
+                        )
                     except Exception:
                         pass
                 if (
@@ -438,7 +451,9 @@ def main():
                                     "ALTER TABLE special_email_config ALTER COLUMN nudge_min_delay_hours TYPE FLOAT"
                                 )
                             )
-                        print("schema_fix=special_email_config.nudge_min_delay_hours_float")
+                        print(
+                            "schema_fix=special_email_config.nudge_min_delay_hours_float"
+                        )
                     except Exception:
                         pass
                 if (
@@ -549,10 +564,14 @@ def main():
                                     "ALTER TABLE status_option ADD COLUMN notify_to_originator_only BOOLEAN DEFAULT FALSE"
                                 )
                             )
-                        print("schema_fix=status_option.notify_to_originator_only_added")
+                        print(
+                            "schema_fix=status_option.notify_to_originator_only_added"
+                        )
                     except Exception:
                         # Don't fail the whole release on this ALTER; log and continue.
-                        print("schema_fix=status_option.notify_to_originator_only_failed")
+                        print(
+                            "schema_fix=status_option.notify_to_originator_only_failed"
+                        )
 
                 department_cols = (
                     {c["name"] for c in insp.get_columns("department")}
@@ -825,41 +844,81 @@ def main():
                         user_cols = {c["name"] for c in insp.get_columns("user")}
                         if "dark_mode" not in user_cols:
                             with engine.begin() as conn:
-                                conn.execute(text('ALTER TABLE "user" ADD COLUMN dark_mode BOOLEAN DEFAULT FALSE'))
+                                conn.execute(
+                                    text(
+                                        'ALTER TABLE "user" ADD COLUMN dark_mode BOOLEAN DEFAULT FALSE'
+                                    )
+                                )
                             print("schema_fix=user.dark_mode_added")
                         if "quotes_enabled" not in user_cols:
                             with engine.begin() as conn:
-                                conn.execute(text('ALTER TABLE "user" ADD COLUMN quotes_enabled BOOLEAN NOT NULL DEFAULT TRUE'))
+                                conn.execute(
+                                    text(
+                                        'ALTER TABLE "user" ADD COLUMN quotes_enabled BOOLEAN NOT NULL DEFAULT TRUE'
+                                    )
+                                )
                             print("schema_fix=user.quotes_enabled_added_late")
                         if "vibe_button_enabled" not in user_cols:
                             with engine.begin() as conn:
-                                conn.execute(text('ALTER TABLE "user" ADD COLUMN vibe_button_enabled BOOLEAN NOT NULL DEFAULT TRUE'))
+                                conn.execute(
+                                    text(
+                                        'ALTER TABLE "user" ADD COLUMN vibe_button_enabled BOOLEAN NOT NULL DEFAULT TRUE'
+                                    )
+                                )
                             print("schema_fix=user.vibe_button_enabled_added_late")
                 except Exception:
                     # Don't fail the whole release if this ALTER can't be run;
                     # downstream steps will surface the error and be logged.
                     pass
                 if "guest_form" in insp.get_table_names():
-                    guest_form_cols = {c["name"] for c in insp.get_columns("guest_form")}
+                    guest_form_cols = {
+                        c["name"] for c in insp.get_columns("guest_form")
+                    }
                     if "access_policy" not in guest_form_cols:
                         with engine.begin() as conn:
-                            conn.execute(text("ALTER TABLE guest_form ADD COLUMN access_policy VARCHAR(40) DEFAULT 'public'"))
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE guest_form ADD COLUMN access_policy VARCHAR(40) DEFAULT 'public'"
+                                )
+                            )
                             try:
-                                conn.execute(text("UPDATE guest_form SET access_policy='sso_linked' WHERE require_sso = TRUE"))
+                                conn.execute(
+                                    text(
+                                        "UPDATE guest_form SET access_policy='sso_linked' WHERE require_sso = TRUE"
+                                    )
+                                )
                             except Exception:
-                                conn.execute(text("UPDATE guest_form SET access_policy='sso_linked' WHERE require_sso = 1"))
+                                conn.execute(
+                                    text(
+                                        "UPDATE guest_form SET access_policy='sso_linked' WHERE require_sso = 1"
+                                    )
+                                )
                         print("schema_fix=guest_form.access_policy_added")
                     if "allowed_email_domains" not in guest_form_cols:
                         with engine.begin() as conn:
-                            conn.execute(text("ALTER TABLE guest_form ADD COLUMN allowed_email_domains TEXT"))
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE guest_form ADD COLUMN allowed_email_domains TEXT"
+                                )
+                            )
                         print("schema_fix=guest_form.allowed_email_domains_added")
                     if "credential_requirements_json" not in guest_form_cols:
                         with engine.begin() as conn:
-                            conn.execute(text("ALTER TABLE guest_form ADD COLUMN credential_requirements_json TEXT"))
-                        print("schema_fix=guest_form.credential_requirements_json_added")
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE guest_form ADD COLUMN credential_requirements_json TEXT"
+                                )
+                            )
+                        print(
+                            "schema_fix=guest_form.credential_requirements_json_added"
+                        )
                     if "layout" not in guest_form_cols:
                         with engine.begin() as conn:
-                            conn.execute(text("ALTER TABLE guest_form ADD COLUMN layout VARCHAR(20) DEFAULT 'standard'"))
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE guest_form ADD COLUMN layout VARCHAR(20) DEFAULT 'standard'"
+                                )
+                            )
                         print("schema_fix=guest_form.layout_added")
                 # Ensure request table has expected columns from recent releases.
                 req_cols = set()
@@ -885,26 +944,48 @@ def main():
                         req_cols.add("workflow_id")
 
                 if "integration_event" in insp.get_table_names():
-                    event_cols = {c["name"] for c in insp.get_columns("integration_event")}
+                    event_cols = {
+                        c["name"] for c in insp.get_columns("integration_event")
+                    }
                     if "provider_key" not in event_cols:
                         with engine.begin() as conn:
-                            conn.execute(text("ALTER TABLE integration_event ADD COLUMN provider_key VARCHAR(80)"))
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE integration_event ADD COLUMN provider_key VARCHAR(80)"
+                                )
+                            )
                         print("schema_fix=integration_event.provider_key_added")
                     if "correlation_id" not in event_cols:
                         with engine.begin() as conn:
-                            conn.execute(text("ALTER TABLE integration_event ADD COLUMN correlation_id VARCHAR(120)"))
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE integration_event ADD COLUMN correlation_id VARCHAR(120)"
+                                )
+                            )
                         print("schema_fix=integration_event.correlation_id_added")
                     if "retry_count" not in event_cols:
                         with engine.begin() as conn:
-                            conn.execute(text("ALTER TABLE integration_event ADD COLUMN retry_count INTEGER DEFAULT 0"))
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE integration_event ADD COLUMN retry_count INTEGER DEFAULT 0"
+                                )
+                            )
                         print("schema_fix=integration_event.retry_count_added")
                     if "last_attempt_at" not in event_cols:
                         with engine.begin() as conn:
-                            conn.execute(text("ALTER TABLE integration_event ADD COLUMN last_attempt_at TIMESTAMP"))
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE integration_event ADD COLUMN last_attempt_at TIMESTAMP"
+                                )
+                            )
                         print("schema_fix=integration_event.last_attempt_at_added")
                     if "next_retry_at" not in event_cols:
                         with engine.begin() as conn:
-                            conn.execute(text("ALTER TABLE integration_event ADD COLUMN next_retry_at TIMESTAMP"))
+                            conn.execute(
+                                text(
+                                    "ALTER TABLE integration_event ADD COLUMN next_retry_at TIMESTAMP"
+                                )
+                            )
                         print("schema_fix=integration_event.next_retry_at_added")
                 # Ensure status_bucket.workflow_id exists when the model expects it
                 if "status_bucket" in insp.get_table_names():
@@ -938,7 +1019,9 @@ def main():
                                     "ALTER TABLE status_option ADD COLUMN executive_approval_required BOOLEAN DEFAULT FALSE"
                                 )
                             )
-                        print("schema_fix=status_option.executive_approval_required_added")
+                        print(
+                            "schema_fix=status_option.executive_approval_required_added"
+                        )
                     if "sales_list_number_required" not in status_cols:
                         with engine.begin() as conn:
                             conn.execute(
@@ -946,7 +1029,9 @@ def main():
                                     "ALTER TABLE status_option ADD COLUMN sales_list_number_required BOOLEAN DEFAULT FALSE"
                                 )
                             )
-                        print("schema_fix=status_option.sales_list_number_required_added")
+                        print(
+                            "schema_fix=status_option.sales_list_number_required_added"
+                        )
                     if "approval_stages_json" not in status_cols:
                         with engine.begin() as conn:
                             conn.execute(
@@ -957,8 +1042,8 @@ def main():
                         print("schema_fix=status_option.approval_stages_json_added")
                 # Ensure a default workflow exists so guest forms have sensible choices
                 try:
-                    from app.models import Workflow
                     from app import db
+                    from app.models import Workflow
 
                     if "workflow" in insp.get_table_names():
                         existing = Workflow.query.filter_by(
@@ -982,8 +1067,11 @@ def main():
                             existing_steps = []
                             if isinstance(existing.spec, dict):
                                 existing_steps = existing.spec.get("steps") or []
-                            if any(isinstance(step, str) for step in existing_steps) or not any(
-                                isinstance(step, dict) and (step.get("from_dept") or step.get("to_dept"))
+                            if any(
+                                isinstance(step, str) for step in existing_steps
+                            ) or not any(
+                                isinstance(step, dict)
+                                and (step.get("from_dept") or step.get("to_dept"))
                                 for step in existing_steps
                             ):
                                 existing.spec = spec
@@ -998,6 +1086,7 @@ def main():
                 # if we have any workflows but no status options, bootstrap them
                 try:
                     from app.models import StatusOption
+
                     if (
                         "workflow" in insp.get_table_names()
                         and "status_option" in insp.get_table_names()
@@ -1005,12 +1094,15 @@ def main():
                         # count existing status options using raw SQL to avoid ORM issues
                         count = 0
                         with engine.begin() as conn:
-                            count = conn.execute(text("SELECT count(*) FROM status_option")).scalar()
+                            count = conn.execute(
+                                text("SELECT count(*) FROM status_option")
+                            ).scalar()
                         if count == 0:
                             # iterate workflows via ORM (safe because we've imported models)
                             for wf in Workflow.query.all():
                                 spec = wf.spec or {}
                                 from app.admin.workflows import _normalize_workflow_spec
+
                                 spec = _normalize_workflow_spec(spec, wf.name)
                                 steps = spec.get("steps") or []
                                 for step in steps:

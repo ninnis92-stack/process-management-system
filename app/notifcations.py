@@ -8,19 +8,27 @@ send will be enqueued to RQ so a separate worker can process deliveries.
 Keep the send path idempotent and non-blocking from request handlers.
 """
 
-from .extensions import db
-from .models import FeatureFlags, Notification, User, UserDepartment, SpecialEmailConfig, NotificationRetention
-from .models import DepartmentFormAssignment, FormTemplate
-from flask import current_app, url_for
+import importlib
 from threading import Thread
 from typing import Optional
 
+from flask import current_app, url_for
+from sqlalchemy import and_, or_
+from sqlalchemy.orm import joinedload, sessionmaker
+
+from .extensions import db
+from .models import (
+    DepartmentFormAssignment,
+    FeatureFlags,
+    FormTemplate,
+    Notification,
+    NotificationRetention,
+    SpecialEmailConfig,
+    User,
+    UserDepartment,
+)
 from .services.emailer import EmailService
 from .services.job_dispatcher import run_job
-import importlib
-from sqlalchemy import and_, or_
-from sqlalchemy.orm import joinedload
-from sqlalchemy.orm import sessionmaker
 
 # Use importlib to import optional dependencies at runtime. Add explicit Pylance
 # suppression on the dynamic import calls so editors that don't have the optional
@@ -62,7 +70,9 @@ def _send_notification_fanout_async(notification_entries, request_id=None):
         return
 
     rq_enabled = bool(app.config.get("RQ_ENABLED", False)) if app else False
-    redis_url = (app.config.get("REDIS_URL") or app.config.get("RQ_REDIS_URL")) if app else None
+    redis_url = (
+        (app.config.get("REDIS_URL") or app.config.get("RQ_REDIS_URL")) if app else None
+    )
 
     if rq_enabled and redis_url and fanout_notifications_task:
         try:
@@ -72,7 +82,9 @@ def _send_notification_fanout_async(notification_entries, request_id=None):
             return
         except Exception:
             try:
-                _current.logger.exception("Failed to enqueue notification fan-out job; falling back to thread")
+                _current.logger.exception(
+                    "Failed to enqueue notification fan-out job; falling back to thread"
+                )
             except Exception:
                 pass
 
@@ -87,7 +99,10 @@ def _send_notification_fanout_async(notification_entries, request_id=None):
                     notification_entries,
                     request_id=request_id,
                     queue_name="notifications",
-                    payload={"recipient_count": len(notification_entries or []), "request_id": request_id},
+                    payload={
+                        "recipient_count": len(notification_entries or []),
+                        "request_id": request_id,
+                    },
                 )
             except Exception:
                 _current.logger.exception("Notification fan-out failed")
@@ -117,7 +132,10 @@ def users_in_department(dept: str):
         User.query.options(joinedload(User.departments))
         .outerjoin(
             UserDepartment,
-            and_(UserDepartment.user_id == User.id, UserDepartment.department == normalized),
+            and_(
+                UserDepartment.user_id == User.id,
+                UserDepartment.department == normalized,
+            ),
         )
         .filter(User.is_active.is_(True))
         .filter(
@@ -144,13 +162,19 @@ def users_in_department(dept: str):
         .order_by(User.email.asc())
         .all()
     )
-    candidates = list(assignment_candidates) + list(routed_candidates) + list(watched_candidates)
+    candidates = (
+        list(assignment_candidates) + list(routed_candidates) + list(watched_candidates)
+    )
     recipients = []
     seen = set()
     for user in candidates:
         watched_match = normalized in (getattr(user, "watched_departments", []) or [])
-        primary_match = (getattr(user, "department", "") or "").strip().upper() == normalized
-        routed_match = normalized in (getattr(user, "notification_departments", []) or [])
+        primary_match = (
+            getattr(user, "department", "") or ""
+        ).strip().upper() == normalized
+        routed_match = normalized in (
+            getattr(user, "notification_departments", []) or []
+        )
         assignment_match = any(
             (getattr(assignment, "department", "") or "").strip().upper() == normalized
             and getattr(assignment, "is_active_assignment", True)
@@ -182,7 +206,11 @@ def _notification_recipients(users, title, body=None):
     recipients = []
     seen = set()
     for user in users or []:
-        if not user or not getattr(user, "id", None) or not getattr(user, "is_active", True):
+        if (
+            not user
+            or not getattr(user, "id", None)
+            or not getattr(user, "is_active", True)
+        ):
             continue
         if user.id not in seen:
             recipients.append(
@@ -201,9 +229,17 @@ def _notification_recipients(users, title, body=None):
         backup = getattr(user, "backup_approver", None)
         if not backup or not getattr(backup, "id", None):
             continue
-        if not getattr(backup, "is_active", True) or backup.id == user.id or backup.id in seen:
+        if (
+            not getattr(backup, "is_active", True)
+            or backup.id == user.id
+            or backup.id in seen
+        ):
             continue
-        source_label = getattr(user, "name", None) or getattr(user, "email", None) or "this teammate"
+        source_label = (
+            getattr(user, "name", None)
+            or getattr(user, "email", None)
+            or "this teammate"
+        )
         prefix = f"You received this as backup approver for {source_label}."
         backup_body = prefix if not body else f"{prefix}\n\n{body}"
         recipients.append(
@@ -220,7 +256,9 @@ def _notification_recipients(users, title, body=None):
     return recipients
 
 
-def _send_emails_async(recipients_map, subject=None, body=None, html=None, request_id=None):
+def _send_emails_async(
+    recipients_map, subject=None, body=None, html=None, request_id=None
+):
     """Send emails in background.
 
     recipients_map: dict mapping email -> user_id (legacy) or payload dict
@@ -283,6 +321,7 @@ def _send_emails_async(recipients_map, subject=None, body=None, html=None, reque
             return
 
         with app.app_context():
+
             def _deliver_email_job():
                 svc = EmailService()
                 skipped = []
@@ -312,7 +351,11 @@ def _send_emails_async(recipients_map, subject=None, body=None, html=None, reque
                         try:
                             for e in skipped:
                                 payload = recipients_map.get(e) or {}
-                                uid = payload.get("user_id") if isinstance(payload, dict) else payload
+                                uid = (
+                                    payload.get("user_id")
+                                    if isinstance(payload, dict)
+                                    else payload
+                                )
                                 if uid:
                                     session.add(
                                         Notification(
@@ -329,7 +372,11 @@ def _send_emails_async(recipients_map, subject=None, body=None, html=None, reque
 
                             if error:
                                 for e, payload in recipients_map.items():
-                                    uid = payload.get("user_id") if isinstance(payload, dict) else payload
+                                    uid = (
+                                        payload.get("user_id")
+                                        if isinstance(payload, dict)
+                                        else payload
+                                    )
                                     if uid:
                                         session.add(
                                             Notification(
@@ -370,7 +417,8 @@ def _send_emails_async(recipients_map, subject=None, body=None, html=None, reque
                     payload={
                         "request_id": request_id,
                         "recipient_count": len(recipients_map or {}),
-                        "subject": subject or next(
+                        "subject": subject
+                        or next(
                             (
                                 payload.get("subject")
                                 for payload in (recipients_map or {}).values()
@@ -419,7 +467,9 @@ def notify_users(
     notification_entries = []
 
     try:
-        fanout_threshold = int(current_app.config.get("NOTIFICATION_FANOUT_ASYNC_THRESHOLD", 50) or 50)
+        fanout_threshold = int(
+            current_app.config.get("NOTIFICATION_FANOUT_ASYNC_THRESHOLD", 50) or 50
+        )
     except Exception:
         fanout_threshold = 50
 
@@ -458,7 +508,11 @@ def notify_users(
                 "user_id": u.id,
                 "email": getattr(u, "email", None),
                 "title": resolved_title,
-                "body": (resolved_body or "") + ("\n\n" + url if url else "") if email_enabled and getattr(u, "email", None) and allow_email else resolved_body,
+                "body": (
+                    (resolved_body or "") + ("\n\n" + url if url else "")
+                    if email_enabled and getattr(u, "email", None) and allow_email
+                    else resolved_body
+                ),
                 "url": url,
                 "type": ntype,
                 "allow_email": allow_email,
@@ -505,10 +559,16 @@ def notify_users(
     # session so the caller's commit will persist the removals.
     try:
         for entry in notification_entries:
-            u = type("NotificationUser", (), {"id": entry["user_id"], "email": entry.get("email")})
+            u = type(
+                "NotificationUser",
+                (),
+                {"id": entry["user_id"], "email": entry.get("email")},
+            )
             # only enforce for users that will have DB rows (email-disabled or no email)
             has_email = bool(getattr(u, "email", None))
-            if (email_enabled and has_email and entry.get("allow_email", True)) or not in_app_notifications_enabled:
+            if (
+                email_enabled and has_email and entry.get("allow_email", True)
+            ) or not in_app_notifications_enabled:
                 continue
             count = Notification.query.filter_by(user_id=u.id).count()
             if count > max_per_user:
@@ -697,7 +757,11 @@ def send_request_link_email(recipients: list[str], request_obj) -> bool:
     if not recipients:
         return False
     try:
-        link = url_for("requests.request_detail", request_id=getattr(request_obj, "id", None), _external=True)
+        link = url_for(
+            "requests.request_detail",
+            request_id=getattr(request_obj, "id", None),
+            _external=True,
+        )
     except Exception:
         link = None
     subject = f"Request #{getattr(request_obj, 'id', '')} created"

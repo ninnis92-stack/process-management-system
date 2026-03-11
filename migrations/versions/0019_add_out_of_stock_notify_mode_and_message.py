@@ -5,9 +5,8 @@ Revises: 0018_add_out_of_stock_notify_toggle
 Create Date: 2026-03-05 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0019_add_out_of_stock_notify_mode_and_message"

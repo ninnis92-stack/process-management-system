@@ -5,9 +5,9 @@ This script imports the Flask app and performs a trivial DB query in a loop
 until it succeeds or a timeout is reached. It's intended for use from
 `scripts/entrypoint.sh` so container startup can wait until the DB is usable.
 """
-import time
 import argparse
 import sys
+import time
 from pathlib import Path
 
 # Ensure repository root is on sys.path so `from app import create_app` works
@@ -15,9 +15,10 @@ from pathlib import Path
 repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(repo_root))
 
+from sqlalchemy import text
+
 from app import create_app
 from app.extensions import db
-from sqlalchemy import text
 
 
 def wait(timeout: int = 30, interval: float = 1.0) -> int:

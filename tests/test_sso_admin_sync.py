@@ -1,4 +1,4 @@
-from app.auth.sso import sso_user_is_admin, token_has_mfa, sso_user_department
+from app.auth.sso import sso_user_department, sso_user_is_admin, token_has_mfa
 
 
 def test_sso_admin_sync_from_group_claim():

@@ -1,17 +1,12 @@
+from datetime import datetime, timedelta
+
 import pytest
+
 from app import create_app
 from app.extensions import db
-from app.models import (
-    User,
-    Request as ReqModel,
-    Notification,
-    SpecialEmailConfig,
-    FeatureFlags,
-    StatusOption,
-    StatusBucket,
-    BucketStatus,
-)
-from datetime import datetime, timedelta
+from app.models import BucketStatus, FeatureFlags, Notification
+from app.models import Request as ReqModel
+from app.models import SpecialEmailConfig, StatusBucket, StatusOption, User
 from app.notifications.due import send_high_priority_nudges
 
 
@@ -32,6 +27,8 @@ def app():
     with app.app_context():
         db.create_all()
     yield app
+
+
 def test_send_nudges_creates_notification(app):
     """Basic smoke tests around automated nudges.
 

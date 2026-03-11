@@ -4,11 +4,12 @@ import json
 from datetime import datetime, timedelta
 
 from app.extensions import db
-from app.models import SpecialEmailConfig, Request as ReqModel, User
+from app.models import DepartmentFormAssignment, FormField, FormTemplate
+from app.models import Request as ReqModel
+from app.models import SpecialEmailConfig, User
 
 # reuse helpers from site navigation tests for login
 from tests.test_site_navigation import _create_user, _login
-from app.models import FormTemplate, FormField, DepartmentFormAssignment
 
 
 def _sig(secret: str, payload: bytes) -> str:
@@ -113,7 +114,9 @@ def test_inbound_mail_creates_user_request_for_sso_sender(app, client):
         assert getattr(req, "watcher_emails", None) in (None, [])
 
 
-def test_inbound_mail_records_original_sender_and_notifies_watchers(app, client, monkeypatch):
+def test_inbound_mail_records_original_sender_and_notifies_watchers(
+    app, client, monkeypatch
+):
     secret = "test-secret"
     app.config["WEBHOOK_SHARED_SECRET"] = secret
 
@@ -130,7 +133,10 @@ def test_inbound_mail_records_original_sender_and_notifies_watchers(app, client,
         cfg.enabled = True
         cfg.request_form_email = "requests@example.com"
         cfg.request_form_add_original_sender = True
-        cfg.request_form_default_watchers = ["watcher1@example.com", "watcher2@example.com"]
+        cfg.request_form_default_watchers = [
+            "watcher1@example.com",
+            "watcher2@example.com",
+        ]
         db.session.commit()
 
     payload = {
@@ -152,7 +158,11 @@ def test_inbound_mail_records_original_sender_and_notifies_watchers(app, client,
     with app.app_context():
         req = db.session.get(ReqModel, data["created_request_id"])
         assert req.original_sender == "orig@sender.com"
-        assert set(req.watcher_emails or []) == {"watcher1@example.com", "watcher2@example.com", "orig@sender.com"}
+        assert set(req.watcher_emails or []) == {
+            "watcher1@example.com",
+            "watcher2@example.com",
+            "orig@sender.com",
+        }
     # ensure notification emails were sent to all watchers
     assert any("watcher1@example.com" in e["to"] for e in sent_emails)
     assert any("orig@sender.com" in e["to"] for e in sent_emails)
@@ -390,8 +400,6 @@ def test_out_of_stock_email_only_mode_uses_custom_message(monkeypatch, app, clie
     assert calls["notify"] == 0
     assert calls["email"] == 1
     assert calls["message"] == "Custom OOS message:\n{out_of_stock_fields}"
-
-
 
 
 def test_inbound_mail_uses_sso_owner_email_when_inbox_not_set(app, client):

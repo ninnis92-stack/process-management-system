@@ -1,11 +1,19 @@
-from flask import Blueprint, jsonify, redirect, url_for, request, current_app, render_template
-from flask_login import login_required, current_user
-from ..extensions import db
-from ..models import Notification
-from ..models import NotificationRetention
-from ..models import FeatureFlags
-from sqlalchemy import or_
 from datetime import datetime, timedelta
+
+from flask import (
+    Blueprint,
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+from flask_login import current_user, login_required
+from sqlalchemy import or_
+
+from ..extensions import db
+from ..models import FeatureFlags, Notification, NotificationRetention
 
 notifications_bp = Blueprint("notifications", __name__, url_prefix="/notifications")
 

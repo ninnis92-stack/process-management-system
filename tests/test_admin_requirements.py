@@ -1,6 +1,8 @@
 import io
+
 from werkzeug.security import generate_password_hash
-from app.models import User, FormTemplate, FormField, DepartmentFormAssignment
+
+from app.models import DepartmentFormAssignment, FormField, FormTemplate, User
 
 
 def test_admin_requirement_builder_ui_and_save(app, client):
@@ -55,12 +57,12 @@ def test_admin_requirement_builder_ui_and_save(app, client):
     rv = client.get(f"/admin/fields/{dependent.id}/requirements")
     assert rv.status_code == 200
     assert b'id="requirementBuilder"' in rv.data
-    assert b'Field: Trigger Field' in rv.data
+    assert b"Field: Trigger Field" in rv.data
 
     rv_grouped = client.get(f"/admin/templates/{template_id}/fields")
     assert rv_grouped.status_code == 200
-    assert b'admin-field-group' in rv_grouped.data
-    assert b'Ungrouped fields' in rv_grouped.data
+    assert b"admin-field-group" in rv_grouped.data
+    assert b"Ungrouped fields" in rv_grouped.data
 
     # POST a simple rule using the hidden JSON field (simulating builder output)
     rv2 = client.post(
@@ -70,7 +72,7 @@ def test_admin_requirement_builder_ui_and_save(app, client):
             "scope": "field",
             "mode": "all",
             "message": "Required when trigger is filled.",
-            "rules_json": "[{\"source_type\": \"field\", \"source\": \"trigger_field\", \"operator\": \"populated\"}]",
+            "rules_json": '[{"source_type": "field", "source": "trigger_field", "operator": "populated"}]',
         },
         follow_redirects=True,
     )
@@ -79,12 +81,13 @@ def test_admin_requirement_builder_ui_and_save(app, client):
 
     # the DB record should now reflect the rule config
     dep = db.session.get(FormField, dependent.id)
-    assert dep.requirement_rules and dep.requirement_rules.get('enabled')
-    assert dep.requirement_rules.get('rules')[0]['operator'] == 'populated'
+    assert dep.requirement_rules and dep.requirement_rules.get("enabled")
+    assert dep.requirement_rules.get("rules")[0]["operator"] == "populated"
 
 
 def test_template_layout_persistence_and_api(app, client):
     import importlib
+
     import api.index as api_index
 
     # create admin user
@@ -106,7 +109,9 @@ def test_template_layout_persistence_and_api(app, client):
         follow_redirects=True,
     )
     # create a template with non-default layout
-    t = FormTemplate(name="LayoutTemplate", description="Layout test", layout="spacious")
+    t = FormTemplate(
+        name="LayoutTemplate", description="Layout test", layout="spacious"
+    )
     db.session.add(t)
     db.session.commit()
     with app.test_client() as api_client:
@@ -119,7 +124,9 @@ def test_template_layout_persistence_and_api(app, client):
         rv = api.get("/api/v1/templates", headers=headers)
         data = rv.get_json()
         # find our template
-        found = next((x for x in data.get("templates", []) if x.get("id") == t.id), None)
+        found = next(
+            (x for x in data.get("templates", []) if x.get("id") == t.id), None
+        )
         assert found is not None
         assert found.get("layout") == "spacious"
 

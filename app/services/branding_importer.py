@@ -1,18 +1,17 @@
 from __future__ import annotations
 
+import os
+import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from io import BytesIO
 from pathlib import Path
 from typing import Iterable
 from urllib.parse import urljoin, urlparse
-import os
-import re
 
 import requests
 from PIL import Image, UnidentifiedImageError
 from werkzeug.utils import secure_filename
-
 
 THEME_SWATCHES = {
     "default": "#4f8cff",
@@ -50,7 +49,11 @@ class _BrandingHTMLParser(HTMLParser):
         if tag == "title":
             self._in_title = True
         elif tag == "meta":
-            key = (attrs_map.get("property") or attrs_map.get("name") or "").strip().lower()
+            key = (
+                (attrs_map.get("property") or attrs_map.get("name") or "")
+                .strip()
+                .lower()
+            )
             val = (attrs_map.get("content") or "").strip()
             if key and val:
                 self.meta[key] = val
@@ -69,13 +72,17 @@ class _BrandingHTMLParser(HTMLParser):
 
     @property
     def title(self) -> str:
-        return " ".join(part.strip() for part in self.title_parts if part and part.strip()).strip()
+        return " ".join(
+            part.strip() for part in self.title_parts if part and part.strip()
+        ).strip()
 
 
 def _normalize_url(url: str) -> str:
     parsed = urlparse((url or "").strip())
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise BrandingImportError("Enter a valid website URL starting with http:// or https://")
+        raise BrandingImportError(
+            "Enter a valid website URL starting with http:// or https://"
+        )
     clean = parsed._replace(fragment="")
     return clean.geturl()
 
@@ -97,7 +104,7 @@ def _hex_to_rgb(value: str) -> tuple[int, int, int] | None:
         raw = "".join(ch * 2 for ch in raw)
     if len(raw) != 6 or not re.fullmatch(r"[0-9a-fA-F]{6}", raw):
         return None
-    return tuple(int(raw[idx:idx + 2], 16) for idx in (0, 2, 4))
+    return tuple(int(raw[idx : idx + 2], 16) for idx in (0, 2, 4))
 
 
 def _closest_theme_preset(color: str | None) -> str | None:
@@ -135,7 +142,12 @@ def _candidate_logo_urls(parser: _BrandingHTMLParser, source_url: str) -> list[s
 
     def _image_score(image: dict[str, str]) -> int:
         haystack = " ".join(
-            [image.get("alt", ""), image.get("class", ""), image.get("id", ""), image.get("src", "")]
+            [
+                image.get("alt", ""),
+                image.get("class", ""),
+                image.get("id", ""),
+                image.get("src", ""),
+            ]
         ).lower()
         score = 0
         if "logo" in haystack:
@@ -193,11 +205,17 @@ def _is_safe_image_bytes(data: bytes, extension: str) -> bool:
 def _download_logo(candidate_urls: Iterable[str], *, static_folder: str) -> str | None:
     for candidate in candidate_urls:
         try:
-            response = requests.get(candidate, timeout=8, headers={"User-Agent": "FreshProcess Branding Importer/1.0"})
+            response = requests.get(
+                candidate,
+                timeout=8,
+                headers={"User-Agent": "FreshProcess Branding Importer/1.0"},
+            )
             response.raise_for_status()
         except requests.RequestException:
             continue
-        extension = _safe_logo_extension(response.headers.get("Content-Type"), candidate)
+        extension = _safe_logo_extension(
+            response.headers.get("Content-Type"), candidate
+        )
         if not extension:
             continue
         content = response.content or b""
@@ -208,7 +226,10 @@ def _download_logo(candidate_urls: Iterable[str], *, static_folder: str) -> str 
         rel_dir = Path("uploads") / "branding"
         abs_dir = Path(static_folder) / rel_dir
         abs_dir.mkdir(parents=True, exist_ok=True)
-        safe_base = secure_filename(Path(urlparse(candidate).path).stem or "imported_logo") or "imported_logo"
+        safe_base = (
+            secure_filename(Path(urlparse(candidate).path).stem or "imported_logo")
+            or "imported_logo"
+        )
         filename = f"{safe_base[:40]}_imported{extension}"
         target = abs_dir / filename
         counter = 1
@@ -224,10 +245,16 @@ def _download_logo(candidate_urls: Iterable[str], *, static_folder: str) -> str 
 def import_branding_from_url(url: str, *, static_folder: str) -> ImportedBranding:
     source_url = _normalize_url(url)
     try:
-        response = requests.get(source_url, timeout=8, headers={"User-Agent": "FreshProcess Branding Importer/1.0"})
+        response = requests.get(
+            source_url,
+            timeout=8,
+            headers={"User-Agent": "FreshProcess Branding Importer/1.0"},
+        )
         response.raise_for_status()
     except requests.RequestException as exc:
-        raise BrandingImportError("Unable to fetch the website for branding import") from exc
+        raise BrandingImportError(
+            "Unable to fetch the website for branding import"
+        ) from exc
 
     content_type = (response.headers.get("Content-Type") or "").lower()
     if "html" not in content_type and "xml" not in content_type and not response.text:
@@ -255,7 +282,9 @@ def import_branding_from_url(url: str, *, static_folder: str) -> ImportedBrandin
             canonical = urljoin(source_url, href)
             break
 
-    logo_filename = _download_logo(_candidate_logo_urls(parser, source_url), static_folder=static_folder)
+    logo_filename = _download_logo(
+        _candidate_logo_urls(parser, source_url), static_folder=static_folder
+    )
     return ImportedBranding(
         brand_name=brand_name,
         company_url=_normalize_url(canonical or source_url),

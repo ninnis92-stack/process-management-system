@@ -1,6 +1,6 @@
 import importlib.util
-from pathlib import Path
 import re
+from pathlib import Path
 
 from app.extensions import db
 from app.models import SiteConfig
@@ -20,7 +20,9 @@ def test_release_task_normalizes_quote_sets_and_repairs_active_set(app):
 
     with app.app_context():
         cfg = SiteConfig.get()
-        cfg._rolling_quote_sets = '{"default": [], "engineering": ["Ship it."], "motivational": []}'
+        cfg._rolling_quote_sets = (
+            '{"default": [], "engineering": ["Ship it."], "motivational": []}'
+        )
         cfg.active_quote_set = "unknown"
         db.session.commit()
 
@@ -42,12 +44,17 @@ def test_builtin_quote_sets_use_themed_padding_instead_of_placeholders():
     for name, quotes in SiteConfig.DEFAULT_QUOTE_SETS.items():
         assert len(quotes) == 30
         assert not any(
-            re.fullmatch(rf"{re.escape(str(name))} quote \d+", str(quote), re.IGNORECASE)
+            re.fullmatch(
+                rf"{re.escape(str(name))} quote \d+", str(quote), re.IGNORECASE
+            )
             for quote in quotes
         )
 
     assert "chores" in SiteConfig.DEFAULT_QUOTE_SETS
-    assert any("dish" in quote.lower() or "counter" in quote.lower() for quote in SiteConfig.DEFAULT_QUOTE_SETS["chores"])
+    assert any(
+        "dish" in quote.lower() or "counter" in quote.lower()
+        for quote in SiteConfig.DEFAULT_QUOTE_SETS["chores"]
+    )
 
 
 def test_release_task_keeps_custom_quote_sets_with_content(app):
@@ -55,7 +62,9 @@ def test_release_task_keeps_custom_quote_sets_with_content(app):
 
     with app.app_context():
         cfg = SiteConfig.get()
-        cfg._rolling_quote_sets = '{"custom": ["Own the day."], "default": ["Custom default."]}'
+        cfg._rolling_quote_sets = (
+            '{"custom": ["Own the day."], "default": ["Custom default."]}'
+        )
         cfg.active_quote_set = "custom"
         db.session.commit()
 
@@ -71,30 +80,36 @@ def test_release_task_keeps_custom_quote_sets_with_content(app):
         assert default[0] == "Custom default."
         assert len(default) == 30
 
+
 def test_release_task_adds_company_url_column(app):
     # simulate legacy schema missing the company_url column and run main()
     module = _load_release_tasks_module()
     from sqlalchemy import inspect, text
+
     from app import db
 
     with app.app_context():
         engine = db.engine
         insp = inspect(engine)
-        cols = {c['name'] for c in insp.get_columns('site_config')}
-        if 'company_url' in cols:
+        cols = {c["name"] for c in insp.get_columns("site_config")}
+        if "company_url" in cols:
             with engine.begin() as conn:
                 # sqlite doesn't support drop column easily; instead recreate table
-                conn.execute(text('ALTER TABLE site_config RENAME TO site_config_old'))
+                conn.execute(text("ALTER TABLE site_config RENAME TO site_config_old"))
                 # recreate minimal schema without company_url
-                conn.execute(text('CREATE TABLE site_config (id INTEGER PRIMARY KEY)'))
-                conn.execute(text('INSERT INTO site_config(id) SELECT id FROM site_config_old'))
-                conn.execute(text('DROP TABLE site_config_old'))
+                conn.execute(text("CREATE TABLE site_config (id INTEGER PRIMARY KEY)"))
+                conn.execute(
+                    text("INSERT INTO site_config(id) SELECT id FROM site_config_old")
+                )
+                conn.execute(text("DROP TABLE site_config_old"))
         # ensure it's gone
         insp2 = inspect(engine)
-        assert 'company_url' not in {c['name'] for c in insp2.get_columns('site_config')}
+        assert "company_url" not in {
+            c["name"] for c in insp2.get_columns("site_config")
+        }
 
         # run main which should trigger schema safety net
         module.main()
 
         insp3 = inspect(engine)
-        assert 'company_url' in {c['name'] for c in insp3.get_columns('site_config')}
+        assert "company_url" in {c["name"] for c in insp3.get_columns("site_config")}

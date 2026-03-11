@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
+import requests
 from flask import current_app
 from flask_login import current_user
-import requests
 
 from ..models import IntegrationConfig
 from .integrations import normalize_integration_config
@@ -40,9 +40,33 @@ def _truthy(value: Any) -> Optional[bool]:
     if isinstance(value, (int, float)):
         return value != 0
     text = str(value).strip().lower()
-    if text in {"1", "true", "yes", "y", "ok", "valid", "exists", "found", "available", "pass", "passed"}:
+    if text in {
+        "1",
+        "true",
+        "yes",
+        "y",
+        "ok",
+        "valid",
+        "exists",
+        "found",
+        "available",
+        "pass",
+        "passed",
+    }:
         return True
-    if text in {"0", "false", "no", "n", "invalid", "missing", "not_found", "error", "fail", "failed", "unavailable"}:
+    if text in {
+        "0",
+        "false",
+        "no",
+        "n",
+        "invalid",
+        "missing",
+        "not_found",
+        "error",
+        "fail",
+        "failed",
+        "unavailable",
+    }:
         return False
     return None
 
@@ -146,7 +170,9 @@ class VerificationService:
             pass
         return None
 
-    def _load_verification_config(self, options: Optional[Dict[str, Any]]) -> tuple[Optional[IntegrationConfig], Optional[Dict[str, Any]]]:
+    def _load_verification_config(
+        self, options: Optional[Dict[str, Any]]
+    ) -> tuple[Optional[IntegrationConfig], Optional[Dict[str, Any]]]:
         dept = self._resolve_department(options)
         query = IntegrationConfig.query.filter_by(kind="verification", enabled=True)
         if dept:
@@ -174,7 +200,10 @@ class VerificationService:
         lowered_value = normalized_value.lower()
         normalized_key = (external_key or "").strip().lower()
 
-        allowed_keys = [item.lower() for item in _coerce_list(rule.get("external_keys") or rule.get("fields"))]
+        allowed_keys = [
+            item.lower()
+            for item in _coerce_list(rule.get("external_keys") or rule.get("fields"))
+        ]
         if allowed_keys and normalized_key not in allowed_keys:
             return False
 
@@ -183,7 +212,9 @@ class VerificationService:
             for key, expected in option_matches.items():
                 actual = options.get(key)
                 if isinstance(expected, list):
-                    normalized_expected = {str(item).strip().lower() for item in expected}
+                    normalized_expected = {
+                        str(item).strip().lower() for item in expected
+                    }
                     if str(actual).strip().lower() not in normalized_expected:
                         return False
                 elif str(actual).strip().lower() != str(expected).strip().lower():
@@ -193,15 +224,28 @@ class VerificationService:
         if equals_any and normalized_value not in equals_any:
             return False
 
-        contains_any = [item.lower() for item in _coerce_list(rule.get("contains") or rule.get("contains_any"))]
+        contains_any = [
+            item.lower()
+            for item in _coerce_list(rule.get("contains") or rule.get("contains_any"))
+        ]
         if contains_any and not any(piece in lowered_value for piece in contains_any):
             return False
 
-        starts_any = [item.lower() for item in _coerce_list(rule.get("starts_with") or rule.get("starts_with_any"))]
-        if starts_any and not any(lowered_value.startswith(piece) for piece in starts_any):
+        starts_any = [
+            item.lower()
+            for item in _coerce_list(
+                rule.get("starts_with") or rule.get("starts_with_any")
+            )
+        ]
+        if starts_any and not any(
+            lowered_value.startswith(piece) for piece in starts_any
+        ):
             return False
 
-        ends_any = [item.lower() for item in _coerce_list(rule.get("ends_with") or rule.get("ends_with_any"))]
+        ends_any = [
+            item.lower()
+            for item in _coerce_list(rule.get("ends_with") or rule.get("ends_with_any"))
+        ]
         if ends_any and not any(lowered_value.endswith(piece) for piece in ends_any):
             return False
 
@@ -249,8 +293,13 @@ class VerificationService:
         )
         matched_rule = None
         for rule in routing.get("rules") or []:
-            if self._rule_matches(rule, external_key=external_key, value=value, options=options):
-                tracker_handle = str(rule.get("tracker") or tracker_handle or "default").strip() or "default"
+            if self._rule_matches(
+                rule, external_key=external_key, value=value, options=options
+            ):
+                tracker_handle = (
+                    str(rule.get("tracker") or tracker_handle or "default").strip()
+                    or "default"
+                )
                 matched_rule = rule
                 break
 
@@ -261,11 +310,17 @@ class VerificationService:
                 selected = trackers.get("default")
             if selected is None:
                 tracker_handle, selected = next(iter(trackers.items()))
-            return tracker_handle, _deep_merge(config, selected if isinstance(selected, dict) else {}), matched_rule
+            return (
+                tracker_handle,
+                _deep_merge(config, selected if isinstance(selected, dict) else {}),
+                matched_rule,
+            )
 
         return tracker_handle, config, matched_rule
 
-    def _apply_auth(self, auth_cfg: Dict[str, Any], headers: Dict[str, str], params: Dict[str, Any]) -> None:
+    def _apply_auth(
+        self, auth_cfg: Dict[str, Any], headers: Dict[str, str], params: Dict[str, Any]
+    ) -> None:
         auth_cfg = auth_cfg or {}
         auth_type = (auth_cfg.get("type") or "none").strip().lower()
         token = None
@@ -287,7 +342,9 @@ class VerificationService:
             param_name = auth_cfg.get("param_name") or "api_key"
             params[str(param_name)] = token
 
-    def _normalize_endpoint_url(self, endpoints: Dict[str, Any], tracker_cfg: Dict[str, Any]) -> Optional[str]:
+    def _normalize_endpoint_url(
+        self, endpoints: Dict[str, Any], tracker_cfg: Dict[str, Any]
+    ) -> Optional[str]:
         endpoint = (
             endpoints.get("validate")
             or endpoints.get("lookup")
@@ -309,7 +366,9 @@ class VerificationService:
             return endpoint
         return urljoin(str(base_url).rstrip("/") + "/", endpoint.lstrip("/"))
 
-    def _extract_result(self, payload: Any, response_cfg: Dict[str, Any], *, status_ok: bool) -> tuple[bool, Any, Optional[str]]:
+    def _extract_result(
+        self, payload: Any, response_cfg: Dict[str, Any], *, status_ok: bool
+    ) -> tuple[bool, Any, Optional[str]]:
         response_cfg = response_cfg or {}
         details = _get_nested(payload, response_cfg.get("detail_path"), payload)
         reason = _get_nested(payload, response_cfg.get("reason_path"), None)
@@ -349,7 +408,9 @@ class VerificationService:
         if resolved_ok is None:
             resolved_ok = bool(status_ok)
         if not resolved_ok and not reason:
-            reason = _get_nested(payload, "message", None) or _get_nested(payload, "error", None)
+            reason = _get_nested(payload, "message", None) or _get_nested(
+                payload, "error", None
+            )
         return bool(resolved_ok), details, None if reason is None else str(reason)
 
     def _verify_with_tracker_config(
@@ -375,7 +436,11 @@ class VerificationService:
                 "ok": None,
                 "reason": "disabled",
                 "tracker_handle": tracker_handle,
-                "matched_rule": (matched_rule or {}).get("name") if isinstance(matched_rule, dict) else None,
+                "matched_rule": (
+                    (matched_rule or {}).get("name")
+                    if isinstance(matched_rule, dict)
+                    else None
+                ),
             }
 
         context = {
@@ -385,12 +450,35 @@ class VerificationService:
             **dict(options or {}),
         }
         default_query = {"value": "{value}", "field": "{external_key}"}
-        params = self._render_template_value(request_cfg.get("query_template") or request_cfg.get("query") or default_query, context)
+        params = self._render_template_value(
+            request_cfg.get("query_template")
+            or request_cfg.get("query")
+            or default_query,
+            context,
+        )
         headers = self._render_template_value(request_cfg.get("headers") or {}, context)
-        body = self._render_template_value(request_cfg.get("body_template") or request_cfg.get("body") or {}, context)
-        payload_location = (request_cfg.get("payload_location") or ("query" if (request_cfg.get("method") or "GET").upper() == "GET" else "json")).strip().lower()
+        body = self._render_template_value(
+            request_cfg.get("body_template") or request_cfg.get("body") or {}, context
+        )
+        payload_location = (
+            (
+                request_cfg.get("payload_location")
+                or (
+                    "query"
+                    if (request_cfg.get("method") or "GET").upper() == "GET"
+                    else "json"
+                )
+            )
+            .strip()
+            .lower()
+        )
         method = (request_cfg.get("method") or "GET").strip().upper()
-        timeout = int(request_cfg.get("timeout_seconds") or request_cfg.get("timeout") or tracker_cfg.get("timeout") or 5)
+        timeout = int(
+            request_cfg.get("timeout_seconds")
+            or request_cfg.get("timeout")
+            or tracker_cfg.get("timeout")
+            or 5
+        )
         self._apply_auth(tracker_cfg.get("auth") or {}, headers, params)
 
         request_kwargs: Dict[str, Any] = {
@@ -409,14 +497,20 @@ class VerificationService:
                 payload = resp.json()
             except ValueError:
                 payload = {"raw": resp.text}
-            ok, details, reason = self._extract_result(payload, response_cfg, status_ok=resp.ok)
+            ok, details, reason = self._extract_result(
+                payload, response_cfg, status_ok=resp.ok
+            )
             return {
                 "ok": ok,
                 "details": details,
                 "reason": reason,
                 "tracker_handle": tracker_handle,
                 "tracker_url": url,
-                "matched_rule": (matched_rule or {}).get("name") if isinstance(matched_rule, dict) else None,
+                "matched_rule": (
+                    (matched_rule or {}).get("name")
+                    if isinstance(matched_rule, dict)
+                    else None
+                ),
                 "status_code": resp.status_code,
             }
         except Exception as exc:
@@ -426,7 +520,11 @@ class VerificationService:
                 "error": str(exc),
                 "tracker_handle": tracker_handle,
                 "tracker_url": url,
-                "matched_rule": (matched_rule or {}).get("name") if isinstance(matched_rule, dict) else None,
+                "matched_rule": (
+                    (matched_rule or {}).get("name")
+                    if isinstance(matched_rule, dict)
+                    else None
+                ),
             }
 
     def _verify_with_integration_configs(
@@ -498,7 +596,12 @@ class VerificationService:
             options = dict(options or {})
             options.setdefault("tracker_handle", provider_n.split(":", 1)[1])
             return self._verify_with_integration_configs(key_n, value, options)
-        if provider_n in ("verification", "tracker", "realtime_tracker", "third_party_tracker"):
+        if provider_n in (
+            "verification",
+            "tracker",
+            "realtime_tracker",
+            "third_party_tracker",
+        ):
             return self._verify_with_integration_configs(key_n, value, options)
         if provider_n == "api":
             routed = self._verify_with_integration_configs(key_n, value, options)

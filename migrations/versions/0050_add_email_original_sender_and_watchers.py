@@ -5,8 +5,8 @@ Revises: 0049_add_user_vibe_button_enabled
 Create Date: 2026-03-10 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0050_add_email_original_sender_and_watchers"
@@ -23,7 +23,7 @@ def upgrade():
             "request_form_add_original_sender",
             sa.Boolean(),
             nullable=False,
-            server_default=sa.text('0'),
+            server_default=sa.text("0"),
         ),
     )
     op.add_column(

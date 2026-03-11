@@ -3,8 +3,10 @@
 import argparse
 import os
 import re
-import requests
 from urllib.parse import urljoin
+
+import requests
+
 
 def get_csrf(session, url):
     r = session.get(url, timeout=10)
@@ -15,9 +17,17 @@ def get_csrf(session, url):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", default=os.getenv("SMOKE_BASE_URL") or "https://process-management-prototype-lingering-bush-6175.fly.dev")
-    parser.add_argument("--email", default=os.getenv("SMOKE_ADMIN_EMAIL") or "admin@example.com")
-    parser.add_argument("--password", default=os.getenv("SMOKE_ADMIN_PASSWORD") or "admin123")
+    parser.add_argument(
+        "--url",
+        default=os.getenv("SMOKE_BASE_URL")
+        or "https://process-management-prototype-lingering-bush-6175.fly.dev",
+    )
+    parser.add_argument(
+        "--email", default=os.getenv("SMOKE_ADMIN_EMAIL") or "admin@example.com"
+    )
+    parser.add_argument(
+        "--password", default=os.getenv("SMOKE_ADMIN_PASSWORD") or "admin123"
+    )
     args = parser.parse_args()
     session = requests.Session()
     base = args.url.rstrip("/")

@@ -10,7 +10,14 @@ from ..models import JobRecord
 from .tenant_context import get_current_tenant_id
 
 
-def run_job(job_name: str, handler: Callable[..., Any], *args, queue_name: str = "default", payload: dict | None = None, **kwargs):
+def run_job(
+    job_name: str,
+    handler: Callable[..., Any],
+    *args,
+    queue_name: str = "default",
+    payload: dict | None = None,
+    **kwargs,
+):
     """Persist a job run and execute it synchronously for now.
 
     This gives the app a durable job ledger before a queue backend is wired in.
@@ -33,7 +40,11 @@ def run_job(job_name: str, handler: Callable[..., Any], *args, queue_name: str =
     try:
         result = handler(*args, **kwargs)
         record.status = "completed"
-        record.result_json = result if isinstance(result, dict) else {"result": str(result) if result is not None else ""}
+        record.result_json = (
+            result
+            if isinstance(result, dict)
+            else {"result": str(result) if result is not None else ""}
+        )
         record.finished_at = datetime.utcnow()
         db.session.add(record)
         db.session.commit()

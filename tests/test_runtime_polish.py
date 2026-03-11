@@ -1,11 +1,12 @@
-from werkzeug.security import generate_password_hash
-from unittest.mock import Mock
-import logging
 import json
+import logging
+from unittest.mock import Mock
 
-from app.security import compute_webhook_signature
+from werkzeug.security import generate_password_hash
+
 from app.extensions import db
 from app.models import User
+from app.security import compute_webhook_signature
 from app.services.field_verification import apply_bulk_verification_params
 
 
@@ -35,7 +36,9 @@ def test_ready_endpoint_checks_database_and_emits_request_id(app, client):
     assert payload["components"]["database"]["status"] == "ok"
 
 
-def test_ready_endpoint_returns_503_when_database_is_unavailable(app, client, monkeypatch):
+def test_ready_endpoint_returns_503_when_database_is_unavailable(
+    app, client, monkeypatch
+):
     def _boom(*args, **kwargs):
         raise RuntimeError("db unavailable")
 
@@ -75,7 +78,11 @@ def test_request_logging_includes_request_id_and_path(app, client, caplog):
         response = client.get("/health", headers={"X-Request-ID": "req-log-1"})
 
     assert response.status_code == 200
-    messages = [record for record in caplog.records if record.getMessage() == "request completed"]
+    messages = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "request completed"
+    ]
     assert messages
     record = messages[-1]
     assert getattr(record, "request_id", None) == "req-log-1"
@@ -91,7 +98,11 @@ def test_request_logging_skips_static_paths(app, client, caplog):
         response = client.get("/static/styles.css")
 
     assert response.status_code == 200
-    messages = [record for record in caplog.records if record.getMessage() == "request completed"]
+    messages = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "request completed"
+    ]
     assert not messages
 
 
@@ -132,7 +143,9 @@ def test_guest_lookup_rate_limit_returns_429_after_threshold(app, client):
     assert response2.status_code == 429
 
 
-def test_timestamped_webhook_signature_is_accepted_when_enabled(app, client, monkeypatch):
+def test_timestamped_webhook_signature_is_accepted_when_enabled(
+    app, client, monkeypatch
+):
     app.config["WEBHOOK_SHARED_SECRET"] = "secret-123"
     app.config["WEBHOOK_REQUIRE_TIMESTAMP"] = True
     payload = {"hello": "world"}

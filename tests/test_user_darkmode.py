@@ -1,8 +1,10 @@
 import re
+
 import pytest
+from werkzeug.security import generate_password_hash
+
 from app.extensions import db
 from app.models import User
-from werkzeug.security import generate_password_hash
 
 
 def login(client, email="admin@example.com", password="secret"):

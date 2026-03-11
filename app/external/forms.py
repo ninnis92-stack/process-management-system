@@ -1,8 +1,9 @@
-from flask_wtf import FlaskForm
-from wtforms.fields import DateTimeLocalField
-from wtforms import StringField, TextAreaField, SelectField, BooleanField, IntegerField
-from wtforms.validators import DataRequired, Email, Length, ValidationError, Optional
 from datetime import datetime, timedelta
+
+from flask_wtf import FlaskForm
+from wtforms import BooleanField, IntegerField, SelectField, StringField, TextAreaField
+from wtforms.fields import DateTimeLocalField
+from wtforms.validators import DataRequired, Email, Length, Optional, ValidationError
 
 
 class ExternalNewRequestForm(FlaskForm):

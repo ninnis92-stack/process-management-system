@@ -63,8 +63,9 @@ def test_bulk_role_profile_creates_managed_department_editor(app, client):
         assert row.can_change_priority is True
 
 
-
-def test_temporary_department_assignment_expires_from_available_departments(app, client):
+def test_temporary_department_assignment_expires_from_available_departments(
+    app, client
+):
     _create_user(app, "dept-admin@example.com", is_admin=True)
     user_id = _create_user(app, "loaned-user@example.com", department="A")
 
@@ -74,7 +75,9 @@ def test_temporary_department_assignment_expires_from_available_departments(app,
         data={
             "departments": ["B"],
             "assignment_kind_B": "temporary",
-            "assignment_expires_at_B": (datetime.utcnow() + timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"),
+            "assignment_expires_at_B": (datetime.utcnow() + timedelta(days=2)).strftime(
+                "%Y-%m-%dT%H:%M"
+            ),
             "assignment_note_B": "Finance handoff coverage",
         },
         follow_redirects=True,
@@ -99,13 +102,14 @@ def test_temporary_department_assignment_expires_from_available_departments(app,
     assert dept_resp.get_json()["departments"] == ["A"]
 
 
-
 def test_preferred_department_landing_and_quick_access_links_render(app, client):
     _create_user(app, "landing-admin@example.com", is_admin=True)
     user_id = _create_user(app, "landing-user@example.com", department="A")
 
     with app.app_context():
-        db.session.add(UserDepartment(user_id=user_id, department="B", assignment_kind="shared"))
+        db.session.add(
+            UserDepartment(user_id=user_id, department="B", assignment_kind="shared")
+        )
         user = db.session.get(User, user_id)
         user.preferred_start_page = "dashboard"
         user.preferred_start_department = "B"
@@ -155,7 +159,11 @@ def test_notification_routing_and_backup_approver_receive_alerts(app):
 
         routed.notification_departments = ["A"]
         primary.backup_approver_user_id = backup.id
-        db.session.add(UserDepartment(user_id=borrowed.id, department="A", assignment_kind="shared"))
+        db.session.add(
+            UserDepartment(
+                user_id=borrowed.id, department="A", assignment_kind="shared"
+            )
+        )
         db.session.add_all([primary, routed])
         db.session.commit()
 
@@ -167,16 +175,31 @@ def test_notification_routing_and_backup_approver_receive_alerts(app):
             "backup-alerts@example.com",
         } - {"backup-alerts@example.com"}
 
-        notify_users([primary], "Coverage notice", "Backup should receive this too.", allow_email=False)
+        notify_users(
+            [primary],
+            "Coverage notice",
+            "Backup should receive this too.",
+            allow_email=False,
+        )
         db.session.commit()
 
-        primary_note = Notification.query.filter_by(user_id=primary.id).order_by(Notification.id.desc()).first()
-        backup_note = Notification.query.filter_by(user_id=backup.id).order_by(Notification.id.desc()).first()
+        primary_note = (
+            Notification.query.filter_by(user_id=primary.id)
+            .order_by(Notification.id.desc())
+            .first()
+        )
+        backup_note = (
+            Notification.query.filter_by(user_id=backup.id)
+            .order_by(Notification.id.desc())
+            .first()
+        )
         assert primary_note is not None
         assert backup_note is not None
         assert primary_note.title == "Coverage notice"
         assert backup_note.title == "Coverage notice — backup coverage"
-        assert "backup approver for primary-alerts@example.com" in (backup_note.body or "")
+        assert "backup approver for primary-alerts@example.com" in (
+            backup_note.body or ""
+        )
 
 
 def test_admin_monitored_departments_filter_queue_notifications(app):
@@ -203,7 +226,9 @@ def test_admin_monitored_departments_filter_queue_notifications(app):
 
 
 def test_admin_can_save_notification_routing_and_backup_approver(app, client):
-    admin_id = _create_user(app, "coverage-admin@example.com", is_admin=True, department="B")
+    admin_id = _create_user(
+        app, "coverage-admin@example.com", is_admin=True, department="B"
+    )
     user_id = _create_user(app, "coverage-user@example.com", department="A")
     backup_id = _create_user(app, "coverage-backup@example.com", department="B")
 
@@ -290,7 +315,9 @@ def test_dynamic_department_choices_and_handoff_package_render(app, client):
         data={
             "departments": ["X"],
             "assignment_kind_X": "temporary",
-            "assignment_expires_at_X": (datetime.utcnow() + timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"),
+            "assignment_expires_at_X": (datetime.utcnow() + timedelta(days=2)).strftime(
+                "%Y-%m-%dT%H:%M"
+            ),
             "assignment_note_X": "Expansion desk handoff",
             "assignment_handoff_doc_url_X": "https://example.com/handoff/x",
             "assignment_handoff_checklist_X": "Review queue\nConfirm owner\nPost update",
@@ -319,7 +346,11 @@ def test_department_handoff_defaults_apply_when_assignment_fields_blank(app, cli
     with app.app_context():
         dept = Department(code="X", label="Expansion")
         dept.handoff_template_doc_url = "https://example.com/templates/x"
-        dept.handoff_template_checklist = ["Review queue", "Confirm owner", "Send recap"]
+        dept.handoff_template_checklist = [
+            "Review queue",
+            "Confirm owner",
+            "Send recap",
+        ]
         db.session.add(dept)
         db.session.commit()
 
@@ -335,7 +366,9 @@ def test_department_handoff_defaults_apply_when_assignment_fields_blank(app, cli
         data={
             "departments": ["X"],
             "assignment_kind_X": "temporary",
-            "assignment_expires_at_X": (datetime.utcnow() + timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"),
+            "assignment_expires_at_X": (datetime.utcnow() + timedelta(days=2)).strftime(
+                "%Y-%m-%dT%H:%M"
+            ),
             "assignment_note_X": "Expansion desk handoff",
             "assignment_handoff_doc_url_X": "",
             "assignment_handoff_checklist_X": "",
@@ -421,7 +454,6 @@ def test_coverage_calendar_search_filters_and_saves_query(app, client):
     assert 'option value="7" selected' in persisted_html
 
 
-
 def test_department_notification_template_injected(app):
     """Notifications sent to a user honor the department's custom template."""
     with app.app_context():
@@ -472,9 +504,19 @@ def test_notification_fanout_threshold_uses_async_path(app, monkeypatch):
             captured["entries"] = entries
             captured["request_id"] = request_id
 
-        monkeypatch.setattr(notifications_module, "_send_notification_fanout_async", fake_send_notification_fanout_async)
+        monkeypatch.setattr(
+            notifications_module,
+            "_send_notification_fanout_async",
+            fake_send_notification_fanout_async,
+        )
 
-        notify_users([user_one, user_two], "Fanout", "Scale path", allow_email=False, request_id=42)
+        notify_users(
+            [user_one, user_two],
+            "Fanout",
+            "Scale path",
+            allow_email=False,
+            request_id=42,
+        )
 
         assert len(captured.get("entries") or []) == 2
         assert captured.get("request_id") == 42
@@ -550,10 +592,14 @@ def test_overlapping_temporary_loans_warn_without_blocking_save(app, client):
         data={
             "departments": ["B", "C"],
             "assignment_kind_B": "temporary",
-            "assignment_expires_at_B": (datetime.utcnow() + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M"),
+            "assignment_expires_at_B": (datetime.utcnow() + timedelta(days=3)).strftime(
+                "%Y-%m-%dT%H:%M"
+            ),
             "assignment_note_B": "Existing finance coverage",
             "assignment_kind_C": "temporary",
-            "assignment_expires_at_C": (datetime.utcnow() + timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"),
+            "assignment_expires_at_C": (datetime.utcnow() + timedelta(days=2)).strftime(
+                "%Y-%m-%dT%H:%M"
+            ),
             "assignment_note_C": "Ops support overlap",
         },
         follow_redirects=True,

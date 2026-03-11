@@ -8,9 +8,10 @@ external monitoring job) to detect outages such as DB OperationalError spikes
 or failed migrations.
 """
 import os
-import requests
 import sys
 from urllib.parse import urljoin
+
+import requests
 
 APP = os.getenv("APP_URL", "http://localhost:5001")
 SLACK = os.getenv("SLACK_WEBHOOK")

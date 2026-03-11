@@ -72,8 +72,12 @@ def test_comment_mentions_create_direct_notification(app, client):
         assert "mentioned" in mention.title.lower()
 
 
-def test_search_filters_support_sla_and_approval_views_and_bulk_priority_update(app, client):
-    admin_id = _create_user(app, "search-admin@example.com", department="B", is_admin=True)
+def test_search_filters_support_sla_and_approval_views_and_bulk_priority_update(
+    app, client
+):
+    admin_id = _create_user(
+        app, "search-admin@example.com", department="B", is_admin=True
+    )
 
     with app.app_context():
         overdue_req = Request(
@@ -172,7 +176,9 @@ def test_admin_integration_health_allows_retrying_failed_event(app, client):
     assert "Retry" in html
     assert "Jobs needing attention" in html
 
-    rv = client.post(f"/admin/integration_events/{event_id}/retry", follow_redirects=True)
+    rv = client.post(
+        f"/admin/integration_events/{event_id}/retry", follow_redirects=True
+    )
     assert rv.status_code == 200
 
     with app.app_context():

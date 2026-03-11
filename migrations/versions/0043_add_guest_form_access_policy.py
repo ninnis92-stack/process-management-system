@@ -5,9 +5,8 @@ Revises: 0042_add_attachment_ocr_text
 Create Date: 2026-03-08 23:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0043_add_guest_form_access_policy"
@@ -25,17 +24,35 @@ def upgrade():
     if "access_policy" not in cols:
         op.add_column(
             "guest_form",
-            sa.Column("access_policy", sa.String(length=40), nullable=True, server_default="public"),
+            sa.Column(
+                "access_policy",
+                sa.String(length=40),
+                nullable=True,
+                server_default="public",
+            ),
         )
         try:
-            conn.execute(sa.text("UPDATE guest_form SET access_policy='sso_linked' WHERE require_sso = true"))
+            conn.execute(
+                sa.text(
+                    "UPDATE guest_form SET access_policy='sso_linked' WHERE require_sso = true"
+                )
+            )
         except Exception:
-            conn.execute(sa.text("UPDATE guest_form SET access_policy='sso_linked' WHERE require_sso = 1"))
+            conn.execute(
+                sa.text(
+                    "UPDATE guest_form SET access_policy='sso_linked' WHERE require_sso = 1"
+                )
+            )
         op.alter_column("guest_form", "access_policy", server_default=None)
     if "allowed_email_domains" not in cols:
-        op.add_column("guest_form", sa.Column("allowed_email_domains", sa.Text(), nullable=True))
+        op.add_column(
+            "guest_form", sa.Column("allowed_email_domains", sa.Text(), nullable=True)
+        )
     if "credential_requirements_json" not in cols:
-        op.add_column("guest_form", sa.Column("credential_requirements_json", sa.Text(), nullable=True))
+        op.add_column(
+            "guest_form",
+            sa.Column("credential_requirements_json", sa.Text(), nullable=True),
+        )
 
 
 def downgrade():

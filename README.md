@@ -20,24 +20,20 @@ lightweight Stimulus controllers for interactivity.
 
 ## Overview
 
-*Note: recent updates changed dark-mode behavior such that enabling dark mode disables personal vibe/theme controls. The navbar vibe button is removed and the theme selector is greyed out with a warning, but adopted brand presets now carry their accent palette into the app's native dark mode automatically. The navbar banner now keeps quotes in their own panel, with the vibe button rendered inside its own solid control shell so it stays visually separate and can disappear cleanly when disabled. If the global vibe feature toggle is turned off, the shell is removed while the quote banner remains in a quote-only layout. Shared action-shell styling is now used across the navbar, command center, and monitor views so controls can appear or disappear without breaking alignment. The old dark-mode-compatible subset preview UI was also removed so dark mode has a single, consistent presentation, and the broader dashboard/admin/login surfaces now use a cleaner solid-panel visual system instead of the older glassy treatment. Recent dashboard polish also toned down the launchpad accents so the Workspace overview eyebrow, badges, and queue counters now follow the same quieter theme language as surrounding cards rather than using a separate bright-blue treatment. Panels in the admin command center now flex-wrap on wider screens for improved responsiveness, and a global contrast rule ensures no section is ever whited out under any theme. The admin command center now also keeps a compact quick-route rail near the top of the page, letting operators jump between major sections while the existing search box collapses non-matching sections instead of leaving a long partially-empty page.*
+**Recent Improvements:**
 
-This prototype supports structured intake forms, multi‑step process flows, and an
-extensible admin interface.  Admins can build custom request templates,
-configure verification integrations that auto‑fill other fields, and declare
-conditional requirements (per field, section, or upload area).  The app runs
-on Postgres and optionally Redis, and is deployed on Fly.io with health checks
-and release‑time schema safety.
+- API endpoints now include versioning for future-proofing, robust input validation, and descriptive error messages with error codes.
+- Swagger UI features a dark mode toggle, links to docs/repo/support, improved mobile responsiveness, and interactive "Try It Out" functionality.
+- Subtext centering and UI polish for mobile screens.
+- Comprehensive health checks and test coverage before deployment.
+- Automated deployment to Fly.io with rolling updates and schema safety.
+
+This prototype supports structured intake forms, multi-step process flows, and an extensible admin interface. Admins can build custom request templates, configure verification integrations that auto-fill other fields, and declare conditional requirements (per field, section, or upload area). The app runs on Postgres and optionally Redis, and is deployed on Fly.io with health checks and release-time schema safety.
 
 Key capabilities:
 
-- **Dynamic request templates** with sections, verification‑prefill, and
-  conditional requirements
-- **Printable department packets** generated from the currently assigned request
-  template so teams can produce real-world paper forms without maintaining a
-  second schema. The print view includes the shared intake fields, the
-  template’s configured sections and options, the workflow preview, and the
-  active workspace branding context.
+- **Dynamic request templates** with sections, verification-prefill, and conditional requirements
+- **Printable department packets** generated from the currently assigned request template so teams can produce real-world paper forms without maintaining a second schema. The print view includes the shared intake fields, the template’s configured sections and options, the workflow preview, and the active workspace branding context.
 - **Admin dashboard quick link in navbar banner** so workspace operators can return to the command center with a single click. This control appears beside theme/vibe controls and is always visible to signed-in administrators, even when the workspace banner is disabled.
 - **Clearer public entry flow** with a simplified guest intake path, no
   public department-switch modal, and the default quote set used on the

@@ -10,10 +10,10 @@ prints the resulting notification unread count and created request id.
 This is intended for local development only.
 """
 
+import json
 import os
 import time
 from datetime import datetime, timedelta
-import json
 
 # Force a local sqlite DB for the smoke run (use absolute path)
 smoke_db_path = os.path.join(os.getcwd(), "test_smoke.db")
@@ -28,10 +28,13 @@ try:
 except Exception:
     pass
 
+from werkzeug.security import generate_password_hash
+
 from app import create_app
 from app.extensions import db
-from werkzeug.security import generate_password_hash
-from app.models import User, Request as ReqModel, Notification
+from app.models import Notification
+from app.models import Request as ReqModel
+from app.models import User
 
 app = create_app()
 # Ensure Flask-WTF CSRF is off (safety)

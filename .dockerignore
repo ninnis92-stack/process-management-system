@@ -4,6 +4,9 @@
 **/*.pyc
 **/*.pyo
 **/*.pyd
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
 **/.venv
 **/venv
 **/.env
@@ -19,6 +22,17 @@
 # macOS
 **/.DS_Store
 
+# Git
+.git
+.gitignore
+.github
+
 # VS Code
 **/.vscode
+
+# Frontend / test artifacts
+**/node_modules
+**/cypress/screenshots
+**/cypress/videos
+
 fly.toml

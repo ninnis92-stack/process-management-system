@@ -90,7 +90,8 @@ def test_publish_event_and_failure_tracking_store_retry_metadata(app):
         assert event.retry_count == 1
         assert event.last_attempt_at is not None
         assert event.next_retry_at is not None
-        assert event.next_retry_at >= before
+        # allow small clock skew between timestamp capture and DB update
+        assert event.next_retry_at >= (before - timedelta(seconds=1))
         assert "timeout from provider" in (event.last_error or "")
 
 

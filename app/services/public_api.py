@@ -4,7 +4,9 @@ from typing import Any
 
 from app.api.v1.schemas import RequestSchema, TemplateSchema
 from app.extensions import db, get_or_404
-from app.models import FormTemplate, Request as ReqModel, TemplateSwapRule, WebhookSubscription
+from app.models import FormTemplate
+from app.models import Request as ReqModel
+from app.models import TemplateSwapRule, WebhookSubscription
 from app.services.integrations import fetch_external_data, serialize_request
 from app.services.request_creation import (
     build_template_spec,
@@ -56,7 +58,9 @@ def verify_template_payload(template_id: int, data: dict[str, Any]) -> dict[str,
     try:
         fields = sorted(list(template.fields), key=lambda row: getattr(row, "order", 0))
     except Exception:
-        fields = sorted(list(template.fields or []), key=lambda row: getattr(row, "order", 0))
+        fields = sorted(
+            list(template.fields or []), key=lambda row: getattr(row, "order", 0)
+        )
     verification_results = run_template_field_verifications(fields, data)
     results = {}
     for field in fields:
@@ -224,9 +228,7 @@ def openapi_spec() -> dict[str, Any]:
                     "security": [{"ApiKeyAuth": []}],
                 }
             },
-            "/template-swap": {
-                "get": {"summary": "Resolve template swap rules"}
-            },
+            "/template-swap": {"get": {"summary": "Resolve template swap rules"}},
             "/integrations/fetch": {
                 "post": {
                     "summary": "Fetch data from an external provider",

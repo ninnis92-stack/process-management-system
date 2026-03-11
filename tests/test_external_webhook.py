@@ -1,18 +1,14 @@
-import json
-import hmac
 import hashlib
+import hmac
+import json
 from datetime import datetime
 
 import pytest
 
 from app.extensions import db
-from app.models import (
-    FormTemplate,
-    FormField,
-    DepartmentFormAssignment,
-    Submission,
-    Request as ReqModel,
-)
+from app.models import DepartmentFormAssignment, FormField, FormTemplate
+from app.models import Request as ReqModel
+from app.models import Submission
 
 
 def _sign(secret: str, body: bytes) -> str:

@@ -92,7 +92,9 @@ def value_is_populated(value) -> bool:
     return str(value).strip() != ""
 
 
-def evaluate_single_requirement_rule(rule, submission_data, verification_results, section_map):
+def evaluate_single_requirement_rule(
+    rule, submission_data, verification_results, section_map
+):
     source = rule.get("source")
     operator = rule.get("operator")
     source_type = rule.get("source_type")
@@ -100,7 +102,9 @@ def evaluate_single_requirement_rule(rule, submission_data, verification_results
     if source_type == "section":
         members = section_map.get(source, [])
         if operator == "any_populated":
-            return any(value_is_populated(submission_data.get(name)) for name in members)
+            return any(
+                value_is_populated(submission_data.get(name)) for name in members
+            )
         if operator == "all_populated":
             return bool(members) and all(
                 value_is_populated(submission_data.get(name)) for name in members
@@ -123,7 +127,9 @@ def evaluate_single_requirement_rule(rule, submission_data, verification_results
     return False
 
 
-def evaluate_conditional_requirements(template_fields, submission_data, verification_results):
+def evaluate_conditional_requirements(
+    template_fields, submission_data, verification_results
+):
     section_map = {}
     for field in template_fields:
         section_name = (getattr(field, "section_name", None) or "").strip()

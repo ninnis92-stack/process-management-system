@@ -5,8 +5,8 @@ Revises: 0001_add_is_admin
 Create Date: 2026-03-04 00:01:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
@@ -25,7 +25,9 @@ def upgrade():
 
     try:
         if "totp_secret" not in cols:
-            op.add_column("user", sa.Column("totp_secret", sa.String(64), nullable=True))
+            op.add_column(
+                "user", sa.Column("totp_secret", sa.String(64), nullable=True)
+            )
         if "totp_enabled" not in cols:
             op.add_column(
                 "user",
@@ -39,13 +41,17 @@ def upgrade():
     except Exception:
         try:
             if "totp_secret" not in cols:
-                conn.execute(sa.text('ALTER TABLE "user" ADD COLUMN totp_secret VARCHAR(64)'))
+                conn.execute(
+                    sa.text('ALTER TABLE "user" ADD COLUMN totp_secret VARCHAR(64)')
+                )
         except Exception:
             pass
         try:
             if "totp_enabled" not in cols:
                 conn.execute(
-                    sa.text('ALTER TABLE "user" ADD COLUMN totp_enabled INTEGER DEFAULT 0')
+                    sa.text(
+                        'ALTER TABLE "user" ADD COLUMN totp_enabled INTEGER DEFAULT 0'
+                    )
                 )
         except Exception:
             pass

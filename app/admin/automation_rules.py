@@ -1,10 +1,13 @@
-from flask import render_template, redirect, url_for, flash, request as flask_request, jsonify
+from flask import flash, jsonify, redirect, render_template
+from flask import request as flask_request
+from flask import url_for
 from flask_login import login_required
-from .routes import admin_bp
-from .utils import _is_admin_user
+
 from ..extensions import db, get_or_404
 from ..models import AutomationRule
 from .forms import AutomationRuleForm
+from .routes import admin_bp
+from .utils import _is_admin_user
 
 
 @admin_bp.route("/automation_rules")
@@ -28,9 +31,15 @@ def create_automation_rule():
     if form.validate_on_submit():
         import json
 
-        triggers = [line.strip() for line in (form.triggers.data or "").splitlines() if line.strip()]
+        triggers = [
+            line.strip()
+            for line in (form.triggers.data or "").splitlines()
+            if line.strip()
+        ]
         try:
-            conditions = json.loads(form.conditions.data) if form.conditions.data else {}
+            conditions = (
+                json.loads(form.conditions.data) if form.conditions.data else {}
+            )
         except Exception:
             flash("Invalid JSON for conditions.", "danger")
             return render_template("admin_automation_rule_form.html", form=form)
@@ -73,9 +82,15 @@ def edit_automation_rule(rule_id: int):
 
         r.name = form.name.data.strip()
         r.description = (form.description.data or "").strip() or None
-        r.triggers_json = [line.strip() for line in (form.triggers.data or "").splitlines() if line.strip()]
+        r.triggers_json = [
+            line.strip()
+            for line in (form.triggers.data or "").splitlines()
+            if line.strip()
+        ]
         try:
-            r.conditions_json = json.loads(form.conditions.data) if form.conditions.data else {}
+            r.conditions_json = (
+                json.loads(form.conditions.data) if form.conditions.data else {}
+            )
         except Exception:
             flash("Invalid JSON for conditions.", "danger")
             return render_template("admin_automation_rule_form.html", form=form, rule=r)

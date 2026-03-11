@@ -1,9 +1,12 @@
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import User, DepartmentEditor, Request as ReqModel
+from app.models import DepartmentEditor
+from app.models import Request as ReqModel
+from app.models import User
 
 
 def login(client, email, password="secret"):

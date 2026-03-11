@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta
 import time
+from datetime import datetime, timedelta
 
 from flask import (
     abort,
@@ -15,7 +15,8 @@ from flask_login import current_user, login_required
 
 from .. import metrics as metrics_module
 from ..extensions import db
-from ..models import Request as ReqModel, SpecialEmailConfig, UserDepartment
+from ..models import Request as ReqModel
+from ..models import SpecialEmailConfig, UserDepartment
 from ..notifcations import notify_users, users_in_department
 from ..services.process_metrics import record_process_metric_event
 from ..services.request_creation import (
@@ -29,19 +30,19 @@ from ..services.request_intake import (
     load_request_template_context,
     validate_template_request_submission,
 )
-from .workflow import active_workflow_intake_preview
 from . import requests_bp
 from .forms import (
-    NewRequestForm,
-    CommentForm,
     ArtifactForm,
-    TransitionForm,
-    ToggleCReviewForm,
-    RequestArtifactEditForm,
-    DonorOnlyForm,
     AssignmentForm,
+    CommentForm,
+    DonorOnlyForm,
+    NewRequestForm,
+    RequestArtifactEditForm,
+    ToggleCReviewForm,
+    TransitionForm,
 )
 from .routes import _log
+from .workflow import active_workflow_intake_preview
 
 
 def _normalize_department_code(value: str) -> str:
@@ -54,7 +55,9 @@ def _normalize_department_code(value: str) -> str:
 def _user_can_access_department_packet(department_code: str) -> bool:
     if getattr(current_user, "is_admin", False):
         return True
-    if (getattr(current_user, "department", "") or "").strip().upper() == department_code:
+    if (
+        getattr(current_user, "department", "") or ""
+    ).strip().upper() == department_code:
         return True
     assignment = UserDepartment.query.filter_by(
         user_id=current_user.id,
@@ -186,7 +189,9 @@ def request_new():
                 "This form is provided by an external service; please submit via the external provider.",
                 "warning",
             )
-            return redirect(template.external_form_url or url_for("requests.request_new"))
+            return redirect(
+                template.external_form_url or url_for("requests.request_new")
+            )
         return render_template("request_external_form.html", template=template)
 
     if (template is None and form.validate_on_submit()) or (
@@ -369,7 +374,9 @@ def request_new():
                                         cfg.request_form_inventory_out_of_stock_message
                                         or "Request was auto-rejected because one or more populated fields were not available in the connected source system."
                                     ),
-                                    url=url_for("requests.request_detail", request_id=req.id),
+                                    url=url_for(
+                                        "requests.request_detail", request_id=req.id
+                                    ),
                                     ntype="auto_reject",
                                     request_id=req.id,
                                 )
@@ -383,10 +390,14 @@ def request_new():
                             or "Request auto-rejected because a populated API-verified field was unavailable.",
                             "warning",
                         )
-                        return redirect(url_for("requests.request_detail", request_id=req.id))
+                        return redirect(
+                            url_for("requests.request_detail", request_id=req.id)
+                        )
 
         try:
-            metrics_module.requests_created_total.labels(dept=req.owner_department).inc()
+            metrics_module.requests_created_total.labels(
+                dept=req.owner_department
+            ).inc()
             metrics_module.update_owner_gauge(db.session, ReqModel)
             record_process_metric_event(
                 req,

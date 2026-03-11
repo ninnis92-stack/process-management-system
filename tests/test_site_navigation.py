@@ -4,8 +4,7 @@ from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import User, SiteConfig, UserDepartment, FeatureFlags
-
+from app.models import FeatureFlags, SiteConfig, User, UserDepartment
 
 NAV_LINK_RE = re.compile(r'href="([^"]+)"')
 
@@ -571,10 +570,18 @@ def test_toggle_persistence_script_present(client, app):
         script = handle.read()
     assert "toggle_states" in script
     assert "sessionStorage" in script
+
+
 def test_global_text_color_rule():
     """Ensure stylesheet sets body text color for readability."""
-    import os, re
-    css_path = os.path.join(os.path.dirname(__file__), "..", "app", "static", "styles.css")
+    import os
+    import re
+
+    css_path = os.path.join(
+        os.path.dirname(__file__), "..", "app", "static", "styles.css"
+    )
     with open(css_path, encoding="utf-8") as f:
         content = f.read()
-    assert re.search(r"body[^\{]*\{[^}]*color:\s*var\(--body-text\)", content), "global body color rule missing"
+    assert re.search(
+        r"body[^\{]*\{[^}]*color:\s*var\(--body-text\)", content
+    ), "global body color rule missing"

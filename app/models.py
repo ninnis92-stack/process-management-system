@@ -1,11 +1,13 @@
 """Data models for users, requests, artifacts, comments, submissions, and audit trails."""
 
-from datetime import datetime, timedelta
 import json
 import re
 import secrets
+from datetime import datetime, timedelta
+
 from flask_login import UserMixin
 from sqlalchemy.orm import validates
+
 from .extensions import db
 
 DEPARTMENTS = ("A", "B", "C")
@@ -25,7 +27,12 @@ STATUSES = (
 )
 
 REQUEST_TYPES = ("part_number", "instructions", "both")
-PRIORITIES = ("low", "medium", "high", "highest")  # highest is a special escalation tier above high
+PRIORITIES = (
+    "low",
+    "medium",
+    "high",
+    "highest",
+)  # highest is a special escalation tier above high
 
 PRICEBOOK_LABELS = {
     "in_pricebook": "On the sales list",
@@ -71,7 +78,9 @@ GUEST_FORM_ACCESS_POLICIES = (
 class TenantScopedMixin:
     """Mixin for records that belong to a single tenant."""
 
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenant.id"), nullable=True, index=True)
+    tenant_id = db.Column(
+        db.Integer, db.ForeignKey("tenant.id"), nullable=True, index=True
+    )
 
 
 class SubscriptionPlan(db.Model):
@@ -121,7 +130,9 @@ class Tenant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     slug = db.Column(db.String(120), nullable=False, unique=True, index=True)
     name = db.Column(db.String(200), nullable=False)
-    plan_id = db.Column(db.Integer, db.ForeignKey("subscription_plan.id"), nullable=True)
+    plan_id = db.Column(
+        db.Integer, db.ForeignKey("subscription_plan.id"), nullable=True
+    )
     plan = db.relationship("SubscriptionPlan", backref="tenants")
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -144,9 +155,13 @@ class TenantMembership(db.Model):
     """Maps users to tenants with an explicit SaaS role."""
 
     id = db.Column(db.Integer, primary_key=True)
-    tenant_id = db.Column(db.Integer, db.ForeignKey("tenant.id"), nullable=False, index=True)
+    tenant_id = db.Column(
+        db.Integer, db.ForeignKey("tenant.id"), nullable=False, index=True
+    )
     tenant = db.relationship("Tenant", backref="memberships")
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("user.id"), nullable=False, index=True
+    )
     user = db.relationship("User", backref="tenant_memberships", foreign_keys=[user_id])
     role = db.Column(db.String(40), nullable=False, default="member")
     is_default = db.Column(db.Boolean, nullable=False, default=False)
@@ -169,7 +184,9 @@ class JobRecord(TenantScopedMixin, db.Model):
     result_json = db.Column(db.JSON, nullable=True)
     error_text = db.Column(db.Text, nullable=True)
     retry_count = db.Column(db.Integer, nullable=False, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(
+        db.DateTime, default=datetime.utcnow, nullable=False, index=True
+    )
     started_at = db.Column(db.DateTime, nullable=True)
     finished_at = db.Column(db.DateTime, nullable=True)
 
@@ -190,7 +207,9 @@ class IntegrationEvent(TenantScopedMixin, db.Model):
     last_attempt_at = db.Column(db.DateTime, nullable=True)
     next_retry_at = db.Column(db.DateTime, nullable=True, index=True)
     delivered_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(
+        db.DateTime, default=datetime.utcnow, nullable=False, index=True
+    )
 
 
 class User(TenantScopedMixin, db.Model, UserMixin):
@@ -231,7 +250,9 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
-    backup_approver_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
+    backup_approver_user_id = db.Column(
+        db.Integer, db.ForeignKey("user.id"), nullable=True, index=True
+    )
     backup_approver = db.relationship(
         "User",
         foreign_keys=[backup_approver_user_id],
@@ -299,8 +320,11 @@ class User(TenantScopedMixin, db.Model, UserMixin):
             raise ValueError("Quote interval must be an integer number of seconds")
         # permissible values are 15,20,...,60
         if iv < 15 or iv > 60 or iv % 5 != 0:
-            raise ValueError("Quote interval must be between 15 and 60 seconds in 5‑second steps")
+            raise ValueError(
+                "Quote interval must be between 15 and 60 seconds in 5‑second steps"
+            )
         return iv
+
     # Persist the last department the user was viewing when they logged out
     # or switched contexts. This is used to restore their active department
     # on subsequent logins when they have multiple department assignments.
@@ -417,7 +441,9 @@ class User(TenantScopedMixin, db.Model, UserMixin):
     @property
     def workflow_role_profile_label(self) -> str:
         profile = self.WORKFLOW_ROLE_PROFILES.get(
-            str(getattr(self, "workflow_role_profile", "member") or "member").strip().lower(),
+            str(getattr(self, "workflow_role_profile", "member") or "member")
+            .strip()
+            .lower(),
             self.WORKFLOW_ROLE_PROFILES["member"],
         )
         return profile.get("label", "Member")
@@ -427,14 +453,20 @@ class SavedSearchView(TenantScopedMixin, db.Model):
     """User-saved search filters that double as lightweight personal dashboard shortcuts."""
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("user.id"), nullable=False, index=True
+    )
     user = db.relationship("User", backref="saved_search_views")
     name = db.Column(db.String(120), nullable=False)
-    endpoint = db.Column(db.String(120), nullable=False, default="requests.search_requests")
+    endpoint = db.Column(
+        db.String(120), nullable=False, default="requests.search_requests"
+    )
     query_json = db.Column(db.Text, nullable=True)
     is_default = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
     last_used_at = db.Column(db.DateTime, nullable=True)
 
     __table_args__ = (
@@ -548,10 +580,14 @@ class ProcessMetricEvent(TenantScopedMixin, db.Model):
     """Normalized process analytics event for request lifecycle tracking."""
 
     id = db.Column(db.Integer, primary_key=True)
-    request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False, index=True)
+    request_id = db.Column(
+        db.Integer, db.ForeignKey("request.id"), nullable=False, index=True
+    )
     request = db.relationship("Request", backref="process_metric_events")
 
-    actor_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
+    actor_user_id = db.Column(
+        db.Integer, db.ForeignKey("user.id"), nullable=True, index=True
+    )
     actor_user = db.relationship("User", foreign_keys=[actor_user_id])
 
     actor_department = db.Column(db.String(2), nullable=True, index=True)
@@ -568,7 +604,9 @@ class ProcessMetricEvent(TenantScopedMixin, db.Model):
     request_age_seconds = db.Column(db.Integer, nullable=True)
 
     metadata_json = db.Column(db.JSON, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(
+        db.DateTime, default=datetime.utcnow, nullable=False, index=True
+    )
 
 
 class MetricsConfig(TenantScopedMixin, db.Model):
@@ -787,9 +825,7 @@ class FormTemplate(TenantScopedMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     # When enabled, verification-backed fields on this template may populate
     # other fields in the same request form based on admin-configured mapping.
-    verification_prefill_enabled = db.Column(
-        db.Boolean, nullable=False, default=False
-    )
+    verification_prefill_enabled = db.Column(db.Boolean, nullable=False, default=False)
     # Optional external form integration (eg. Microsoft Forms) — disabled by default
     external_enabled = db.Column(db.Boolean, nullable=False, default=False)
     # Provider identifier (informational), e.g. 'microsoft_forms'
@@ -803,6 +839,7 @@ class FormTemplate(TenantScopedMixin, db.Model):
     def layout_label(self):
         mapping = dict(FORM_TEMPLATE_LAYOUT_CHOICES)
         return mapping.get(self.layout, mapping.get("standard"))
+
     # layout of the template for externally generated forms; used by third
     # party clients to mirror the same spacing/width choices that the app
     # would render.  Defaults to 'standard'.
@@ -835,7 +872,9 @@ class GuestForm(TenantScopedMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     slug = db.Column(db.String(200), nullable=False, unique=True, index=True)
-    template_id = db.Column(db.Integer, db.ForeignKey("form_template.id"), nullable=True)
+    template_id = db.Column(
+        db.Integer, db.ForeignKey("form_template.id"), nullable=True
+    )
     template = db.relationship("FormTemplate", backref="guest_forms")
     require_sso = db.Column(db.Boolean, nullable=False, default=False)
     access_policy = db.Column(db.String(40), nullable=True, default="public")
@@ -1004,13 +1043,17 @@ class TemplateSwapRule(TenantScopedMixin, db.Model):
     """
 
     id = db.Column(db.Integer, primary_key=True)
-    template_id = db.Column(db.Integer, db.ForeignKey("form_template.id"), nullable=False)
+    template_id = db.Column(
+        db.Integer, db.ForeignKey("form_template.id"), nullable=False
+    )
     # the field name in the current template that triggers the swap
     trigger_field_name = db.Column(db.String(200), nullable=False)
     # the exact field value that triggers the swap
     trigger_value = db.Column(db.String(400), nullable=False)
     # target template to switch to
-    target_template_id = db.Column(db.Integer, db.ForeignKey("form_template.id"), nullable=False)
+    target_template_id = db.Column(
+        db.Integer, db.ForeignKey("form_template.id"), nullable=False
+    )
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -1076,7 +1119,9 @@ class SpecialEmailConfig(TenantScopedMixin, db.Model):
     )
     # new option: if incoming email is forwarded by another system, keep the
     # original "from" address on the request and optionally notify it.
-    request_form_add_original_sender = db.Column(db.Boolean, nullable=False, default=False)
+    request_form_add_original_sender = db.Column(
+        db.Boolean, nullable=False, default=False
+    )
     # default list of additional email addresses that should always be
     # copied/treated as "watchers" when a request is created by email. Stored
     # as JSON array of strings.
@@ -1175,7 +1220,9 @@ class FeatureFlags(TenantScopedMixin, db.Model):
         # missing in an out-of-date production schema. If this fails, fall
         # back to returning an in-memory default to keep admin pages working.
         try:
-            row = db.session.execute(text("SELECT id FROM feature_flags LIMIT 1")).fetchone()
+            row = db.session.execute(
+                text("SELECT id FROM feature_flags LIMIT 1")
+            ).fetchone()
         except Exception:
             try:
                 from flask import current_app
@@ -1325,7 +1372,9 @@ class RequestApproval(TenantScopedMixin, db.Model):
     """A single approval-stage record created when a request enters an approval status."""
 
     id = db.Column(db.Integer, primary_key=True)
-    request_id = db.Column(db.Integer, db.ForeignKey("request.id"), nullable=False, index=True)
+    request_id = db.Column(
+        db.Integer, db.ForeignKey("request.id"), nullable=False, index=True
+    )
     status_code = db.Column(db.String(80), nullable=False, index=True)
     cycle_index = db.Column(db.Integer, nullable=False, default=1)
     stage_order = db.Column(db.Integer, nullable=False, default=0)
@@ -1333,11 +1382,15 @@ class RequestApproval(TenantScopedMixin, db.Model):
     required_role = db.Column(db.String(40), nullable=True)
     required_department = db.Column(db.String(10), nullable=True)
     state = db.Column(db.String(30), nullable=False, default="pending", index=True)
-    decided_by_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
+    decided_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("user.id"), nullable=True, index=True
+    )
     decided_by_user = db.relationship("User", foreign_keys=[decided_by_user_id])
     decision_note = db.Column(db.Text, nullable=True)
     decided_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(
+        db.DateTime, default=datetime.utcnow, nullable=False, index=True
+    )
 
     @property
     def is_complete(self) -> bool:
@@ -1364,7 +1417,9 @@ class SiteConfig(TenantScopedMixin, db.Model):
         "rolling_quote_sets", db.Text, nullable=True
     )  # JSON map of named sets -> list of strings
     active_quote_set = db.Column(db.String(80), nullable=True, default="motivational")
-    quote_permissions = db.Column(db.Text, nullable=True)  # JSON: {"departments":{code:[sets]},"users":{email:[sets]}}
+    quote_permissions = db.Column(
+        db.Text, nullable=True
+    )  # JSON: {"departments":{code:[sets]},"users":{email:[sets]}}
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
@@ -1504,68 +1559,250 @@ class SiteConfig(TenantScopedMixin, db.Model):
 
     _QUOTE_SET_PADDING = {
         "default": {
-            "openings": ["Keep the day simple", "Choose the next useful step", "Stay steady", "Aim for calm progress"],
-            "actions": ["finish one meaningful task", "honor the plan you made", "let small wins stack up", "give your attention a single job"],
-            "payoffs": ["momentum will meet you", "clarity tends to follow", "the day will feel lighter", "confidence grows from repetition"],
+            "openings": [
+                "Keep the day simple",
+                "Choose the next useful step",
+                "Stay steady",
+                "Aim for calm progress",
+            ],
+            "actions": [
+                "finish one meaningful task",
+                "honor the plan you made",
+                "let small wins stack up",
+                "give your attention a single job",
+            ],
+            "payoffs": [
+                "momentum will meet you",
+                "clarity tends to follow",
+                "the day will feel lighter",
+                "confidence grows from repetition",
+            ],
         },
         "sales": {
-            "openings": ["Lead with value", "Stay curious", "Follow up with purpose", "Keep the conversation human"],
-            "actions": ["ask one better question", "solve the real hesitation", "make the next decision easy", "show the outcome, not just the feature list"],
-            "payoffs": ["trust grows faster", "good deals get easier to spot", "clarity does the heavy lifting", "relationships outlast the quarter"],
+            "openings": [
+                "Lead with value",
+                "Stay curious",
+                "Follow up with purpose",
+                "Keep the conversation human",
+            ],
+            "actions": [
+                "ask one better question",
+                "solve the real hesitation",
+                "make the next decision easy",
+                "show the outcome, not just the feature list",
+            ],
+            "payoffs": [
+                "trust grows faster",
+                "good deals get easier to spot",
+                "clarity does the heavy lifting",
+                "relationships outlast the quarter",
+            ],
         },
         "motivational": {
-            "openings": ["Start anyway", "Stay with the process", "Protect your momentum", "Trust the small win"],
-            "actions": ["do the next right thing", "repeat the habit that helps", "move before doubt gets louder", "keep your standards close"],
-            "payoffs": ["results will eventually catch up", "your confidence will strengthen", "today will count", "progress will stop feeling accidental"],
+            "openings": [
+                "Start anyway",
+                "Stay with the process",
+                "Protect your momentum",
+                "Trust the small win",
+            ],
+            "actions": [
+                "do the next right thing",
+                "repeat the habit that helps",
+                "move before doubt gets louder",
+                "keep your standards close",
+            ],
+            "payoffs": [
+                "results will eventually catch up",
+                "your confidence will strengthen",
+                "today will count",
+                "progress will stop feeling accidental",
+            ],
         },
         "laundry riddles": {
-            "openings": ["Sort the load", "Fold what is ready", "Reset the basket", "Treat laundry like a checkpoint"],
-            "actions": ["finish one cycle at a time", "pair the socks before the excuses", "make the room feel cared for", "turn the routine into rhythm"],
-            "payoffs": ["calm returns faster", "home feels easier to enter", "order becomes visible", "the week gets less noisy"],
+            "openings": [
+                "Sort the load",
+                "Fold what is ready",
+                "Reset the basket",
+                "Treat laundry like a checkpoint",
+            ],
+            "actions": [
+                "finish one cycle at a time",
+                "pair the socks before the excuses",
+                "make the room feel cared for",
+                "turn the routine into rhythm",
+            ],
+            "payoffs": [
+                "calm returns faster",
+                "home feels easier to enter",
+                "order becomes visible",
+                "the week gets less noisy",
+            ],
         },
         "chores": {
-            "openings": ["Tidy a little now", "Pick one corner", "Handle the simple task", "Reset the space"],
-            "actions": ["clear one surface", "wash the next dish", "close one household loop", "do the part future-you will notice"],
-            "payoffs": ["the room will breathe again", "stress loses some volume", "evening gets easier", "routine starts helping you back"],
+            "openings": [
+                "Tidy a little now",
+                "Pick one corner",
+                "Handle the simple task",
+                "Reset the space",
+            ],
+            "actions": [
+                "clear one surface",
+                "wash the next dish",
+                "close one household loop",
+                "do the part future-you will notice",
+            ],
+            "payoffs": [
+                "the room will breathe again",
+                "stress loses some volume",
+                "evening gets easier",
+                "routine starts helping you back",
+            ],
         },
         "engineering": {
-            "openings": ["Ship with intention", "Debug with patience", "Design for clarity", "Keep the system understandable"],
-            "actions": ["reduce one source of risk", "write the simpler version first", "improve the path that fails most often", "name things so the code can explain itself"],
-            "payoffs": ["future fixes get easier", "reliability compounds", "the next release feels safer", "the team moves faster together"],
+            "openings": [
+                "Ship with intention",
+                "Debug with patience",
+                "Design for clarity",
+                "Keep the system understandable",
+            ],
+            "actions": [
+                "reduce one source of risk",
+                "write the simpler version first",
+                "improve the path that fails most often",
+                "name things so the code can explain itself",
+            ],
+            "payoffs": [
+                "future fixes get easier",
+                "reliability compounds",
+                "the next release feels safer",
+                "the team moves faster together",
+            ],
         },
         "productivity": {
-            "openings": ["Guard your focus", "Start with the priority", "Trim the noise", "Finish before you optimize"],
-            "actions": ["protect one block of deep work", "close the task that matters most", "trade urgency for intention", "let the checklist support you"],
-            "payoffs": ["time opens up", "progress gets measurable", "the backlog feels smaller", "energy stops leaking away"],
+            "openings": [
+                "Guard your focus",
+                "Start with the priority",
+                "Trim the noise",
+                "Finish before you optimize",
+            ],
+            "actions": [
+                "protect one block of deep work",
+                "close the task that matters most",
+                "trade urgency for intention",
+                "let the checklist support you",
+            ],
+            "payoffs": [
+                "time opens up",
+                "progress gets measurable",
+                "the backlog feels smaller",
+                "energy stops leaking away",
+            ],
         },
         "leadership": {
-            "openings": ["Lead calmly", "Model the standard", "Communicate early", "Make the path clearer"],
-            "actions": ["remove one point of confusion", "match your actions to your message", "set the tone with consistency", "help the team see the priority"],
-            "payoffs": ["trust has room to grow", "people move with confidence", "the team steadies faster", "clarity becomes contagious"],
+            "openings": [
+                "Lead calmly",
+                "Model the standard",
+                "Communicate early",
+                "Make the path clearer",
+            ],
+            "actions": [
+                "remove one point of confusion",
+                "match your actions to your message",
+                "set the tone with consistency",
+                "help the team see the priority",
+            ],
+            "payoffs": [
+                "trust has room to grow",
+                "people move with confidence",
+                "the team steadies faster",
+                "clarity becomes contagious",
+            ],
         },
         "innovation": {
-            "openings": ["Test the new idea", "Challenge the assumption", "Stay experimental", "Build the first useful version"],
-            "actions": ["learn from the quick draft", "keep curiosity attached to execution", "treat feedback like fuel", "let constraints sharpen the concept"],
-            "payoffs": ["the next version gets smarter", "new options appear", "useful change becomes possible", "creative work gains traction"],
+            "openings": [
+                "Test the new idea",
+                "Challenge the assumption",
+                "Stay experimental",
+                "Build the first useful version",
+            ],
+            "actions": [
+                "learn from the quick draft",
+                "keep curiosity attached to execution",
+                "treat feedback like fuel",
+                "let constraints sharpen the concept",
+            ],
+            "payoffs": [
+                "the next version gets smarter",
+                "new options appear",
+                "useful change becomes possible",
+                "creative work gains traction",
+            ],
         },
         "customer-centric": {
-            "openings": ["Start with the customer", "Listen one layer deeper", "Reduce the friction", "Make the next step easy"],
-            "actions": ["solve the felt pain point", "write for clarity", "keep empathy practical", "design around their real goal"],
-            "payoffs": ["trust gets stronger", "adoption feels natural", "support gets lighter", "people remember the experience"],
+            "openings": [
+                "Start with the customer",
+                "Listen one layer deeper",
+                "Reduce the friction",
+                "Make the next step easy",
+            ],
+            "actions": [
+                "solve the felt pain point",
+                "write for clarity",
+                "keep empathy practical",
+                "design around their real goal",
+            ],
+            "payoffs": [
+                "trust gets stronger",
+                "adoption feels natural",
+                "support gets lighter",
+                "people remember the experience",
+            ],
         },
         "coffee-humour": {
-            "openings": ["Respect the coffee", "Let the mug buy you a minute", "Begin after the first sip", "Pair the plan with caffeine"],
-            "actions": ["tackle the task while the optimism is warm", "keep the humor in the process", "use the ritual to settle in", "start before the cup gets cold"],
-            "payoffs": ["the morning feels friendlier", "the hard part looks smaller", "focus tends to show up", "the draft gets written"],
+            "openings": [
+                "Respect the coffee",
+                "Let the mug buy you a minute",
+                "Begin after the first sip",
+                "Pair the plan with caffeine",
+            ],
+            "actions": [
+                "tackle the task while the optimism is warm",
+                "keep the humor in the process",
+                "use the ritual to settle in",
+                "start before the cup gets cold",
+            ],
+            "payoffs": [
+                "the morning feels friendlier",
+                "the hard part looks smaller",
+                "focus tends to show up",
+                "the draft gets written",
+            ],
         },
         "wellbeing": {
-            "openings": ["Protect your energy", "Choose a kinder pace", "Let recovery count", "Take the small pause"],
-            "actions": ["breathe before the next push", "notice what your body is asking for", "rest before frustration hardens", "keep the routine sustainable"],
-            "payoffs": ["resilience lasts longer", "focus returns cleaner", "stress loses its grip", "good work stays repeatable"],
+            "openings": [
+                "Protect your energy",
+                "Choose a kinder pace",
+                "Let recovery count",
+                "Take the small pause",
+            ],
+            "actions": [
+                "breathe before the next push",
+                "notice what your body is asking for",
+                "rest before frustration hardens",
+                "keep the routine sustainable",
+            ],
+            "payoffs": [
+                "resilience lasts longer",
+                "focus returns cleaner",
+                "stress loses its grip",
+                "good work stays repeatable",
+            ],
         },
     }
 
-    def _build_padded_quote_set(name, quotes, profiles=_QUOTE_SET_PADDING, max_length=MAX_QUOTE_LENGTH):
+    def _build_padded_quote_set(
+        name, quotes, profiles=_QUOTE_SET_PADDING, max_length=MAX_QUOTE_LENGTH
+    ):
         cleaned = [
             str(item).strip()[:max_length]
             for item in (quotes or [])
@@ -1574,7 +1811,9 @@ class SiteConfig(TenantScopedMixin, db.Model):
         if len(cleaned) >= 30:
             return cleaned
 
-        profile = profiles.get(str(name or "").strip().lower()) or profiles["motivational"]
+        profile = (
+            profiles.get(str(name or "").strip().lower()) or profiles["motivational"]
+        )
         seen = {item.casefold() for item in cleaned}
 
         for opening in profile.get("openings", []):
@@ -1686,21 +1925,27 @@ class SiteConfig(TenantScopedMixin, db.Model):
                 try:
                     parsed = json.loads(self._rolling_quotes)
                     if isinstance(parsed, list):
-                        sets = type(self).normalize_quote_sets({
-                            "default": [str(x).strip() for x in parsed if str(x).strip()]
-                        })
+                        sets = type(self).normalize_quote_sets(
+                            {
+                                "default": [
+                                    str(x).strip() for x in parsed if str(x).strip()
+                                ]
+                            }
+                        )
                 except Exception:
-                    sets = type(self).normalize_quote_sets({
-                        "default": [
-                            line.strip()
-                            for line in str(self._rolling_quotes).splitlines()
-                            if line.strip()
-                        ]
-                    })
+                    sets = type(self).normalize_quote_sets(
+                        {
+                            "default": [
+                                line.strip()
+                                for line in str(self._rolling_quotes).splitlines()
+                                if line.strip()
+                            ]
+                        }
+                    )
             if not sets:
                 sets = type(self).normalize_quote_sets()
 
-            active = (self.active_quote_set or "motivational")
+            active = self.active_quote_set or "motivational"
             if active in sets:
                 return sets.get(active, [])
             # fallback to the first available set
@@ -1737,16 +1982,20 @@ class SiteConfig(TenantScopedMixin, db.Model):
             if self._rolling_quotes:
                 parsed = json.loads(self._rolling_quotes)
                 if isinstance(parsed, list):
-                    return type(self).normalize_quote_sets({
-                        "default": [str(x).strip() for x in parsed if str(x).strip()]
-                    })
+                    return type(self).normalize_quote_sets(
+                        {"default": [str(x).strip() for x in parsed if str(x).strip()]}
+                    )
         except Exception:
             if self._rolling_quotes:
-                return type(self).normalize_quote_sets({
-                    "default": [
-                        line.strip() for line in str(self._rolling_quotes).splitlines() if line.strip()
-                    ]
-                })
+                return type(self).normalize_quote_sets(
+                    {
+                        "default": [
+                            line.strip()
+                            for line in str(self._rolling_quotes).splitlines()
+                            if line.strip()
+                        ]
+                    }
+                )
         return type(self).normalize_quote_sets()
 
     @property
@@ -1787,7 +2036,9 @@ class SiteConfig(TenantScopedMixin, db.Model):
                 if isinstance(values, list):
                     cleaned = [str(v).strip() for v in values if str(v).strip()]
                 elif isinstance(values, str):
-                    cleaned = [str(v).strip() for v in values.split(",") if str(v).strip()]
+                    cleaned = [
+                        str(v).strip() for v in values.split(",") if str(v).strip()
+                    ]
                 else:
                     cleaned = []
                 normalized[name] = cleaned
@@ -1816,7 +2067,11 @@ class SiteConfig(TenantScopedMixin, db.Model):
 
         user_allowed = perms.get("users", {}).get(email)
         dept_allowed = perms.get("departments", {}).get(dept)
-        allowed = user_allowed if user_allowed is not None and len(user_allowed) > 0 else dept_allowed
+        allowed = (
+            user_allowed
+            if user_allowed is not None and len(user_allowed) > 0
+            else dept_allowed
+        )
         if not allowed:
             return names
         allowed_set = {str(name).strip() for name in allowed if str(name).strip()}
@@ -1829,7 +2084,9 @@ class SiteConfig(TenantScopedMixin, db.Model):
         if not names:
             return None
 
-        preferred = str(getattr(user, "quote_set", "") or "").strip().lower() if user else ""
+        preferred = (
+            str(getattr(user, "quote_set", "") or "").strip().lower() if user else ""
+        )
         if preferred:
             for name in names:
                 if str(name).lower() == preferred:
@@ -1854,7 +2111,11 @@ class SiteConfig(TenantScopedMixin, db.Model):
             self._rolling_quotes = None
             return
         if isinstance(value, list):
-            cleaned = [str(x).strip()[: type(self).MAX_QUOTE_LENGTH] for x in value if str(x).strip()][:30]
+            cleaned = [
+                str(x).strip()[: type(self).MAX_QUOTE_LENGTH]
+                for x in value
+                if str(x).strip()
+            ][:30]
             self._rolling_quotes = json.dumps(cleaned)
             return
         if isinstance(value, str):
@@ -1875,7 +2136,11 @@ class SiteConfig(TenantScopedMixin, db.Model):
                     return
             except Exception:
                 pass
-            cleaned = [line.strip()[: type(self).MAX_QUOTE_LENGTH] for line in raw.splitlines() if line.strip()][:30]
+            cleaned = [
+                line.strip()[: type(self).MAX_QUOTE_LENGTH]
+                for line in raw.splitlines()
+                if line.strip()
+            ][:30]
             self._rolling_quotes = json.dumps(cleaned)
             return
         self._rolling_quotes = json.dumps([str(value)])
@@ -1898,17 +2163,25 @@ class SiteConfig(TenantScopedMixin, db.Model):
             except Exception:
                 db.session.rollback()
         try:
-            normalized_sets = cls.normalize_quote_sets(getattr(cfg, "rolling_quote_sets", None))
+            normalized_sets = cls.normalize_quote_sets(
+                getattr(cfg, "rolling_quote_sets", None)
+            )
             current_sets = getattr(cfg, "rolling_quote_sets", None) or {}
-            if normalized_sets != current_sets or not getattr(cfg, "_rolling_quote_sets", None):
+            if normalized_sets != current_sets or not getattr(
+                cfg, "_rolling_quote_sets", None
+            ):
                 cfg._rolling_quote_sets = json.dumps(normalized_sets)
-            active_quote_set = str(getattr(cfg, "active_quote_set", "") or "").strip().lower()
+            active_quote_set = (
+                str(getattr(cfg, "active_quote_set", "") or "").strip().lower()
+            )
             if (
                 not active_quote_set
                 or active_quote_set not in normalized_sets
                 or active_quote_set == "default"
             ):
-                cfg.active_quote_set = "motivational" if "motivational" in normalized_sets else "default"
+                cfg.active_quote_set = (
+                    "motivational" if "motivational" in normalized_sets else "default"
+                )
             db.session.commit()
         except Exception:
             try:
@@ -1957,7 +2230,11 @@ class Department(TenantScopedMixin, db.Model):
 
     @handoff_template_checklist.setter
     def handoff_template_checklist(self, values):
-        cleaned = [str(item or "").strip()[:255] for item in (values or []) if str(item or "").strip()]
+        cleaned = [
+            str(item or "").strip()[:255]
+            for item in (values or [])
+            if str(item or "").strip()
+        ]
         self.handoff_template_checklist_json = json.dumps(cleaned)
 
 
@@ -2034,9 +2311,16 @@ class StatusOption(TenantScopedMixin, db.Model):
                 role = None
                 department = None
             elif isinstance(item, dict):
-                name = str(item.get("name") or item.get("label") or item.get("title") or "").strip()
+                name = str(
+                    item.get("name") or item.get("label") or item.get("title") or ""
+                ).strip()
                 role = str(item.get("role") or "").strip().lower() or None
-                department = str(item.get("department") or item.get("dept") or "").strip().upper() or None
+                department = (
+                    str(item.get("department") or item.get("dept") or "")
+                    .strip()
+                    .upper()
+                    or None
+                )
             else:
                 continue
 
@@ -2066,7 +2350,9 @@ class StatusOption(TenantScopedMixin, db.Model):
         stages = self.approval_stages
         if not stages:
             return "No stages"
-        return ", ".join(stage.get("name") or f"Stage {idx + 1}" for idx, stage in enumerate(stages))
+        return ", ".join(
+            stage.get("name") or f"Stage {idx + 1}" for idx, stage in enumerate(stages)
+        )
 
 
 class Workflow(TenantScopedMixin, db.Model):
@@ -2139,7 +2425,10 @@ class UserDepartment(TenantScopedMixin, db.Model):
 
     @property
     def is_temporary(self) -> bool:
-        return str(getattr(self, "assignment_kind", "shared") or "shared").strip().lower() == "temporary"
+        return (
+            str(getattr(self, "assignment_kind", "shared") or "shared").strip().lower()
+            == "temporary"
+        )
 
     @property
     def is_expired(self) -> bool:

@@ -15,9 +15,10 @@ def test_settings_page_includes_camera_demo(app, client):
     """The user settings page should render a demo input and camera button."""
     with app.app_context():
         # make sure a user exists
+        from werkzeug.security import generate_password_hash
+
         from app.extensions import db
         from app.models import User
-        from werkzeug.security import generate_password_hash
 
         u = User(
             email="user@example.com",
@@ -51,11 +52,12 @@ def test_app_js_contains_camera_helpers(app, client):
 def test_request_form_shows_camera_for_verified_field(app, client):
     """A request template with a verified text field renders a camera button."""
     with app.app_context():
+        from werkzeug.security import generate_password_hash
+
         from app.extensions import db
 
         # template model names
-        from app.models import FormTemplate, FormField, DepartmentFormAssignment, User
-        from werkzeug.security import generate_password_hash
+        from app.models import DepartmentFormAssignment, FormField, FormTemplate, User
 
         # create simple template and field
         tmpl = FormTemplate(name="camtest")
@@ -100,9 +102,10 @@ def test_request_form_shows_successive_camera_capture_for_bulk_verified_field(
 ):
     """Bulk-verified fields should render additive camera capture affordances."""
     with app.app_context():
-        from app.extensions import db
-        from app.models import FormTemplate, FormField, DepartmentFormAssignment, User
         from werkzeug.security import generate_password_hash
+
+        from app.extensions import db
+        from app.models import DepartmentFormAssignment, FormField, FormTemplate, User
 
         tmpl = FormTemplate(name="bulkcam", verification_prefill_enabled=True)
         db.session.add(tmpl)
@@ -170,6 +173,7 @@ def test_camera_endpoint_ocr(app, client, monkeypatch):
 
     # create a simple image with text using PIL
     from io import BytesIO
+
     from PIL import Image, ImageDraw, ImageFont
 
     img = Image.new("RGB", (200, 60), color="white")

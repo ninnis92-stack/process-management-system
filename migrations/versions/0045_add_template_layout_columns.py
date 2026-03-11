@@ -5,9 +5,8 @@ Revises: 0044_add_user_quote_interval
 Create Date: 2026-03-08 23:30:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0045_add_template_layout_columns"
@@ -26,7 +25,12 @@ def upgrade():
         if "layout" not in cols:
             op.add_column(
                 "guest_form",
-                sa.Column("layout", sa.String(length=20), nullable=False, server_default="standard"),
+                sa.Column(
+                    "layout",
+                    sa.String(length=20),
+                    nullable=False,
+                    server_default="standard",
+                ),
             )
             op.alter_column("guest_form", "layout", server_default=None)
 
@@ -36,7 +40,12 @@ def upgrade():
         if "layout" not in cols:
             op.add_column(
                 "form_template",
-                sa.Column("layout", sa.String(length=20), nullable=False, server_default="standard"),
+                sa.Column(
+                    "layout",
+                    sa.String(length=20),
+                    nullable=False,
+                    server_default="standard",
+                ),
             )
             op.alter_column("form_template", "layout", server_default=None)
 

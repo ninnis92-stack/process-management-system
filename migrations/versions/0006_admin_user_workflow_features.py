@@ -6,9 +6,8 @@ Create Date: 2026-03-09 22:10:00.000000
 
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0006_admin_user_workflow_features"
@@ -18,24 +17,40 @@ depends_on = None
 
 
 USER_COLUMNS = [
-    sa.Column("preferred_start_page", sa.String(length=40), nullable=True, server_default=sa.text("'dashboard'")),
+    sa.Column(
+        "preferred_start_page",
+        sa.String(length=40),
+        nullable=True,
+        server_default=sa.text("'dashboard'"),
+    ),
     sa.Column("preferred_start_department", sa.String(length=2), nullable=True),
     sa.Column("watched_departments_json", sa.Text(), nullable=True),
-    sa.Column("workflow_role_profile", sa.String(length=40), nullable=True, server_default=sa.text("'member'")),
+    sa.Column(
+        "workflow_role_profile",
+        sa.String(length=40),
+        nullable=True,
+        server_default=sa.text("'member'"),
+    ),
 ]
 
 
 USER_DEPARTMENT_COLUMNS = [
-    sa.Column("assignment_kind", sa.String(length=20), nullable=False, server_default=sa.text("'shared'")),
+    sa.Column(
+        "assignment_kind",
+        sa.String(length=20),
+        nullable=False,
+        server_default=sa.text("'shared'"),
+    ),
     sa.Column("note", sa.String(length=255), nullable=True),
     sa.Column("expires_at", sa.DateTime(), nullable=True),
 ]
 
 
 DEPARTMENT_EDITOR_COLUMNS = [
-    sa.Column("managed_by_profile", sa.Boolean(), nullable=False, server_default=sa.false()),
+    sa.Column(
+        "managed_by_profile", sa.Boolean(), nullable=False, server_default=sa.false()
+    ),
 ]
-
 
 
 def upgrade():
@@ -57,7 +72,6 @@ def upgrade():
             op.add_column("user_department", column)
         for column in DEPARTMENT_EDITOR_COLUMNS:
             op.add_column("department_editor", column)
-
 
 
 def downgrade():

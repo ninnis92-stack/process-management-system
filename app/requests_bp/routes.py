@@ -10,66 +10,51 @@ Prometheus metrics (via `app/metrics.py`) when available.
 import json
 import os
 import re
-import uuid
 import time
+import uuid
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict
-from sqlalchemy import or_, and_, func
-from sqlalchemy.orm import selectinload
+from typing import Dict, List, Optional
 
 from flask import (
-    render_template,
-    redirect,
-    request,
-    url_for,
-    flash,
-    abort,
-    send_file,
-    current_app,
-    jsonify,
     Response,
+    abort,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
     session,
+    url_for,
 )
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
+from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import selectinload
 from werkzeug.utils import secure_filename
 
-from ..extensions import db, get_or_404
 from .. import metrics as metrics_module
+from .. import notifcations as notifications_module
+from ..extensions import db, get_or_404
 from ..models import (
-    Request as ReqModel,
-    Comment,
-    AuditLog,
     Artifact,
-    Submission,
     Attachment,
-    User,
-    Notification,
-    RejectRequestConfig,
+    AuditLog,
+    BucketStatus,
+    Comment,
     DepartmentEditor,
     FeatureFlags,
-    SavedSearchView,
-    RequestApproval,
-    StatusOption,
-)
-from ..models import StatusBucket, BucketStatus
-from .forms import (
-    CommentForm,
-    ArtifactForm,
-    TransitionForm,
-    ToggleCReviewForm,
-    RequestArtifactEditForm,
-    DonorOnlyForm,
-    AssignmentForm,
-)
-from ..models import (
-    Submission as FormSubmission,
     FormField,
     FormFieldOption,
+    Notification,
+    RejectRequestConfig,
 )
+from ..models import Request as ReqModel
+from ..models import RequestApproval, SavedSearchView, StatusBucket, StatusOption
+from ..models import Submission
+from ..models import Submission as FormSubmission
+from ..models import User
 from ..notifcations import notify_users, users_in_department
-from .. import notifcations as notifications_module
-from ..services.ticketing import TicketingClient
-from ..services.verification import VerificationService
 from ..services.integrations import (
     build_handoff_bundle_payload,
     emit_webhook_event,
@@ -80,7 +65,19 @@ from ..services.process_metrics import (
     record_process_metric_event,
 )
 from ..services.tenant_context import tenant_role_for_user
+from ..services.ticketing import TicketingClient
+from ..services.verification import VerificationService
 from ..utils.user_context import get_user_departments
+from . import requests_bp
+from .forms import (
+    ArtifactForm,
+    AssignmentForm,
+    CommentForm,
+    DonorOnlyForm,
+    RequestArtifactEditForm,
+    ToggleCReviewForm,
+    TransitionForm,
+)
 from .permissions import (
     allowed_comment_scopes_for_user,
     can_view_request,
@@ -92,7 +89,6 @@ from .workflow import (
     owner_for_status,
     transition_allowed,
 )
-from . import requests_bp
 
 
 def _metric_departments_for_user(user) -> list[str]:
@@ -130,10 +126,7 @@ def _user_is_dept_head(user, dept: str) -> bool:
     if getattr(user, "is_admin", False):
         return True
     try:
-        row = (
-            DepartmentEditor.query.filter_by(user_id=user.id, department=dept)
-            .first()
-        )
+        row = DepartmentEditor.query.filter_by(user_id=user.id, department=dept).first()
         return bool(row and getattr(row, "can_view_metrics", False))
     except Exception:
         try:
@@ -178,14 +171,17 @@ def _require_metrics_access(user) -> list[str]:
         abort(403)
     return allowed
 
+
 # Optional cache helper (Flask-Caching may not be available in some test envs).
 try:
     from ..extensions import cache
 except Exception:
     cache = None
 
+
 def _make_cache_key(name: str) -> str:
     return f"requests:{name}"
+
 
 def cached_view(timeout: int = 60, prefix: str = None):
     def _decorator(f):
@@ -220,7 +216,9 @@ def _approval_status_codes() -> tuple:
     return tuple(sorted(codes))
 
 
-def _sla_state_for_request(req: ReqModel, now: Optional[datetime] = None) -> Optional[str]:
+def _sla_state_for_request(
+    req: ReqModel, now: Optional[datetime] = None
+) -> Optional[str]:
     now = now or datetime.utcnow()
     due_at = getattr(req, "due_at", None)
     if not due_at or getattr(req, "status", None) == "CLOSED":
@@ -248,7 +246,8 @@ def _mentioned_recipients_for_comment(req: ReqModel, body: str) -> list[User]:
         return []
 
     allowed_user_ids = {
-        getattr(u, "id", None) for u in _users_in_dept(getattr(req, "owner_department", None))
+        getattr(u, "id", None)
+        for u in _users_in_dept(getattr(req, "owner_department", None))
     }
     if getattr(req, "created_by_user_id", None):
         allowed_user_ids.add(req.created_by_user_id)
@@ -286,11 +285,16 @@ def _normalized_saved_view_params(source) -> dict[str, str]:
     raw = {
         "q": (source.get("q") or "").strip(),
         "status": (source.get("status") or "").strip().upper(),
-        "priority": (source.get("priority") or source.get("priority_filter") or "").strip().lower(),
+        "priority": (source.get("priority") or source.get("priority_filter") or "")
+        .strip()
+        .lower(),
         "sla": (source.get("sla") or "").strip().lower(),
-        "approval_only": "1"
-        if (source.get("approval_only") or "").strip().lower() in {"1", "true", "yes", "on"}
-        else "",
+        "approval_only": (
+            "1"
+            if (source.get("approval_only") or "").strip().lower()
+            in {"1", "true", "yes", "on"}
+            else ""
+        ),
     }
     return {k: v for k, v in raw.items() if v}
 
@@ -346,7 +350,12 @@ def _require_assigned_user(req: ReqModel):
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         if assigned_to_user_id is None:
             return jsonify({"ok": False, "message": "Assign the request first."}), 409
-        return jsonify({"ok": False, "message": "This request is assigned to another user."}), 403
+        return (
+            jsonify(
+                {"ok": False, "message": "This request is assigned to another user."}
+            ),
+            403,
+        )
 
     if assigned_to_user_id is None:
         flash("Assign the request before making changes.", "warning")
@@ -364,9 +373,13 @@ def _success_response(message: str, req: ReqModel):
 
 def can_edit_artifact(req: ReqModel, artifact: Artifact, dept: str) -> bool:
     if dept == "A":
-        return bool(req.owner_department == "A" or getattr(artifact, "edit_requested", False))
+        return bool(
+            req.owner_department == "A" or getattr(artifact, "edit_requested", False)
+        )
     if dept == "C":
-        return bool(getattr(req, "requires_c_review", False) or req.status == "PENDING_C_REVIEW")
+        return bool(
+            getattr(req, "requires_c_review", False) or req.status == "PENDING_C_REVIEW"
+        )
     return dept == "B"
 
 
@@ -374,7 +387,9 @@ def can_add_artifact(req: ReqModel, dept: str, artifact_type: Optional[str]) -> 
     if dept == "A":
         return req.owner_department == "A"
     if dept == "C":
-        return bool(getattr(req, "requires_c_review", False) or req.status == "PENDING_C_REVIEW")
+        return bool(
+            getattr(req, "requires_c_review", False) or req.status == "PENDING_C_REVIEW"
+        )
     return dept == "B"
 
 
@@ -527,7 +542,9 @@ APPROVAL_TRANSITIONS_REQUIRING_COMPLETION = {
 }
 
 
-def _role_satisfies_requirement(actual_role: Optional[str], required_role: Optional[str]) -> bool:
+def _role_satisfies_requirement(
+    actual_role: Optional[str], required_role: Optional[str]
+) -> bool:
     if not required_role:
         return True
     return ROLE_PRIORITY.get(actual_role or "", -1) >= ROLE_PRIORITY.get(
@@ -550,8 +567,12 @@ def _current_approval_rows(request_id: int, status_code: Optional[str]):
         return []
     try:
         rows = (
-            RequestApproval.query.filter_by(request_id=request_id, status_code=status_code)
-            .order_by(RequestApproval.cycle_index.desc(), RequestApproval.stage_order.asc())
+            RequestApproval.query.filter_by(
+                request_id=request_id, status_code=status_code
+            )
+            .order_by(
+                RequestApproval.cycle_index.desc(), RequestApproval.stage_order.asc()
+            )
             .all()
         )
     except Exception:
@@ -568,7 +589,9 @@ def _approval_history_rows(request_id: int, status_code: Optional[str]):
     current_rows = _current_approval_rows(request_id, status_code)
     current_cycle = current_rows[0].cycle_index if current_rows else None
     try:
-        query = RequestApproval.query.filter_by(request_id=request_id, status_code=status_code)
+        query = RequestApproval.query.filter_by(
+            request_id=request_id, status_code=status_code
+        )
         if current_cycle is not None:
             query = query.filter(RequestApproval.cycle_index < current_cycle)
         return query.order_by(
@@ -580,7 +603,9 @@ def _approval_history_rows(request_id: int, status_code: Optional[str]):
         return []
 
 
-def _user_can_signoff_approval(approval: RequestApproval, user, cycle_rows=None) -> bool:
+def _user_can_signoff_approval(
+    approval: RequestApproval, user, cycle_rows=None
+) -> bool:
     if not approval or not user or approval.state != "pending":
         return False
     if approval.required_department:
@@ -591,7 +616,11 @@ def _user_can_signoff_approval(approval: RequestApproval, user, cycle_rows=None)
         tenant_role_for_user(user), approval.required_role
     ):
         return False
-    rows = cycle_rows if cycle_rows is not None else _current_approval_rows(approval.request_id, approval.status_code)
+    rows = (
+        cycle_rows
+        if cycle_rows is not None
+        else _current_approval_rows(approval.request_id, approval.status_code)
+    )
     for row in rows or []:
         if row.cycle_index != approval.cycle_index:
             continue
@@ -602,13 +631,21 @@ def _user_can_signoff_approval(approval: RequestApproval, user, cycle_rows=None)
     return True
 
 
-def _approval_cycle_state(request_id: int, status_code: Optional[str], user=None) -> dict:
+def _approval_cycle_state(
+    request_id: int, status_code: Optional[str], user=None
+) -> dict:
     current_rows = _current_approval_rows(request_id, status_code)
     ready = bool(current_rows) and all(row.state == "approved" for row in current_rows)
     blocked = any(row.state == "changes_requested" for row in current_rows)
-    actionable = [
-        row for row in current_rows if _user_can_signoff_approval(row, user, current_rows)
-    ] if user else []
+    actionable = (
+        [
+            row
+            for row in current_rows
+            if _user_can_signoff_approval(row, user, current_rows)
+        ]
+        if user
+        else []
+    )
     return {
         "current_rows": current_rows,
         "history_rows": _approval_history_rows(request_id, status_code),
@@ -616,7 +653,9 @@ def _approval_cycle_state(request_id: int, status_code: Optional[str], user=None
         "blocked": blocked,
         "actionable_rows": actionable,
         "actionable_ids": [row.id for row in actionable],
-        "has_configured_stages": bool(_approval_stage_definitions_for_status(status_code)),
+        "has_configured_stages": bool(
+            _approval_stage_definitions_for_status(status_code)
+        ),
     }
 
 
@@ -744,9 +783,14 @@ def is_transition_valid_for_request(
             return False
 
     # If C review is required: block bypass to final review
-    if requires_c and to_status == "B_FINAL_REVIEW" and from_status in (
-        "NEW_FROM_A",
-        "B_IN_PROGRESS",
+    if (
+        requires_c
+        and to_status == "B_FINAL_REVIEW"
+        and from_status
+        in (
+            "NEW_FROM_A",
+            "B_IN_PROGRESS",
+        )
     ):
         return False
 
@@ -817,17 +861,31 @@ def dashboard():
             nb = StatusBucket(name="New", department_name="B", order=0, active=True)
             db.session.add(nb)
             db.session.flush()
-            db.session.add(BucketStatus(bucket_id=nb.id, status_code="NEW_FROM_A", order=0))
-            ip = StatusBucket(name="In Progress", department_name="B", order=1, active=True)
+            db.session.add(
+                BucketStatus(bucket_id=nb.id, status_code="NEW_FROM_A", order=0)
+            )
+            ip = StatusBucket(
+                name="In Progress", department_name="B", order=1, active=True
+            )
             db.session.add(ip)
             db.session.flush()
-            db.session.add(BucketStatus(bucket_id=ip.id, status_code="B_IN_PROGRESS", order=0))
-            db.session.add(BucketStatus(bucket_id=ip.id, status_code="PENDING_C_REVIEW", order=1))
-            db.session.add(BucketStatus(bucket_id=ip.id, status_code="B_FINAL_REVIEW", order=2))
-            ni = StatusBucket(name="Needs Info", department_name="B", order=2, active=True)
+            db.session.add(
+                BucketStatus(bucket_id=ip.id, status_code="B_IN_PROGRESS", order=0)
+            )
+            db.session.add(
+                BucketStatus(bucket_id=ip.id, status_code="PENDING_C_REVIEW", order=1)
+            )
+            db.session.add(
+                BucketStatus(bucket_id=ip.id, status_code="B_FINAL_REVIEW", order=2)
+            )
+            ni = StatusBucket(
+                name="Needs Info", department_name="B", order=2, active=True
+            )
             db.session.add(ni)
             db.session.flush()
-            db.session.add(BucketStatus(bucket_id=ni.id, status_code="NEEDS_INFO", order=0))
+            db.session.add(
+                BucketStatus(bucket_id=ni.id, status_code="NEEDS_INFO", order=0)
+            )
             db.session.commit()
         except Exception:
             try:
@@ -848,7 +906,9 @@ def dashboard():
     bucket_status_map = {bucket.id: [] for bucket in bucket_list}
     if bucket_status_map:
         bucket_status_rows = (
-            BucketStatus.query.filter(BucketStatus.bucket_id.in_(bucket_status_map.keys()))
+            BucketStatus.query.filter(
+                BucketStatus.bucket_id.in_(bucket_status_map.keys())
+            )
             .order_by(BucketStatus.bucket_id.asc(), BucketStatus.order.asc())
             .all()
         )
@@ -945,7 +1005,7 @@ def dashboard():
             days=now.weekday()
         )
         # bucket_list already prepared above
-        
+
         # first handle bucket selection explicitly (works for any department)
         if bucket_id:
             selected_bucket_mode = True
@@ -1449,8 +1509,7 @@ def assign_bucket():
     status_codes = []
     if b:
         status_codes = [
-            s.status_code
-            for s in b.statuses.order_by(BucketStatus.order.asc()).all()
+            s.status_code for s in b.statuses.order_by(BucketStatus.order.asc()).all()
         ]
 
     # fetch requests that live in this bucket and department
@@ -1536,9 +1595,7 @@ def assign_bucket():
             ).inc()
             metrics_module.update_owner_gauge(db.session, ReqModel)
         except Exception:
-            current_app.logger.exception(
-                "Failed to update metrics on bulk assignment"
-            )
+            current_app.logger.exception("Failed to update metrics on bulk assignment")
     else:
         flash("No assignments changed.", "info")
 
@@ -1580,7 +1637,9 @@ def search_requests():
         )
 
     results = []
-    has_filters = bool(q or status_filter or priority_filter or sla_filter or approval_only)
+    has_filters = bool(
+        q or status_filter or priority_filter or sla_filter or approval_only
+    )
     if has_filters:
         # Numeric queries should match request id exactly, but also look for text in other fields
         qry = base.outerjoin(Artifact, Artifact.request_id == ReqModel.id)
@@ -1757,11 +1816,18 @@ def bulk_update_requests():
             continue
         old_priority = req.priority
         req.priority = new_priority
-        _log(req, "bulk_priority_update", note=f"Priority changed from {old_priority} to {new_priority} via search.")
+        _log(
+            req,
+            "bulk_priority_update",
+            note=f"Priority changed from {old_priority} to {new_priority} via search.",
+        )
         updated += 1
 
     db.session.commit()
-    flash(f"Updated priority on {updated} request{'s' if updated != 1 else ''}.", "success")
+    flash(
+        f"Updated priority on {updated} request{'s' if updated != 1 else ''}.",
+        "success",
+    )
     return redirect(url_for("requests.search_requests", **redirect_kwargs))
 
 
@@ -1797,9 +1863,10 @@ def metrics_ui():
     # admins can change filters; rebuild from unfiltered summary if needed
     if user_filters:
         # rebuild unfiltered snapshot to list all users
-        unfiltered = build_process_metrics_summary(range_key=r, depts=visible_depts, query=q)
+        unfiltered = build_process_metrics_summary(
+            range_key=r, depts=visible_depts, query=q
+        )
         available_users = unfiltered.get("users", [])
-
 
     # export support
     if request.args.get("export") == "csv":
@@ -1817,55 +1884,81 @@ def metrics_ui():
             ]
         ]
         for m in snapshot["by_dept"]:
-            rows.append([
-                m["dept"],
-                m["total"],
-                m["open"],
-                m["created_window"],
-                m["closed_window"],
-                m["tracked_events"],
-                m["avg_completion_hours"] if m["avg_completion_hours"] is not None else "",
-                m["within_target_pct"] if m["within_target_pct"] is not None else "",
-            ])
+            rows.append(
+                [
+                    m["dept"],
+                    m["total"],
+                    m["open"],
+                    m["created_window"],
+                    m["closed_window"],
+                    m["tracked_events"],
+                    (
+                        m["avg_completion_hours"]
+                        if m["avg_completion_hours"] is not None
+                        else ""
+                    ),
+                    (
+                        m["within_target_pct"]
+                        if m["within_target_pct"] is not None
+                        else ""
+                    ),
+                ]
+            )
         # also include user-level breakdown and interactions for a full export
         # users section (always output headers so readers know structure)
         rows.append([])
-        rows.append([
-            "Users",
-            "Department",
-            "Events",
-            "Status changes",
-            "Assignments",
-            "Slow events",
-            "Avg gap (h)",
-            "Avg completion (h)",
-            "Closed count",
-        ])
+        rows.append(
+            [
+                "Users",
+                "Department",
+                "Events",
+                "Status changes",
+                "Assignments",
+                "Slow events",
+                "Avg gap (h)",
+                "Avg completion (h)",
+                "Closed count",
+            ]
+        )
         for u in snapshot.get("users", []):
-            rows.append([
-                u.get("email") or "",
-                u.get("department") or "",
-                u.get("events"),
-                u.get("status_changes"),
-                u.get("assignments"),
-                u.get("slow_events"),
-                u.get("avg_gap_hours") if u.get("avg_gap_hours") is not None else "",
-                u.get("avg_completion_hours") if u.get("avg_completion_hours") is not None else "",
-                u.get("closed_count"),
-            ])
+            rows.append(
+                [
+                    u.get("email") or "",
+                    u.get("department") or "",
+                    u.get("events"),
+                    u.get("status_changes"),
+                    u.get("assignments"),
+                    u.get("slow_events"),
+                    (
+                        u.get("avg_gap_hours")
+                        if u.get("avg_gap_hours") is not None
+                        else ""
+                    ),
+                    (
+                        u.get("avg_completion_hours")
+                        if u.get("avg_completion_hours") is not None
+                        else ""
+                    ),
+                    u.get("closed_count"),
+                ]
+            )
         # interactions section
         rows.append([])
-        rows.append([
-            "From dept",
-            "To dept",
-            "Count",
-        ])
+        rows.append(
+            [
+                "From dept",
+                "To dept",
+                "Count",
+            ]
+        )
         for i in snapshot.get("interactions", []):
-            rows.append([
-                i.get("from_department"),
-                i.get("to_department"),
-                i.get("count"),
-            ])
+            rows.append(
+                [
+                    i.get("from_department"),
+                    i.get("to_department"),
+                    i.get("count"),
+                ]
+            )
         output = []
         for rrow in rows:
             # ensure proper quoting if any commas in text? simple join is ok for now
@@ -1934,14 +2027,21 @@ def metrics_json():
         selected_dept = (request.args.get("dept") or "").strip().upper()
         r = (request.args.get("range") or "weekly").lower()
         q = (request.args.get("q") or "").strip()
-        visible_depts = [selected_dept] if selected_dept in allowed_depts else allowed_depts
+        visible_depts = (
+            [selected_dept] if selected_dept in allowed_depts else allowed_depts
+        )
         user_filters = request.args.getlist("user")
-        snapshot = build_process_metrics_summary(range_key=r, depts=visible_depts, query=q)
+        snapshot = build_process_metrics_summary(
+            range_key=r, depts=visible_depts, query=q
+        )
 
         if user_filters:
             filtered = []
             for u in snapshot.get("users", []):
-                if str(u.get("user_id")) in user_filters or u.get("email") in user_filters:
+                if (
+                    str(u.get("user_id")) in user_filters
+                    or u.get("email") in user_filters
+                ):
                     filtered.append(u)
             snapshot["users"] = filtered
 
@@ -1970,7 +2070,10 @@ def request_detail(request_id: int):
     try:
         req = (
             db.session.query(ReqModel)
-            .options(selectinload(ReqModel.assigned_to_user), selectinload(ReqModel.artifacts))
+            .options(
+                selectinload(ReqModel.assigned_to_user),
+                selectinload(ReqModel.artifacts),
+            )
             .filter(ReqModel.id == request_id)
             .one()
         )
@@ -2230,13 +2333,19 @@ def request_detail(request_id: int):
     # query artifacts directly by request id so the session is used explicitly.
     try:
         has_part_number = (
-            Artifact.query.filter_by(request_id=req.id, artifact_type="part_number").count() > 0
+            Artifact.query.filter_by(
+                request_id=req.id, artifact_type="part_number"
+            ).count()
+            > 0
         )
     except Exception:
         has_part_number = False
     try:
         has_instructions = (
-            Artifact.query.filter_by(request_id=req.id, artifact_type="instructions").count() > 0
+            Artifact.query.filter_by(
+                request_id=req.id, artifact_type="instructions"
+            ).count()
+            > 0
         )
     except Exception:
         has_instructions = False
@@ -2305,7 +2414,11 @@ def request_detail(request_id: int):
         has_instructions=has_instructions,
         next_hint=next_hint,
         now=now,
-        assigned_user=(db.session.get(User, req.assigned_to_user_id) if req.assigned_to_user_id else None),
+        assigned_user=(
+            db.session.get(User, req.assigned_to_user_id)
+            if req.assigned_to_user_id
+            else None
+        ),
         handoff_targets=[
             t for t, _ in possible if handoff_for_transition(req.status, t)
         ],
@@ -2322,7 +2435,9 @@ def request_detail(request_id: int):
     )
 
 
-@requests_bp.route("/requests/<int:request_id>/approvals/<int:approval_id>/decision", methods=["POST"])
+@requests_bp.route(
+    "/requests/<int:request_id>/approvals/<int:approval_id>/decision", methods=["POST"]
+)
 @login_required
 def record_approval_decision(request_id: int, approval_id: int):
     req = get_or_404(ReqModel, request_id)
@@ -2333,7 +2448,10 @@ def record_approval_decision(request_id: int, approval_id: int):
     if approval.request_id != req.id:
         abort(404)
     if req.status != approval.status_code:
-        flash("This approval stage is no longer active for the current request status.", "warning")
+        flash(
+            "This approval stage is no longer active for the current request status.",
+            "warning",
+        )
         return redirect(url_for("requests.request_detail", request_id=request_id))
 
     cycle_rows = _current_approval_rows(req.id, approval.status_code)
@@ -2569,7 +2687,9 @@ def _collect_nudge_targets(req, exclude_user_id=None):
             recipients = []
 
     if exclude_user_id:
-        recipients = [u for u in recipients if getattr(u, "id", None) != exclude_user_id]
+        recipients = [
+            u for u in recipients if getattr(u, "id", None) != exclude_user_id
+        ]
 
     deduped = {
         getattr(u, "id", None): u
@@ -2588,11 +2708,9 @@ def _user_can_change_priority(user, req) -> bool:
     if getattr(user, "is_admin", False):
         return True
     try:
-        de = (
-            DepartmentEditor.query.filter_by(
-                user_id=user.id, department=req.owner_department
-            ).first()
-        )
+        de = DepartmentEditor.query.filter_by(
+            user_id=user.id, department=req.owner_department
+        ).first()
         if de and getattr(de, "can_change_priority", False):
             return True
     except Exception:
@@ -2665,7 +2783,11 @@ def _dispatch_nudge_notifications(
             pass
 
 
-@requests_bp.route("/requests/<int:request_id>/admin_reminder", methods=["POST"], endpoint="admin_reminder")
+@requests_bp.route(
+    "/requests/<int:request_id>/admin_reminder",
+    methods=["POST"],
+    endpoint="admin_reminder",
+)
 @requests_bp.route("/requests/<int:request_id>/admin_nudge", methods=["POST"])
 @login_required
 def admin_nudge(request_id: int):
@@ -2710,7 +2832,11 @@ def admin_nudge(request_id: int):
     return redirect(url_for("requests.request_detail", request_id=req.id))
 
 
-@requests_bp.route("/requests/<int:request_id>/push_reminder", methods=["POST"], endpoint="push_reminder")
+@requests_bp.route(
+    "/requests/<int:request_id>/push_reminder",
+    methods=["POST"],
+    endpoint="push_reminder",
+)
 @requests_bp.route("/requests/<int:request_id>/push_nudge", methods=["POST"])
 @login_required
 def push_nudge(request_id: int):
@@ -2722,7 +2848,9 @@ def push_nudge(request_id: int):
     if getattr(current_user, "daily_nudge_limit", 1):
         from datetime import datetime, timedelta
 
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.utcnow().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         sent_today = (
             Notification.query.filter_by(actor_user_id=current_user.id, type="nudge")
             .filter(Notification.created_at >= today_start)
@@ -2777,7 +2905,11 @@ def change_priority(request_id: int):
     if req.priority != new_priority:
         old = req.priority
         req.priority = new_priority
-        _log(req, "priority_change", note=f"{current_user.email or current_user.name} changed priority from {old} to {new_priority}")
+        _log(
+            req,
+            "priority_change",
+            note=f"{current_user.email or current_user.name} changed priority from {old} to {new_priority}",
+        )
         db.session.commit()
         flash("Priority updated.", "success")
     return redirect(url_for("requests.request_detail", request_id=req.id))
@@ -3341,7 +3473,10 @@ def do_transition(request_id: int):
     try:
         req = (
             db.session.query(ReqModel)
-            .options(selectinload(ReqModel.assigned_to_user), selectinload(ReqModel.artifacts))
+            .options(
+                selectinload(ReqModel.assigned_to_user),
+                selectinload(ReqModel.artifacts),
+            )
             .filter(ReqModel.id == request_id)
             .one()
         )
@@ -3359,7 +3494,9 @@ def do_transition(request_id: int):
         try:
             row = (
                 db.session.query(
-                    ReqModel.owner_department, ReqModel.created_by_user_id, ReqModel.status
+                    ReqModel.owner_department,
+                    ReqModel.created_by_user_id,
+                    ReqModel.status,
                 )
                 .filter(ReqModel.id == request_id)
                 .one()
@@ -3377,7 +3514,10 @@ def do_transition(request_id: int):
             if not enforce:
                 if current_user.department in ("B", "C"):
                     pass
-                elif created_by_user_id == getattr(current_user, "id", None) or owner_dept == "A":
+                elif (
+                    created_by_user_id == getattr(current_user, "id", None)
+                    or owner_dept == "A"
+                ):
                     pass
                 else:
                     abort(403)
@@ -3388,8 +3528,12 @@ def do_transition(request_id: int):
                 if owner_dept == dept:
                     pass
                 else:
-                    sent = Submission.query.filter_by(request_id=request_id, to_department=dept).first()
-                    if not sent and not (dept == "C" and status_val == "PENDING_C_REVIEW"):
+                    sent = Submission.query.filter_by(
+                        request_id=request_id, to_department=dept
+                    ).first()
+                    if not sent and not (
+                        dept == "C" and status_val == "PENDING_C_REVIEW"
+                    ):
                         abort(403)
 
     form = TransitionForm()
@@ -3415,9 +3559,11 @@ def do_transition(request_id: int):
             possible = [
                 (
                     code,
-                    "Pending review from Department A"
-                    if code == "WAITING_ON_A_RESPONSE"
-                    else label,
+                    (
+                        "Pending review from Department A"
+                        if code == "WAITING_ON_A_RESPONSE"
+                        else label
+                    ),
                 )
                 for code, label in choices
             ]
@@ -3434,8 +3580,12 @@ def do_transition(request_id: int):
             if not target_department or target_department in seen_targets:
                 continue
             seen_targets.add(target_department)
-            target_choices.append((target_department, f"Department {target_department}"))
-        form.target_department.choices = [("", "-- Choose department --")] + target_choices
+            target_choices.append(
+                (target_department, f"Department {target_department}")
+            )
+        form.target_department.choices = [
+            ("", "-- Choose department --")
+        ] + target_choices
 
         if not form.validate_on_submit():
             flash("Transition failed validation.", "danger")
@@ -3674,7 +3824,9 @@ def do_transition(request_id: int):
                 req.owner_department = resolved_target_owner
 
             if handoff:
-                recipients = [u for u in _users_in_dept(to_dept) if u.id != current_user.id]
+                recipients = [
+                    u for u in _users_in_dept(to_dept) if u.id != current_user.id
+                ]
                 notify_users(
                     recipients,
                     title=f"New handoff: {from_dept} → {to_dept} (Request #{req.id})",
@@ -3707,21 +3859,33 @@ def do_transition(request_id: int):
                         if not bundle_options.get("include_attachments", True):
                             payload["attachments"] = []
 
-                        if cfg.kind == "ticketing" and bundle_options.get("create_ticket", True):
+                        if cfg.kind == "ticketing" and bundle_options.get(
+                            "create_ticket", True
+                        ):
                             tc.create_ticket(
                                 f"Handoff bundle for Request #{req.id}",
                                 json.dumps(payload, default=str, indent=2),
-                                metadata={"request_id": req.id, "dept": to_dept, **cfg_data},
+                                metadata={
+                                    "request_id": req.id,
+                                    "dept": to_dept,
+                                    **cfg_data,
+                                },
                             )
                         elif cfg.kind == "webhook":
-                            target_url = cfg_data.get("url") or (cfg_data.get("endpoints") or {}).get("url")
+                            target_url = cfg_data.get("url") or (
+                                cfg_data.get("endpoints") or {}
+                            ).get("url")
                             if not target_url:
                                 continue
                             requests = __import__("requests")
                             headers = {"Content-Type": "application/json"}
                             if cfg_data.get("token"):
-                                headers["Authorization"] = f"Bearer {cfg_data.get('token')}"
-                            payload["event"] = bundle_options.get("event_name") or "handoff_bundle"
+                                headers["Authorization"] = (
+                                    f"Bearer {cfg_data.get('token')}"
+                                )
+                            payload["event"] = (
+                                bundle_options.get("event_name") or "handoff_bundle"
+                            )
                             requests.post(
                                 target_url,
                                 json=payload,
@@ -3729,7 +3893,9 @@ def do_transition(request_id: int):
                                 timeout=5,
                             )
                 except Exception:
-                    current_app.logger.exception("Failed to emit handoff bundle integration payload")
+                    current_app.logger.exception(
+                        "Failed to emit handoff bundle integration payload"
+                    )
 
         req.status = to_status
         req.owner_department = resolved_target_owner
@@ -3779,7 +3945,9 @@ def do_transition(request_id: int):
 
             if assigned_id:
                 previous = db.session.get(User, assigned_id)
-                prev_label = (previous.name or previous.email) if previous else "Unassigned"
+                prev_label = (
+                    (previous.name or previous.email) if previous else "Unassigned"
+                )
 
                 try:
                     db.session.query(ReqModel).filter(ReqModel.id == request_id).update(
@@ -3813,7 +3981,9 @@ def do_transition(request_id: int):
                             [previous],
                             title=f"Assignment cleared on Request #{request_id}",
                             body="Your assignment was cleared because the request was sent to Department A.",
-                            url=url_for("requests.request_detail", request_id=request_id),
+                            url=url_for(
+                                "requests.request_detail", request_id=request_id
+                            ),
                             ntype="assignment_cleared",
                             request_id=request_id,
                         )
@@ -3866,7 +4036,9 @@ def do_transition(request_id: int):
                     if not opt.notify_enabled:
                         send_notification = False
                     elif opt.notify_on_transfer_only:
-                        prev_owner = owner_for_status(from_status) if from_status else None
+                        prev_owner = (
+                            owner_for_status(from_status) if from_status else None
+                        )
                         new_owner = owner_for_status(to_status)
                         if prev_owner == new_owner:
                             send_notification = False
@@ -3889,7 +4061,10 @@ def do_transition(request_id: int):
                             owner_recipients = []
                         # the assigned user should still get updates even if
                         # the admin opted to notify only the originator
-                        if req.assigned_to_user and req.assigned_to_user.id != current_user.id:
+                        if (
+                            req.assigned_to_user
+                            and req.assigned_to_user.id != current_user.id
+                        ):
                             if req.assigned_to_user not in owner_recipients:
                                 owner_recipients.append(req.assigned_to_user)
                 except Exception:
@@ -3964,7 +4139,9 @@ def do_transition(request_id: int):
                                     "Failed to POST webhook for integration"
                                 )
                 except Exception:
-                    current_app.logger.exception("Failed to process integration configs")
+                    current_app.logger.exception(
+                        "Failed to process integration configs"
+                    )
 
         if req.created_by_user_id and req.created_by_user_id != current_user.id:
             creator = db.session.get(User, req.created_by_user_id)
@@ -4017,7 +4194,10 @@ def do_transition(request_id: int):
         try:
             req = (
                 db.session.query(ReqModel)
-                .options(selectinload(ReqModel.assigned_to_user), selectinload(ReqModel.artifacts))
+                .options(
+                    selectinload(ReqModel.assigned_to_user),
+                    selectinload(ReqModel.artifacts),
+                )
                 .filter(ReqModel.id == request_id)
                 .one()
             )
@@ -4087,7 +4267,11 @@ def assign_request(request_id: int):
             return redirect(url_for("requests.request_detail", request_id=req.id))
 
     # Re-query previous assignee from the session to avoid DetachedInstanceError
-    previous = db.session.get(User, req.assigned_to_user_id) if req.assigned_to_user_id else None
+    previous = (
+        db.session.get(User, req.assigned_to_user_id)
+        if req.assigned_to_user_id
+        else None
+    )
     if (previous.id if previous else None) == (
         new_assignee.id if new_assignee else None
     ):

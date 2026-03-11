@@ -9,6 +9,7 @@ non-zero status if any request returns 5xx.
 """
 
 import sys
+
 from app import create_app
 
 CHECKS = [

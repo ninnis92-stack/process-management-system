@@ -1,5 +1,6 @@
 import os
 import warnings
+
 import pytest
 
 try:  # urllib3<2 does not define NotOpenSSLWarning
@@ -7,9 +8,10 @@ try:  # urllib3<2 does not define NotOpenSSLWarning
 except Exception:  # noqa: BLE001
     NotOpenSSLWarning = None
 
+import hashlib
+
 from app import create_app
 from app.extensions import db
-import hashlib
 
 # Some Python environments (notably older macOS builds) may not expose hashlib.scrypt.
 # Werkzeug's generate_password_hash uses scrypt by default; provide a lightweight
@@ -32,6 +34,7 @@ def app(monkeypatch):
     # same data without worrying about pooling behavior.  The temporary file is
     # removed when the fixture completes.
     import tempfile
+
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{path}")

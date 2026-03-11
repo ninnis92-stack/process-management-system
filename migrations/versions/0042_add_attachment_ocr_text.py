@@ -5,19 +5,19 @@ Revises: 0041_drop_user_show_hints
 Create Date: 2026-03-08 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = '0042_add_attachment_ocr_text'
-down_revision = '0041_drop_user_show_hints'
+revision = "0042_add_attachment_ocr_text"
+down_revision = "0041_drop_user_show_hints"
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
-    op.add_column('attachment', sa.Column('ocr_text', sa.Text(), nullable=True))
+    op.add_column("attachment", sa.Column("ocr_text", sa.Text(), nullable=True))
 
 
 def downgrade():
-    op.drop_column('attachment', 'ocr_text')
+    op.drop_column("attachment", "ocr_text")

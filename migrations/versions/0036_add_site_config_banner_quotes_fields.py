@@ -5,9 +5,8 @@ Revises: 0035_add_sso_department_override
 Create Date: 2026-03-08 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0036_add_site_config_banner_quotes_fields"
@@ -26,15 +25,38 @@ def upgrade():
     if "site_config" in insp.get_table_names():
         cols = {c["name"] for c in insp.get_columns("site_config")}
         if "navbar_banner" not in cols:
-            op.add_column("site_config", sa.Column("navbar_banner", sa.String(length=500), nullable=True))
+            op.add_column(
+                "site_config",
+                sa.Column("navbar_banner", sa.String(length=500), nullable=True),
+            )
         if "show_banner" not in cols:
-            op.add_column("site_config", sa.Column("show_banner", sa.Boolean(), nullable=False, server_default=sa.text('false')))
+            op.add_column(
+                "site_config",
+                sa.Column(
+                    "show_banner",
+                    sa.Boolean(),
+                    nullable=False,
+                    server_default=sa.text("false"),
+                ),
+            )
         if "rolling_quotes" not in cols:
-            op.add_column("site_config", sa.Column("rolling_quotes", sa.Text(), nullable=True))
+            op.add_column(
+                "site_config", sa.Column("rolling_quotes", sa.Text(), nullable=True)
+            )
         if "rolling_quote_sets" not in cols:
-            op.add_column("site_config", sa.Column("rolling_quote_sets", sa.Text(), nullable=True))
+            op.add_column(
+                "site_config", sa.Column("rolling_quote_sets", sa.Text(), nullable=True)
+            )
         if "active_quote_set" not in cols:
-            op.add_column("site_config", sa.Column("active_quote_set", sa.String(length=80), nullable=True, server_default='default'))
+            op.add_column(
+                "site_config",
+                sa.Column(
+                    "active_quote_set",
+                    sa.String(length=80),
+                    nullable=True,
+                    server_default="default",
+                ),
+            )
         if "updated_at" not in cols:
             # the updated_at column is populated by the model; using server_default
             # avoids problems with existing rows.

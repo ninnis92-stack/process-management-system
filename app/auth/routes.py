@@ -1,41 +1,37 @@
+from urllib.parse import urlparse
+
 from flask import (
     Blueprint,
-    render_template,
-    redirect,
-    url_for,
-    flash,
     current_app,
-    session,
-    request,
+    flash,
     jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
 )
-from urllib.parse import urlparse
 from werkzeug.security import check_password_hash
 
 try:
     import pyotp
 except Exception:
     pyotp = None
-from flask_login import login_user, logout_user, login_required, current_user
-
-from .forms import LoginForm, SettingsForm
-from ..models import User
-from ..models import FeatureFlags
-from ..extensions import db
-from .sso import oauth
-from .sso import token_has_mfa
-from .sso import sso_user_is_admin
-from .sso import sso_user_department
-from sqlalchemy.exc import OperationalError
 from flask import session as _session
-from ..models import UserDepartment, Department
-from ..services.tenant_context import ensure_user_tenant_membership, set_active_tenant
+from flask_login import current_user, login_required, login_user, logout_user
+from sqlalchemy.exc import OperationalError
+
+from ..extensions import db
+from ..models import Department, FeatureFlags, User, UserDepartment
 from ..security import rate_limit
+from ..services.tenant_context import ensure_user_tenant_membership, set_active_tenant
 from ..utils.user_context import (
     get_user_departments,
     is_external_theme_active,
     user_can_access_department,
 )
+from .forms import LoginForm, SettingsForm
+from .sso import oauth, sso_user_department, sso_user_is_admin, token_has_mfa
 
 
 def _restore_last_active_dept_for_user(user):
@@ -105,8 +101,12 @@ def _sync_current_user_preferences(user):
         current_user.vibe_index = getattr(user, "vibe_index", None)
         current_user.quote_set = getattr(user, "quote_set", None)
         current_user.quote_interval = getattr(user, "quote_interval", None)
-        current_user.preferred_start_page = getattr(user, "preferred_start_page", "dashboard")
-        current_user.preferred_start_department = getattr(user, "preferred_start_department", None)
+        current_user.preferred_start_page = getattr(
+            user, "preferred_start_page", "dashboard"
+        )
+        current_user.preferred_start_department = getattr(
+            user, "preferred_start_department", None
+        )
     except Exception:
         pass
 
@@ -126,15 +126,25 @@ def _authenticated_user_home_url(user):
     if not user:
         return url_for("requests.dashboard")
 
-    preferred_page = str(getattr(user, "preferred_start_page", "dashboard") or "dashboard").strip().lower() or "dashboard"
-    preferred_dept = str(getattr(user, "preferred_start_department", "") or "").strip().upper()
+    preferred_page = (
+        str(getattr(user, "preferred_start_page", "dashboard") or "dashboard")
+        .strip()
+        .lower()
+        or "dashboard"
+    )
+    preferred_dept = (
+        str(getattr(user, "preferred_start_department", "") or "").strip().upper()
+    )
     allowed_depts = set(get_user_departments(user))
     if preferred_dept and preferred_dept in allowed_depts:
         _session["active_dept"] = preferred_dept
 
     if getattr(user, "is_admin", False):
         if preferred_page == "admin_monitor":
-            return url_for("admin.monitor", dept=preferred_dept or getattr(user, "department", "B") or "B")
+            return url_for(
+                "admin.monitor",
+                dept=preferred_dept or getattr(user, "department", "B") or "B",
+            )
         if preferred_page == "metrics":
             return url_for("admin.metrics_config")
         if preferred_page == "search":
@@ -166,7 +176,9 @@ def _restore_user_department_context(user):
     """
     try:
         depts = _get_user_departments(user)
-        preferred = (getattr(user, "preferred_start_department", None) or "").strip().upper()
+        preferred = (
+            (getattr(user, "preferred_start_department", None) or "").strip().upper()
+        )
         if preferred and preferred in depts:
             _session["active_dept"] = preferred
             return
@@ -174,7 +186,9 @@ def _restore_user_department_context(user):
             _restore_last_active_dept_for_user(user)
             if _session.get("active_dept"):
                 return
-        _session["active_dept"] = depts[0] if depts else getattr(user, "department", None)
+        _session["active_dept"] = (
+            depts[0] if depts else getattr(user, "department", None)
+        )
     except Exception:
         pass
 
@@ -207,6 +221,7 @@ VIBE_PALETTE_CHOICES = [
     (24, "Aurora · Aurora"),
 ]
 
+
 def _normalize_vibe_index(vibe_index):
     try:
         parsed = int(vibe_index)
@@ -230,7 +245,14 @@ def _is_vibe_feature_enabled():
         return True
 
 
-def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None, vibe_feature_enabled=None, partial=False):
+def _apply_user_preference_updates(
+    user,
+    payload,
+    *,
+    external_theme_loaded=None,
+    vibe_feature_enabled=None,
+    partial=False,
+):
     if not user or payload is None:
         return {}
 
@@ -241,27 +263,39 @@ def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None,
 
     updated = {}
 
-    if _setting_present(payload, "dark_mode") or _setting_present(payload, "dark_mode_present"):
+    if _setting_present(payload, "dark_mode") or _setting_present(
+        payload, "dark_mode_present"
+    ):
         user.dark_mode = _coerce_checkbox_value(payload.get("dark_mode"))
         updated["dark_mode"] = bool(user.dark_mode)
 
-    if _setting_present(payload, "quotes_enabled") or _setting_present(payload, "quotes_enabled_present"):
+    if _setting_present(payload, "quotes_enabled") or _setting_present(
+        payload, "quotes_enabled_present"
+    ):
         user.quotes_enabled = _coerce_checkbox_value(payload.get("quotes_enabled"))
         updated["quotes_enabled"] = bool(user.quotes_enabled)
 
-    if _setting_present(payload, "vibe_button_enabled") or _setting_present(payload, "vibe_button_enabled_present"):
-        user.vibe_button_enabled = _coerce_checkbox_value(payload.get("vibe_button_enabled"))
+    if _setting_present(payload, "vibe_button_enabled") or _setting_present(
+        payload, "vibe_button_enabled_present"
+    ):
+        user.vibe_button_enabled = _coerce_checkbox_value(
+            payload.get("vibe_button_enabled")
+        )
         updated["vibe_button_enabled"] = bool(user.vibe_button_enabled)
 
-    if _setting_present(payload, "onboarding_guidance_enabled") or _setting_present(payload, "onboarding_guidance_enabled_present"):
+    if _setting_present(payload, "onboarding_guidance_enabled") or _setting_present(
+        payload, "onboarding_guidance_enabled_present"
+    ):
         user.onboarding_guidance_enabled = _coerce_checkbox_value(
             payload.get("onboarding_guidance_enabled")
         )
-        updated["onboarding_guidance_enabled"] = bool(
-            user.onboarding_guidance_enabled
-        )
+        updated["onboarding_guidance_enabled"] = bool(user.onboarding_guidance_enabled)
 
-    if not external_theme_loaded and vibe_feature_enabled and _setting_present(payload, "vibe_index"):
+    if (
+        not external_theme_loaded
+        and vibe_feature_enabled
+        and _setting_present(payload, "vibe_index")
+    ):
         raw_vibe = payload.get("vibe_index")
         if raw_vibe in (None, ""):
             user.vibe_index = None
@@ -281,13 +315,17 @@ def _apply_user_preference_updates(user, payload, *, external_theme_loaded=None,
 
     if _setting_present(payload, "quote_set"):
         quote_set = payload.get("quote_set")
-        user.quote_set = (str(quote_set).strip() or None) if quote_set is not None else None
+        user.quote_set = (
+            (str(quote_set).strip() or None) if quote_set is not None else None
+        )
         updated["quote_set"] = getattr(user, "quote_set", None)
 
     if _setting_present(payload, "quote_interval"):
         raw_interval = payload.get("quote_interval")
         try:
-            user.quote_interval = int(raw_interval) if str(raw_interval or "").strip() else None
+            user.quote_interval = (
+                int(raw_interval) if str(raw_interval or "").strip() else None
+            )
         except Exception:
             pass
         updated["quote_interval"] = getattr(user, "quote_interval", None)
@@ -325,7 +363,10 @@ def _sync_primary_department_from_sso(user, userinfo):
             return
 
         resolved_department = sso_user_department(userinfo, current_app.config)
-        if resolved_department and getattr(user, "department", None) != resolved_department:
+        if (
+            resolved_department
+            and getattr(user, "department", None) != resolved_department
+        ):
             user.department = resolved_department
     except Exception:
         current_app.logger.exception(
@@ -445,8 +486,8 @@ def sso_callback():
     # /auth/choose_dept page.  We still respect a `next` URL if present so that
     # automated flows continue to work.
     if getattr(user, "is_admin", False):
-        next_url = request.args.get('next') or request.form.get('next')
-        if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+        next_url = request.args.get("next") or request.form.get("next")
+        if next_url and next_url.startswith("/") and not next_url.startswith("//"):
             return redirect(next_url)
         return redirect(_authenticated_user_home_url(user))
     try:
@@ -478,7 +519,9 @@ def settings():
     all_palettes = list(VIBE_PALETTE_CHOICES)
     vibe_feature_enabled = _is_vibe_feature_enabled()
     form.vibe_index.choices = all_palettes
-    form.vibe_index.data = _normalize_vibe_index(getattr(current_user, "vibe_index", None))
+    form.vibe_index.data = _normalize_vibe_index(
+        getattr(current_user, "vibe_index", None)
+    )
     # populate quote-set choices from site config defaults
     try:
         from ..models import SiteConfig
@@ -502,12 +545,12 @@ def settings():
     # quote interval choices already defined on the form; preselect user's
     # current value if available or fall back to site default
     try:
-        if hasattr(current_user, 'quote_interval') and current_user.quote_interval:
+        if hasattr(current_user, "quote_interval") and current_user.quote_interval:
             form.quote_interval.data = current_user.quote_interval
         else:
             # use site config default
             cfg = SiteConfig.get()
-            form.quote_interval.data = getattr(cfg, 'rolling_quote_interval_default', 8)
+            form.quote_interval.data = getattr(cfg, "rolling_quote_interval_default", 8)
     except Exception:
         form.quote_interval.data = None
     if form.validate_on_submit():
@@ -653,8 +696,13 @@ def switch_department():
         return jsonify({"ok": True, "active_dept": dept})
     # if we landed here from the login flow and a next-url was preserved,
     # redirect there now that the department has been chosen
-    next_url = _session.pop('next_after_choose_dept', None)
-    if next_url and isinstance(next_url, str) and next_url.startswith('/') and not next_url.startswith('//'):
+    next_url = _session.pop("next_after_choose_dept", None)
+    if (
+        next_url
+        and isinstance(next_url, str)
+        and next_url.startswith("/")
+        and not next_url.startswith("//")
+    ):
         return redirect(next_url)
     return redirect(url_for("requests.dashboard"))
 
@@ -664,7 +712,9 @@ def switch_department():
 @rate_limit("login", config_key="LOGIN_RATE_LIMIT", default="5/300")
 def login():
     if current_user.is_authenticated and request.method == "GET":
-        return redirect(_safe_login_redirect_target() or _authenticated_user_home_url(current_user))
+        return redirect(
+            _safe_login_redirect_target() or _authenticated_user_home_url(current_user)
+        )
 
     form = LoginForm()
     # Clear any pre-filled email when rendering the login page via GET so
@@ -887,7 +937,7 @@ def totp_verify():
         session["totp_verified"] = True
         # TOTP flow also honours admin landing
         if getattr(u, "is_admin", False):
-                return redirect(_authenticated_user_home_url(u))
+            return redirect(_authenticated_user_home_url(u))
         try:
             _restore_user_department_context(u)
         except Exception:

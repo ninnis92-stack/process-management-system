@@ -1,9 +1,9 @@
+import os
 from importlib import import_module
 from typing import TYPE_CHECKING
-import os
 
-from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
+from flask_sqlalchemy import SQLAlchemy
 
 try:
     _fc = import_module("flask_caching")

@@ -1,24 +1,27 @@
 import os
+from datetime import datetime
+
+from flask import jsonify, request
 from sqlalchemy import inspect as sa_inspect
 
-from app import create_app
-from app import csrf
-from flask import jsonify, request
-from app.models import (
-    FormTemplate,
-    FormField,
-    FormFieldOption,
-    Request as ReqModel,
-    TemplateSwapRule,
-    WebhookSubscription,
-)
+from app import create_app, csrf
 from app.extensions import db, get_or_404
-from datetime import datetime
+from app.models import FormField, FormFieldOption, FormTemplate
+from app.models import Request as ReqModel
+from app.models import TemplateSwapRule, WebhookSubscription
 from app.services.integrations import fetch_external_data, serialize_request
-from app.services.request_creation import run_template_field_verifications
-from app.services.request_creation import build_template_spec, group_template_spec_by_section
+from app.services.request_creation import (
+    build_template_spec,
+    group_template_spec_by_section,
+    run_template_field_verifications,
+)
 
 app = create_app()
+
+# for backwards compatibility during migration we redirect unversioned
+# requests to the latest version.  This is intentionally simple and can be
+# removed once clients are updated.
+from flask import redirect
 
 # older modules may import this file directly; the application factory
 # takes care of registering the versioned blueprint.  We still import it here
@@ -26,11 +29,6 @@ app = create_app()
 # are executed.
 from app.api.v1 import api_v1_bp  # noqa: F401
 
-
-# for backwards compatibility during migration we redirect unversioned
-# requests to the latest version.  This is intentionally simple and can be
-# removed once clients are updated.
-from flask import redirect
 
 @app.route("/api/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 def _api_catch_all(subpath):
@@ -83,10 +81,15 @@ def api_templates():
     for t in templates:
         tfields = []
         # fields relationship returns a plain list; sort by order attribute if present
-        for f in sorted(list(getattr(t, "fields", [])), key=lambda fld: getattr(fld, "order", 0)):
+        for f in sorted(
+            list(getattr(t, "fields", [])), key=lambda fld: getattr(fld, "order", 0)
+        ):
             opts = [
                 dict(value=o.value, label=o.label)
-                for o in sorted(list(getattr(f, "options", [])), key=lambda o: getattr(o, "order", 0))
+                for o in sorted(
+                    list(getattr(f, "options", [])),
+                    key=lambda o: getattr(o, "order", 0),
+                )
             ]
             tfields.append(
                 dict(
@@ -99,7 +102,13 @@ def api_templates():
                 )
             )
         out.append(
-            dict(id=t.id, name=t.name, description=t.description, layout=getattr(t, "layout", "standard"), fields=tfields)
+            dict(
+                id=t.id,
+                name=t.name,
+                description=t.description,
+                layout=getattr(t, "layout", "standard"),
+                fields=tfields,
+            )
         )
     return jsonify({"ok": True, "templates": out})
 
@@ -118,7 +127,9 @@ def api_template_verify(template_id: int):
         # attempt to use ORM ordering if available
         fields = sorted(list(t.fields), key=lambda field: getattr(field, "order", 0))
     except Exception:
-        fields = sorted(list(t.fields or []), key=lambda field: getattr(field, "order", 0))
+        fields = sorted(
+            list(t.fields or []), key=lambda field: getattr(field, "order", 0)
+        )
     verification_results = run_template_field_verifications(fields, data)
     results = {}
     for f in fields:
@@ -126,7 +137,14 @@ def api_template_verify(template_id: int):
         results[f.name] = verification_results.get(f.name) or {"ok": True, "value": val}
         results[f.name].setdefault("value", val)
 
-    return jsonify({"ok": True, "template_id": t.id, "layout": getattr(t, "layout", "standard"), "results": results})
+    return jsonify(
+        {
+            "ok": True,
+            "template_id": t.id,
+            "layout": getattr(t, "layout", "standard"),
+            "results": results,
+        }
+    )
 
 
 @app.route("/api/templates/<int:template_id>/external-schema", methods=["GET"])
@@ -136,10 +154,15 @@ def api_template_external_schema(template_id: int):
         return jsonify({"ok": False, "error": "auth_required"}), 401
 
     t = get_or_404(FormTemplate, template_id)
-    fields = sorted(list(getattr(t, "fields", []) or []), key=lambda field: getattr(field, "order", 0))
+    fields = sorted(
+        list(getattr(t, "fields", []) or []),
+        key=lambda field: getattr(field, "order", 0),
+    )
     spec = build_template_spec(
         fields,
-        verification_prefill_enabled=bool(getattr(t, "verification_prefill_enabled", False)),
+        verification_prefill_enabled=bool(
+            getattr(t, "verification_prefill_enabled", False)
+        ),
     )
     return jsonify(
         {
@@ -213,9 +236,15 @@ def api_template_swap():
         return jsonify({"ok": True, "swap": False})
 
     t = get_or_404(FormTemplate, rule.target_template_id)
-    fields = sorted(list(getattr(t, "fields", []) or []), key=lambda field: getattr(field, "order", 0))
+    fields = sorted(
+        list(getattr(t, "fields", []) or []),
+        key=lambda field: getattr(field, "order", 0),
+    )
     spec = build_template_spec(
-        fields, verification_prefill_enabled=bool(getattr(t, "verification_prefill_enabled", False))
+        fields,
+        verification_prefill_enabled=bool(
+            getattr(t, "verification_prefill_enabled", False)
+        ),
     )
     return jsonify(
         {
@@ -266,7 +295,9 @@ def api_webhook_subscriptions():
         return jsonify({"ok": False, "error": "auth_required"}), 401
 
     if request.method == "GET":
-        subs = WebhookSubscription.query.order_by(WebhookSubscription.created_at.desc()).all()
+        subs = WebhookSubscription.query.order_by(
+            WebhookSubscription.created_at.desc()
+        ).all()
         return jsonify(
             {
                 "ok": True,
@@ -276,7 +307,9 @@ def api_webhook_subscriptions():
                         "url": s.url,
                         "events": s.events or [],
                         "active": bool(s.active),
-                        "created_at": s.created_at.isoformat() if s.created_at else None,
+                        "created_at": (
+                            s.created_at.isoformat() if s.created_at else None
+                        ),
                     }
                     for s in subs
                 ],

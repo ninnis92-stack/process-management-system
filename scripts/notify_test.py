@@ -1,6 +1,6 @@
 from app import create_app
 from app.extensions import db
-from app.models import User, Notification
+from app.models import Notification, User
 from app.notifcations import notify_users
 
 

@@ -3,7 +3,9 @@ from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import FeatureFlags, Notification, Request as ReqModel, User
+from app.models import FeatureFlags, Notification
+from app.models import Request as ReqModel
+from app.models import User
 
 
 def test_user_push_nudge_obeys_feature_flag(app, client):

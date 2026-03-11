@@ -1,7 +1,8 @@
 import pytest
 from werkzeug.security import generate_password_hash
-from app.models import FormTemplate, DepartmentFormAssignment, User, UserDepartment
+
 from app.extensions import db
+from app.models import DepartmentFormAssignment, FormTemplate, User, UserDepartment
 
 
 def login_admin(client, email="admin-assign@example.com", password="secret"):

@@ -39,7 +39,10 @@ def test_login_page_makes_sso_option_clear_when_enabled(client, app):
     assert response.status_code == 200
     assert b"Continue with SSO" in response.data
     assert b"Or use local credentials" in response.data
-    assert b"Use email and password only if an administrator gave you local credentials" in response.data
+    assert (
+        b"Use email and password only if an administrator gave you local credentials"
+        in response.data
+    )
 
 
 def test_timestamped_webhook_replay_is_rejected(app, client, monkeypatch):
@@ -83,7 +86,9 @@ def test_inbound_mail_requires_valid_signature(client, app):
 
     response = client.post(
         "/integrations/inbound-mail",
-        data=json.dumps({"from": "user@example.com", "subject": "hello"}).encode("utf-8"),
+        data=json.dumps({"from": "user@example.com", "subject": "hello"}).encode(
+            "utf-8"
+        ),
         headers={"Content-Type": "application/json", "X-Webhook-Signature": "bad"},
     )
 

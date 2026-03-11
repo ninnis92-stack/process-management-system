@@ -1,8 +1,12 @@
-import pytest
-from app.extensions import db
-from app.models import User, Request as ReqModel, StatusBucket, BucketStatus
-from werkzeug.security import generate_password_hash
 from datetime import datetime, timedelta
+
+import pytest
+from werkzeug.security import generate_password_hash
+
+from app.extensions import db
+from app.models import BucketStatus
+from app.models import Request as ReqModel
+from app.models import StatusBucket, User
 
 
 def login_admin(client, email="admin@example.com", password="secret"):
@@ -67,7 +71,9 @@ def test_bucket_import_and_filtering(app, client):
             ua = StatusBucket.query.filter_by(
                 name="Unassigned", department_name=dept_code
             ).first()
-            assert ua is not None, f"Unassigned bucket should be auto-created for Dept {dept_code}"
+            assert (
+                ua is not None
+            ), f"Unassigned bucket should be auto-created for Dept {dept_code}"
         unassigned = StatusBucket.query.filter_by(
             name="Unassigned", department_name="B"
         ).first()
@@ -110,16 +116,24 @@ def test_bucket_filtering_other_departments(app, client):
         db.session.commit()
 
         # dept A bucket
-        a_bucket = StatusBucket(name="A Bucket", department_name="A", order=0, active=True)
+        a_bucket = StatusBucket(
+            name="A Bucket", department_name="A", order=0, active=True
+        )
         db.session.add(a_bucket)
         db.session.flush()
-        db.session.add(BucketStatus(bucket_id=a_bucket.id, status_code="A_SPECIAL", order=0))
+        db.session.add(
+            BucketStatus(bucket_id=a_bucket.id, status_code="A_SPECIAL", order=0)
+        )
 
         # dept C bucket
-        c_bucket = StatusBucket(name="C Bucket", department_name="C", order=0, active=True)
+        c_bucket = StatusBucket(
+            name="C Bucket", department_name="C", order=0, active=True
+        )
         db.session.add(c_bucket)
         db.session.flush()
-        db.session.add(BucketStatus(bucket_id=c_bucket.id, status_code="PENDING_C_REVIEW", order=0))
+        db.session.add(
+            BucketStatus(bucket_id=c_bucket.id, status_code="PENDING_C_REVIEW", order=0)
+        )
 
         # requests for A
         rA1 = ReqModel(

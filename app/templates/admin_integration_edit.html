@@ -33,6 +33,10 @@
     </div>
     <div class="mt-3">
       <button class="btn btn-primary" type="submit">Save</button>
+      {% if integration %}
+        <button id="testIntegrationBtn" type="button" class="btn btn-outline-info">Test</button>
+        <button id="revealIntegrationBtn" type="button" class="btn btn-outline-secondary">Reveal secrets</button>
+      {% endif %}
       <a href="{{ url_for('admin.list_integrations') }}" class="btn btn-secondary">Cancel</a>
     </div>
   </form>
@@ -75,4 +79,68 @@
       updatePreview();
     })();
   </script>
+  {% if integration %}
+  <script>
+    (function(){
+      const testBtn = document.getElementById('testIntegrationBtn');
+      const revealBtn = document.getElementById('revealIntegrationBtn');
+      const resultShell = document.createElement('pre');
+      resultShell.className = 'bg-dark text-white p-3 mt-3';
+      resultShell.style.whiteSpace = 'pre-wrap';
+      if (testBtn) {
+        testBtn.addEventListener('click', function(){
+          try {
+            testBtn.disabled = true;
+            testBtn.innerText = 'Testing…';
+            fetch('{{ url_for("admin.test_integration", int_id=integration.id) }}', { method: 'POST', headers: {'Content-Type':'application/json'} })
+              .then(r => r.json())
+              .then(j => {
+                resultShell.textContent = JSON.stringify(j, null, 2);
+                testBtn.parentNode.insertBefore(resultShell, testBtn.nextSibling);
+              }).catch(e => {
+                resultShell.textContent = 'Test failed: ' + String(e);
+                testBtn.parentNode.insertBefore(resultShell, testBtn.nextSibling);
+              }).finally(()=>{
+                testBtn.disabled = false;
+                testBtn.innerText = 'Test';
+              });
+          } catch (e) {
+            console.warn(e);
+          }
+        });
+      }
+      if (revealBtn) {
+        revealBtn.addEventListener('click', function(){
+          try {
+            if (!window.confirm('Revealing secret references will be recorded in the audit log. Continue?')) return;
+            revealBtn.disabled = true;
+            revealBtn.innerText = 'Checking…';
+            fetch('{{ url_for("admin.reveal_integration_secrets", int_id=integration.id) }}', { method: 'POST', headers: {'Content-Type':'application/json'} })
+              .then(r => r.json())
+              .then(j => {
+                // render a friendly table of secrets
+                if (j && j.secrets) {
+                  const lines = [];
+                  for (const k of Object.keys(j.secrets)) {
+                    const s = j.secrets[k];
+                    lines.push(`${k}: present=${s.present} masked=${s.masked ? s.masked : '–'}`);
+                  }
+                  resultShell.textContent = lines.join('\n');
+                } else {
+                  resultShell.textContent = JSON.stringify(j, null, 2);
+                }
+                revealBtn.parentNode.insertBefore(resultShell, revealBtn.nextSibling);
+              }).catch(e => {
+                resultShell.textContent = 'Reveal failed: ' + String(e);
+                revealBtn.parentNode.insertBefore(resultShell, revealBtn.nextSibling);
+              }).finally(()=>{
+                revealBtn.disabled = false;
+                revealBtn.innerText = 'Reveal secrets';
+              });
+          } catch (e) { console.warn(e); }
+        });
+      }
+    })();
+  </script>
+  {% endif %}
 {% endblock %}

@@ -4,7 +4,6 @@ import json
 
 from .requirement_rules import describe_requirement_rules, normalize_requirement_rules
 
-
 DEFAULT_SECTION_NAME = "Ungrouped fields"
 
 
@@ -34,9 +33,15 @@ def update_template_field_settings(template, form_data, db_session):
     if "layout" in form_data:
         template.layout = (form_data.get("layout") or "standard").strip() or "standard"
     template.external_enabled = bool(form_data.get("external_enabled"))
-    template.external_provider = (form_data.get("external_provider") or "").strip() or None
-    template.external_form_url = (form_data.get("external_form_url") or "").strip() or None
-    template.external_form_id = (form_data.get("external_form_id") or "").strip() or None
+    template.external_provider = (
+        form_data.get("external_provider") or ""
+    ).strip() or None
+    template.external_form_url = (
+        form_data.get("external_form_url") or ""
+    ).strip() or None
+    template.external_form_id = (
+        form_data.get("external_form_id") or ""
+    ).strip() or None
     db_session.add(template)
 
 

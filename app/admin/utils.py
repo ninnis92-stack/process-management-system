@@ -14,7 +14,10 @@ def _is_admin_user() -> bool:
     """
     if not current_user.is_authenticated:
         return False
-    if not (getattr(current_user, "is_admin", False) or user_has_permission(current_user, "admin")):
+    if not (
+        getattr(current_user, "is_admin", False)
+        or user_has_permission(current_user, "admin")
+    ):
         return False
 
     if current_app.config.get("SSO_ENABLED") and current_app.config.get(

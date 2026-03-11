@@ -16,12 +16,12 @@ import logging
 
 try:
     from prometheus_client import (
+        CONTENT_TYPE_LATEST,
+        REGISTRY,
+        CollectorRegistry,
         Counter,
         Gauge,
         generate_latest,
-        CollectorRegistry,
-        CONTENT_TYPE_LATEST,
-        REGISTRY,
     )
 
     METRICS_AVAILABLE = True

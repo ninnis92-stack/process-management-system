@@ -62,10 +62,14 @@ def get_user_departments(user):
 
         depts = []
         primary = (
-            getattr(user, "_stored_primary_department", None)
-            or getattr(user, "department", None)
-            or ""
-        ).strip().upper()
+            (
+                getattr(user, "_stored_primary_department", None)
+                or getattr(user, "department", None)
+                or ""
+            )
+            .strip()
+            .upper()
+        )
         if primary:
             depts.append(primary)
 

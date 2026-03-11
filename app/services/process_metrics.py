@@ -1,21 +1,16 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from sqlalchemy import and_, or_
 from datetime import datetime, timedelta
 from typing import Any
 
 from flask import current_app
+from sqlalchemy import and_, or_
 
 from ..extensions import db
-from ..models import (
-    MetricsConfig,
-    ProcessMetricEvent,
-    Request as ReqModel,
-    Submission,
-    User,
-    Artifact,
-)
+from ..models import Artifact, MetricsConfig, ProcessMetricEvent
+from ..models import Request as ReqModel
+from ..models import Submission, User
 
 
 def get_range_cutoff(range_key: str) -> tuple[datetime, str]:
@@ -71,7 +66,9 @@ def record_process_metric_event(
         now = datetime.utcnow()
         prev = (
             ProcessMetricEvent.query.filter_by(request_id=req.id)
-            .order_by(ProcessMetricEvent.created_at.desc(), ProcessMetricEvent.id.desc())
+            .order_by(
+                ProcessMetricEvent.created_at.desc(), ProcessMetricEvent.id.desc()
+            )
             .first()
         )
         since_last_event_seconds = None
@@ -87,7 +84,9 @@ def record_process_metric_event(
         evt = ProcessMetricEvent(
             request_id=req.id,
             actor_user_id=getattr(actor_user, "id", None),
-            actor_department=(actor_department or getattr(actor_user, "department", None) or None),
+            actor_department=(
+                actor_department or getattr(actor_user, "department", None) or None
+            ),
             owner_department=getattr(req, "owner_department", None),
             event_type=event_type,
             from_status=from_status,
@@ -111,7 +110,12 @@ def record_process_metric_event(
             pass
 
 
-def build_process_metrics_summary(*, range_key: str = "weekly", depts: list[str] | None = None, query: str | None = None) -> dict[str, Any]:
+def build_process_metrics_summary(
+    *,
+    range_key: str = "weekly",
+    depts: list[str] | None = None,
+    query: str | None = None,
+) -> dict[str, Any]:
     """Return a snapshot of metrics.
 
     ``query`` may be supplied to restrict the set of requests/event rows to
@@ -200,7 +204,9 @@ def build_process_metrics_summary(*, range_key: str = "weekly", depts: list[str]
         if req.status == "CLOSED" and req.updated_at and req.updated_at >= cutoff:
             closed_window[dept] += 1
             if req.created_at and req.updated_at:
-                age_seconds = max(int((req.updated_at - req.created_at).total_seconds()), 0)
+                age_seconds = max(
+                    int((req.updated_at - req.created_at).total_seconds()), 0
+                )
                 avg_completion_samples[dept].append(age_seconds)
                 if age_seconds <= target_seconds:
                     within_target_counts[dept] += 1
@@ -225,7 +231,8 @@ def build_process_metrics_summary(*, range_key: str = "weekly", depts: list[str]
                 row = {
                     "user_id": evt.actor_user_id,
                     "email": getattr(actor, "email", f"User #{evt.actor_user_id}"),
-                    "department": evt.actor_department or getattr(actor, "department", None),
+                    "department": evt.actor_department
+                    or getattr(actor, "department", None),
                     "events": 0,
                     "status_changes": 0,
                     "assignments": 0,
@@ -265,13 +272,19 @@ def build_process_metrics_summary(*, range_key: str = "weekly", depts: list[str]
                 "status_changes": status_changes.get(dept, 0),
                 "assignments": assignments.get(dept, 0),
                 "slow_events": slow_events.get(dept, 0),
-                "avg_completion_hours": round(sum(completion_avg) / len(completion_avg) / 3600, 2)
-                if completion_avg
-                else None,
-                "avg_gap_hours": round(sum(gap_avg) / len(gap_avg) / 3600, 2) if gap_avg else None,
-                "within_target_pct": round((within_target_counts.get(dept, 0) / closed) * 100, 1)
-                if closed
-                else None,
+                "avg_completion_hours": (
+                    round(sum(completion_avg) / len(completion_avg) / 3600, 2)
+                    if completion_avg
+                    else None
+                ),
+                "avg_gap_hours": (
+                    round(sum(gap_avg) / len(gap_avg) / 3600, 2) if gap_avg else None
+                ),
+                "within_target_pct": (
+                    round((within_target_counts.get(dept, 0) / closed) * 100, 1)
+                    if closed
+                    else None
+                ),
             }
         )
 
@@ -288,10 +301,14 @@ def build_process_metrics_summary(*, range_key: str = "weekly", depts: list[str]
                 "status_changes": row["status_changes"],
                 "assignments": row["assignments"],
                 "slow_events": row["slow_events"],
-                "avg_gap_hours": round(sum(gap_avg) / len(gap_avg) / 3600, 2) if gap_avg else None,
-                "avg_completion_hours": round(sum(completion_avg) / len(completion_avg) / 3600, 2)
-                if completion_avg
-                else None,
+                "avg_gap_hours": (
+                    round(sum(gap_avg) / len(gap_avg) / 3600, 2) if gap_avg else None
+                ),
+                "avg_completion_hours": (
+                    round(sum(completion_avg) / len(completion_avg) / 3600, 2)
+                    if completion_avg
+                    else None
+                ),
                 "closed_count": row["closed_count"],
             }
         )

@@ -7,6 +7,7 @@ Provides `resolve_secret_ref(ref)` which accepts either:
 
 Falls back to environment variables for resilience in developer environments.
 """
+
 from __future__ import annotations
 
 import os

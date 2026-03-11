@@ -3,8 +3,9 @@
 
 Usage: python3 scripts/smoke_deployed_login.py --url https://your-app
 """
-import re
 import argparse
+import re
+
 import requests
 
 

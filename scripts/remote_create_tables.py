@@ -3,8 +3,8 @@
 
 Run this from the deployed container (e.g. `python3 /app/scripts/remote_create_tables.py`).
 """
-import sys
 import os
+import sys
 
 sys.path.append("/app")
 

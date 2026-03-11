@@ -1,38 +1,29 @@
 import smtplib
 from email.message import EmailMessage
+from types import SimpleNamespace
+
 from flask import (
     Blueprint,
-    render_template,
-    redirect,
-    url_for,
-    flash,
     abort,
     current_app,
+    flash,
+    redirect,
+    render_template,
     request,
+    url_for,
 )
 from sqlalchemy import func
+from sqlalchemy.exc import OperationalError
+from werkzeug.routing import BuildError
 
 from ..extensions import db
-from sqlalchemy.exc import OperationalError
-from ..models import (
-    Artifact,
-    FeatureFlags,
-    Request as ReqModel,
-    Comment,
-    AuditLog,
-    Submission,
-    User,
-    Notification,
-    Workflow,
-)
-from ..models import GuestForm
-from ..models import SpecialEmailConfig
+from ..models import Artifact, AuditLog, Comment, FeatureFlags, GuestForm, Notification
+from ..models import Request as ReqModel
+from ..models import SpecialEmailConfig, Submission, User, Workflow
 from ..notifcations import notify_users, users_in_department
-from types import SimpleNamespace
-from werkzeug.routing import BuildError
-from .forms import ExternalNewRequestForm, ExternalCommentForm, GuestLookupForm
-from ..security import rate_limit
 from ..requests_bp.workflow import workflow_intake_preview
+from ..security import rate_limit
+from .forms import ExternalCommentForm, ExternalNewRequestForm, GuestLookupForm
 
 external_bp = Blueprint("external", __name__, url_prefix="/external")
 
@@ -52,7 +43,9 @@ def _guest_submission_enabled() -> bool:
 
 
 def _resolve_guest_form_selection(guest_forms):
-    slug = (request.args.get("guest_form") or request.form.get("guest_form") or "").strip()
+    slug = (
+        request.args.get("guest_form") or request.form.get("guest_form") or ""
+    ).strip()
     selected = None
     if slug:
         selected = next((gf for gf in guest_forms if gf.slug == slug), None)
@@ -70,7 +63,9 @@ def _fallback_guest_form_policy():
         owner_department="B",
         layout="standard",
         normalized_access_policy=has_policy,
-        access_policy_label=("Any SSO-linked account" if require_sso else "Anyone with the form link"),
+        access_policy_label=(
+            "Any SSO-linked account" if require_sso else "Anyone with the form link"
+        ),
         access_policy_hint=(
             "Submitters must already be linked to an SSO-backed user account."
             if require_sso
@@ -80,10 +75,18 @@ def _fallback_guest_form_policy():
         credential_requirements_pretty_json="",
         credential_requirements={},
         evaluate_submitter_access=lambda email, user=None: {
-            "allowed": bool(user and getattr(user, "sso_sub", None)) if require_sso else True,
+            "allowed": (
+                bool(user and getattr(user, "sso_sub", None)) if require_sso else True
+            ),
             "policy": has_policy,
-            "message": "Guest email must be an SSO-linked account for this form." if require_sso else "",
-            "email_domain": ((email or "").split("@", 1)[1].lower() if "@" in (email or "") else ""),
+            "message": (
+                "Guest email must be an SSO-linked account for this form."
+                if require_sso
+                else ""
+            ),
+            "email_domain": (
+                (email or "").split("@", 1)[1].lower() if "@" in (email or "") else ""
+            ),
             "has_sso": bool(user and getattr(user, "sso_sub", None)),
             "approved_domain": False,
             "credential_requirements": {},
@@ -161,15 +164,20 @@ def external_new():
     form.workflow_id.choices = wf_choices
     # Expose active guest forms to the template so the public UI can allow
     # submitters to pick a specific GuestForm (by slug).
-    guest_forms = GuestForm.query.filter_by(active=True).order_by(GuestForm.name.asc()).all()
+    guest_forms = (
+        GuestForm.query.filter_by(active=True).order_by(GuestForm.name.asc()).all()
+    )
     selected_guest_form = _resolve_guest_form_selection(guest_forms)
     effective_guest_form = selected_guest_form or _fallback_guest_form_policy()
     workflow_previews = {
-        str(w.id): workflow_intake_preview(w, w.department_code)
-        for w in wfs
+        str(w.id): workflow_intake_preview(w, w.department_code) for w in wfs
     }
-    default_process_preview = workflow_intake_preview(None, getattr(effective_guest_form, "owner_department", None) or "B")
-    if request.method == "GET" and getattr(effective_guest_form, "owner_department", None):
+    default_process_preview = workflow_intake_preview(
+        None, getattr(effective_guest_form, "owner_department", None) or "B"
+    )
+    if request.method == "GET" and getattr(
+        effective_guest_form, "owner_department", None
+    ):
         form.owner_department.data = effective_guest_form.owner_department
 
     if form.validate_on_submit():
@@ -178,9 +186,15 @@ def external_new():
         guest_email = (form.guest_email.data or "").strip().lower()
         guest_form = selected_guest_form
         matched_user = User.query.filter_by(email=guest_email).first()
-        access_result = effective_guest_form.evaluate_submitter_access(guest_email, matched_user)
+        access_result = effective_guest_form.evaluate_submitter_access(
+            guest_email, matched_user
+        )
         if not access_result.get("allowed"):
-            flash(access_result.get("message") or "You do not have access to submit this guest form.", "warning")
+            flash(
+                access_result.get("message")
+                or "You do not have access to submit this guest form.",
+                "warning",
+            )
             return render_template(
                 "external_new.html",
                 form=form,

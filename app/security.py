@@ -65,7 +65,9 @@ def parse_rate_limit(
     return default_limit, default_window
 
 
-def _rate_limit_storage_key(bucket: str, key: str, window_seconds: int, now: float) -> str:
+def _rate_limit_storage_key(
+    bucket: str, key: str, window_seconds: int, now: float
+) -> str:
     return f"rl:{bucket}:{key}:{int(now // window_seconds)}"
 
 
@@ -102,12 +104,16 @@ def _default_rate_limit_key() -> str:
         else (request.remote_addr or "unknown")
     )
     email = (
-        request.form.get("email")
-        or request.form.get("guest_email")
-        or request.args.get("email")
-        or request.args.get("guest_email")
-        or ""
-    ).strip().lower()
+        (
+            request.form.get("email")
+            or request.form.get("guest_email")
+            or request.args.get("email")
+            or request.args.get("guest_email")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
     if email:
         return f"{ip}:{email}"
     return ip
@@ -131,7 +137,9 @@ def rate_limit(
 
             spec = current_app.config.get(config_key) if config_key else default
             limit, window_seconds = parse_rate_limit(spec)
-            limiter_key = key_func() if callable(key_func) else _default_rate_limit_key()
+            limiter_key = (
+                key_func() if callable(key_func) else _default_rate_limit_key()
+            )
             allowed, _remaining = consume_rate_limit(
                 bucket, limiter_key, limit, window_seconds
             )

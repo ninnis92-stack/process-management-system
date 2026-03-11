@@ -3,7 +3,9 @@ from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import DepartmentEditor, Request as ReqModel, Submission, User, StatusBucket, BucketStatus
+from app.models import BucketStatus, DepartmentEditor
+from app.models import Request as ReqModel
+from app.models import StatusBucket, Submission, User
 
 
 def login_user(client, email, password="secret"):
@@ -296,7 +298,6 @@ def test_admin_can_view_metrics_from_settings_and_overview(app, client):
     assert b"Dept A" in rv.data
 
 
-
 def test_user_filter_and_export(app, client):
     # department head should be able to restrict which users show in metrics
     # and export the filtered set for comparison.
@@ -357,8 +358,12 @@ def test_user_filter_and_export(app, client):
         db.session.add_all([r1, r2])
         db.session.commit()
         # record events by user1 and user2
-        record_process_metric_event(r1, event_type="request_created", actor_user=user1, actor_department="B")
-        record_process_metric_event(r2, event_type="request_created", actor_user=user2, actor_department="B")
+        record_process_metric_event(
+            r1, event_type="request_created", actor_user=user1, actor_department="B"
+        )
+        record_process_metric_event(
+            r2, event_type="request_created", actor_user=user2, actor_department="B"
+        )
 
     rv = login_user(client, "userfilter-head@example.com")
     assert rv.status_code == 200
@@ -418,10 +423,14 @@ def test_bulk_assign_bucket(app, client):
         )
         db.session.commit()
         # create a simple bucket
-        bkt = StatusBucket(name="Test bucket", department_name="B", order=0, active=True)
+        bkt = StatusBucket(
+            name="Test bucket", department_name="B", order=0, active=True
+        )
         db.session.add(bkt)
         db.session.flush()
-        db.session.add(BucketStatus(bucket_id=bkt.id, status_code="B_IN_PROGRESS", order=0))
+        db.session.add(
+            BucketStatus(bucket_id=bkt.id, status_code="B_IN_PROGRESS", order=0)
+        )
         # two requests in that status
         r1 = ReqModel(
             title="R1",
@@ -447,7 +456,13 @@ def test_bulk_assign_bucket(app, client):
         )
         db.session.add_all([r1, r2])
         db.session.commit()
-        r1_id, r2_id, bkt_id, head_id, col_id = r1.id, r2.id, bkt.id, head.id, colleague.id
+        r1_id, r2_id, bkt_id, head_id, col_id = (
+            r1.id,
+            r2.id,
+            bkt.id,
+            head.id,
+            colleague.id,
+        )
     rv = login_user(client, "bucket-head@example.com")
     assert rv.status_code == 200
     # perform the bulk assign

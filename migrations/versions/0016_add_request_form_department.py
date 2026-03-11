@@ -5,9 +5,8 @@ Revises: 0015_add_reject_request_config
 Create Date: 2026-03-05 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0016_add_request_form_department"

@@ -1,14 +1,21 @@
+from datetime import datetime, timedelta
+
 from werkzeug.security import generate_password_hash
 
 from app import create_app
 from app.extensions import db
-from app.models import User, Request as ReqModel, WebhookSubscription, FormTemplate, FormField, IntegrationConfig
-from datetime import datetime, timedelta
-from app.services.integrations import get_integration_scaffold, normalize_integration_config
+from app.models import FormField, FormTemplate, IntegrationConfig
+from app.models import Request as ReqModel
+from app.models import User, WebhookSubscription
+from app.services.integrations import (
+    get_integration_scaffold,
+    normalize_integration_config,
+)
 
 
 def test_requests_api_and_webhook_subscription(client, app):
     import importlib
+
     import api.index as api_index
 
     api_index = importlib.reload(api_index)
@@ -69,7 +76,9 @@ def test_requests_api_and_webhook_subscription(client, app):
     assert rv.status_code == 201
 
     with api_app.app_context():
-        sub = WebhookSubscription.query.filter_by(url="https://example.com/hook").first()
+        sub = WebhookSubscription.query.filter_by(
+            url="https://example.com/hook"
+        ).first()
         assert sub is not None
         assert sub.events == ["request.status_changed"]
 
@@ -99,6 +108,7 @@ def test_integration_scaffold_normalization_defaults():
 
 def test_versioned_openapi_document(client, app):
     import importlib
+
     import api.index as api_index
 
     api_index = importlib.reload(api_index)
@@ -139,6 +149,7 @@ def test_admin_integration_edit_shows_scaffold(client, app):
 
 def test_api_template_verify_uses_tracker_integration(client, app, monkeypatch):
     import importlib
+
     import api.index as api_index
 
     api_index = importlib.reload(api_index)
@@ -165,7 +176,9 @@ def test_api_template_verify_uses_tracker_integration(client, app, monkeypatch):
         db.session.add(admin)
         db.session.commit()
 
-        template = FormTemplate(name="API Verify Template", description="Template verify")
+        template = FormTemplate(
+            name="API Verify Template", description="Template verify"
+        )
         db.session.add(template)
         db.session.commit()
         template_id = template.id
@@ -176,7 +189,11 @@ def test_api_template_verify_uses_tracker_integration(client, app, monkeypatch):
             label="Badge ID",
             field_type="text",
             required=True,
-            verification={"provider": "verification", "external_key": "badge_id", "params": {"department": "A"}},
+            verification={
+                "provider": "verification",
+                "external_key": "badge_id",
+                "params": {"department": "A"},
+            },
         )
         db.session.add(field)
 
@@ -191,7 +208,9 @@ def test_api_template_verify_uses_tracker_integration(client, app, monkeypatch):
 
     monkeypatch.setattr(
         "requests.sessions.Session.request",
-        lambda self, method, url, **kwargs: DummyHTTPResponse({"ok": True, "details": {"badge": kwargs.get("params", {}).get("badge")}}),
+        lambda self, method, url, **kwargs: DummyHTTPResponse(
+            {"ok": True, "details": {"badge": kwargs.get("params", {}).get("badge")}}
+        ),
     )
 
     api = api_app.test_client()
@@ -211,6 +230,7 @@ def test_api_template_verify_uses_tracker_integration(client, app, monkeypatch):
 
 def test_api_template_external_schema_exposes_layout_and_sections(client, app):
     import importlib
+
     import api.index as api_index
 
     api_index = importlib.reload(api_index)

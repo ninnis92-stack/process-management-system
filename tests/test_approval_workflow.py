@@ -3,7 +3,8 @@ from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import Request as ReqModel, RequestApproval, StatusOption, Tenant, TenantMembership, User
+from app.models import Request as ReqModel
+from app.models import RequestApproval, StatusOption, Tenant, TenantMembership, User
 
 
 def login(client, email, password="secret"):
@@ -52,9 +53,16 @@ def test_admin_can_configure_approval_stages_on_status_options(app, client):
         ]
 
 
-def test_multi_stage_approval_requires_matching_roles_before_completion(app, client, monkeypatch):
-    monkeypatch.setattr("app.requests_bp.routes.emit_webhook_event", lambda *args, **kwargs: None)
-    monkeypatch.setattr("app.requests_bp.routes.record_process_metric_event", lambda *args, **kwargs: None)
+def test_multi_stage_approval_requires_matching_roles_before_completion(
+    app, client, monkeypatch
+):
+    monkeypatch.setattr(
+        "app.requests_bp.routes.emit_webhook_event", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "app.requests_bp.routes.record_process_metric_event",
+        lambda *args, **kwargs: None,
+    )
 
     with app.app_context():
         tenant = Tenant.get_default()
@@ -141,7 +149,9 @@ def test_multi_stage_approval_requires_matching_roles_before_completion(app, cli
     with app.app_context():
         req = db.session.get(ReqModel, request_id)
         approvals = (
-            RequestApproval.query.filter_by(request_id=request_id, status_code="PENDING_C_REVIEW")
+            RequestApproval.query.filter_by(
+                request_id=request_id, status_code="PENDING_C_REVIEW"
+            )
             .order_by(RequestApproval.stage_order.asc())
             .all()
         )
@@ -180,7 +190,10 @@ def test_multi_stage_approval_requires_matching_roles_before_completion(app, cli
 
     rv = client.post(
         f"/requests/{request_id}/transition",
-        data={"to_status": "C_APPROVED", "submission_summary": "Approved by Department C"},
+        data={
+            "to_status": "C_APPROVED",
+            "submission_summary": "Approved by Department C",
+        },
         follow_redirects=True,
     )
     html = rv.get_data(as_text=True)
@@ -197,7 +210,10 @@ def test_multi_stage_approval_requires_matching_roles_before_completion(app, cli
 
     rv = client.post(
         f"/requests/{request_id}/transition",
-        data={"to_status": "C_APPROVED", "submission_summary": "Approved by Department C"},
+        data={
+            "to_status": "C_APPROVED",
+            "submission_summary": "Approved by Department C",
+        },
         follow_redirects=True,
     )
     assert rv.status_code == 200
@@ -205,7 +221,9 @@ def test_multi_stage_approval_requires_matching_roles_before_completion(app, cli
     with app.app_context():
         req = db.session.get(ReqModel, request_id)
         approvals = (
-            RequestApproval.query.filter_by(request_id=request_id, status_code="PENDING_C_REVIEW")
+            RequestApproval.query.filter_by(
+                request_id=request_id, status_code="PENDING_C_REVIEW"
+            )
             .order_by(RequestApproval.stage_order.asc())
             .all()
         )
@@ -214,8 +232,13 @@ def test_multi_stage_approval_requires_matching_roles_before_completion(app, cli
 
 
 def test_signoff_history_and_dashboard_cards_show_new_cycles(app, client, monkeypatch):
-    monkeypatch.setattr("app.requests_bp.routes.emit_webhook_event", lambda *args, **kwargs: None)
-    monkeypatch.setattr("app.requests_bp.routes.record_process_metric_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "app.requests_bp.routes.emit_webhook_event", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "app.requests_bp.routes.record_process_metric_event",
+        lambda *args, **kwargs: None,
+    )
 
     with app.app_context():
         tenant = Tenant.get_default()
@@ -246,9 +269,27 @@ def test_signoff_history_and_dashboard_cards_show_new_cycles(app, client, monkey
         db.session.flush()
         db.session.add_all(
             [
-                TenantMembership(tenant_id=tenant.id, user_id=b_user.id, role="member", is_default=True, is_active=True),
-                TenantMembership(tenant_id=tenant.id, user_id=c_analyst.id, role="analyst", is_default=True, is_active=True),
-                TenantMembership(tenant_id=tenant.id, user_id=c_member.id, role="member", is_default=True, is_active=True),
+                TenantMembership(
+                    tenant_id=tenant.id,
+                    user_id=b_user.id,
+                    role="member",
+                    is_default=True,
+                    is_active=True,
+                ),
+                TenantMembership(
+                    tenant_id=tenant.id,
+                    user_id=c_analyst.id,
+                    role="analyst",
+                    is_default=True,
+                    is_active=True,
+                ),
+                TenantMembership(
+                    tenant_id=tenant.id,
+                    user_id=c_member.id,
+                    role="member",
+                    is_default=True,
+                    is_active=True,
+                ),
             ]
         )
         req = ReqModel(
@@ -281,7 +322,9 @@ def test_signoff_history_and_dashboard_cards_show_new_cycles(app, client, monkey
 
     with app.app_context():
         approvals = (
-            RequestApproval.query.filter_by(request_id=request_id, status_code="PENDING_C_REVIEW")
+            RequestApproval.query.filter_by(
+                request_id=request_id, status_code="PENDING_C_REVIEW"
+            )
             .order_by(RequestApproval.stage_order.asc())
             .all()
         )
@@ -303,7 +346,10 @@ def test_signoff_history_and_dashboard_cards_show_new_cycles(app, client, monkey
     )
     client.post(
         f"/requests/{request_id}/transition",
-        data={"to_status": "C_NEEDS_CHANGES", "submission_summary": "Need updates from Department B"},
+        data={
+            "to_status": "C_NEEDS_CHANGES",
+            "submission_summary": "Need updates from Department B",
+        },
         follow_redirects=True,
     )
 

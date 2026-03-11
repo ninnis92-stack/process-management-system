@@ -1,7 +1,8 @@
 import pytest
-from app.extensions import db
-from app.models import User, Workflow, StatusOption
 from werkzeug.security import generate_password_hash
+
+from app.extensions import db
+from app.models import StatusOption, User, Workflow
 
 
 def login_admin(client, email="admin@example.com", password="secret"):
@@ -48,16 +49,16 @@ def test_admin_index_links(client, app):
     assert "First admin pass" in html
     assert "Start with process flows" in html
     # FontAwesome stylesheet
-    assert 'font-awesome' in html or 'fa-' in html
+    assert "font-awesome" in html or "fa-" in html
     # offcanvas toggle button appears for mobile sidebar
     assert 'data-bs-toggle="offcanvas"' in html
 
     # visit special email configuration and check that nudge select lists small intervals
-    rv = client.get('/admin/special_email')
+    rv = client.get("/admin/special_email")
     assert rv.status_code == 200
     spechtml = rv.get_data(as_text=True)
-    assert '30 minutes' in spechtml or '0.5' in spechtml
-    assert '1 hour' in spechtml
+    assert "30 minutes" in spechtml or "0.5" in spechtml
+    assert "1 hour" in spechtml
 
 
 def test_status_options_auto_generated_from_workflows(client, app):
@@ -70,7 +71,10 @@ def test_status_options_auto_generated_from_workflows(client, app):
         # create workflow row with simple steps
         wf = Workflow(
             name="AutoTest",
-            spec={"steps": ["A_STEP", "B_STEP"], "transitions": [{"from": "A_STEP", "to": "B_STEP"}]},
+            spec={
+                "steps": ["A_STEP", "B_STEP"],
+                "transitions": [{"from": "A_STEP", "to": "B_STEP"}],
+            },
             active=True,
         )
         db.session.add(wf)
@@ -91,13 +95,13 @@ def test_status_options_auto_generated_from_workflows(client, app):
     assert "status options" in html.lower()
     # sidebar should be present with a link to process flows
     assert 'class="admin-sidebar"' in html
-    assert '/admin/workflows' in html
+    assert "/admin/workflows" in html
     # table should be compact, responsive, and well-structured
-    assert 'table-responsive' in html
-    assert 'table-sm' in html
-    assert 'admin-status-table' in html
+    assert "table-responsive" in html
+    assert "table-sm" in html
+    assert "admin-status-table" in html
     # ensure not forcing a horizontal scrollbar by enabling wrapping for actions column
-    assert 'actions-cell' in html  # class should appear on the last column cell
+    assert "actions-cell" in html  # class should appear on the last column cell
     # the database should now have entries
     with app.app_context():
         assert StatusOption.query.filter_by(code="A_STEP").first() is not None

@@ -1,5 +1,5 @@
-from flask import current_app, jsonify
 import pytest
+from flask import current_app, jsonify
 
 from app import create_app
 from app.extensions import db
@@ -27,7 +27,11 @@ def test_ready_endpoint_reports_unhealthy_if_db_throws(app, client, monkeypatch)
     class DummyException(Exception):
         pass
 
-    monkeypatch.setattr(db.session, "execute", lambda *args, **kwargs: (_ for _ in ()).throw(DummyException("boom")))
+    monkeypatch.setattr(
+        db.session,
+        "execute",
+        lambda *args, **kwargs: (_ for _ in ()).throw(DummyException("boom")),
+    )
 
     resp = client.get("/ready")
     assert resp.status_code >= 500

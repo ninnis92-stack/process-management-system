@@ -3,8 +3,11 @@ import pytest
 
 def test_sent_to_a_clears_assignment_and_notifies(app, client):
     from werkzeug.security import generate_password_hash
+
     from app.extensions import db
-    from app.models import User, Request as ReqModel, AuditLog, Notification
+    from app.models import AuditLog, Notification
+    from app.models import Request as ReqModel
+    from app.models import User
 
     # Create Dept B actor and an assignee
     # Use pbkdf2 for compatibility in test envs without scrypt support

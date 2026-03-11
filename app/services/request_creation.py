@@ -10,18 +10,8 @@ from sqlalchemy import inspect as sa_inspect
 from werkzeug.utils import secure_filename
 
 from ..extensions import db
-from ..models import (
-    Artifact,
-    Attachment,
-    FieldVerification,
-    Submission as FormSubmission,
-)
-from .requirement_rules import (
-    describe_requirement_rules,
-    evaluate_conditional_requirements,
-    normalize_requirement_rules,
-    value_is_populated,
-)
+from ..models import Artifact, Attachment, FieldVerification
+from ..models import Submission as FormSubmission
 from .field_verification import (
     apply_prefill_values_to_submission,
     collect_prefill_target_names,
@@ -30,6 +20,12 @@ from .field_verification import (
     normalize_bulk_separator,
     resolve_field_verification_rule,
     run_field_verification,
+)
+from .requirement_rules import (
+    describe_requirement_rules,
+    evaluate_conditional_requirements,
+    normalize_requirement_rules,
+    value_is_populated,
 )
 
 
@@ -183,15 +179,21 @@ def collect_template_submission_data(template_fields, skip_required_fields=None)
         else:
             value = request.form.get(field.name)
 
-        if field.required and field.name not in skip_required_fields and (
-            value is None
-            or (not getattr(value, "filename", None) and str(value).strip() == "")
+        if (
+            field.required
+            and field.name not in skip_required_fields
+            and (
+                value is None
+                or (not getattr(value, "filename", None) and str(value).strip() == "")
+            )
         ):
             missing_field = getattr(field, "label", field.name)
             break
 
         if getattr(field, "field_type", "") in ("file", "photo", "video"):
-            submission_data[field.name] = getattr(value, "filename", None) if value else None
+            submission_data[field.name] = (
+                getattr(value, "filename", None) if value else None
+            )
         else:
             submission_data[field.name] = value
 
@@ -227,7 +229,10 @@ def validate_conditional_template_submission(
 
 
 def get_template_prefill_target_names(
-    template_fields, latest_map: dict[int, object] | None = None, *, enabled: bool = False
+    template_fields,
+    latest_map: dict[int, object] | None = None,
+    *,
+    enabled: bool = False,
 ) -> set[str]:
     if not enabled:
         return set()
@@ -254,7 +259,9 @@ def apply_submission_data_to_request(req, submission_data: dict):
     return req
 
 
-def build_initial_artifact(req, form, submission_data: dict | None, current_user_id: int):
+def build_initial_artifact(
+    req, form, submission_data: dict | None, current_user_id: int
+):
     request_type = (req.request_type or "").strip()
     if request_type == "part_number":
         artifact_type = "part_number"
@@ -303,7 +310,9 @@ def create_form_submission(template, req, submission_data: dict, current_user_id
     return form_submission
 
 
-def save_template_file_attachments(form_submission, template_fields, current_user_id: int):
+def save_template_file_attachments(
+    form_submission, template_fields, current_user_id: int
+):
     # support generic file uploads as well as dedicated photo/video fields
     for field in template_fields:
         if field.field_type not in ("file", "photo", "video"):
@@ -315,7 +324,9 @@ def save_template_file_attachments(form_submission, template_fields, current_use
         filename = secure_filename(upload.filename)
         _, ext = os.path.splitext(filename)
         stored = f"uploads/{int(time.time())}-{uuid.uuid4().hex}{ext}"
-        static_upload_dir = os.path.join(current_app.static_folder or "static", "uploads")
+        static_upload_dir = os.path.join(
+            current_app.static_folder or "static", "uploads"
+        )
         os.makedirs(static_upload_dir, exist_ok=True)
         destination = os.path.join(current_app.static_folder or "static", stored)
         upload.save(destination)

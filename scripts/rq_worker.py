@@ -7,8 +7,9 @@ python3 scripts/rq_worker.py
 """
 
 import os
+
 from redis import Redis
-from rq import Worker, Queue, Connection
+from rq import Connection, Queue, Worker
 
 listen = ["emails"]
 

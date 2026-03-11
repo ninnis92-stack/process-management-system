@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta
+
 from flask import url_for
-from ..extensions import db
-from ..models import Request as ReqModel, User, Notification
-from ..models import SpecialEmailConfig
-from ..models import FeatureFlags
+
 from .. import notifcations as notifications_module
+from ..extensions import db
+from ..models import FeatureFlags, Notification
+from ..models import Request as ReqModel
+from ..models import SpecialEmailConfig, User
 
 
 def users_in_dept(dept: str):

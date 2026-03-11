@@ -5,8 +5,8 @@ Revises: None
 Create Date: 2026-03-04 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
@@ -35,7 +35,9 @@ def upgrade():
         )
     except Exception:
         # Best-effort: direct EXECUTE for sqlite if add_column fails in older Alembic
-        conn.execute(sa.text('ALTER TABLE "user" ADD COLUMN is_admin INTEGER DEFAULT 0'))
+        conn.execute(
+            sa.text('ALTER TABLE "user" ADD COLUMN is_admin INTEGER DEFAULT 0')
+        )
 
 
 def downgrade():

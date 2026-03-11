@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 import logging
+import os
 
 from flask import current_app
 from redis import Redis
@@ -10,6 +10,7 @@ from rq import Queue
 from app import create_app
 from app.extensions import db
 from app.models import Attachment
+
 from .providers import extract_text_from_image
 
 logger = logging.getLogger(__name__)

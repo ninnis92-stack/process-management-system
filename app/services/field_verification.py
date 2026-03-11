@@ -96,7 +96,9 @@ def get_verification_prefill_config(rule) -> Dict[str, Any] | None:
             path = target_spec.strip()
             overwrite = default_overwrite
         elif isinstance(target_spec, dict):
-            path = str(target_spec.get("path") or target_spec.get("source") or "").strip()
+            path = str(
+                target_spec.get("path") or target_spec.get("source") or ""
+            ).strip()
             overwrite = _prefill_bool(target_spec.get("overwrite", default_overwrite))
         else:
             continue
@@ -151,7 +153,9 @@ def _get_prefill_path_value(result: Dict[str, Any], path: str):
     return current
 
 
-def extract_prefill_values(rule, result: Dict[str, Any] | None) -> Dict[str, Dict[str, Any]]:
+def extract_prefill_values(
+    rule, result: Dict[str, Any] | None
+) -> Dict[str, Dict[str, Any]]:
     config = get_verification_prefill_config(rule)
     if not config or not isinstance(result, dict) or result.get("ok") is not True:
         return {}
@@ -185,8 +189,10 @@ def apply_prefill_values_to_submission(
 def run_single_field_verification(field: FormField, rule, value):
     provider = (rule.get("provider") or rule.get("type") or "").strip().lower()
     external_key = (
-        rule.get("external_key") or rule.get("key") or field.name or ""
-    ).strip().lower()
+        (rule.get("external_key") or rule.get("key") or field.name or "")
+        .strip()
+        .lower()
+    )
     params = rule.get("params") or {}
 
     if provider == "regex":
@@ -231,7 +237,12 @@ def run_single_field_verification(field: FormField, rule, value):
     result.setdefault("provider", provider)
     result.setdefault("external_key", external_key)
     result.setdefault("type", "external_lookup")
-    if provider in ("verification", "tracker", "realtime_tracker", "third_party_tracker") or str(provider).startswith("tracker:"):
+    if provider in (
+        "verification",
+        "tracker",
+        "realtime_tracker",
+        "third_party_tracker",
+    ) or str(provider).startswith("tracker:"):
         result.setdefault("type", "tracker_lookup")
     result.setdefault("triggers_auto_reject", bool(rule.get("triggers_auto_reject")))
     result.setdefault("value", value)
@@ -257,7 +268,9 @@ def run_field_verification(field: FormField, rule, submission_data: Dict):
     if separator == "\n":
         pieces = [piece.strip() for piece in raw_value.splitlines() if piece.strip()]
     else:
-        pieces = [piece.strip() for piece in raw_value.split(separator) if piece.strip()]
+        pieces = [
+            piece.strip() for piece in raw_value.split(separator) if piece.strip()
+        ]
 
     if not pieces:
         return {"ok": None, "reason": "empty", "type": "external_lookup"}

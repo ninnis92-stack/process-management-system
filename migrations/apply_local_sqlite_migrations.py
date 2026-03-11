@@ -7,10 +7,11 @@ This script will:
 
 Run from project root with the active virtualenv python if needed.
 """
+import os
 import sqlite3
 import sys
+
 from config import Config
-import os
 
 
 def get_db_path():
@@ -120,11 +121,16 @@ def main():
     con = sqlite3.connect(path)
     cur = con.cursor()
     try:
-        tbls = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-        if 'guest_form' not in tbls:
-            print('Creating guest_form table...')
+        tbls = [
+            r[0]
+            for r in cur.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        ]
+        if "guest_form" not in tbls:
+            print("Creating guest_form table...")
             cur.execute(
-                '''
+                """
                 CREATE TABLE guest_form (
                     id INTEGER PRIMARY KEY,
                     name VARCHAR(200) NOT NULL,
@@ -136,12 +142,12 @@ def main():
                     active INTEGER NOT NULL DEFAULT 1,
                     created_at DATETIME DEFAULT (CURRENT_TIMESTAMP)
                 )
-                '''
+                """
             )
             con.commit()
-            print('guest_form table created')
+            print("guest_form table created")
     except Exception as e:
-        print('Failed to ensure guest_form table:', e)
+        print("Failed to ensure guest_form table:", e)
     finally:
         con.close()
 

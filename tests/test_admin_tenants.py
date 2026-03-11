@@ -1,7 +1,8 @@
 import pytest
-from app.extensions import db
-from app.models import User, Tenant, TenantMembership
 from werkzeug.security import generate_password_hash
+
+from app.extensions import db
+from app.models import Tenant, TenantMembership, User
 
 
 def login_admin(client, email="admin@example.com", password="secret"):
@@ -116,13 +117,27 @@ def test_user_list_tenant_filter(client, app):
         t2 = Tenant(name="Two", slug="two")
         db.session.add_all([admin, t1, t2])
         db.session.commit()
-        u1 = User(email="u1@example.com", password_hash=generate_password_hash("x"), department="A", tenant_id=t1.id)
-        u2 = User(email="u2@example.com", password_hash=generate_password_hash("x"), department="A", tenant_id=t2.id)
+        u1 = User(
+            email="u1@example.com",
+            password_hash=generate_password_hash("x"),
+            department="A",
+            tenant_id=t1.id,
+        )
+        u2 = User(
+            email="u2@example.com",
+            password_hash=generate_password_hash("x"),
+            department="A",
+            tenant_id=t2.id,
+        )
         db.session.add_all([u1, u2])
         db.session.commit()
 
     # login as admin
-    rv = client.post("/auth/login", data={"email":"admin-filter@example.com","password":"secret"}, follow_redirects=True)
+    rv = client.post(
+        "/auth/login",
+        data={"email": "admin-filter@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
     assert rv.status_code == 200
 
     # unfiltered list shows both users
@@ -154,12 +169,26 @@ def test_user_list_search(client, app):
         t = Tenant(name="Searchland", slug="search")
         db.session.add_all([admin, t])
         db.session.commit()
-        u1 = User(email="apple@example.com", password_hash=generate_password_hash("x"), department="A", tenant_id=t.id)
-        u2 = User(email="banana@example.com", password_hash=generate_password_hash("x"), department="A", tenant_id=t.id)
+        u1 = User(
+            email="apple@example.com",
+            password_hash=generate_password_hash("x"),
+            department="A",
+            tenant_id=t.id,
+        )
+        u2 = User(
+            email="banana@example.com",
+            password_hash=generate_password_hash("x"),
+            department="A",
+            tenant_id=t.id,
+        )
         db.session.add_all([u1, u2])
         db.session.commit()
 
-    rv = client.post("/auth/login", data={"email":"admin-search@example.com","password":"secret"}, follow_redirects=True)
+    rv = client.post(
+        "/auth/login",
+        data={"email": "admin-search@example.com", "password": "secret"},
+        follow_redirects=True,
+    )
     assert rv.status_code == 200
 
     # search for 'apple' should only show u1

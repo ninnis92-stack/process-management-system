@@ -117,7 +117,9 @@ def test_guest_form_layout_applied_to_ui(app, client, monkeypatch):
 
 
 def test_approved_sso_domains_policy_enforced(app, client, monkeypatch):
-    monkeypatch.setattr("app.external.routes._send_guest_email", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "app.external.routes._send_guest_email", lambda *args, **kwargs: None
+    )
 
     with app.app_context():
         form = GuestForm(
@@ -167,7 +169,9 @@ def test_approved_sso_domains_policy_enforced(app, client, monkeypatch):
 
 
 def test_unaffiliated_only_policy_enforced(app, client, monkeypatch):
-    monkeypatch.setattr("app.external.routes._send_guest_email", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "app.external.routes._send_guest_email", lambda *args, **kwargs: None
+    )
 
     with app.app_context():
         form = GuestForm(

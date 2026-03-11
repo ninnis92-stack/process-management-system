@@ -1,9 +1,11 @@
+import json
+
+from sqlalchemy import inspect, text
 from werkzeug.security import generate_password_hash
+
 from app import create_app
 from app.extensions import db
 from app.models import FeatureFlags, SiteConfig, User
-from sqlalchemy import inspect, text
-import json
 
 
 def main():
@@ -20,7 +22,11 @@ def main():
             if "dark_mode" not in cols:
                 try:
                     with engine.connect() as conn:
-                        conn.execute(text("ALTER TABLE \"user\" ADD COLUMN dark_mode BOOLEAN DEFAULT FALSE"))
+                        conn.execute(
+                            text(
+                                'ALTER TABLE "user" ADD COLUMN dark_mode BOOLEAN DEFAULT FALSE'
+                            )
+                        )
                         try:
                             conn.commit()
                         except Exception:
@@ -53,9 +59,7 @@ def main():
                     # add column used by rolling quote feature
                     with engine.connect() as conn:
                         conn.execute(
-                            text(
-                                "ALTER TABLE user ADD COLUMN quote_interval INTEGER"
-                            )
+                            text("ALTER TABLE user ADD COLUMN quote_interval INTEGER")
                         )
                         try:
                             conn.commit()
@@ -68,7 +72,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN department_override BOOLEAN DEFAULT FALSE"
+                                'ALTER TABLE "user" ADD COLUMN department_override BOOLEAN DEFAULT FALSE'
                             )
                         )
                         try:
@@ -82,7 +86,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN totp_secret VARCHAR(64)"
+                                'ALTER TABLE "user" ADD COLUMN totp_secret VARCHAR(64)'
                             )
                         )
                         try:
@@ -96,7 +100,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN totp_enabled BOOLEAN DEFAULT FALSE"
+                                'ALTER TABLE "user" ADD COLUMN totp_enabled BOOLEAN DEFAULT FALSE'
                             )
                         )
                         try:
@@ -110,7 +114,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN vibe_index INTEGER DEFAULT 0"
+                                'ALTER TABLE "user" ADD COLUMN vibe_index INTEGER DEFAULT 0'
                             )
                         )
                         try:
@@ -124,7 +128,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN quotes_enabled BOOLEAN DEFAULT TRUE"
+                                'ALTER TABLE "user" ADD COLUMN quotes_enabled BOOLEAN DEFAULT TRUE'
                             )
                         )
                         try:
@@ -138,7 +142,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN vibe_button_enabled BOOLEAN DEFAULT TRUE"
+                                'ALTER TABLE "user" ADD COLUMN vibe_button_enabled BOOLEAN DEFAULT TRUE'
                             )
                         )
                         try:
@@ -180,7 +184,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN preferred_start_department VARCHAR(2)"
+                                'ALTER TABLE "user" ADD COLUMN preferred_start_department VARCHAR(2)'
                             )
                         )
                         try:
@@ -194,7 +198,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN watched_departments_json TEXT"
+                                'ALTER TABLE "user" ADD COLUMN watched_departments_json TEXT'
                             )
                         )
                         try:
@@ -222,7 +226,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN notification_departments_json TEXT"
+                                'ALTER TABLE "user" ADD COLUMN notification_departments_json TEXT'
                             )
                         )
                         try:
@@ -236,7 +240,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN onboarding_guidance_enabled BOOLEAN DEFAULT TRUE"
+                                'ALTER TABLE "user" ADD COLUMN onboarding_guidance_enabled BOOLEAN DEFAULT TRUE'
                             )
                         )
                         try:
@@ -250,7 +254,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"user\" ADD COLUMN backup_approver_user_id INTEGER"
+                                'ALTER TABLE "user" ADD COLUMN backup_approver_user_id INTEGER'
                             )
                         )
                         try:
@@ -266,7 +270,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"department\" ADD COLUMN notification_template TEXT"
+                                'ALTER TABLE "department" ADD COLUMN notification_template TEXT'
                             )
                         )
                         try:
@@ -277,7 +281,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"department\" ADD COLUMN handoff_template_doc_url VARCHAR(500)"
+                                'ALTER TABLE "department" ADD COLUMN handoff_template_doc_url VARCHAR(500)'
                             )
                         )
                         try:
@@ -288,7 +292,7 @@ def main():
                     with engine.connect() as conn:
                         conn.execute(
                             text(
-                                "ALTER TABLE \"department\" ADD COLUMN handoff_template_checklist_json TEXT"
+                                'ALTER TABLE "department" ADD COLUMN handoff_template_checklist_json TEXT'
                             )
                         )
                         try:
@@ -298,7 +302,9 @@ def main():
             except Exception:
                 pass
             try:
-                user_department_cols = [c["name"] for c in inspector.get_columns("user_department")]
+                user_department_cols = [
+                    c["name"] for c in inspector.get_columns("user_department")
+                ]
                 if "handoff_doc_url" not in user_department_cols:
                     with engine.connect() as conn:
                         conn.execute(
@@ -441,7 +447,9 @@ def main():
         db.session.add(flags)
 
         cfg = SiteConfig.get()
-        normalized_sets = SiteConfig.normalize_quote_sets(getattr(cfg, "rolling_quote_sets", None))
+        normalized_sets = SiteConfig.normalize_quote_sets(
+            getattr(cfg, "rolling_quote_sets", None)
+        )
         # ensure each set has at least 30 entries so the rolling quote feature
         # can cycle without immediately repeating.  We simply repeat existing
         # quotes in a round-robin fashion if a set is too small.
@@ -455,13 +463,17 @@ def main():
                         quotes.append(quotes[i % len(quotes)])
                         i += 1
         cfg._rolling_quote_sets = json.dumps(normalized_sets)
-        active_quote_set = str(getattr(cfg, "active_quote_set", "") or "").strip().lower()
+        active_quote_set = (
+            str(getattr(cfg, "active_quote_set", "") or "").strip().lower()
+        )
         if (
             not active_quote_set
             or active_quote_set not in normalized_sets
             or active_quote_set == "default"
         ):
-            cfg.active_quote_set = "motivational" if "motivational" in normalized_sets else "default"
+            cfg.active_quote_set = (
+                "motivational" if "motivational" in normalized_sets else "default"
+            )
         # normalize any existing user preferences just in case there are stray
         # upper‑case or whitespace‑padded values from earlier releases or manual
         # edits; the model's validator will also keep future writes consistent.

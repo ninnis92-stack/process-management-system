@@ -5,10 +5,9 @@ Revises: 0047_add_department_handoff_defaults
 Create Date: 2026-03-10 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy import inspect
-
 
 revision = "0048_add_guest_page_feature_flags"
 down_revision = "0047_add_department_handoff_defaults"

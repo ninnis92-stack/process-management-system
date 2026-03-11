@@ -6,8 +6,8 @@ Create Date: 2026-03-05 00:30:00.000000
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0007_add_integration_config"

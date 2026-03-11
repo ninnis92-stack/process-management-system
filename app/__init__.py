@@ -9,15 +9,17 @@ and local scripts can create the app with `create_app()`.
 """
 
 import os
+
 import click
 from dotenv import load_dotenv
 from flask import Flask, current_app
 from flask_login import current_user
+from flask_wtf import CSRFProtect
 from werkzeug.security import generate_password_hash
 
 from config import Config
+
 from .extensions import db, login_manager, migrate
-from flask_wtf import CSRFProtect
 from .models import User
 from .utils.user_context import (
     avatar_url_for,
@@ -163,7 +165,9 @@ def create_app():
     @app.cli.command("onboard-tenant")
     @click.option("--slug", required=True, help="Tenant slug (unique identifier)")
     @click.option("--name", required=True, help="Human-readable tenant name")
-    @click.option("--admin-email", required=True, help="Email address for initial admin user")
+    @click.option(
+        "--admin-email", required=True, help="Email address for initial admin user"
+    )
     @click.option(
         "--admin-password",
         prompt=True,
@@ -173,8 +177,8 @@ def create_app():
     )
     def onboard_tenant(slug, name, admin_email, admin_password):
         """Create a tenant with defaults and an initial admin user."""
-        from .models import Tenant, TenantMembership, User, FeatureFlags, Department
         from .extensions import db
+        from .models import Department, FeatureFlags, Tenant, TenantMembership, User
 
         slug = slug.strip().lower()
         name = name.strip()
@@ -210,7 +214,9 @@ def create_app():
             user = User(
                 email=admin_email,
                 department="A",
-                password_hash=generate_password_hash(admin_password, method="pbkdf2:sha256"),
+                password_hash=generate_password_hash(
+                    admin_password, method="pbkdf2:sha256"
+                ),
                 is_active=True,
                 is_admin=True,
             )
@@ -218,7 +224,9 @@ def create_app():
             db.session.commit()
             click.echo(f"Created admin user {admin_email}")
         else:
-            user.password_hash = generate_password_hash(admin_password, method="pbkdf2:sha256")
+            user.password_hash = generate_password_hash(
+                admin_password, method="pbkdf2:sha256"
+            )
             user.is_active = True
             user.is_admin = True
             user.department = "A"
@@ -226,7 +234,9 @@ def create_app():
             click.echo(f"Updated admin user {admin_email}")
 
         # make membership record for tenant
-        if not TenantMembership.query.filter_by(tenant_id=tenant.id, user_id=user.id).first():
+        if not TenantMembership.query.filter_by(
+            tenant_id=tenant.id, user_id=user.id
+        ).first():
             tm = TenantMembership(
                 tenant_id=tenant.id,
                 user_id=user.id,
@@ -377,12 +387,15 @@ def create_app():
 
         try:
             if not hasattr(current_user, "_stored_primary_department"):
-                current_user._stored_primary_department = getattr(current_user, "department", None)
+                current_user._stored_primary_department = getattr(
+                    current_user, "department", None
+                )
         except Exception:
             pass
 
         imp_admin = None
-        from flask import session as _session, current_app as _current_app
+        from flask import current_app as _current_app
+        from flask import session as _session
 
         # only honor impersonation if the flag is enabled; otherwise the
         # session keys are ignored.
@@ -441,13 +454,13 @@ def create_app():
             pass
         return
 
-    from .auth.routes import auth_bp
-    from .verify import verify_bp
-    from .requests_bp import requests_bp
-    from .external.routes import external_bp
-    from .notifications.routes import notifications_bp
     from .admin.routes import admin_bp
+    from .auth.routes import auth_bp
+    from .external.routes import external_bp
     from .integrations.webhooks import integrations_bp
+    from .notifications.routes import notifications_bp
+    from .requests_bp import requests_bp
+    from .verify import verify_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(requests_bp)
@@ -471,8 +484,9 @@ def create_app():
     @app.context_processor
     def _theme_context():
         try:
-            from .models import SiteConfig, Department, FeatureFlags
             from flask import url_for
+
+            from .models import Department, FeatureFlags, SiteConfig
 
             css = ""
             logo = current_app.config.get("LOGO_URL")
@@ -524,11 +538,13 @@ def create_app():
                 rolling_quotes_enabled = bool(cfg.rolling_quotes_enabled)
                 rolling_quotes = cfg.rolling_quotes or []
                 # allow user to disable quotes entirely
-                if quote_user and getattr(quote_user, 'quotes_enabled', True) is False:
+                if quote_user and getattr(quote_user, "quotes_enabled", True) is False:
                     rolling_quotes = []
                 else:
                     try:
-                        selected_quote_key = cfg.resolve_quote_set_name_for_user(quote_user)
+                        selected_quote_key = cfg.resolve_quote_set_name_for_user(
+                            quote_user
+                        )
                         if selected_quote_key:
                             # prefer configured sets if present, otherwise fall
                             # back to built-in defaults so personal overrides
@@ -642,7 +658,6 @@ def create_app():
             except Exception:
                 pass
 
-
             return dict(
                 active_theme_css=css,
                 theme_logo_url=logo,
@@ -650,7 +665,7 @@ def create_app():
                 site_theme_preset=site_theme_preset,
                 department_labels=dept_labels,
                 site_banner_html=banner_html,
-                company_url=getattr(cfg, 'company_url', None),
+                company_url=getattr(cfg, "company_url", None),
                 rolling_quotes_enabled=rolling_quotes_enabled,
                 rolling_quotes=rolling_quotes,
                 # choose an initial quote to render server-side; fallback to the
@@ -661,11 +676,18 @@ def create_app():
                     # select a fresh random entry each time instead of using a
                     # day‑based deterministic shuffle; this keeps the sequence
                     # unpredictable even within the same day.
-                    (lambda quotes, enabled:
-                        __import__('random').choice(quotes) if quotes and enabled else None
-                    )(rolling_quotes[:] if rolling_quotes else [], rolling_quotes_enabled)
+                    (
+                        lambda quotes, enabled: (
+                            __import__("random").choice(quotes)
+                            if quotes and enabled
+                            else None
+                        )
+                    )(
+                        rolling_quotes[:] if rolling_quotes else [],
+                        rolling_quotes_enabled,
+                    )
                     if rolling_quotes and rolling_quotes_enabled
-                    else (SiteConfig.DEFAULT_QUOTE_SETS.get('motivational', [None])[0])
+                    else (SiteConfig.DEFAULT_QUOTE_SETS.get("motivational", [None])[0])
                 ),
                 allow_user_reminders_enabled=allow_user_reminders_enabled,
                 guest_dashboard_enabled=guest_dashboard_enabled,
@@ -682,8 +704,10 @@ def create_app():
             try:
                 ff = FeatureFlags.get()
             except Exception:
+
                 class _Dummy:
                     vibe_enabled = False
+
                 ff = _Dummy()
             return dict(
                 active_theme_css="",
@@ -706,7 +730,8 @@ def create_app():
     # Track the last successfully rendered GET URL in the session so that
     # when the DB is temporarily unavailable we can redirect users back to
     # the last working page instead of showing a persistent 503 on refresh.
-    from flask import session as _session, request as _request
+    from flask import request as _request
+    from flask import session as _session
 
     @app.after_request
     def _store_last_good(response):
@@ -734,9 +759,9 @@ def create_app():
     # Lightweight request-time DB readiness check so navigation to admin and
     # other app pages fails gracefully while the database is still starting.
     try:
+        from flask import request as _request
         from sqlalchemy import text
         from sqlalchemy.exc import OperationalError
-        from flask import request as _request
 
         @app.before_request
         def _ensure_database_ready_before_request():
@@ -764,6 +789,7 @@ def create_app():
             except Exception:
                 # Defer non-operational errors to the normal request flow.
                 return None
+
     except Exception:
         pass
 
@@ -780,7 +806,9 @@ def create_app():
             # redirecting them there so a browser refresh will return them to
             # a previously loaded page instead of repeatedly showing the 503.
             try:
-                from flask import session as _session, redirect, request as _request
+                from flask import redirect
+                from flask import request as _request
+                from flask import session as _session
 
                 last = _session.get("last_good_url")
                 # Avoid redirect loops: don't redirect back to the same failing URL
@@ -802,7 +830,7 @@ def create_app():
         pass
 
     try:
-        from flask import jsonify, request, render_template
+        from flask import jsonify, render_template, request
 
         @app.errorhandler(429)
         def _handle_rate_limit(_err):
@@ -827,8 +855,8 @@ def create_app():
 
     # Friendly handling for expired/invalid CSRF tokens (common during prototyping).
     try:
-        from flask_wtf.csrf import CSRFError
         from flask import flash, redirect, url_for
+        from flask_wtf.csrf import CSRFError
 
         @app.errorhandler(CSRFError)
         def _handle_csrf_error(err):
@@ -847,7 +875,7 @@ def create_app():
         pass
 
     # Runtime health endpoints for liveness/readiness probes.
-    from flask import jsonify, g
+    from flask import g, jsonify
 
     def _build_health_payload(*, check_dependencies: bool):
         payload = {
@@ -874,7 +902,8 @@ def create_app():
             redis_required = bool(app.config.get("HEALTHCHECK_REDIS_REQUIRED"))
             redis_url = app.config.get("REDIS_URL")
             try:
-                from .extensions import redis_client as _redis_client, init_redis_client
+                from .extensions import init_redis_client
+                from .extensions import redis_client as _redis_client
             except Exception:
                 _redis_client = None
                 init_redis_client = None
@@ -934,6 +963,7 @@ def create_app():
     # immediately reachable at process start (e.g. cloud services).
     if os.getenv("WAIT_FOR_DB", "False") == "True":
         import time
+
         from sqlalchemy import text
 
         with app.app_context():
@@ -954,7 +984,7 @@ def create_app():
     # edit or replace buckets via the admin UI.
     try:
         if os.getenv("SEED_DEFAULT_BUCKETS", "True").lower() != "false":
-            from .models import StatusBucket, BucketStatus, Department
+            from .models import BucketStatus, Department, StatusBucket
 
             try:
                 with app.app_context():
@@ -1138,9 +1168,19 @@ def create_app():
     @app.context_processor
     def _user_helpers():
         try:
-            return dict(avatar_url_for=avatar_url_for, user_has_multiple_departments=user_has_multiple_departments, can_view_metrics_for_user=can_view_metrics_for_user, get_user_departments=get_user_departments)
+            return dict(
+                avatar_url_for=avatar_url_for,
+                user_has_multiple_departments=user_has_multiple_departments,
+                can_view_metrics_for_user=can_view_metrics_for_user,
+                get_user_departments=get_user_departments,
+            )
         except Exception:
-            return dict(avatar_url_for=lambda u, size=34: gravatar_url(None, size), user_has_multiple_departments=lambda u: False, can_view_metrics_for_user=lambda u: False, get_user_departments=lambda u: [])
+            return dict(
+                avatar_url_for=lambda u, size=34: gravatar_url(None, size),
+                user_has_multiple_departments=lambda u: False,
+                can_view_metrics_for_user=lambda u: False,
+                get_user_departments=lambda u: [],
+            )
 
     @app.cli.command("process-outbox")
     def process_outbox():
@@ -1152,4 +1192,5 @@ def create_app():
             click.echo(f"Processed {count} integration events")
         except Exception as e:
             click.echo(f"Failed to process outbox: {e}")
+
     return app

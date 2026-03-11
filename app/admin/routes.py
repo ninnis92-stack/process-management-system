@@ -1,56 +1,57 @@
+import json
+import os
 import re
+from datetime import datetime, timedelta
+from urllib.parse import unquote
 
-from flask import (
-    Blueprint,
-    render_template,
-    redirect,
-    url_for,
-    flash,
-    current_app,
-    session,
-    jsonify,
-)
-from flask_login import login_required, current_user
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template
+from flask import request as flask_request
+from flask import session, url_for
+from flask_login import current_user, login_required
 from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
 
 from ..extensions import db, get_or_404
-from ..models import User
-from .forms import SiteConfigForm, DepartmentForm
-from ..models import Request as ReqModel, Artifact, Submission, SiteConfig, Department
-from ..models import StatusOption, DepartmentEditor
-from ..models import IntegrationConfig
-from ..models import Tenant, TenantMembership, JobRecord, IntegrationEvent
-from datetime import datetime, timedelta
-from flask import request as flask_request
 from ..models import (
-    Notification,
+    Artifact,
     AuditLog,
-    NotificationRetention,
-    StatusBucket,
     BucketStatus,
+    Department,
+    DepartmentEditor,
+    DepartmentFormAssignment,
+    FeatureFlags,
+    FieldVerification,
+    FormField,
+    FormTemplate,
+    IntegrationConfig,
+    IntegrationEvent,
+    JobRecord,
+    Notification,
+    NotificationRetention,
+    RejectRequestConfig,
 )
-from ..models import FeatureFlags, RejectRequestConfig
-from urllib.parse import unquote
-import os
-import json
-from werkzeug.utils import secure_filename
-from ..models import Workflow
-from .forms import WorkflowForm
-from .forms import StatusBucketForm
-from .forms import FormTemplateAdminForm, FormFieldInlineForm
-from .forms import DepartmentAssignmentForm
-from ..models import FormTemplate, FormField, DepartmentFormAssignment
-from .forms import FieldVerificationForm, FieldRequirementForm
-from ..models import FieldVerification
+from ..models import Request as ReqModel
+from ..models import (
+    SiteConfig,
+    StatusBucket,
+    StatusOption,
+    Submission,
+    Tenant,
+    TenantMembership,
+    User,
+    Workflow,
+)
 from ..requests_bp.workflow import owner_for_status
+from ..services.branding_importer import BrandingImportError, import_branding_from_url
+from ..services.field_verification import apply_bulk_verification_params
 from ..services.integrations import (
     INTEGRATION_KIND_SCAFFOLDS,
+    fetch_external_data,
     get_integration_scaffold,
     integration_config_summary,
     normalize_integration_config,
 )
-from ..services.field_verification import apply_bulk_verification_params
-from ..services.branding_importer import BrandingImportError, import_branding_from_url
+from ..services.secret_store import resolve_secret_ref
 from ..services.template_admin import (
     build_grouped_template_fields,
     build_requirement_editor_context,
@@ -59,10 +60,21 @@ from ..services.template_admin import (
     update_template_field_settings,
 )
 from ..services.tenant_context import (
+    ensure_user_tenant_membership,
     get_current_tenant,
     tenant_role_for_user,
     user_has_permission,
-    ensure_user_tenant_membership,
+)
+from .forms import (
+    DepartmentAssignmentForm,
+    DepartmentForm,
+    FieldRequirementForm,
+    FieldVerificationForm,
+    FormFieldInlineForm,
+    FormTemplateAdminForm,
+    SiteConfigForm,
+    StatusBucketForm,
+    WorkflowForm,
 )
 from .utils import _is_admin_user
 
@@ -98,12 +110,12 @@ def _coerce_checkbox_like_value(value, default: bool = False) -> bool:
 # Load auxiliary handlers to keep this file from growing even more.
 # ``tenants`` and ``users`` must be imported after ``admin_bp`` is defined so the
 # routes they declare can attach to the same blueprint.
+from . import automation_rules  # noqa: F401, E402
+from . import guest_forms  # noqa: F401, E402
+from . import notifications  # noqa: F401, E402
 from . import tenants  # noqa: F401, E402
 from . import users  # noqa: F401, E402
 from . import workflows  # noqa: F401, E402
-from . import guest_forms  # noqa: F401, E402
-from . import notifications  # noqa: F401, E402
-from . import automation_rules  # noqa: F401, E402
 
 
 @admin_bp.route("/")
@@ -134,6 +146,22 @@ def index():
         current_tenant_role=tenant_role_for_user(current_user),
         flags=flags,
     )
+
+
+@admin_bp.route("/onboarding/dismiss", methods=["POST"])
+@login_required
+def dismiss_onboarding():
+    if not _is_admin_user():
+        return jsonify({"ok": False, "error": "access_denied"}), 403
+    try:
+        # mark onboarding as dismissed for current_user
+        current_user.onboarding_guidance_enabled = False
+        db.session.add(current_user)
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception:
+        db.session.rollback()
+        return jsonify({"ok": False}), 500
 
 
 @admin_bp.route("/monitor")
@@ -1451,12 +1479,10 @@ def special_email():
         cfg.request_form_add_original_sender = bool(
             form.request_form_add_original_sender.data
         )
-        raw_watchers = (form.request_form_default_watchers.data or "")
+        raw_watchers = form.request_form_default_watchers.data or ""
         # split on commas or whitespace
         cfg.request_form_default_watchers = [
-            w.strip().lower()
-            for w in re.split(r"[,\s]+", raw_watchers)
-            if w.strip()
+            w.strip().lower() for w in re.split(r"[,\s]+", raw_watchers) if w.strip()
         ] or None
 
         cfg.nudge_enabled = bool(form.nudge_enabled.data)
@@ -1843,9 +1869,9 @@ def metrics_config():
         flash("Access denied.", "danger")
         return redirect(url_for("requests.dashboard"))
 
-    from .forms import MetricsConfigForm
     from ..models import MetricsConfig
     from ..services.process_metrics import build_process_metrics_summary
+    from .forms import MetricsConfigForm
 
     def build_admin_metrics_explorer_context():
         allowed_depts = ["A", "B", "C"]
@@ -2326,6 +2352,119 @@ def delete_integration(int_id: int):
     db.session.commit()
     flash("Integration removed.", "success")
     return redirect(url_for("admin.list_integrations"))
+
+
+@admin_bp.route("/integrations/<int:int_id>/test", methods=["POST"])
+@login_required
+def test_integration(int_id: int):
+    if not _is_admin_user():
+        return jsonify({"ok": False, "error": "access_denied"}), 403
+    ic = get_or_404(IntegrationConfig, int_id)
+    try:
+        cfg = normalize_integration_config(ic.kind, ic.config)
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid_config"}), 400
+
+    out = {"ok": True, "kind": ic.kind, "provider": cfg.get("provider")}
+
+    # detect auth secrets and attempt to resolve env-style refs (no external calls)
+    auth = cfg.get("auth") or {}
+    if isinstance(auth, dict):
+        secret_env = (
+            auth.get("secret_env") or auth.get("token_env") or auth.get("password_env")
+        )
+        if secret_env:
+            # report whether the secret is present in environment or via resolvers
+            resolved = resolve_secret_ref(f"env:{secret_env}")
+            out["auth_secret_present"] = bool(resolved)
+            out["auth_secret_preview"] = bool(resolved)
+
+    # If provider is one of our built-in PROVIDERS, attempt a safe fetch
+    provider = (cfg.get("provider") or "").strip().lower()
+    try:
+        if provider:
+            try:
+                # only call fetch_external_data for providers that are registered
+                from ..services.integrations import PROVIDERS
+
+                if provider in PROVIDERS:
+                    sample = fetch_external_data(
+                        provider, config=cfg, query={"sample": True}
+                    )
+                    out["sample_fetch"] = sample
+            except Exception:
+                out["sample_fetch_error"] = "provider_fetch_failed"
+    except Exception:
+        pass
+
+    # For webhook configs, surface endpoint URL and compatibility
+    if ic.kind == "webhook":
+        endpoints = cfg.get("endpoints") or {}
+        out["webhook_endpoints"] = endpoints
+        out["compatibility"] = cfg.get("compatibility") or {}
+
+    return jsonify(out)
+
+
+@admin_bp.route("/integrations/<int:int_id>/reveal", methods=["POST"])
+@login_required
+def reveal_integration_secrets(int_id: int):
+    if not _is_admin_user():
+        return jsonify({"ok": False, "error": "access_denied"}), 403
+    ic = get_or_404(IntegrationConfig, int_id)
+    try:
+        cfg = normalize_integration_config(ic.kind, ic.config)
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid_config"}), 400
+
+    auth = cfg.get("auth") or {}
+    out = {"ok": True, "secrets": {}}
+    revealed_summary = {}
+    try:
+        if isinstance(auth, dict):
+            keys = list(auth.keys())
+            for key in keys:
+                val = auth.get(key)
+                resolved = None
+                try:
+                    # prefer resolver for structured refs
+                    resolved = resolve_secret_ref(val) if val is not None else None
+                except Exception:
+                    resolved = None
+                present = bool(resolved)
+                out["secrets"][key] = {
+                    "ref": val,
+                    "present": present,
+                    "masked": ("****" if present else None),
+                }
+                revealed_summary[key] = {"present": present}
+    except Exception:
+        pass
+
+    # record audit entry for secret reveal action (do not store secrets themselves)
+    try:
+        entry = AuditLog(
+            actor_type="user",
+            actor_user_id=current_user.id,
+            actor_label=getattr(current_user, "email", None),
+            action_type="reveal_integration_secrets",
+            note=f'revealed secret refs for integration {getattr(ic, "id", "")}',
+            metadata_json=json.dumps(
+                {
+                    "integration_id": getattr(ic, "id", None),
+                    "revealed": revealed_summary,
+                }
+            ),
+        )
+        db.session.add(entry)
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+    return jsonify(out)
 
 
 @admin_bp.route("/dept_editors/new", methods=["GET", "POST"])

@@ -6,8 +6,8 @@ Create Date: 2026-03-06 18:00:00.000000
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0023_add_user_department_and_last_active"
 down_revision = "0022_add_sso_admin_sync_flag"

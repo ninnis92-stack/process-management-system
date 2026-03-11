@@ -11,6 +11,7 @@ from .field_verification import (
     run_field_verification,
 )
 from .request_creation import (
+    apply_template_verification_prefills,
     build_template_spec,
     collect_template_submission_data,
     get_template_prefill_target_names,
@@ -19,7 +20,6 @@ from .request_creation import (
     run_template_field_verifications,
     validate_conditional_template_submission,
     validate_required_template_submission,
-    apply_template_verification_prefills,
 )
 
 
@@ -102,7 +102,9 @@ def validate_template_request_submission(template_context: RequestTemplateContex
         enabled=bool(getattr(template, "verification_prefill_enabled", False)),
     )
 
-    missing_field = validate_required_template_submission(template_fields, submission_data)
+    missing_field = validate_required_template_submission(
+        template_fields, submission_data
+    )
     if missing_field:
         return {
             "ok": False,
@@ -113,10 +115,12 @@ def validate_template_request_submission(template_context: RequestTemplateContex
             "applied_prefills": applied_prefills,
         }
 
-    conditional_missing_field, conditional_meta = validate_conditional_template_submission(
-        template_fields,
-        submission_data,
-        verification_results,
+    conditional_missing_field, conditional_meta = (
+        validate_conditional_template_submission(
+            template_fields,
+            submission_data,
+            verification_results,
+        )
     )
     if conditional_missing_field:
         return {
@@ -138,7 +142,9 @@ def validate_template_request_submission(template_context: RequestTemplateContex
     }
 
 
-def handle_template_prefill_request(template_context: RequestTemplateContext, payload: dict):
+def handle_template_prefill_request(
+    template_context: RequestTemplateContext, payload: dict
+):
     template = template_context.template
     if not template or not getattr(template, "verification_prefill_enabled", False):
         return {"ok": False, "error": "prefill_disabled"}, 400
@@ -149,7 +155,11 @@ def handle_template_prefill_request(template_context: RequestTemplateContext, pa
         return {"ok": False, "error": "missing_field_name"}, 400
 
     source_field = next(
-        (field for field in template_context.template_fields if field.name == field_name),
+        (
+            field
+            for field in template_context.template_fields
+            if field.name == field_name
+        ),
         None,
     )
     if not source_field:
@@ -173,6 +183,8 @@ def handle_template_prefill_request(template_context: RequestTemplateContext, pa
     return {
         "ok": True,
         "result": result,
-        "prefills": {key: value.get("value") for key, value in applied_prefills.items()},
+        "prefills": {
+            key: value.get("value") for key, value in applied_prefills.items()
+        },
         "meta": applied_prefills,
     }, 200

@@ -5,13 +5,15 @@ events occur. It intentionally keeps behavior simple because a more robust
 workflow engine may be added later; rules execute synchronously here and
 emit integration boundary events for outbound actions.
 """
+
 from __future__ import annotations
 
-from typing import Any
 from datetime import datetime
+from typing import Any
 
 from ..extensions import db
-from ..models import AutomationRule, Request as ReqModel
+from ..models import AutomationRule
+from ..models import Request as ReqModel
 from .event_bus import publish_event
 from .integrations import serialize_request
 
@@ -26,7 +28,9 @@ def evaluate_rules_for_event(event_name: str, request_obj: ReqModel) -> list[int
         tenant_id = getattr(request_obj, "tenant_id", None)
         query = AutomationRule.query.filter_by(is_active=True)
         # prefer tenant-scoped rules but include global (tenant_id is NULL)
-        rules = query.filter((AutomationRule.tenant_id == tenant_id) | (AutomationRule.tenant_id == None)).all()
+        rules = query.filter(
+            (AutomationRule.tenant_id == tenant_id) | (AutomationRule.tenant_id == None)
+        ).all()
     except Exception:
         try:
             db.session.rollback()
@@ -51,7 +55,9 @@ def evaluate_rules_for_event(event_name: str, request_obj: ReqModel) -> list[int
     return fired
 
 
-def execute_rule_actions(rule: AutomationRule, request_obj: ReqModel, *, event_name: str | None = None) -> None:
+def execute_rule_actions(
+    rule: AutomationRule, request_obj: ReqModel, *, event_name: str | None = None
+) -> None:
     """Execute declared actions for a matching rule.
 
     Actions are simple dicts with an `action` key. We persist an
@@ -63,11 +69,19 @@ def execute_rule_actions(rule: AutomationRule, request_obj: ReqModel, *, event_n
         kind = (action.get("action") or "").strip().lower()
         if kind == "webhook":
             event = action.get("event_name") or f"automation.{rule.id}.webhook"
-            publish_event(event, {"rule_id": rule.id, "request": payload_root}, destination_kind="webhook")
+            publish_event(
+                event,
+                {"rule_id": rule.id, "request": payload_root},
+                destination_kind="webhook",
+            )
         elif kind == "email":
             # emit to outbox for downstream emailer worker
             to = action.get("to")
-            publish_event("automation.email", {"rule_id": rule.id, "to": to, "request": payload_root}, destination_kind="outbox")
+            publish_event(
+                "automation.email",
+                {"rule_id": rule.id, "to": to, "request": payload_root},
+                destination_kind="outbox",
+            )
         elif kind == "change_status":
             new_status = action.get("status")
             if new_status:
@@ -75,10 +89,18 @@ def execute_rule_actions(rule: AutomationRule, request_obj: ReqModel, *, event_n
                 request_obj.updated_at = datetime.utcnow()
                 db.session.add(request_obj)
                 db.session.commit()
-                publish_event("request.status_changed", {"rule_id": rule.id, "request": payload_root}, destination_kind="outbox")
+                publish_event(
+                    "request.status_changed",
+                    {"rule_id": rule.id, "request": payload_root},
+                    destination_kind="outbox",
+                )
         elif kind == "escalate":
             # escalate: publish an integration event that can be processed by rules
-            publish_event("automation.escalation", {"rule_id": rule.id, "request": payload_root}, destination_kind="outbox")
+            publish_event(
+                "automation.escalation",
+                {"rule_id": rule.id, "request": payload_root},
+                destination_kind="outbox",
+            )
         elif kind == "assign_user":
             user_id = action.get("user_id")
             if user_id:
@@ -86,7 +108,15 @@ def execute_rule_actions(rule: AutomationRule, request_obj: ReqModel, *, event_n
                 request_obj.updated_at = datetime.utcnow()
                 db.session.add(request_obj)
                 db.session.commit()
-                publish_event("request.assignment_changed", {"rule_id": rule.id, "request": payload_root}, destination_kind="outbox")
+                publish_event(
+                    "request.assignment_changed",
+                    {"rule_id": rule.id, "request": payload_root},
+                    destination_kind="outbox",
+                )
         else:
             # unknown action: publish a generic automation event for observability
-            publish_event("automation.unknown_action", {"rule_id": rule.id, "action": action, "request": payload_root}, destination_kind="outbox")
+            publish_event(
+                "automation.unknown_action",
+                {"rule_id": rule.id, "action": action, "request": payload_root},
+                destination_kind="outbox",
+            )

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta
 from typing import Any
-import uuid
 
 from flask import current_app
 
@@ -69,11 +69,16 @@ def mark_event_failed(event: IntegrationEvent, exc: Exception) -> None:
     event.last_error = str(exc)
     event.retry_count = retry_count
     event.last_attempt_at = now
-    if getattr(event, "next_retry_at", None) is None and event.status != "permanent_failed":
+    if (
+        getattr(event, "next_retry_at", None) is None
+        and event.status != "permanent_failed"
+    ):
         event.next_retry_at = now + timedelta(minutes=backoff_minutes)
     db.session.add(event)
     db.session.commit()
     try:
-        current_app.logger.exception("Integration boundary event failed: %s", event.event_name)
+        current_app.logger.exception(
+            "Integration boundary event failed: %s", event.event_name
+        )
     except Exception:
         pass

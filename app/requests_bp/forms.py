@@ -1,16 +1,16 @@
 from dataclasses import field
+from datetime import datetime, timedelta
 
 from flask_wtf import FlaskForm
 from wtforms import (
+    BooleanField,
+    MultipleFileField,
+    SelectField,
     StringField,
     TextAreaField,
-    SelectField,
-    MultipleFileField,
-    BooleanField,
 )
 from wtforms.fields import DateTimeLocalField
-from wtforms.validators import DataRequired, Length, Optional, URL, ValidationError
-from datetime import datetime, timedelta
+from wtforms.validators import URL, DataRequired, Length, Optional, ValidationError
 
 
 class NewRequestForm(FlaskForm):

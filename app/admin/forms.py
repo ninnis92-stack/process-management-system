@@ -1,22 +1,21 @@
 import json
-
 import re
+
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileAllowed, FileField
 from wtforms import (
-    StringField,
+    BooleanField,
+    IntegerField,
     PasswordField,
     SelectField,
     SelectMultipleField,
-    BooleanField,
+    StringField,
     SubmitField,
     TextAreaField,
+    ValidationError,
 )
 from wtforms.fields import EmailField
-from wtforms.validators import DataRequired, Email, Optional, Length, URL
-from wtforms.validators import AnyOf
-from wtforms import ValidationError
-from wtforms import IntegerField
-from flask_wtf.file import FileField, FileAllowed
+from wtforms.validators import URL, AnyOf, DataRequired, Email, Length, Optional
 
 
 class AdminCreateUserForm(FlaskForm):
@@ -50,6 +49,7 @@ class AdminCreateUserForm(FlaskForm):
             raise ValidationError("Must be an integer between 1 and 5")
         if iv < 1 or iv > 5:
             raise ValidationError("Limit must be between 1 and 5")
+
     # quote preferences for new user
     quote_set = SelectField("Initial quote set", choices=[], validators=[Optional()])
     quotes_enabled = BooleanField("Enable rotating quotes", default=True)
@@ -107,7 +107,11 @@ class SiteConfigForm(FlaskForm):
     QUOTE_MAX_LENGTH = 160
     import_url = StringField(
         "Import branding from website",
-        validators=[Optional(), Length(max=255), URL(message="Must be a valid website URL")],
+        validators=[
+            Optional(),
+            Length(max=255),
+            URL(message="Must be a valid website URL"),
+        ],
     )
     brand_name = StringField("Brand name", validators=[Optional(), Length(max=120)])
     theme_preset = SelectField(
@@ -134,7 +138,8 @@ class SiteConfigForm(FlaskForm):
         "Navbar banner text", validators=[Optional(), Length(max=500)]
     )
     company_url = StringField(
-        "Company URL", validators=[Optional(), Length(max=255), URL(message="Must be a valid URL")] 
+        "Company URL",
+        validators=[Optional(), Length(max=255), URL(message="Must be a valid URL")],
     )
     show_banner = BooleanField("Show banner", default=False)
     rolling_quotes = TextAreaField(
@@ -147,7 +152,8 @@ class SiteConfigForm(FlaskForm):
         "Active quote set", choices=[], validators=[Optional()]
     )
     quote_permissions_dept = TextAreaField(
-        "Allowed quote sets by department (JSON)", validators=[Optional(), Length(max=4000)]
+        "Allowed quote sets by department (JSON)",
+        validators=[Optional(), Length(max=4000)],
     )
     quote_permissions_user = TextAreaField(
         "Allowed quote sets by user (JSON)", validators=[Optional(), Length(max=4000)]
@@ -159,8 +165,12 @@ class SiteConfigForm(FlaskForm):
             return
         quotes = [line.strip() for line in raw.splitlines() if line.strip()]
         if len(quotes) > 30:
-            raise ValidationError("The default quote set can contain at most 30 quotes.")
-        too_long = next((quote for quote in quotes if len(quote) > form.QUOTE_MAX_LENGTH), None)
+            raise ValidationError(
+                "The default quote set can contain at most 30 quotes."
+            )
+        too_long = next(
+            (quote for quote in quotes if len(quote) > form.QUOTE_MAX_LENGTH), None
+        )
         if too_long is not None:
             raise ValidationError(
                 f"Each quote must be {form.QUOTE_MAX_LENGTH} characters or fewer."
@@ -178,13 +188,19 @@ class SiteConfigForm(FlaskForm):
         except Exception:
             raise ValidationError("Rolling quote sets must be valid JSON.")
         if not isinstance(parsed, dict):
-            raise ValidationError("Rolling quote sets must be a JSON object mapping names to lists.")
+            raise ValidationError(
+                "Rolling quote sets must be a JSON object mapping names to lists."
+            )
         for name, val in parsed.items():
             if not isinstance(name, str) or not name.strip():
                 raise ValidationError("Each quote set must have a non-empty name.")
             if not isinstance(val, list):
                 raise ValidationError(f"Set '{name}' must be a JSON array of strings.")
-            cleaned = [str(item).strip() for item in val if isinstance(item, str) and str(item).strip()]
+            cleaned = [
+                str(item).strip()
+                for item in val
+                if isinstance(item, str) and str(item).strip()
+            ]
             if len(cleaned) > 30:
                 raise ValidationError(f"Set '{name}' can contain at most 30 quotes.")
             if any(len(item) > form.QUOTE_MAX_LENGTH for item in cleaned):
@@ -193,7 +209,9 @@ class SiteConfigForm(FlaskForm):
                 )
             for item in val:
                 if not isinstance(item, str):
-                    raise ValidationError(f"All quotes must be strings (error in set '{name}').")
+                    raise ValidationError(
+                        f"All quotes must be strings (error in set '{name}')."
+                    )
 
     def _validate_permissions(self, field, kind):
         # helper used by both department and user validators; "self" is the form
@@ -207,7 +225,9 @@ class SiteConfigForm(FlaskForm):
         except Exception:
             raise ValidationError(f"{kind} permissions must be valid JSON.")
         if not isinstance(parsed, dict):
-            raise ValidationError(f"{kind} permissions must be a JSON object mapping keys to lists.")
+            raise ValidationError(
+                f"{kind} permissions must be a JSON object mapping keys to lists."
+            )
         for name, val in parsed.items():
             if not (isinstance(name, str) and name):
                 raise ValidationError(f"Invalid key in {kind} permissions: {name}")
@@ -215,7 +235,9 @@ class SiteConfigForm(FlaskForm):
                 raise ValidationError(f"Value for '{name}' must be a JSON array.")
             for item in val:
                 if not isinstance(item, str):
-                    raise ValidationError(f"All entries in {kind} permissions must be strings (error for key '{name}').")
+                    raise ValidationError(
+                        f"All entries in {kind} permissions must be strings (error for key '{name}')."
+                    )
 
     def validate_quote_permissions_dept(form, field):
         return form._validate_permissions(field, "Department")
@@ -487,7 +509,11 @@ class FormTemplateAdminForm(FlaskForm):
     )
     layout = SelectField(
         "Form layout",
-        choices=[("standard", "Standard"), ("compact", "Compact"), ("spacious", "Spacious")],
+        choices=[
+            ("standard", "Standard"),
+            ("compact", "Compact"),
+            ("spacious", "Spacious"),
+        ],
         default="standard",
         validators=[DataRequired(), AnyOf(["standard", "compact", "spacious"])],
     )
@@ -551,7 +577,7 @@ class FieldVerificationForm(FlaskForm):
         "Verify each separated value individually", default=False
     )
     value_separator = StringField(
-        "Value separator", validators=[Optional(), Length(max=20)], default="," 
+        "Value separator", validators=[Optional(), Length(max=20)], default=","
     )
     bulk_input_hint = StringField(
         "User entry hint", validators=[Optional(), Length(max=300)]
@@ -643,9 +669,7 @@ class FeatureFlagsForm(FlaskForm):
     rolling_quotes_enabled = BooleanField(
         "Enable rolling quotes in the header/footer", default=True
     )
-    guest_dashboard_enabled = BooleanField(
-        "Enable guest dashboard pages", default=True
-    )
+    guest_dashboard_enabled = BooleanField("Enable guest dashboard pages", default=True)
     guest_submission_enabled = BooleanField(
         "Enable guest submission page", default=True
     )
@@ -667,11 +691,17 @@ class MetricsConfigForm(FlaskForm):
 class GuestFormAdminForm(FlaskForm):
     name = StringField("Guest form name", validators=[DataRequired(), Length(max=200)])
     slug = StringField("Slug (unique)", validators=[DataRequired(), Length(max=200)])
-    template_id = SelectField("Template (optional)", coerce=int, validators=[Optional()])
+    template_id = SelectField(
+        "Template (optional)", coerce=int, validators=[Optional()]
+    )
     require_sso = BooleanField("Require SSO-linked account to submit", default=False)
     layout = SelectField(
         "Form layout",
-        choices=[("standard", "Standard"), ("compact", "Compact"), ("spacious", "Spacious")],
+        choices=[
+            ("standard", "Standard"),
+            ("compact", "Compact"),
+            ("spacious", "Spacious"),
+        ],
         default="standard",
         validators=[DataRequired(), AnyOf(["standard", "compact", "spacious"])],
     )
@@ -684,7 +714,12 @@ class GuestFormAdminForm(FlaskForm):
             ("unaffiliated_only", "Unaffiliated accounts only"),
         ],
         default="public",
-        validators=[DataRequired(), AnyOf(["public", "sso_linked", "approved_sso_domains", "unaffiliated_only"])],
+        validators=[
+            DataRequired(),
+            AnyOf(
+                ["public", "sso_linked", "approved_sso_domains", "unaffiliated_only"]
+            ),
+        ],
     )
     allowed_email_domains = TextAreaField(
         "Approved organization email domains",
@@ -711,7 +746,9 @@ class GuestFormAdminForm(FlaskForm):
         try:
             parsed = json.loads(raw)
         except Exception as exc:
-            raise ValidationError("Credential requirements must be valid JSON.") from exc
+            raise ValidationError(
+                "Credential requirements must be valid JSON."
+            ) from exc
         if not isinstance(parsed, dict):
             raise ValidationError("Credential requirements JSON must be an object.")
 
@@ -780,7 +817,9 @@ class StatusBucketForm(FlaskForm):
     workflow_id = SelectField(
         "Assign workflow (optional)", coerce=int, choices=[], validators=[Optional()]
     )
-    executive_approval_required = BooleanField("Require executive approval", default=False)
+    executive_approval_required = BooleanField(
+        "Require executive approval", default=False
+    )
     sales_list_number_required = BooleanField("Require sales list #", default=False)
     bulk_statuses = TextAreaField(
         "Bulk add statuses (one per line)", validators=[Optional()]
@@ -790,7 +829,9 @@ class StatusBucketForm(FlaskForm):
 
 class AutomationRuleForm(FlaskForm):
     name = StringField("Rule name", validators=[DataRequired(), Length(max=200)])
-    description = TextAreaField("Description", validators=[Optional(), Length(max=2000)])
+    description = TextAreaField(
+        "Description", validators=[Optional(), Length(max=2000)]
+    )
     triggers = TextAreaField(
         "Triggers",
         description="One event name per line, or '*' to match all events",

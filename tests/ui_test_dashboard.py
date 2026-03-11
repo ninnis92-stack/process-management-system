@@ -3,13 +3,15 @@ import pytest
 # Module-level skip: this UI test acts as a smoke/integration check and is
 # skipped by default to avoid running browser-style checks in CI/dev runs.
 pytestmark = pytest.mark.skip(reason="Smoke UI test - skipped by default")
+from datetime import datetime, timedelta
+
 from werkzeug.security import generate_password_hash
 
 from app import create_app
 from app.extensions import db
-from datetime import datetime, timedelta
-
-from app.models import User, Request as ReqModel, Artifact
+from app.models import Artifact
+from app.models import Request as ReqModel
+from app.models import User
 
 
 @pytest.fixture()

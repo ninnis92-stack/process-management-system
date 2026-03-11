@@ -5,9 +5,8 @@ Revises: 0017_add_request_form_field_validation_toggle
 Create Date: 2026-03-05 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0018_add_out_of_stock_notify_toggle"
