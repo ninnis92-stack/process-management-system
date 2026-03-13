@@ -248,6 +248,9 @@ body {
   .navbar__center {
     margin: var(--space-sm) 0;
     justify-content: center;
+    min-width: 0;
+    max-width: 100vw;
+    overflow-x: auto;
   }
   .navbar__right {
     justify-content: flex-end;
@@ -265,6 +268,8 @@ body {
   padding: var(--space-sm) var(--space-lg);
   box-shadow: var(--shadow-sm);
   min-width: 0;
+  max-width: 100vw;
+  overflow-x: auto;
 }
 .banner__quote {
   font-size: var(--font-base);

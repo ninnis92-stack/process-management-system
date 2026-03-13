@@ -288,22 +288,22 @@
             {% if ep in highlight_endpoints and onboarding_guidance_enabled %}
               <section class="hero-callouts" aria-label="Workflow guidance">
                 <div class="hero-callouts__intro">
-                  <p class="hero-callouts__tag">Workflow signal</p>
+                  <p class="hero-callouts__tag">Workflow</p>
                   {% if current_user.is_admin %}
-                    <h3>Stay synced across teams, guests, and the admin desk</h3>
+                    <h3>Stay in sync across your team</h3>
                     <p class="hero-callouts__lede">
-                      Dashboards now float over a subtle gradient, so you see where work needs attention, which guest form stays open, and what the next action should be.
+                      See what needs attention and what to do next—all in one place.
                     </p>
                     <div class="hero-callouts__hint" role="status" aria-live="polite">
-                      Not sure where to start? Follow the storyboards above: admin approvals on the left, guest handoffs on the right.
+                      Unsure where to start? Use the admin and guest panels above.
                     </div>
                   {% else %}
-                    <h3>Stay synced across guests and staff workflows</h3>
+                    <h3>Stay in sync with your work</h3>
                     <p class="hero-callouts__lede">
-                      Requests now float on a gentle canvas, surfacing what needs attention, which guests are waiting, and what your next action can be.
+                      See what needs action, who’s waiting, and your next step.
                     </p>
                     <div class="hero-callouts__hint" role="status" aria-live="polite">
-                      Need to escalate a request? Tag the right department or reach out to your admin to keep things moving.
+                      Escalate by tagging a department or contacting your admin.
                     </div>
                   {% endif %}
                 </div>
