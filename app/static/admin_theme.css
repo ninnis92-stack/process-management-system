@@ -1,3 +1,27 @@
+/* Remove text wrapping from admin hero callouts, ledes, hints, card headers, pills, section headers */
+.hero-callout-card__badge,
+.hero-callout-card__title,
+.hero-callout-card__body,
+.hero-callouts__lede,
+.hero-callouts__hint,
+.admin-section__title,
+.admin-section__hint,
+.admin-command-pill,
+.card-header,
+.section-header,
+.section-header-title,
+.section-header-content {
+  white-space: nowrap;
+  overflow-x: auto;
+}
+/* Remove text wrapping from Command Center header and sidebar */
+.admin-sidebar-panel__header,
+.admin-sidebar-panel__eyebrow,
+.admin-sidebar-panel__title,
+.admin-sidebar-panel__lede {
+  white-space: nowrap;
+  overflow-x: auto;
+}
 /* Admin responsive theme overrides: simple, high-contrast, mobile-friendly */
 :root{
   --admin-accent:#0d6efd;

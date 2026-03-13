@@ -1,3 +1,18 @@
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var vibeBtn = document.getElementById('vibeBtn');
+      if (vibeBtn) {
+        vibeBtn.addEventListener('click', function() {
+          var body = document.body;
+          if (body.getAttribute('data-theme') === 'vibe') {
+            body.removeAttribute('data-theme');
+          } else {
+            body.setAttribute('data-theme', 'vibe');
+          }
+        });
+      }
+    });
+  </script>
 <!doctype html>
 <html>
 {% set ep = request.endpoint or '' %}
@@ -55,66 +70,77 @@
       })();
     </script>
   {% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260313a') }}">
  </head>
  {% set ep = request.endpoint or '' %}
  {% set public_entry_screen = ep in ['auth.login', 'external.external_new', 'external.external_dashboard'] %}
  {% set guest_dashboard_available = guest_dashboard_enabled|default(True) %}
  {% set guest_submission_available = guest_submission_enabled|default(True) %}
- {% set global_no_vibe = (not FeatureFlags.get().vibe_enabled) %}
+{# Global vibe feature flag no longer disables user controls #}
+{% set global_no_vibe = False %}
  {% set dark_mode_active = current_user.is_authenticated and (current_user.dark_mode or False) %}
  {% set vibe_button_enabled = (current_user.vibe_button_enabled if current_user.is_authenticated else True) %}
- {% set vibe_ui_enabled = current_user.is_authenticated and FeatureFlags.get().vibe_enabled and not external_theme_loaded and not dark_mode_active and vibe_button_enabled %}
+{% set vibe_ui_enabled = current_user.is_authenticated and not external_theme_loaded and not dark_mode_active and vibe_button_enabled %}
  {% set show_brand_banner = (rolling_quotes_enabled or vibe_ui_enabled) and not public_entry_screen %}
  {% set no_brand_banner = (not show_brand_banner) and (not public_entry_screen) %}
  <body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if dark_mode_active %} dark-mode{% endif %}{% if global_no_vibe %} no-vibe{% endif %}{% if no_brand_banner %} no-brand-banner{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-endpoint="{{ ep }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if dark_mode_active else '0' }}" data-user-is-admin="{{ '1' if current_user.is_authenticated and current_user.is_admin else '0' }}">
   <a href="#content" class="skip-link">Skip to content</a>
 
-  <nav class="navbar theme-nav navbar-expand-lg navbar-dark">
-    {% if ep.startswith('admin') %}
-      <button class="btn btn-outline-light d-md-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-label="Toggle admin navigation">
-        <i class="fas fa-bars"></i>
-      </button>
-    {% endif %}
-    <div class="container-fluid">
-      {% set brand_href = company_url if company_url else url_for('requests.dashboard') %}
-      <div class="brand-cluster flex-wrap align-items-center">
-        <a class="navbar-brand d-flex align-items-center brand-stack" href="{{ brand_href }}"
-           {% if company_url and (company_url.startswith('http://') or company_url.startswith('https://')) %}target="_blank" rel="noopener noreferrer"{% endif %}>
-          {% if theme_logo_url %}
-            <img src="{{ theme_logo_url }}" alt="{{ site_brand_name or 'FreshProcess' }} logo" class="brand-logo-img" />
-          {% else %}
-            <div class="logo-fallback" aria-hidden="true"></div>
-          {% endif %}
-          <div class="brand-title">{{ site_brand_name or 'FreshProcess' }}</div>
-        </a>
-        {% if current_user.is_authenticated and current_user.is_admin %}
-          <a href="{{ url_for('admin.index') }}" class="btn btn-sm btn-outline-light ms-2" title="Admin dashboard">Admin</a>
+  <nav class="navbar">
+    <div class="navbar__left">
+      <a class="navbar__brand" href="{{ brand_href }}">
+        {% if theme_logo_url %}
+          <img src="{{ theme_logo_url }}" alt="FreshProcess logo" class="navbar__logo" />
+        {% else %}
+          <div class="logo-fallback" aria-hidden="true"></div>
         {% endif %}
-
-        {# --- Brand Banner, Quote Panel, and Vibe Button (for test compliance) --- #}
-        {% set show_brand_banner = (current_user.is_authenticated and (FeatureFlags.get().vibe_enabled or current_user.quotes_enabled)) %}
-        {% set dark_mode_active = current_user.is_authenticated and (current_user.dark_mode or False) %}
-        {% set external_theme = active_theme_css is defined and active_theme_css %}
-        {% set show_vibe_btn = FeatureFlags.get().vibe_enabled and current_user.vibe_button_enabled and not dark_mode_active and not external_theme %}
-        {% if show_brand_banner %}
-        <div class="brand-banner-row{% if not FeatureFlags.get().vibe_enabled %} brand-banner-row--quotes-only{% endif %}" data-theme-banner>
-          <div class="brand-banner-row__quote-panel" data-vibe-quote-panel>
-            {% if current_user.quotes_enabled %}
-              <span id="motivation">{{ rolling_quotes[0] if rolling_quotes else 'Progress, not perfection.' }}</span>
-            {% endif %}
-          </div>
-          <div class="brand-banner-row__control-panel">
-            <div class="brand-banner-row__control-shell ui-control-shell--banner" data-vibe-shell>
-              {% if show_vibe_btn %}
-                <button id="vibeBtn" class="btn btn-outline-info brand-vibe-btn" type="button">Vibe</button>
-              {% endif %}
-              <span class="theme-label">Current theme</span>
-            </div>
-          </div>
-        </div>
-        {% endif %}
+        <span class="navbar__title">FreshProcess</span>
+      </a>
+    </div>
+    <div class="navbar__center">
+      <div class="banner">
+        <span class="banner__quote">{{ rolling_quotes[0] if rolling_quotes else 'Small habits compound into big results.' }}</span>
+        <button id="vibeBtn" class="banner__vibe-btn button" type="button" aria-label="Toggle Vibe Theme">
+          <span class="vibe-icon">🎉</span> Vibe
+        </button>
       </div>
-      <!-- Removed theme banner for compactness -->
+    </div>
+    <div class="navbar__right">
+      {% if current_user.is_authenticated and current_user.is_admin %}
+        <a href="{{ url_for('admin.index') }}" class="navbar__admin-btn">Admin</a>
+      {% endif %}
+      <button class="navbar__menu-btn" aria-label="Menu"><span class="navbar__menu-icon"></span></button>
+    </div>
+  </nav>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const vibeBtn = document.getElementById('vibeBtn');
+      function setTheme(theme, vibeColor) {
+        document.body.setAttribute('data-theme', theme);
+        if (vibeColor) {
+          document.body.style.setProperty('--vibe-color', vibeColor);
+          localStorage.setItem('vibeColor', vibeColor);
+        }
+        localStorage.setItem('theme', theme);
+        vibeBtn.classList.toggle('active', theme === 'vibe');
+      }
+      // Restore theme on load
+      const savedTheme = localStorage.getItem('theme') || 'default';
+      const savedVibeColor = localStorage.getItem('vibeColor') || '#ff4f81';
+      setTheme(savedTheme, savedVibeColor);
+
+      if (vibeBtn) {
+        vibeBtn.addEventListener('click', function() {
+          const currentTheme = document.body.getAttribute('data-theme') || 'default';
+          if (currentTheme === 'vibe') {
+            setTheme('default');
+          } else {
+            setTheme('vibe', savedVibeColor);
+          }
+        });
+      }
+    });
+  </script>
 
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Open main navigation menu">
         <span class="navbar-toggler-icon" aria-hidden="true"></span>
