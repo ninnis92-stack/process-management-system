@@ -1,3 +1,61 @@
+/* --- Navbar action area: consistent height, spacing, alignment --- */
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-actions .btn,
+.nav-actions .dropdown-toggle {
+  height: 36px;
+  min-width: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.nav-actions .dropdown-toggle img.avatar {
+  height: 28px;
+  width: 28px;
+  margin-right: 6px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* --- Section headings and card overflow fixes --- */
+.section-title,
+.admin-section-panel h2,
+.admin-section-panel h3 {
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+.admin-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px;
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-section-panel {
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+.card,
+.admin-card,
+.surface-panel {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
 /* Prevent vertical text stacking and ensure safe wrapping */
 *, *:before, *:after {
   min-width: 0;
