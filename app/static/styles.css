@@ -253,7 +253,13 @@ body {
     overflow-x: auto;
   }
   .navbar__right {
+    display: flex;
+    align-items: center;
     justify-content: flex-end;
+    min-width: 0;
+    flex: 1 1 0;
+    gap: var(--space-md);
+    flex-wrap: wrap;
   }
 }
 

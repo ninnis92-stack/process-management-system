@@ -97,21 +97,44 @@
         <span class="navbar__title">FreshProcess</span>
       </a>
     </div>
-    <div class="navbar__center">
-      <div class="banner">
-        <span class="banner__quote">{{ rolling_quotes[0] if rolling_quotes else 'Small habits compound into big results.' }}</span>
-        <button id="vibeBtn" class="banner__vibe-btn button" type="button" aria-label="Toggle Vibe Theme">
-          <span class="vibe-icon">🎉</span> Vibe
-        </button>
-      </div>
-    </div>
-    <div class="navbar__right">
+    <div class="navbar__right nav-actions">
       {% if current_user.is_authenticated and current_user.is_admin %}
         <a href="{{ url_for('admin.index') }}" class="navbar__admin-btn">Admin</a>
+        <button id="toggleNotifBtn" type="button" class="btn btn-outline-light btn-sm" title="Toggle notifications icon" aria-label="Toggle notifications icon" tabindex="0">🔕</button>
       {% endif %}
       <button class="navbar__menu-btn" aria-label="Menu"><span class="navbar__menu-icon"></span></button>
+      <div class="dropdown ms-2">
+        <button type="button" class="btn btn-outline-light btn-sm d-flex align-items-center dropdown-toggle" id="accountMenuBtn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Open account menu" data-user-name="{{ current_user.name or '' }}" data-user-email="{{ current_user.email or '' }}" data-sso-sub="{{ current_user.sso_sub or '' }}">
+          <img src="{{ avatar_url_for(current_user, size=34) }}" alt="Account avatar" class="avatar avatar-sm me-2" />
+          <span class="visually-hidden">Account</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end account-dropdown-menu" aria-labelledby="accountMenuBtn" role="menu">
+          <li class="px-3 py-2" role="none">
+            <div class="small text-muted">Signed in as</div>
+            <div class="fw-bold">{{ current_user.email }}</div>
+            <div class="small text-muted mt-1">{{ department_labels.get(current_user.department, 'Dept ' ~ current_user.department) }}</div>
+          </li>
+          <li><hr class="dropdown-divider"></li>
+          <li role="none"><a class="dropdown-item account-dropdown-item" href="{{ url_for('auth.settings') }}" role="menuitem">Account settings</a></li>
+          <li role="none">
+            <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="dropdown-item account-dropdown-item" role="menuitem">Sign out</button>
+            </form>
+          </li>
+        </ul>
+      </div>
     </div>
   </nav>
+
+  {% if ep.startswith('admin') %}
+    <div class="banner banner--admin mt-2 mb-3">
+      <span class="banner__quote">{{ rolling_quotes[0] if rolling_quotes else 'Small habits compound into big results.' }}</span>
+      <button id="vibeBtn" class="banner__vibe-btn button" type="button" aria-label="Toggle Vibe Theme">
+        <span class="vibe-icon">🎉</span> Vibe
+      </button>
+    </div>
+  {% endif %}
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const vibeBtn = document.getElementById('vibeBtn');
