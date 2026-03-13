@@ -16,6 +16,7 @@ from flask import Flask, current_app
 from flask_login import current_user
 from flask_wtf import CSRFProtect
 from werkzeug.security import generate_password_hash
+from werkzeug.exceptions import HTTPException
 
 from config import Config
 
@@ -67,8 +68,13 @@ def create_app():
     # Optionally, log all exceptions
     @app.errorhandler(Exception)
     def handle_exception(e):
+        import logging, traceback
+        # If it's an HTTPException (like 403), return its default handler
+        if isinstance(e, HTTPException):
+            return e
         logging.error("Unhandled Exception: %s", e)
         logging.error(traceback.format_exc())
+        from flask import jsonify
         return jsonify({"error": "Unhandled Exception", "details": str(e)}), 500
 
     # We will perform a one-time schema check (original_sender column) after

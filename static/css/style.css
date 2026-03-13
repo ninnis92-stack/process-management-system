@@ -14,25 +14,80 @@ GLOBAL LAYOUT STABILIZATION
 ----------------------------------------------------- */
 *,
 *::before,
-*::after {
-  box-sizing: border-box;
-  min-width: 0;
+/* === UNIFIED THEME TOKEN SYSTEM === */
+:root {
+  /* Core backgrounds */
+  --color-bg: #f6f7fb;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f1f3f6;
+  /* Text colors */
+  --color-text: #1f2937;
+  --color-muted: #6b7280;
+  --color-heading: #1a1a1a;
+  /* Borders and shadows */
+  --color-border: #e5e7eb;
+  --color-shadow: 0 2px 8px #e5e7eb;
+  /* Accent and buttons */
+  --color-accent: #5b7cff;
+  --color-accent-strong: #2563eb;
+  --color-accent-soft: #e0e7ff;
+  --color-button-text: #fff;
+  /* Admin theme tokens */
+  --admin-accent: #0d6efd;
+  --admin-bg: #0f1720;
+  --admin-surface: #0b1220;
+  --admin-text: #e6eef8;
+  /* Vibe theme */
+  --vibe-color: #ff4f81;
 }
 
-body {
-  overflow-x: hidden;
+/* Dark theme overrides */
+[data-theme="dark"] {
+  --color-bg: #181c24;
+  --color-surface: #232a36;
+  --color-surface-alt: #1a202c;
+  --color-text: #e6eef8;
+  --color-muted: #a0aec0;
+  --color-heading: #f6f7fb;
+  --color-border: #2d3748;
+  --color-shadow: 0 2px 8px #232a36;
+  --color-accent: #5b7cff;
+  --color-accent-strong: #2563eb;
+  --color-accent-soft: #2d3748;
+  --color-button-text: #fff;
 }
 
-/* -----------------------------------------------------
-CONTAINER SYSTEM
-Prevents layout collapse
------------------------------------------------------ */
-.container,
-.surface-panel,
-.dashboard,
-.section,
-.admin-section {
-  width: 100%;
+/* Admin theme overrides */
+[data-theme="admin"] {
+  --color-bg: var(--admin-bg);
+  --color-surface: var(--admin-surface);
+  --color-surface-alt: #151a24;
+  --color-text: var(--admin-text);
+  --color-muted: #b6c2d1;
+  --color-heading: #e6eef8;
+  --color-border: #232a36;
+  --color-shadow: 0 2px 8px #0b1220;
+  --color-accent: var(--admin-accent);
+  --color-accent-strong: #0a58ca;
+  --color-accent-soft: #232a36;
+  --color-button-text: #fff;
+}
+
+/* Vibe theme overrides */
+[data-theme="vibe"] {
+  --color-bg: #fff0f6;
+  --color-surface: #fff;
+  --color-surface-alt: #ffeaf2;
+  --color-text: #1a1a1a;
+  --color-muted: #a14f6b;
+  --color-heading: #ff4f81;
+  --color-border: #ffb3c6;
+  --color-shadow: 0 2px 8px #ffb3c6;
+  --color-accent: var(--vibe-color, #ff4f81);
+  --color-accent-strong: #d72660;
+  --color-accent-soft: #ffeaf2;
+  --color-button-text: #fff;
+}
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 16px;
@@ -93,7 +148,7 @@ Improves readability
   background: var(--color-surface);
   border-radius: 16px;
   padding: 20px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+  box-shadow: var(--color-shadow);
   transition: transform .2s ease;
 }
 
@@ -110,19 +165,7 @@ Improves readability
   color: var(--color-muted);
 }
 
-/* -----------------------------------------------------
-THEME TOKEN SYSTEM
-Controls colors across the app
------------------------------------------------------ */
-:root {
-  --color-bg: #f6f7fb;
-  --color-surface: #ffffff;
-  --color-text: #1f2937;
-  --color-muted: #6b7280;
-  --color-bg: #f6f7fb;
-  --color-surface: #ffffff;
-  --color-surface-alt: #f1f3f6;
-  --color-text: #1f2937;
+/* ...existing code... */
   --color-muted: #6b7280;
   --color-heading: #1a1a1a;
   --color-border: #e5e7eb;

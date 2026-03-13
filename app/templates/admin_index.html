@@ -1,46 +1,40 @@
 {% extends "base.html" %}
+{% block body_class %}top-nav-layout no-vibe{% endblock %}
 {% from 'admin/_macros.html' import command_section, command_nav_card, command_toggle_card %}
 
 {% block content %}
-  <section class="admin-hero surface-panel">
-    <div class="admin-hero__content">
-      <p class="eyebrow-label">Command center</p>
-      <h1 class="admin-hero__title">Operate every process flow, request form, and department from one command center.</h1>
-      <p class="admin-hero__lede">Watch live queues, handoffs, and guest intake first, then move into configuration only when the workspace needs intervention.</p>
-      <div class="admin-hero__actions ui-action-bar">
-        <div class="ui-action-group">
-          <a class="btn btn-sm btn-primary" href="{{ url_for('admin.monitor') }}">Open live monitor</a>
-          <a class="btn btn-sm btn-outline-light" href="{{ url_for('admin.feature_flags') }}">Explore feature flags</a>
-          {% if FeatureFlags.get().vibe_enabled and not current_user.dark_mode %}
-            <div class="ui-control-shell ui-control-shell--compact" data-vibe-shell>
-              <button id="vibeBtnAdmin" data-vibe-trigger="admin" type="button" class="btn btn-sm btn-outline-light">Vibe · <span class="vibeLabel">—</span></button>
-            </div>
-          {% endif %}
-        </div>
-        <div class="ui-action-group ui-action-group--meta">
-          {% if current_user.dark_mode %}
-            <div class="ui-action-note ui-action-note--warning">Vibe controls are disabled while dark mode is active.</div>
-          {% endif %}
-          <span class="ui-action-note admin-hero__hint">Start with live monitoring, then branch into configuration per department.</span>
-        </div>
+<div class="login-shell">
+  <section class="page-header login-page-header">
+    <div>
+      <div class="page-header__eyebrow">Command center</div>
+      <h1 class="page-header__title">Operate every process flow, request form, and department from one command center.</h1>
+      <p class="page-header__lede">Watch live queues, handoffs, and guest intake first, then move into configuration only when the workspace needs intervention.</p>
+    </div>
+  </section>
+
+  <section class="login-hero surface-panel surface-panel-muted" style="background: var(--theme-banner-bg);">
+    <div class="login-hero__content">
+      <div class="page-header__eyebrow">Welcome back</div>
+      <h2 class="login-hero__title">Keep every admin path consistent from login onward</h2>
+      <p class="login-hero__lede">Track handoffs, update priorities, send reminders, and manage guest-facing workflows from one shared workspace.</p>
+      <div class="login-hero__chips" aria-label="Admin highlights">
+        <span class="login-hero__chip">Live monitoring</span>
+        <span class="login-hero__chip">Configuration</span>
+        <span class="login-hero__chip">Audit trail</span>
       </div>
     </div>
-    <div class="admin-hero__stats">
-      <article class="hero-metric">
+    <div class="login-hero__aside">
+      <div class="login-hero__aside-card">
         <div class="hero-metric__label">Users</div>
         <strong class="hero-metric__value">{{ total_users }}</strong>
         <span class="hero-metric__note">Active across {{ total_tenants }} workspaces</span>
-      </article>
-      <article class="hero-metric">
-        <div class="hero-metric__label">Departments</div>
+        <div class="hero-metric__label mt-2">Departments</div>
         <strong class="hero-metric__value">{{ total_depts }}</strong>
-        <span class="hero-metric__note">{{ total_jobs }} jobs • {{ total_events }} events</span>
-      </article>
-      <article class="hero-metric">
-        <div class="hero-metric__label">Audit trail</div>
+        <span class="hero-metric__note">{{ total_jobs }} jobs 2 {{ total_events }} events</span>
+        <div class="hero-metric__label mt-2">Audit trail</div>
         <strong class="hero-metric__value">{{ total_audit }}</strong>
         <span class="hero-metric__note">Respecting workspace {{ current_tenant_name }}</span>
-      </article>
+      </div>
     </div>
   </section>
 
@@ -109,4 +103,5 @@
       {{ command_nav_card(url_for('admin.integration_events'), 'Integration Events', 'Track outbound sync events and retry state.', '<i class="fas fa-plug"></i>') }}
     {% endcall %}
   </div>
+</div>
 {% endblock %}

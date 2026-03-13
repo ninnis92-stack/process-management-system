@@ -53,7 +53,7 @@ lightweight Stimulus controllers for interactivity.
 - Fly.io deployment now fully automated with `flyctl deploy` and post-deployment script (`scripts/release_tasks.py`).
 - Brand banner and quote area now theme-adaptive, with expanded quote section and current quote set name shown.
 - Admin dashboard, login, and account pages unified under theme/vibe system; theme selection available in settings for all users.
-- Vibe button removed; theme/vibe controls now managed via settings and feature flags.
+- Vibe button and related admin controls removed; theme/vibe controls are now managed via user settings and feature flags only.
 - UI polish: card borders, tile-sub color, and quote area all adapt to current theme; minimal mobile spacing and robust desktop layout.
 - Release script handles Alembic migrations and schema safety; manual schema workarounds removed.
 - README updated for deployment workflow, theme system, and UI improvements.

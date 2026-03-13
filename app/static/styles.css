@@ -1,8 +1,9 @@
+/* Begin unified styles */
 /* Prevent vertical text stacking and ensure safe wrapping */
 *, *:before, *:after {
   min-width: 0;
   box-sizing: border-box;
-}
+/* Removed stray closing brace. */
 
 h1, h2, h3, h4, h5, h6,
 .card__title,
@@ -905,6 +906,313 @@ a:hover, .btn:hover {
   background: #3f8cff;
   border-radius: 8px;
 }
+/* Remove merge conflict marker */
+  #quotes-settings {
+    background: var(--surface-accent, #eef4fb) !important;
+    border: 2px solid var(--accent, #4f8cff) !important;
+    box-shadow: 0 4px 16px rgba(79,140,255,0.08);
+    padding: 1.6rem 1.2rem !important;
+    border-radius: 1.2rem !important;
+    max-width: 720px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  @media (max-width: 600px) {
+    .brand-banner-row {
+      margin: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      width: 100vw !important;
+      min-width: 100vw !important;
+      max-width: 100vw !important;
+      border-radius: 0 !important;
+      min-height: 0 !important;
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: center !important;
+      position: relative !important;
+      overflow-x: hidden !important;
+    }
+    .brand-banner-row__quote-panel,
+    .brand-banner-row__control-panel {
+      min-height: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100vw !important;
+      min-width: 100vw !important;
+      max-width: 100vw !important;
+      border: none !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      border-radius: 0 !important;
+      overflow-x: hidden !important;
+    }
+    .quote-theme-title {
+      font-size: 0.78rem !important;
+      margin-bottom: 0.04rem !important;
+      margin-top: 0.02rem !important;
+    }
+    #motivation {
+      font-size: 0.68rem !important;
+      min-height: 1rem !important;
+      max-height: 1.6rem !important;
+      padding: 0.01rem 0.01rem !important;
+      margin-bottom: 0.02rem !important;
+    }
+    .brand-banner-row__content {
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100vw !important;
+      max-width: 100vw !important;
+      text-align: center !important;
+    }
+    .navbar-toggler {
+      position: absolute !important;
+      right: 0.18rem !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      z-index: 2 !important;
+    }
+  }
+    .brand-banner-row__content {
+      flex: 1 1 auto !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 100%;
+      text-align: center !important;
+    }
+    .navbar-toggler {
+      position: absolute !important;
+      right: 0.18rem !important;
+      top: 50% !important;
+      transform: translateY(-50%) !important;
+      z-index: 2 !important;
+    }
+    .brand-banner-row__control-panel {
+      margin-bottom: 0.04rem !important;
+      padding-bottom: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      width: 100vw !important;
+      max-width: 100vw !important;
+      border-radius: 0 !important;
+    }
+    .brand-banner-row__quote-panel {
+      margin-top: 0 !important;
+      padding: 0.08rem 0.04rem !important;
+      border: none !important;
+      box-shadow: none !important;
+      background: #fff !important;
+      min-height: 0 !important;
+      width: 100vw !important;
+      max-width: 100vw !important;
+      border-radius: 0 !important;
+    }
+
+    .quote-theme-title {
+      display: block !important;
+      text-align: center !important;
+      font-size: 0.82rem !important;
+      font-weight: 700 !important;
+      margin-bottom: 0.08rem !important;
+      margin-top: 0.04rem !important;
+      color: var(--accent, #4f8cff) !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .brand-banner-row__quote-panel,
+    .brand-banner-row__control-panel {
+      border-width: 1px !important;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
+      padding: 0.08rem 0.12rem !important;
+      margin: 0.04rem 0 !important;
+      min-width: 0 !important;
+      max-width: 100vw !important;
+      overflow-x: hidden !important;
+    }
+    /* Removed empty ruleset for .brand-banner-row__quote-panel */
+}
+/* The following block was misplaced, moved to proper selector below */
+.main-container {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    width: 100vw;
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
+
+@media (max-width: 600px) {
+    .brand-banner-row {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 100vw !important;
+      max-width: 100vw !important;
+      overflow-x: hidden !important;
+      padding: 0.12rem 0.08rem !important;
+      box-sizing: border-box !important;
+    }
+    .brand-banner-row__quote-panel,
+    .brand-banner-row__control-panel {
+      width: 100% !important;
+      max-width: 100vw !important;
+      overflow-x: hidden !important;
+      margin: 0 auto !important;
+    }
+  }
+  @media (max-width: 600px) {
+    .brand-banner-row__quote-panel {
+      padding: 0.18rem 0.32rem;
+      border-radius: 10px;
+      min-height: 0;
+      margin-bottom: 0.18rem;
+    }
+    .brand-banner-row__content {
+      gap: 0.18rem;
+      padding: 0.12rem 0.18rem;
+    }
+    .brand-vibe-btn {
+      font-size: 0.58rem;
+      padding: 0.18rem 0.38rem;
+      margin-top: 0.12rem;
+      margin-bottom: 0.12rem;
+    }
+    #motivation {
+      font-size: 0.62rem;
+      min-height: 1.2rem;
+      max-height: 2.1rem;
+      padding: 0.08rem 0.12rem;
+      margin-bottom: 0.08rem;
+    }
+  }
+  @media (max-width: 600px) {
+    .brand-banner-row__eyebrow {
+      font-size: 0.54rem;
+      padding: 0.12rem 0.18rem;
+      line-height: 1.05;
+    }
+    .brand-quote {
+      font-size: 0.68rem;
+      padding: 0.12rem 0.18rem;
+      line-height: 1.05;
+    }
+    .brand-vibe-btn {
+      font-size: 0.62rem;
+      padding: 0.28rem 0.5rem;
+      border-radius: 999px;
+      box-shadow: 0 4px 8px rgba(15, 23, 42, 0.18);
+    }
+    #motivation {
+      font-size: 0.68rem;
+      min-height: 2.1rem;
+      max-height: 2.8rem;
+      line-clamp: 2;
+      -webkit-line-clamp: 2;
+      padding: 0.12rem 0.18rem;
+    }
+  }
+  .navbar-toggler-icon {
+    display: inline-block;
+    width: 1.5em;
+    height: 1.5em;
+    vertical-align: middle;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 100% 100%;
+    /* Hamburger icon using CSS */
+    position: relative;
+  }
+  .navbar-toggler-icon::before,
+  .navbar-toggler-icon::after {
+    content: '';
+    display: block;
+    width: 1.5em;
+    height: 0.2em;
+    background: var(--nav-text, #0f172a);
+    border-radius: 2px;
+    margin: 0.3em 0;
+  }
+  .navbar-toggler-icon::before {
+    margin-top: 0.2em;
+  }
+  .navbar-toggler-icon {
+    box-sizing: border-box;
+  }
+
+  .brand-banner-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    padding: 0.5rem 0.65rem !important;
+    border-radius: 18px !important;
+    background: var(--banner-bg) !important;
+    border: 1px solid var(--banner-border) !important;
+    box-shadow: var(--banner-shadow) !important;
+    min-height: 50px !important;
+    margin-left: 1.3rem !important;
+    margin-right: 1.3rem !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+
+
+  .brand-banner-row__quote-panel {
+    min-width: 0 !important;
+    flex: 1 1 100% !important;
+    padding: 1.2rem 0.8rem !important;
+    border-radius: 18px !important;
+    background: var(--surface-raised) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: var(--shadow-sm) !important;
+    overflow: hidden !important;
+    font-size: 1.12rem !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+  .brand-banner-row__content {
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 0.32rem !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .brand-banner-row__control-panel {
+    flex: 0 0 0% !important;
+    min-width: 0 !important;
+    width: 0 !important;
+    display: none !important;
+  }
+  .navbar-toggler {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: var(--surface-raised, #fff) !important;
+    border: 1px solid var(--border, #d1d5db) !important;
+    box-shadow: var(--shadow-sm, 0 2px 6px rgba(0,0,0,0.08)) !important;
+    border-radius: 8px !important;
+    padding: 0.35rem 0.35rem !important;
+    min-width: 2.2rem !important;
+    min-height: 2.2rem !important;
+    color: var(--nav-text, #0f172a) !important;
+  }
+/* Remove merge conflict marker */
 /* --- Global style cleanup: removed redundant and repeated rules, unified spacing, font, and color usage. --- */
 .admin-hero__title, .admin-hero__lede {
   font-size: 1.05rem;
@@ -961,7 +1269,7 @@ a:hover, .btn:hover {
   min-height: 1.25rem;
   margin-top: 0.45rem;
   font-size: 0.84rem;
-  color: #64748b;
+  color: var(--body-text, #1a1a1a);
 }
 
 .dynamic-field-status.is-loading {
@@ -976,21 +1284,21 @@ a:hover, .btn:hover {
   color: #b45309;
 }
 
-.login-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.9fr);
-  gap: 1.5rem;
-  align-items: stretch;
-  padding: 1.4rem;
+.admin-hero,
+.hero-callout-card,
+.template-intake-summary,
+.dynamic-field-card,
+.process-preview-card,
+.workflow-editor__overview-card,
+.workflow-preview-card,
+.admin-toggle-card--neutral,
+.admin-toggle-card--neutral.active,
+.admin-field-group,
+.login-hero__aside-card {
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 1.25rem;
   box-shadow: var(--shadow-md);
-}
-
-.login-shell {
-  display: grid;
-  gap: 1.25rem;
 }
 
 .login-page-header {
@@ -1289,7 +1597,7 @@ a:hover, .btn:hover {
 .process-preview-list li em,
 .workflow-editor__stage-list li em {
   font-size: 0.88rem;
-  color: #64748b;
+  color: var(--body-text, #1a1a1a);
   font-style: normal;
 }
 
@@ -1377,10 +1685,11 @@ a:hover, .btn:hover {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 0.9rem;
-  background: var(--surface-muted);
+  padding: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-md);
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
@@ -1399,7 +1708,8 @@ a:hover, .btn:hover {
 .admin-toggle-card--neutral.active {
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-md);
 }
 
 .admin-toggle-card--neutral .btn {
@@ -1420,10 +1730,11 @@ a:hover, .btn:hover {
 }
 
 .template-section-block {
-  padding: 1rem;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.9);
+  padding: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-md);
 }
 
 .template-section-block__header {
@@ -1469,12 +1780,36 @@ a:hover, .btn:hover {
   }
 
   /* keep admin-card hierarchy consistent across every tile state */
+
+
+
   .admin-card .tile-title {
-    color: var(--body-text) !important;
+    color: #132033 !important;
+    font-weight: 700 !important;
+    font-size: 1.08rem !important;
+    letter-spacing: 0.01em !important;
+  }
+  .admin-card .tile-sub {
+    color: var(--accent, #4f8cff) !important;
+    font-weight: 500 !important;
+    font-size: 0.98rem !important;
   }
 
-  .admin-card .tile-sub {
-    color: var(--body-text-muted) !important;
+  .admin-command-pill {
+    color: var(--accent, #4f8cff) !important;
+    font-weight: 700 !important;
+    font-size: 1.01rem !important;
+    letter-spacing: 0.02em !important;
+    background: var(--surface-accent, #eef4fb) !important;
+    border-radius: 999px !important;
+    padding: 0.38rem 1.1rem !important;
+    margin: 0.12rem 0.18rem !important;
+    box-shadow: 0 2px 8px rgba(79,140,255,0.08);
+    transition: background 0.18s, color 0.18s;
+  }
+  .admin-command-pill:hover, .admin-command-pill:focus {
+    background: var(--accent, #4f8cff) !important;
+    color: #fff !important;
   }
 
   .admin-card,
@@ -1936,10 +2271,15 @@ body.no-brand-banner .brand-cluster {
   letter-spacing: 0.2px;
   line-height: 1;
 }
+/* Desktop styles: restore previous layout */
+/* Desktop styles: allow banner contents to wrap and increase flex-basis */
+/* Desktop styles: minimize spacing around contents */
+/* Desktop styles: minimize spacing, quote theme bar and vibe button touch */
+/* Desktop styles: restore clean layout */
 .brand-banner-row {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 0.85rem;
   min-width: 0;
   flex-wrap: nowrap;
@@ -1949,10 +2289,10 @@ body.no-brand-banner .brand-cluster {
   background: var(--banner-bg);
   border: 1px solid var(--banner-border);
   box-shadow: var(--banner-shadow);
-  min-height: 50px;
-  margin-left: 1.3rem; /* keep a bit more space from brand title so text never bumps the border */
+  min-height: 32px;
+  margin-left: 1.3rem;
   position: relative;
-  z-index: 1; /* sit behind brand-stack so kicker/logo remain visible */
+  z-index: 1;
 }
 .brand-banner-row--quotes-only {
   justify-content: flex-start;
@@ -1961,70 +2301,109 @@ body.no-brand-banner .brand-cluster {
   min-width: 0;
   flex: 1 1 auto;
   padding: 0.55rem 0.8rem;
-  border-radius: 14px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-}
-.brand-banner-row--quotes-only .brand-banner-row__quote-panel {
-  flex: 1 1 100%;
-  padding-top: 0.7rem;
-  padding-bottom: 0.7rem;
-}
-.brand-banner-row__content {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 0.32rem;
-  flex: 1 1 auto;
-  width: 100%;
-  overflow: hidden;
-}
-.brand-banner-row--quotes-only .brand-banner-row__content {
-  gap: 0.42rem;
-}
-.brand-banner-row__control-panel {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.brand-banner-row__control-panel[hidden] {
-  display: none !important;
-}
-.brand-banner-row__control-shell {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.28rem;
-  padding: 0.52rem 0.58rem;
-  min-width: 148px;
-}
-.brand-banner-row__control-label {
-  font-size: 0.61rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.64);
-  font-weight: 700;
-  text-align: center;
-}
-.brand-banner-row__eyebrow {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: #52627a;
-  font-weight: 700;
-  line-height: 1.15;
-  flex: 0 0 auto;
-}
-.brand-quote { 
-  font-size: 0.86rem;
-  font-style: normal;
-  font-weight: 600;
-  color: var(--body-text) !important;
+@media (max-width: 600px) {
+  .brand-banner-row {
+    margin: 0 auto !important;
+    padding: 0.08rem 0.04rem !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    border-radius: 4px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+    overflow-x: hidden !important;
+    min-height: 38px !important;
+    height: auto !important;
+    max-height: 18vh !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .brand-banner-row__quote-panel,
+  .brand-banner-row__control-panel {
+    min-height: 0 !important;
+    padding: 0.04rem 0.02rem !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    border-radius: 0 !important;
+    overflow-x: hidden !important;
+    font-size: 0.52rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .quote-theme-title {
+    font-size: 0.48rem !important;
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+    text-align: center !important;
+    width: 100%;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+  #motivation {
+    font-size: 0.68rem !important;
+    min-height: 1rem !important;
+    max-height: 1.6rem !important;
+    padding: 0.01rem 0.01rem !important;
+    margin-bottom: 0.02rem !important;
+    color: var(--accent, #4f8cff) !important;
+  }
+    text-align: center !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    width: 100%;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+  .brand-banner-row__content {
+    padding: 0 !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    text-align: center !important;
+    font-size: 0.52rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+  .navbar-toggler {
+    position: absolute !important;
+    right: 0.02rem !important;
+    top: 0.02rem !important;
+    transform: none !important;
+    z-index: 2 !important;
+/* ...existing code... */
   text-decoration: none;
 }
 .brand-vibe-btn {
@@ -2818,8 +3197,11 @@ a:hover { color: var(--accent-2); }
     flex-direction: row;
     flex-wrap: wrap;
   }
+  /* Make dashboard panels, especially quotes, more visible and prevent squishing */
   .admin-dashboard-panels > * {
-    flex: 1 1 320px;
+    flex: 1 1 420px;
+    min-width: 320px;
+    padding: 1.6rem 1.2rem;
   }
 }
 
@@ -3092,8 +3474,11 @@ a:hover { color: var(--accent-2); }
 
 
 .admin-card.hidden-by-filter {
-  opacity: 0.18;
+  /* Remove fading: hide completely if filtered, or use a border only */
+  opacity: 1;
+  filter: grayscale(0.5) brightness(0.95);
   pointer-events: none;
+  /* Optionally, add a border or background to indicate filtering */
 }
 
 .admin-grid {
@@ -4326,25 +4711,26 @@ pre {
   color: var(--accent);
 }
 
+
 .notif-dropdown { 
   position: fixed;
   right: 1rem;
   top: 3.5rem;
   width: 360px;
   z-index: 9999;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-6px);
-  transition: opacity .18s ease, transform .18s ease;
-  box-shadow: 0 18px 44px rgba(0,0,0,0.24);
-  border: 1px solid rgba(255,255,255,0.05);
-  background: rgba(13,23,38,0.95);
-  color: var(--body-text);
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: box-shadow .18s ease, transform .18s ease;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.12);
+  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #1a2236);
 }
 .notif-dropdown.open { opacity: 1; visibility: visible; transform: translateY(0); }
 .notif-dropdown .card-body { max-height: 360px; overflow: auto; }
-.notif-item { cursor: pointer; }
-.notif-item:hover { background: rgba(255,255,255,0.04); }
+.notif-item { cursor: pointer; color: var(--color-text, #1a2236); background: none; }
+.notif-item:hover { background: var(--color-bg, #f7f8fa); color: var(--color-text, #1a2236); }
 
 /* Improve contrast for notification item text */
 .notif-dropdown .notif-item { color: var(--body-text); }
@@ -5553,14 +5939,12 @@ canvas {
 .dark-mode .alert :is(a, strong, .btn-link, .alert-heading) {
   color: inherit !important;
 }
+}
+
 
 .dark-mode .alert .btn-close {
-  /* avoid using CSS filters to invert the close icon; filters can produce
-     unintended “inversion” effects when inherited or when browser behavior
-     changes.  Bootstrap’s SVG close icon respects `currentColor`, so we
-     simply adjust the color instead. */
-  color: var(--body-text) !important;
-  opacity: 0.9;
+  color: var(--color-text, #fff) !important;
+  opacity: 1;
 }
 
 /* Dark-mode admin data views: keep tables and helper copy readable without
@@ -5900,9 +6284,8 @@ canvas {
 }
 
 .dark-mode .alert .btn-close {
-  /* same rule repeated later; keep colors consistent without filters */
-  color: var(--body-text) !important;
-  opacity: 0.9;
+  color: var(--color-text, #fff) !important;
+  opacity: 1;
 }
 
 .dark-mode .table {

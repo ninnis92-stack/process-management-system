@@ -63,8 +63,6 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
         "Tenants",
         "Jobs",
         "Integration Events",
-        "Open live monitor",
-        "Explore feature flags",
     }
     for label in expected_labels:
         assert label in html

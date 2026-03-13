@@ -1,21 +1,24 @@
 {% extends "base.html" %}
-{% block content %}
-{% from 'admin/_macros.html' import page_header %}
-{{ page_header('Users', new_url=url_for('admin.create_user'), new_label='Create / Update User', eyebrow='Administration', lede='Manage access, departments, backup coverage, and queue-routing preferences in one place.') }}
 
+{% block page_header %}
+  <div class="page-header__eyebrow">Administration</div>
+  <h1 class="page-header__title">Users</h1>
+  <p class="page-header__lede">Manage access, departments, backup coverage, and queue-routing preferences in one place.</p>
+  <a class="btn btn-primary" href="{{ url_for('admin.create_user') }}">Create / Update User</a>
+{% endblock %}
+
+{% block content %}
 {% if user_stats %}
-<section class="surface-panel surface-panel-muted mb-3">
-  <div class="d-flex flex-wrap gap-2">
+  <div class="panel mb-3 d-flex flex-wrap gap-2">
     <span class="dashboard-section-badge">{{ user_stats.total }} total users</span>
     <span class="dashboard-section-badge">{{ user_stats.inactive }} inactive</span>
     <span class="dashboard-section-badge">{{ user_stats.multi_dept }} shared across departments</span>
     <span class="dashboard-section-badge">{{ user_stats.expiring_loans }} loans ending soon</span>
   </div>
-</section>
 {% endif %}
 
-<section class="surface-panel surface-panel-muted">
-  <div class="page-toolbar d-flex flex-wrap gap-2">
+<div class="panel mb-3">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
     <a class="btn btn-outline-secondary" href="{{ url_for('admin.assign_sso') }}">Assign SSO Emails</a>
     <a class="btn btn-outline-secondary" href="{{ url_for('admin.bulk_assign_departments') }}">Bulk Assign Departments</a>
     <a class="btn btn-outline-secondary" href="{{ url_for('admin.monitor') }}?dept=A">Monitor A</a>
@@ -40,9 +43,9 @@
       <button type="submit" class="btn btn-sm btn-outline-secondary">Go</button>
     </form>
   </div>
-</section>
+</div>
 
-<form id="bulk-update-form" method="post" action="{{ url_for('admin.bulk_update_users') }}" class="surface-panel surface-panel-muted my-3">
+<form id="bulk-update-form" method="post" action="{{ url_for('admin.bulk_update_users') }}" class="panel mb-3">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="row g-2 align-items-end">
     <div class="col-12 col-lg-4">
@@ -79,88 +82,88 @@
   <div class="form-text mt-2">Use the checkboxes in the table below. Bulk updates avoid repetitive edits when teams rotate coverage.</div>
 </form>
 
-<section class="surface-panel table-shell">
-<div class="table-responsive">
-  <table class="table table-sm align-middle">
-    <thead>
-      <tr>
-        <th style="width: 42px;">
-          <input
-            type="checkbox"
-            aria-label="Select all users"
-            onchange="document.querySelectorAll('input[name=\'user_ids\']').forEach((box) => { box.checked = this.checked; });"
-          >
-        </th>
-        <th>Email</th>
-        <th>Workspace</th>
-        <th>Workflow</th>
-        <th>Coverage</th>
-        <th>Status</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for u in users %}
+<div class="panel">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
         <tr>
-          <td>
-            <input type="checkbox" name="user_ids" value="{{ u.id }}" class="form-check-input" form="bulk-update-form">
-          </td>
-          <td>
-            <div class="fw-semibold">{{ u.email }}</div>
-            {% if u.name %}<div class="text-muted small">{{ u.name }}</div>{% endif %}
-            <div class="d-flex flex-wrap gap-1 mt-1">
-              <span class="badge text-bg-light">Dept {{ u.department }}</span>
-              {% if u.is_admin %}<span class="badge text-bg-primary">Admin</span>{% endif %}
-              {% if not u.is_active %}<span class="badge text-bg-secondary">Inactive</span>{% endif %}
-            </div>
-          </td>
-          <td>{{ u.tenant.name if u.tenant else '–' }}</td>
-          <td>
-            <div class="fw-semibold">{{ u.workflow_role_profile_label if u.workflow_role_profile_label is defined else (u.workflow_role_profile or 'Member')|replace('_', ' ')|title }}</div>
-            {% if u.watched_departments %}
-              <div class="text-muted small">Quick access: {{ u.watched_departments|join(', ') }}</div>
-            {% endif %}
-            {% if u.notification_departments %}
-              <div class="text-muted small">Alerts: {{ u.notification_departments|join(', ') }}</div>
-            {% endif %}
-          </td>
-          <td>
-            {% if u.backup_approver %}
-              <div class="small"><strong>Backup:</strong> {{ u.backup_approver.email }}</div>
-            {% endif %}
-            {% set active_loans = u.departments|selectattr('is_active_assignment')|list %}
-            {% if active_loans %}
-              <div class="small text-muted">{{ active_loans|length }} extra dept{{ '' if active_loans|length == 1 else 's' }}</div>
-            {% else %}
-              <div class="small text-muted">Primary dept only</div>
-            {% endif %}
-          </td>
-          <td>
-            <div class="small">{{ 'Active' if u.is_active else 'Inactive' }}</div>
-            <div class="text-muted small">Created {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '–' }}</div>
-          </td>
-          <td class="text-end">
-            <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.edit_user', user_id=u.id) }}">Edit</a>
-            <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.manage_user_departments', user_id=u.id) }}">Departments</a>
-            <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.monitor') }}?dept={{ u.department }}">Monitor {{ u.department }}</a>
-            {% if current_user.id != u.id and config.get('ALLOW_IMPERSONATION') %}
-              <form method="post" action="{{ url_for('admin.impersonate_dept') }}" class="d-inline">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="dept" value="{{ u.department }}" />
-                <button class="btn btn-sm btn-outline-primary me-1">Act as Dept {{ u.department }}</button>
-              </form>
-            {% endif %}
-            <form method="post" action="{{ url_for('admin.delete_user', user_id=u.id) }}" class="d-inline" onsubmit="return confirm('Delete user {{ u.email }}?');">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-sm btn-outline-danger">Delete</button>
-            </form>
-          </td>
+          <th style="width: 42px;">
+            <input
+              type="checkbox"
+              aria-label="Select all users"
+              onchange="document.querySelectorAll('input[name=\'user_ids\']').forEach((box) => { box.checked = this.checked; });"
+            >
+          </th>
+          <th>Email</th>
+          <th>Workspace</th>
+          <th>Workflow</th>
+          <th>Coverage</th>
+          <th>Status</th>
+          <th></th>
         </tr>
-      {% else %}
-        <tr><td colspan="7" class="text-muted">No users.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {% for u in users %}
+          <tr>
+            <td>
+              <input type="checkbox" name="user_ids" value="{{ u.id }}" class="form-check-input" form="bulk-update-form">
+            </td>
+            <td>
+              <div class="fw-semibold">{{ u.email }}</div>
+              {% if u.name %}<div class="text-muted small">{{ u.name }}</div>{% endif %}
+              <div class="d-flex flex-wrap gap-1 mt-1">
+                <span class="badge text-bg-light">Dept {{ u.department }}</span>
+                {% if u.is_admin %}<span class="badge text-bg-primary">Admin</span>{% endif %}
+                {% if not u.is_active %}<span class="badge text-bg-secondary">Inactive</span>{% endif %}
+              </div>
+            </td>
+            <td>{{ u.tenant.name if u.tenant else '–' }}</td>
+            <td>
+              <div class="fw-semibold">{{ u.workflow_role_profile_label if u.workflow_role_profile_label is defined else (u.workflow_role_profile or 'Member')|replace('_', ' ')|title }}</div>
+              {% if u.watched_departments %}
+                <div class="text-muted small">Quick access: {{ u.watched_departments|join(', ') }}</div>
+              {% endif %}
+              {% if u.notification_departments %}
+                <div class="text-muted small">Alerts: {{ u.notification_departments|join(', ') }}</div>
+              {% endif %}
+            </td>
+            <td>
+              {% if u.backup_approver %}
+                <div class="small"><strong>Backup:</strong> {{ u.backup_approver.email }}</div>
+              {% endif %}
+              {% set active_loans = u.departments|selectattr('is_active_assignment')|list %}
+              {% if active_loans %}
+                <div class="small text-muted">{{ active_loans|length }} extra dept{{ '' if active_loans|length == 1 else 's' }}</div>
+              {% else %}
+                <div class="small text-muted">Primary dept only</div>
+              {% endif %}
+            </td>
+            <td>
+              <div class="small">{{ 'Active' if u.is_active else 'Inactive' }}</div>
+              <div class="text-muted small">Created {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '–' }}</div>
+            </td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.edit_user', user_id=u.id) }}">Edit</a>
+              <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.manage_user_departments', user_id=u.id) }}">Departments</a>
+              <a class="btn btn-sm btn-outline-secondary me-1" href="{{ url_for('admin.monitor') }}?dept={{ u.department }}">Monitor {{ u.department }}</a>
+              {% if current_user.id != u.id and config.get('ALLOW_IMPERSONATION') %}
+                <form method="post" action="{{ url_for('admin.impersonate_dept') }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="dept" value="{{ u.department }}" />
+                  <button class="btn btn-sm btn-outline-primary me-1">Act as Dept {{ u.department }}</button>
+                </form>
+              {% endif %}
+              <form method="post" action="{{ url_for('admin.delete_user', user_id=u.id) }}" class="d-inline" onsubmit="return confirm('Delete user {{ u.email }}?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="text-muted">No users.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
- </section>
 {% endblock %}

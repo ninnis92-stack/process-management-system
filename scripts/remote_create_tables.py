@@ -8,8 +8,11 @@ import sys
 
 sys.path.append("/app")
 
+
 from app import create_app
 from app.extensions import db
+# Import all models to ensure tables are created
+from app.models import *
 
 
 def main():

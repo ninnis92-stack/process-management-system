@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from urllib.parse import unquote
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template
+import flask
 from flask import request as flask_request
 from flask import session, url_for
 from flask_login import current_user, login_required
