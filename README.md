@@ -47,15 +47,16 @@ lightweight Stimulus controllers for interactivity.
 
 
 
+
 **Recent Improvements:**
 
-- Increased Fly.io memory allocation to 2GB to resolve OOM errors during deployment.
-- Added `[mounts]` section to `fly.toml` for volume configuration. If you encounter errors about volume names (e.g., "can't update the attached volume app_data with name 'vol_xxx' by 'pg_data'"), check your Fly.io volume name and ensure it matches the `source` in `[mounts]`. You may need to detach or rename volumes in the Fly.io dashboard.
-- API endpoints now include versioning for future-proofing, robust input validation, and descriptive error messages with error codes.
-- Swagger UI features a dark mode toggle, links to docs/repo/support, improved mobile responsiveness, and interactive "Try It Out" functionality.
-- Subtext centering and UI polish for mobile screens.
-- Comprehensive health checks and test coverage before deployment.
-- Automated deployment to Fly.io with rolling updates and schema safety.
+- Fly.io deployment now fully automated with `flyctl deploy` and post-deployment script (`scripts/release_tasks.py`).
+- Brand banner and quote area now theme-adaptive, with expanded quote section and current quote set name shown.
+- Admin dashboard, login, and account pages unified under theme/vibe system; theme selection available in settings for all users.
+- Vibe button removed; theme/vibe controls now managed via settings and feature flags.
+- UI polish: card borders, tile-sub color, and quote area all adapt to current theme; minimal mobile spacing and robust desktop layout.
+- Release script handles Alembic migrations and schema safety; manual schema workarounds removed.
+- README updated for deployment workflow, theme system, and UI improvements.
 
 This prototype supports structured intake forms, multi-step process flows, and an extensible admin interface. Admins can build custom request templates, configure verification integrations that auto-fill other fields, and declare conditional requirements (per field, section, or upload area). The app runs on Postgres and optionally Redis, and is deployed on Fly.io with health checks and release-time schema safety.
 
