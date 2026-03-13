@@ -1,3 +1,4 @@
+<!-- Removed unfinished script block referencing vibeBtn -->
 <!doctype html>
 <html>
 {% set ep = request.endpoint or '' %}
@@ -29,94 +30,51 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" integrity="sha512-p1Cm0QlW0FQvgw+Vxv0+H5a6uVgnF6V5u0Y2dd4AozqA3BsnF7mk/WvJL3Z8zUuNX1U4MZT+O2e2d3dH+pvGVHg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <!-- bump version after latest CSS changes to force clients to fetch new stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='saas-base.css', v='20260313a') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260310c') }}">
   {% if ep.startswith('admin') %}
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_theme.css', v='20260310a') }}">
   {% endif %}
-  <!-- bundled frontend assets (built by Vite/ES modules) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css', v='20260310a') }}">
-  {% if active_theme_css %}
-    <script id="active-theme-css-data" type="application/json">{{ active_theme_css|tojson }}</script>
-    <script>
-      (function () {
-        const payload = document.getElementById('active-theme-css-data');
-        if (!payload) return;
-        let cssText = '';
-        try {
-          cssText = JSON.parse(payload.textContent || '""');
-        } catch (_) {
-          cssText = '';
-        }
-        if (!cssText) return;
-        const styleEl = document.createElement('style');
-        styleEl.id = 'active-theme-css';
-        styleEl.textContent = cssText;
-        document.head.appendChild(styleEl);
-      })();
-    </script>
-  {% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260313a') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ui-stability.css') }}">
  </head>
- {% set ep = request.endpoint or '' %}
- {% set public_entry_screen = ep in ['auth.login', 'external.external_new', 'external.external_dashboard'] %}
- {% set guest_dashboard_available = guest_dashboard_enabled|default(True) %}
- {% set guest_submission_available = guest_submission_enabled|default(True) %}
- {% set global_no_vibe = (not FeatureFlags.get().vibe_enabled) %}
- {% set dark_mode_active = current_user.is_authenticated and (current_user.dark_mode or False) %}
- {% set vibe_button_enabled = (current_user.vibe_button_enabled if current_user.is_authenticated else True) %}
- {% set vibe_ui_enabled = current_user.is_authenticated and FeatureFlags.get().vibe_enabled and not external_theme_loaded and not dark_mode_active and vibe_button_enabled %}
- {% set show_brand_banner = (rolling_quotes_enabled or vibe_ui_enabled) and not public_entry_screen %}
- {% set no_brand_banner = (not show_brand_banner) and (not public_entry_screen) %}
- <body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if dark_mode_active %} dark-mode{% endif %}{% if global_no_vibe %} no-vibe{% endif %}{% if no_brand_banner %} no-brand-banner{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-endpoint="{{ ep }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if dark_mode_active else '0' }}" data-user-is-admin="{{ '1' if current_user.is_authenticated and current_user.is_admin else '0' }}">
-  <a href="#content" class="skip-link">Skip to content</a>
 
-  <nav class="navbar theme-nav navbar-expand-lg navbar-dark">
-    {% if ep.startswith('admin') %}
-      <button class="btn btn-outline-light d-md-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-label="Toggle admin navigation">
-        <i class="fas fa-bars"></i>
-      </button>
-    {% endif %}
-    <div class="container-fluid">
-      {% set brand_href = company_url if company_url else url_for('requests.dashboard') %}
-      <div class="brand-cluster flex-wrap align-items-center">
-        <a class="navbar-brand d-flex align-items-center brand-stack" href="{{ brand_href }}"
-           {% if company_url and (company_url.startswith('http://') or company_url.startswith('https://')) %}target="_blank" rel="noopener noreferrer"{% endif %}>
-          {% if theme_logo_url %}
-            <img src="{{ theme_logo_url }}" alt="{{ site_brand_name or 'FreshProcess' }} logo" class="brand-logo-img" />
-          {% else %}
-            <div class="logo-fallback" aria-hidden="true"></div>
-          {% endif %}
-          <div class="brand-title">{{ site_brand_name or 'FreshProcess' }}</div>
-        </a>
-        {% if current_user.is_authenticated and current_user.is_admin %}
-          <a href="{{ url_for('admin.index') }}" class="btn btn-sm btn-outline-light ms-2" title="Admin dashboard">Admin</a>
-        {% endif %}
+<body class="{% block body_class %}theme-body{% endblock %}"
+  data-user-is-admin="{{ '1' if current_user.is_authenticated and current_user.is_admin else '0' }}"
+  data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}"
+  data-active-dept="{{ session.get('active_dept', '') }}"
+>
+  <nav class="topbar">
+    <div class="brand-title"><a href="{{ url_for('requests.dashboard') }}">{{ site_brand_name or 'FreshProcess' }}</a></div>
+    <div class="topbar-actions">
+      {% if current_user.is_authenticated %}
+        <span>{{ current_user.email }}</span>
+        <a href="{{ url_for('auth.settings') }}" class="btn btn-secondary">Settings</a>
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-secondary">Logout</a>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Login</a>
+      {% endif %}
+    </div>
+  </nav>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <nav>
+        <ul>
 
-        {# --- Brand Banner, Quote Panel, and Vibe Button (for test compliance) --- #}
-        {% set show_brand_banner = (current_user.is_authenticated and (FeatureFlags.get().vibe_enabled or current_user.quotes_enabled)) %}
-        {% set dark_mode_active = current_user.is_authenticated and (current_user.dark_mode or False) %}
-        {% set external_theme = active_theme_css is defined and active_theme_css %}
-        {% set show_vibe_btn = FeatureFlags.get().vibe_enabled and current_user.vibe_button_enabled and not dark_mode_active and not external_theme %}
-        {% if show_brand_banner %}
-        <div class="brand-banner-row{% if not FeatureFlags.get().vibe_enabled %} brand-banner-row--quotes-only{% endif %}" data-theme-banner>
-          <div class="brand-banner-row__quote-panel" data-vibe-quote-panel>
-            {% if rolling_quotes and rolling_quotes|length > 0 %}
-              <span class="quote-theme-title">{{ selected_quote_key or 'Current quote set' }}</span>
-              <span id="motivation">{{ rolling_quotes[0] }}</span>
-            {% else %}
-              <span class="quote-theme-title">No quotes available</span>
-              <span id="motivation">Add quotes in site config to display here.</span>
-            {% endif %}
-          </div>
-          <div class="brand-banner-row__control-panel">
-            <div class="brand-banner-row__control-shell ui-control-shell--banner" data-vibe-shell>
-              <!-- Vibe button removed: theme selection now in settings -->
-              <span class="theme-label d-none d-md-inline">Current theme</span>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-      </div>
-      <!-- Removed theme banner for compactness -->
+          <li><a href="{{ url_for('auth.settings') }}">Settings</a></li>
+        </ul>
+      </nav>
+    </aside>
+    <main class="content-container">
+      <header class="page-header">
+        {% block page_header %}{% endblock %}
+      </header>
+      <section class="page-content">
+        {% block content %}{% endblock %}
+      </section>
+    </main>
+  </div>
 
       {% if not public_entry_screen %}
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Open main navigation menu">
@@ -374,7 +332,7 @@
             </div>
           {% endif %}
 
-          {% block content %}{% endblock %}
+
 
       </div>
 

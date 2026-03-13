@@ -1,0 +1,77 @@
+/* ===============================
+   UI STABILITY PATCH
+   =============================== */
+
+/* Force readable text everywhere */
+body,
+.theme-body,
+.page-shell,
+.surface-panel,
+.card,
+.admin-card,
+.dashboard-card {
+  color: #1e293b !important;
+  opacity: 1 !important;
+}
+
+/* Prevent faded containers */
+[class*="panel"],
+[class*="card"],
+[class*="dashboard"],
+[class*="admin"] {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Fix washed out text */
+.text-muted {
+  color: #64748b !important;
+}
+
+/* Fix accidental rgba fading */
+* {
+  text-shadow: none !important;
+}
+
+/* Ensure backgrounds are visible */
+.surface-panel,
+.card,
+.admin-card,
+.dashboard-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+/* Improve readability */
+p, span, label, div {
+  line-height: 1.5;
+}
+
+/* Button clarity */
+.btn-primary {
+  background: #4f46e5 !important;
+  border-color: #4f46e5 !important;
+}
+
+.btn-primary:hover {
+  background: #4338ca !important;
+}
+
+/* Remove overlay fade effects */
+.modal-backdrop,
+.offcanvas-backdrop {
+  opacity: 0 !important;
+}
+
+/* Prevent accidental CSS filters */
+* {
+  filter: none !important;
+}
+
+/* Fix banner / hero areas */
+.hero,
+.hero-callouts,
+.admin-hero {
+  background: #f8fafc !important;
+  color: #1e293b !important;
+}

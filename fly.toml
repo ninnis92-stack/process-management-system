@@ -1,6 +1,6 @@
 # fly.toml app configuration for process-management-prototype-lingering-bush-6175
 app = 'process-management-prototype-lingering-bush-6175'
-primary_region = 'ord'
+primary_region = 'sjc'
 
 [build]
 

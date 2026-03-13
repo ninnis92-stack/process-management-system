@@ -48,6 +48,7 @@ lightweight Stimulus controllers for interactivity.
 
 
 
+<<<<<<< HEAD
 **Recent Improvements:**
 
 - Fly.io deployment now fully automated with `flyctl deploy` and post-deployment script (`scripts/release_tasks.py`).
@@ -57,8 +58,20 @@ lightweight Stimulus controllers for interactivity.
 - UI polish: card borders, tile-sub color, and quote area all adapt to current theme; minimal mobile spacing and robust desktop layout.
 - Release script handles Alembic migrations and schema safety; manual schema workarounds removed.
 - README updated for deployment workflow, theme system, and UI improvements.
+=======
 
-This prototype supports structured intake forms, multi-step process flows, and an extensible admin interface. Admins can build custom request templates, configure verification integrations that auto-fill other fields, and declare conditional requirements (per field, section, or upload area). The app runs on Postgres and optionally Redis, and is deployed on Fly.io with health checks and release-time schema safety.
+**Recent Improvements:**
+
+- **Unified color system:** All theme, dark mode, and vibe logic has been removed. The app now uses a single, production-ready color palette for all user pages, matching the login page for maximum readability and accessibility.
+- **UI stabilization layer:** A dedicated CSS stabilization layer (`ui-stability.css`) is now loaded last on every page, enforcing high-contrast, readable UI across all screens. This ensures consistent appearance and accessibility regardless of prior theme settings.
+- **Simplified settings:** Theme, dark mode, and vibe controls have been removed from user and admin settings. All users now experience the same unified, stable UI.
+- **Fly.io deployment remains fully automated** with `flyctl deploy` and post-deployment script (`scripts/release_tasks.py`).
+- **Release script** continues to handle Alembic migrations and schema safety; manual schema workarounds are not required.
+- **README updated** for new UI stabilization, deployment workflow, and removal of theme/vibe/dark mode logic.
+>>>>>>> 59fabef
+
+
+This prototype supports structured intake forms, multi-step process flows, and an extensible admin interface. Admins can build custom request templates, configure verification integrations that auto-fill other fields, and declare conditional requirements (per field, section, or upload area). The app runs on Postgres and optionally Redis, and is deployed on Fly.io with health checks and release-time schema safety. The UI is now fully unified and stabilized for all users—no theme, dark mode, or vibe settings are present.
 
 Key capabilities:
 
@@ -97,7 +110,8 @@ Key capabilities:
 - **Cleaner GitHub automation** with repaired CI/deploy workflows and a valid
   Codespaces prebuild workflow configuration
 - **SSO/OIDC support** with optional admin sync
-- **Theme/vibe system**, dark mode (now integrated with vibe accents) and explicit no‑vibe support. Dark mode preference is stored per-user in the database so it follows you across devices and sessions, whereas the feature flags on the admin page remain true global switches for the entire workspace. Dark mode disables personal vibe overrides and hides the vibe button, while adopted brand presets continue to tint the native dark palette so imported branding still looks natural. Importing branding from a website now suppresses the rolling-quote banner and locks accent/vibe controls; when the global vibe feature is turned off the UI switches to a unique neutral palette with its own slate‑toned accents rather than lingering on the last selected color. The theme dropdown is locked with explanatory text shown to the user, and the names of the built-in presets have been updated to match the softer accent palette: *Sky*, *Moss*, *Dawn*, and *Twilight* (replacing Ocean/Forest/Sunset/Midnight respectively). Users can now independently hide or show the navbar vibe button from their personal settings, with the preference defaulting to on for discoverability. The workspace-wide vibe feature flag still acts as a hard-off override for every account, but turning that global flag back on does not force the button back into user navbars unless each account still has its personal setting enabled. The navbar quote area and vibe control are separated so quotes stay visible even when the vibe button is absent, the vibe button itself now sits inside a distinct solid control shell instead of blending into the banner, shared action bars and control shells keep admin and monitor layouts uniform when controls are added or removed, and the quote slot now clamps long lines on desktop while still exposing the full text via tooltip/ARIA. A recent set of fixes ensures the brand title never gets obscured by the quote/vibe banner, adds extra spacing when the banner wraps on narrow screens, and widens the left gap further so the last letter and the entire brand string sit clear of the banner border. The login page now uses the shared `surface-panel`/`form-shell` layout and page header, delivering the same look and feel as the rest of the app. Recent UI polish also darkened the lighter preset accents so theme-controlled buttons and labels remain readable, replaced the older glassy treatment with a more solid shared surface system across login, dashboard, settings, and admin pages, and kept dashboard overview/badge accents aligned with surrounding cards instead of using an unrelated bright-blue emphasis. Preferences, feature flags, and other toggle/dropdown controls save instantly without any "Save" button
+
+- **Unified color system and stabilized UI:** All theme, dark mode, and vibe logic has been removed. The app now uses a single, accessible color palette for all user pages, matching the login page. A dedicated UI stabilization CSS layer ensures high-contrast, readable UI everywhere. Theme/vibe/dark mode controls have been removed from all user and admin settings.
 
 Everything is covered by a comprehensive test suite and deploys automatically
 using a release script that migrates the database, creates missing columns,
@@ -125,11 +139,11 @@ and default diff views.
    ```
    During development run `npm run dev` and to produce a production bundle use `npm run build` (assets output to `app/static/dist`).
 
-  Preferences and feature flags now autosave as soon as you change them; the page will post data automatically and even flush outstanding requests on navigation via the `keepalive` API.  Internally the client uses a traditional `application/x-www-form-urlencoded` payload which works even when headers are stripped (sendBeacon, odd mobile browsers, corporate proxies), and the server happily handles both this and raw JSON.  Dropdowns (vibe/theme selector, quote set, etc.) are treated the same way, and the server echoes back the current value so the UI stays in sync.
 
-    Preference updates now also write a timestamp into `localStorage` (similar to feature flags) so that other open browser tabs will reload automatically and mirror your choices.  On the settings page the vibe‑button toggle has a tiny live preview that shows or hides the sample control immediately and the banner layout recomputes when quote or vibe visibility changes.
+  Preferences and feature flags now autosave as soon as you change them; the page will post data automatically and even flush outstanding requests on navigation via the `keepalive` API.  Internally the client uses a traditional `application/x-www-form-urlencoded` payload which works even when headers are stripped (sendBeacon, odd mobile browsers, corporate proxies), and the server happily handles both this and raw JSON. Dropdowns for quote set and other controls are treated the same way, and the server echoes back the current value so the UI stays in sync. Theme, dark mode, and vibe controls have been removed.
 
-  The admin command centre includes a Notifications card which flips a workspace-wide flag; the backend route at `/admin/toggle_notifications` and the `/notifications/*` API endpoints are fully implemented and covered by tests.  A recent style tweak ensures every admin card (including the bell) uses the standard body text colour so the dashboard looks cohesive in both light and dark modes. A global CSS rule now ensures body text always defaults to the current theme’s readable color, preventing white‑on‑white cases.
+
+  The admin command centre includes a Notifications card which flips a workspace-wide flag; the backend route at `/admin/toggle_notifications` and the `/notifications/*` API endpoints are fully implemented and covered by tests.  A recent style tweak ensures every admin card (including the bell) uses the standard body text colour so the dashboard looks cohesive. A global CSS rule now ensures body text always defaults to a readable color, preventing white‑on‑white cases. Theme/dark mode/vibe logic is no longer present.
 
   **Learning aids:** the “Workflow signal” hero panels on dashboard, admin landing and external dashboards are controlled by a per‑user toggle (`onboarding_guidance_enabled`).  The same flag is exposed on the settings page (and saved via the autosave machinery) so users can hide the guided “start here” panels once they’ve seen them; functional workflow previews still appear where they belong.  The toggle respects session persistence and broadcast logic just like other preferences.
 
@@ -640,8 +654,7 @@ page displays the last few steps and suggests next actions to the user.
 - Ticketing and webhook integrations can optionally emit a structured handoff
   bundle payload containing request metadata, submission details, and
   attachment descriptors whenever a department handoff is created.
-- **User settings**: dark mode (keeps adopted brand presets blended into the native dark palette while disabling personal vibes), theme/vibe selection, navbar vibe button visibility, quote set, rotating
-  quotes.
+- **User settings**: quote set, rotating quotes. Theme, dark mode, and vibe controls have been removed for all users.
 - **Templates & requirements**: rich form editing with grouped fields, hints,
   and other metadata.
 - Shared UI macros (`app/templates/admin/_macros.html`) keep styles consistent.

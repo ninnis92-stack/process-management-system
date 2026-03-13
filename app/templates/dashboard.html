@@ -1,4 +1,15 @@
+
 {% extends "base.html" %}
+{% block page_header %}
+  <div class="page-header__eyebrow">Work management</div>
+  <h1 class="page-header__title">Dashboard</h1>
+  <p class="page-header__lede">Track requests, filter active work, and jump directly into the next task.</p>
+  {% if mode == "A" %}
+    <a class="btn btn-primary" href="{{ url_for('requests.request_new') }}">New Request</a>
+  {% endif %}
+{% endblock %}
+
+
 {% block content %}
 {% set totals = namespace(items=(requests|length if requests is defined and requests is not none else 0)) %}
 {% if buckets is defined and buckets %}
@@ -7,18 +18,6 @@
     {% set totals.items = totals.items + (bucket_items|length) %}
   {% endfor %}
 {% endif %}
-<section class="page-header">
-  <div>
-    <div class="page-header__eyebrow">Work management</div>
-    <h3 class="page-header__title mb-0">Dashboard</h3>
-    <p class="page-header__lede mb-0">Track requests, filter active work, and jump directly into the next task.</p>
-  </div>
-  {% if mode == "A" %}
-    <div class="page-header__actions">
-      <a class="btn btn-primary" href="{{ url_for('requests.request_new') }}">New Request</a>
-    </div>
-  {% endif %}
-</section>
 
 <section class="surface-panel dashboard-launchpad mb-3">
   <div class="dashboard-launchpad__intro">
