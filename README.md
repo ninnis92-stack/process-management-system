@@ -661,5 +661,5 @@ flow through the native dark palette, and raw external CSS themes still revert
 to a basic compatible dark treatment.
 
 ## March 13, 2026
-- FreshProcess title is now black in light mode and uses the current theme color in dark mode or when vibe/theme is enabled.
+- Vibe button and quotes are now fully removed from the admin banner when disabled, for a cleaner UI.
 - Deployment, post-deployment script, and documentation update completed.
