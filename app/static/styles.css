@@ -104,23 +104,15 @@ body[data-theme="vibe"] {
 /* --- SaaS Dashboard Design Tokens & Theme Engine --- */
 :root {
   /* Colors */
-  --color-bg: #f7f8fa;
+
+  --color-bg: #eaf0fa;
   --color-surface: #fff;
   --color-primary: #3f8cff;
   --color-accent: #232946;
   --color-muted: #64748b;
-  --color-text: #1a2236;
+  --color-text: #232946;
   --color-banner-bg: #eaf0fa;
   --color-banner-text: #232946;
-
-  /* Vibe Theme */
-  --vibe-bg: #2e2d4d;
-  --vibe-surface: #3f8cff;
-  --vibe-primary: #ff6f91;
-  --vibe-accent: #fff;
-  --vibe-text: #fff;
-  --vibe-banner-bg: #3f8cff;
-  --vibe-banner-text: #fff;
 
   /* Spacing */
   --space-xs: 4px;
@@ -148,15 +140,7 @@ body[data-theme="vibe"] {
   --font-family: 'Poppins', system-ui, sans-serif;
 }
 
-body[data-theme="vibe"] {
-  --color-bg: var(--vibe-bg);
-  --color-surface: var(--vibe-surface);
-  --color-primary: var(--vibe-primary);
-  --color-accent: var(--vibe-accent);
-  --color-text: var(--vibe-text);
-  --color-banner-bg: var(--vibe-banner-bg);
-  --color-banner-text: var(--vibe-banner-text);
-}
+
 
 body {
   background: var(--color-bg);

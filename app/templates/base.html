@@ -36,42 +36,13 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_theme.css', v='20260310a') }}">
   {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css', v='20260310a') }}">
-  {% if active_theme_css %}
-    <script id="active-theme-css-data" type="application/json">{{ active_theme_css|tojson }}</script>
-    <script>
-      (function () {
-        const payload = document.getElementById('active-theme-css-data');
-        if (!payload) return;
-        let cssText = '';
-        try {
-          cssText = JSON.parse(payload.textContent || '""');
-        } catch (_) {
-          cssText = '';
-        }
-        if (!cssText) return;
-        const styleEl = document.createElement('style');
-        styleEl.id = 'active-theme-css';
-        styleEl.textContent = cssText;
-        document.head.appendChild(styleEl);
-      })();
-    </script>
-  {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260313a') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ui-stability.css') }}">
  </head>
- {% set ep = request.endpoint or '' %}
- {% set guest_dashboard_available = guest_dashboard_enabled|default(True) %}
- {% set guest_submission_available = guest_submission_enabled|default(True) %}
-{# Global vibe feature flag no longer disables user controls #}
-{% set global_no_vibe = False %}
- {% set dark_mode_active = current_user.is_authenticated and (current_user.dark_mode or False) %}
- {% set vibe_button_enabled = (current_user.vibe_button_enabled if current_user.is_authenticated else True) %}
-{% set vibe_ui_enabled = current_user.is_authenticated and not external_theme_loaded and not dark_mode_active and vibe_button_enabled %}
- {% set show_brand_banner = (rolling_quotes_enabled or vibe_ui_enabled) and not public_entry_screen %}
- {% set no_brand_banner = (not show_brand_banner) and (not public_entry_screen) %}
+
 <body class="{% block body_class %}theme-body{% endblock %}"
   data-user-is-admin="{{ '1' if current_user.is_authenticated and current_user.is_admin else '0' }}"
   data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}"
-  data-user-dark-mode="{{ '1' if current_user.is_authenticated and (current_user.dark_mode or False) else '0' }}"
   data-active-dept="{{ session.get('active_dept', '') }}"
 >
   <nav class="topbar">

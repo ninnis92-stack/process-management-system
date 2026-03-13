@@ -1,15 +1,15 @@
 /* SaaS App Design System: Base CSS */
 :root {
-  --primary: #2563eb;
+  --primary: #3f8cff;
   --secondary: #64748b;
-  --accent: #4f8cff;
-  --background: #f8fafc;
+  --accent: #232946;
+  --background: #eaf0fa;
   --surface: #fff;
   --border: #e2e8f0;
   --success: #22c55e;
   --warning: #facc15;
   --danger: #ef4444;
-  --text: #1e293b;
+  --text: #232946;
   --muted: #64748b;
   --radius: 0.5rem;
   --shadow-card: 0 2px 8px #e2e8f0;

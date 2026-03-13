@@ -24,7 +24,7 @@
 }
 /* Admin responsive theme overrides: simple, high-contrast, mobile-friendly */
 /* Admin theme now uses unified tokens from static/css/style.css */
-body.admin-theme, body.theme-body.top-nav-layout{ }
+
 
 /* Increase tap targets and readable fonts on mobile */
 .navbar .nav-link, .navbar .btn{ padding-top:0.5rem; padding-bottom:0.5rem; }
