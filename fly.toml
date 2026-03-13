@@ -33,6 +33,7 @@ primary_region = 'ord'
     protocol = "http"
 
 [processes]
+# Attach pg_data volume for persistent storage
 # Tuned for small shared-cpu instances: 3 workers, 4 threads each.
 # Adjust `-w` and `--threads` for your target machine size and workload.
   # Bind to the internal port (8080) so Fly's launcher doesn't try to parse a
@@ -53,6 +54,6 @@ primary_region = 'ord'
   release_command = "python scripts/release_tasks.py"
 
 # Volume mount configuration required by Fly.io
-[mounts]
-  source = "pg_data"
-  destination = "/data"
+ [mounts]
+ source = "pg_data"
+ destination = "/data"

@@ -23,7 +23,7 @@ RUN chmod +x /app/scripts/entrypoint.sh
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-	CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"PORT\", \"8080\")}/ready', timeout=3)" || exit 1
+ CMD python -c "import os, urllib.request;\ntry:\n    urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"PORT\", \"8080\")}/ready', timeout=3)\nexcept Exception:\n    urllib.request.urlopen(f'http://0.0.0.0:{os.environ.get(\"PORT\", \"8080\")}/ready', timeout=3)" || exit 1
 
 USER appuser
 

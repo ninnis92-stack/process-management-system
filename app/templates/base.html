@@ -99,16 +99,18 @@
         {% if show_brand_banner %}
         <div class="brand-banner-row{% if not FeatureFlags.get().vibe_enabled %} brand-banner-row--quotes-only{% endif %}" data-theme-banner>
           <div class="brand-banner-row__quote-panel" data-vibe-quote-panel>
-            {% if current_user.quotes_enabled %}
-              <span id="motivation">{{ rolling_quotes[0] if rolling_quotes else 'Progress, not perfection.' }}</span>
+            {% if rolling_quotes and rolling_quotes|length > 0 %}
+              <span class="quote-theme-title">{{ selected_quote_key or 'Current quote set' }}</span>
+              <span id="motivation">{{ rolling_quotes[0] }}</span>
+            {% else %}
+              <span class="quote-theme-title">No quotes available</span>
+              <span id="motivation">Add quotes in site config to display here.</span>
             {% endif %}
           </div>
           <div class="brand-banner-row__control-panel">
             <div class="brand-banner-row__control-shell ui-control-shell--banner" data-vibe-shell>
-              {% if show_vibe_btn %}
-                <button id="vibeBtn" class="btn btn-outline-info brand-vibe-btn" type="button">Vibe</button>
-              {% endif %}
-              <span class="theme-label">Current theme</span>
+              <!-- Vibe button removed: theme selection now in settings -->
+              <span class="theme-label d-none d-md-inline">Current theme</span>
             </div>
           </div>
         </div>
@@ -116,9 +118,11 @@
       </div>
       <!-- Removed theme banner for compactness -->
 
+      {% if not public_entry_screen %}
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Open main navigation menu">
         <span class="navbar-toggler-icon" aria-hidden="true"></span>
       </button>
+      {% endif %}
 
       <div class="collapse navbar-collapse" id="mainNav" aria-label="Main navigation">
         <ul class="navbar-nav ms-3 me-auto mb-2 mb-lg-0" role="menubar">
