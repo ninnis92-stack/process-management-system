@@ -83,16 +83,17 @@ def _default_workflow_spec():
 
 
 def main():
-            # Optionally seed demo data if RUN_SEED=1 is set (idempotent)
-            try:
-                from app.models import SiteConfig
-                from app import db
-                _ensure_quote_sets_ready()
-                if os.environ.get("RUN_SEED", "0") == "1":
-                    import seed
-                    seed.run()
-            except Exception as exc:
-                print("seed_exception", exc, file=sys.stderr)
+    # Optionally seed demo data if RUN_SEED=1 is set (idempotent)
+    try:
+        from app.models import SiteConfig
+        from app import db
+        _ensure_quote_sets_ready()
+        if os.environ.get("RUN_SEED", "0") == "1":
+            import seed
+            seed.run()
+    except Exception as exc:
+        print("seed_exception", exc, file=sys.stderr)
+
     app = create_app()
     with app.app_context():
         # Report which database we're connected to and run Alembic migrations
