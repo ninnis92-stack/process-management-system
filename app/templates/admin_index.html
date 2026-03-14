@@ -111,7 +111,7 @@
         'Review retention windows and delivery routing.',
         '<i class="fas fa-bell"></i>'
       ) }}
-      {{ command_nav_card(url_for('admin.notifications_retention') if 'admin.notifications_retention' in globals() else '#', 'Notification Retention', 'Configure notification retention policies.', '<i class="fas fa-history"></i>') }}
+      {{ command_nav_card('#', 'Notification Retention', 'Configure notification retention policies.', '<i class="fas fa-history"></i>') }}
       {{ command_nav_card(url_for('admin.feature_flags'), 'Flags & integrations', 'Manage feature rollout, connections, and unmapped items.', '🚦') }}
       {{ command_nav_card(url_for('admin.migration_status'), 'Migrations', 'Check schema readiness and migration health.', '🛠️') }}
       {{ command_nav_card(url_for('admin.debug_workspace'), 'Debug workspace', 'Open diagnostics, helper tools, and troubleshooting views.', '🧰') }}
