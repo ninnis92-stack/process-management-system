@@ -1,3 +1,12 @@
+## March 14, 2026
+- **Mobile quote section fix:** The quote section in the navbar is now fully content-driven and visually balanced on all mobile devices. Removed min-height and flex inflation, ensuring quotes never overflow or crowd the brand title. This improves mobile usability and keeps the UI polished across breakpoints.
+- **Test suite health:** All tests pass after recent UI and logic changes. The test suite covers navigation, admin, onboarding, notifications, feature flags, and mobile layout.
+- **Documentation update:** README and deployment docs updated to reflect the latest UI, mobile, and deployment changes. See the UI/Theme and Deployment sections above for details.
+
+## March 13, 2026
+- Vibe button and quotes are now fully removed from the admin banner when disabled, for a cleaner UI.
+- Deployment, post-deployment script, and documentation update completed.
+## March 2026 Update
 **Deployment Requirements:**
 - Fly.io requires a persistent volume for Postgres. Create the volume before deploying:
   ```bash
@@ -642,7 +651,9 @@ page displays the last few steps and suggests next actions to the user.
   bundle payload containing request metadata, submission details, and
   attachment descriptors whenever a department handoff is created.
 - **User settings**: dark mode (keeps adopted brand presets blended into the native dark palette while disabling personal vibes), theme/vibe selection, navbar vibe button visibility, quote set, rotating
-  quotes.
+  quotes.  
+  
+  **Mobile quote section:** The quote section in the navbar is now fully content-driven and visually balanced on all mobile devices. Min-height and flex inflation were removed, so quotes never overflow or crowd the brand title. This ensures a polished, responsive experience across all breakpoints.
 - **Templates & requirements**: rich form editing with grouped fields, hints,
   and other metadata.
 - Shared UI macros (`app/templates/admin/_macros.html`) keep styles consistent.
