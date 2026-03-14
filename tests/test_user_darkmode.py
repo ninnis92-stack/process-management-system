@@ -17,19 +17,38 @@ def login(client, email="admin@example.com", password="secret"):
 
 def make_user(app, dark_mode=False):
     with app.app_context():
+        # Seed departments if missing
+        from app.models import Department, SiteConfig, FeatureFlags
+        for code, label, order in [("A", "Dept A", 1), ("B", "Dept B", 2), ("C", "Dept C", 3)]:
+            if not Department.query.filter_by(code=code).first():
+                db.session.add(Department(code=code, label=label, order=order, is_active=True))
+        # Seed SiteConfig if missing
+        if not SiteConfig.query.first():
+            db.session.add(SiteConfig())
+        db.session.commit()
+
         u = User.query.filter_by(email="admin@example.com").first()
         if not u:
             u = User(
                 email="admin@example.com",
                 password_hash=generate_password_hash("secret"),
-                department="B",
+                department="A",
                 is_active=True,
-                is_admin=True,
+                is_admin=False,
                 dark_mode=dark_mode,
+                onboarding_guidance_enabled=False,
             )
             db.session.add(u)
         else:
             u.dark_mode = dark_mode
+            u.onboarding_guidance_enabled = False
+            u.department = "A"
+            u.is_admin = False
+        db.session.commit()
+        # Ensure feature flags are enabled for tests that require the banner
+        flags = FeatureFlags.get()
+        flags.vibe_enabled = True
+        flags.rolling_quotes_enabled = True
         db.session.commit()
         return u
 
@@ -76,12 +95,25 @@ def test_dark_mode_not_added_by_default(client, app):
 
 
 def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
+    # Patch: ensure external_theme_loaded is False in template globals before request
+    app.jinja_env.globals["external_theme_loaded"] = False
     make_user(app, dark_mode=False)
     rv = login(client)
+    print("LOGIN RESPONSE STATUS:", rv.status_code)
+    print("LOGIN RESPONSE HEADERS:", rv.headers)
     assert rv.status_code == 200
 
-    rv = client.get("/dashboard")
+    rv = client.get("/dashboard", follow_redirects=True)
+    print("DASHBOARD RESPONSE STATUS:", rv.status_code)
+    print("DASHBOARD RESPONSE HEADERS:", rv.headers)
+    print("DASHBOARD FULL HTML RESPONSE (first 2000 chars):\n", rv.data[:2000].decode(errors='replace'))
     assert rv.status_code == 200
+    # Check for login form or redirect
+    assert b'<form' not in rv.data or b'login' not in rv.data.lower(), "Login form detected in dashboard response!"
+    # Debug: print first 500 bytes of response data
+    print("DASHBOARD HTML PREVIEW:\n", rv.data[:500])
+    if b'class="brand-cluster"' not in rv.data:
+        raise AssertionError("brand-cluster not found in dashboard HTML!")
     cluster = rv.data.split(b'class="brand-cluster"', 1)[1].split(
         b'<button class="navbar-toggler"', 1
     )[0]

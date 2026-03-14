@@ -37,13 +37,18 @@ load_dotenv()
 
 
 def create_app():
-        # Enable Brotli/gzip compression for static assets
-        try:
-            from flask_compress import Compress
-            Compress(app)
-        except ImportError:
-            pass
     app = Flask(__name__)
+
+    @app.errorhandler(403)
+    def forbidden_error(error):
+        return (jsonify({"error": "Forbidden", "details": str(error)}), 403)
+    app = Flask(__name__)
+    # Enable Brotli/gzip compression for static assets
+    try:
+        from flask_compress import Compress
+        Compress(app)
+    except ImportError:
+        pass
     # Set static asset cache headers for /static/dist assets
     from config import set_cache_headers
     app.after_request(set_cache_headers)
@@ -74,8 +79,12 @@ def create_app():
         return jsonify({"error": "Internal Server Error", "details": str(error)}), 500
 
     # Optionally, log all exceptions
+    from werkzeug.exceptions import HTTPException
+
     @app.errorhandler(Exception)
     def handle_exception(e):
+        if isinstance(e, HTTPException):
+            return e
         logging.error("Unhandled Exception: %s", e)
         logging.error(traceback.format_exc())
         return jsonify({"error": "Unhandled Exception", "details": str(e)}), 500
@@ -86,7 +95,9 @@ def create_app():
     # tests.
     #
     # The check is implemented further down (after the main init section).
-    pass
+    db.init_app(app)
+    login_manager.init_app(app)
+    # Do not return here! Return at the end after all blueprints and extensions are registered.
 
     @app.cli.command("notify-due")
     def notify_due():
@@ -322,7 +333,7 @@ def create_app():
         except OSError:
             pass
 
-    db.init_app(app)
+    # db.init_app(app)  # Duplicate, remove this line
 
     # post-initialization schema guard for production; identical to the
     # migration fallback in scripts/release_tasks.py.
@@ -529,7 +540,6 @@ def create_app():
     # versioned public API
     try:
         from .api.v1 import api_v1_bp
-
         app.register_blueprint(api_v1_bp)
     except ImportError:
         # during early bootstrap (tests, minimal env) the new api package
@@ -716,6 +726,8 @@ def create_app():
             except Exception:
                 pass
 
+            company_url_val = getattr(cfg, "company_url", None)
+            brand_href = company_url_val if company_url_val else "/dashboard"
             return dict(
                 active_theme_css=css,
                 theme_logo_url=logo,
@@ -723,17 +735,11 @@ def create_app():
                 site_theme_preset=site_theme_preset,
                 department_labels=dept_labels,
                 site_banner_html=banner_html,
-                company_url=getattr(cfg, "company_url", None),
+                company_url=company_url_val,
+                brand_href=brand_href,
                 rolling_quotes_enabled=rolling_quotes_enabled,
                 rolling_quotes=rolling_quotes,
-                # choose an initial quote to render server-side; fallback to the
-                # first entry of the active list or the default set.  this
-                # ensures that when JS fails or loads slowly the placeholder is
-                # replaced with something meaningful.
                 initial_quote=(
-                    # select a fresh random entry each time instead of using a
-                    # day‑based deterministic shuffle; this keeps the sequence
-                    # unpredictable even within the same day.
                     (
                         lambda quotes, enabled: (
                             __import__("random").choice(quotes)
@@ -752,6 +758,13 @@ def create_app():
                 guest_submission_enabled=guest_submission_enabled,
                 external_theme_loaded=external_theme_loaded,
                 FeatureFlags=FeatureFlags,
+                # Always provide template helpers
+                avatar_url_for=avatar_url_for,
+                gravatar_url=gravatar_url,
+                get_user_departments=get_user_departments,
+                can_view_metrics_for_user=can_view_metrics_for_user,
+                is_external_theme_active=is_external_theme_active,
+                user_has_multiple_departments=user_has_multiple_departments,
             )
         except Exception:
             # if any part of the helper blows up (e.g. missing schema), still
@@ -777,6 +790,7 @@ def create_app():
                 rolling_quotes_enabled=False,
                 rolling_quotes=[],
                 company_url=None,
+                brand_href="/dashboard",
                 initial_quote=None,
                 allow_user_reminders_enabled=False,
                 guest_dashboard_enabled=True,
@@ -1017,6 +1031,8 @@ def create_app():
     # Optionally wait for DB readiness during app startup. When the
     # `WAIT_FOR_DB` env var is set to a truthy value, the application will
     # attempt a simple `SELECT 1` repeatedly before returning the app
+
+    return app
     # instance. This is helpful for deployments where the DB may not be
     # immediately reachable at process start (e.g. cloud services).
     if os.getenv("WAIT_FOR_DB", "False") == "True":

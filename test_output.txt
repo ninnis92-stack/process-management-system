@@ -1,0 +1,171 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.3.4, pluggy-1.6.0 -- /Users/naheeminnis/Development/process-management-prototype/venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/naheeminnis/Development/process-management-prototype
+configfile: pytest.ini
+collecting ... collected 26 items
+
+tests/test_user_darkmode.py::test_dark_mode_class_added_server_side PASSED [  3%]
+tests/test_user_darkmode.py::test_admin_dashboard_keeps_dark_mode_and_hides_vibe_controls FAILED [  7%]
+tests/test_user_darkmode.py::test_dark_mode_not_added_by_default PASSED  [ 11%]
+tests/test_user_darkmode.py::test_dashboard_shows_navbar_vibe_button_in_brand_banner FAILED [ 15%]
+tests/test_user_darkmode.py::test_settings_page_shows_disable_text_when_dark_mode_enabled PASSED [ 19%]
+tests/test_user_darkmode.py::test_settings_page_shows_enable_text_when_dark_mode_disabled PASSED [ 23%]
+tests/test_user_darkmode.py::test_settings_page_shows_vibe_toggle PASSED [ 26%]
+tests/test_user_darkmode.py::test_vibe_button_preference_hides_nav PASSED [ 30%]
+tests/test_user_darkmode.py::test_preferences_autosave_broadcast PASSED  [ 34%]
+tests/test_user_darkmode.py::test_workspace_vibe_flag_overrides_user_vibe_button_preference PASSED [ 38%]
+tests/test_user_darkmode.py::test_settings_page_disables_theme_when_vibe_feature_is_off PASSED [ 42%]
+tests/test_user_darkmode.py::test_dashboard_uses_compact_nav_state_when_vibe_and_quotes_are_disabled PASSED [ 46%]
+tests/test_user_darkmode.py::test_user_settings_opt_in_to_session_toggle_persistence FAILED [ 50%]
+tests/test_user_darkmode.py::test_generic_preferences_endpoint_updates_multiple_settings PASSED [ 53%]
+tests/test_user_darkmode.py::test_preferences_endpoint_does_not_change_vibe_when_feature_disabled PASSED [ 57%]
+tests/test_user_darkmode.py::test_vibe_endpoint_rejects_updates_while_dark_mode_enabled PASSED [ 61%]
+tests/test_user_darkmode.py::test_vibe_endpoint_rejects_any_updates_when_dark_mode_enabled PASSED [ 65%]
+tests/test_user_darkmode.py::test_vibe_endpoint_rejects_updates_when_feature_disabled PASSED [ 69%]
+tests/test_user_darkmode.py::test_dark_mode_dashboard_bootstraps_selected_vibe PASSED [ 73%]
+tests/test_user_darkmode.py::test_settings_preview_hides_vibe_button PASSED [ 76%]
+tests/test_user_darkmode.py::test_brand_adoption_keeps_native_dark_mode_with_brand_preset PASSED [ 80%]
+tests/test_user_darkmode.py::test_vibe_endpoint_persists_and_settings_reflect PASSED [ 84%]
+tests/test_user_darkmode.py::test_settings_post_unchecked_dark_mode_disables_preference PASSED [ 88%]
+tests/test_user_darkmode.py::test_settings_post_checked_dark_mode_enables_preference PASSED [ 92%]
+tests/test_user_darkmode.py::test_dark_mode_preference_endpoint_enables_account_wide_setting PASSED [ 96%]
+tests/test_user_darkmode.py::test_dark_mode_preference_endpoint_disables_account_wide_setting PASSED [100%]
+
+=================================== FAILURES ===================================
+_________ test_admin_dashboard_keeps_dark_mode_and_hides_vibe_controls _________
+
+client = <FlaskClient <Flask 'app'>>, app = <Flask 'app'>
+
+    def test_admin_dashboard_keeps_dark_mode_and_hides_vibe_controls(client, app):
+        make_user(app, dark_mode=True)
+        rv = login(client)
+        assert rv.status_code == 200
+    
+        rv = client.get("/admin/")
+>       assert rv.status_code == 200
+E       assert 403 == 200
+E        +  where 403 = <WrapperTestResponse streamed [403 FORBIDDEN]>.status_code
+
+tests/test_user_darkmode.py:76: AssertionError
+___________ test_dashboard_shows_navbar_vibe_button_in_brand_banner ____________
+
+client = <FlaskClient <Flask 'app'>>, app = <Flask 'app'>
+
+    def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
+        # Patch: ensure external_theme_loaded is False in template globals before request
+        app.jinja_env.globals["external_theme_loaded"] = False
+        make_user(app, dark_mode=False)
+        rv = login(client)
+        print("LOGIN RESPONSE STATUS:", rv.status_code)
+        print("LOGIN RESPONSE HEADERS:", rv.headers)
+        assert rv.status_code == 200
+    
+        rv = client.get("/dashboard", follow_redirects=True)
+        print("DASHBOARD RESPONSE STATUS:", rv.status_code)
+        print("DASHBOARD RESPONSE HEADERS:", rv.headers)
+        print("DASHBOARD FULL HTML RESPONSE (first 2000 chars):\n", rv.data[:2000].decode(errors='replace'))
+        assert rv.status_code == 200
+        # Check for login form or redirect
+        assert b'<form' not in rv.data or b'login' not in rv.data.lower(), "Login form detected in dashboard response!"
+        # Debug: print first 500 bytes of response data
+        print("DASHBOARD HTML PREVIEW:\n", rv.data[:500])
+        if b'class="brand-cluster"' not in rv.data:
+            raise AssertionError("brand-cluster not found in dashboard HTML!")
+        cluster = rv.data.split(b'class="brand-cluster"', 1)[1].split(
+            b'<button class="navbar-toggler"', 1
+        )[0]
+>       assert b'class="brand-banner-row"' in rv.data
+E       assert b'class="brand-banner-row"' in b'<script>\n    document.addEventListener(\'DOMContentLoaded\', function() {\n      var vibeBtn = document.getElementById(\'vibeBtn\');\n      if (vibeBtn) {\n        vibeBtn.addEventListener(\'click\', function() {\n          var body = document.body;\n          if (body.getAttribute(\'data-theme\') === \'vibe\') {\n            body.removeAttribute(\'data-theme\');\n          } else {\n            body.setAttribute(\'data-theme\', \'vibe\');\n          }\n        });\n      }\n    });\n  </script>\n<!doctype html>\n<html>\n\n<head>\n  <meta charset="utf-8" />\n  <meta name="viewport" content="width=device-width,initial-scale=1" />\n  <meta name="csrf-token" content="IjFiOGY2MDc4MDQzYmUzNjNiMGNiMWZhYzI5OTM0ZDgyODdkYWUzNjQi.abWZyA.ZAXL-HFVdUldSrzYrqHJ_R7wJho">\n  <title>FreshProcess</title>\n  <!-- Defensive shim early: avoid uncaught errors when third-party extensions expect a Sortable global -->\n  <script>\n    (function(){\n      try{\n        if(typeof window.Sortable === \'undefined\'){\n          window.Sortable = {\n            create: function(){\n              try{ console.warn(\'Defensive shim: Sortable.create called; providing noop implementation.\'); console.warn(new ...        status.textContent = visibleCards\n            ? \'Showing \' + visibleCards + \' matching command-center card\' + (visibleCards === 1 ? \'\' : \'s\') + \'.\'\n            : \'No command-center cards matched that search.\';\n        }\n      });\n      resetFilterState();\n    })();\n  </script>\n  <!-- dynamic toggle labels -->\n  <script>\n    document.querySelectorAll(\'.form-check-input[data-toggle-text-checked]\').forEach(cb=>{\n      var form = cb.closest(\'.form-check\');\n      var card = cb.closest(\'.admin-toggle-card\');\n      var lbl = form && form.querySelector(\'.form-check-label\');\n      if (lbl == null) return;\n      var checkedLabel = cb.dataset.toggleTextChecked;\n      var uncheckedLabel = cb.dataset.toggleTextUnchecked;\n      var upd = ()=> {\n        lbl.textContent = cb.checked ? checkedLabel : uncheckedLabel;\n        form.classList.toggle(\'active\', cb.checked);\n        if (card) card.classList.toggle(\'active\', cb.checked);\n      };\n      cb.addEventListener(\'change\', upd);\n      upd();\n    });\n  </script>\n  <!-- autosave/session-persistence logic now ships from frontend/js/modules/autosave.js via Vite -->\n  \n  \n</body>\n</html>'
+E        +  where b'<script>\n    document.addEventListener(\'DOMContentLoaded\', function() {\n      var vibeBtn = document.getElementById(\'vibeBtn\');\n      if (vibeBtn) {\n        vibeBtn.addEventListener(\'click\', function() {\n          var body = document.body;\n          if (body.getAttribute(\'data-theme\') === \'vibe\') {\n            body.removeAttribute(\'data-theme\');\n          } else {\n            body.setAttribute(\'data-theme\', \'vibe\');\n          }\n        });\n      }\n    });\n  </script>\n<!doctype html>\n<html>\n\n<head>\n  <meta charset="utf-8" />\n  <meta name="viewport" content="width=device-width,initial-scale=1" />\n  <meta name="csrf-token" content="IjFiOGY2MDc4MDQzYmUzNjNiMGNiMWZhYzI5OTM0ZDgyODdkYWUzNjQi.abWZyA.ZAXL-HFVdUldSrzYrqHJ_R7wJho">\n  <title>FreshProcess</title>\n  <!-- Defensive shim early: avoid uncaught errors when third-party extensions expect a Sortable global -->\n  <script>\n    (function(){\n      try{\n        if(typeof window.Sortable === \'undefined\'){\n          window.Sortable = {\n            create: function(){\n              try{ console.warn(\'Defensive shim: Sortable.create called; providing noop implementation.\'); console.warn(new ...        status.textContent = visibleCards\n            ? \'Showing \' + visibleCards + \' matching command-center card\' + (visibleCards === 1 ? \'\' : \'s\') + \'.\'\n            : \'No command-center cards matched that search.\';\n        }\n      });\n      resetFilterState();\n    })();\n  </script>\n  <!-- dynamic toggle labels -->\n  <script>\n    document.querySelectorAll(\'.form-check-input[data-toggle-text-checked]\').forEach(cb=>{\n      var form = cb.closest(\'.form-check\');\n      var card = cb.closest(\'.admin-toggle-card\');\n      var lbl = form && form.querySelector(\'.form-check-label\');\n      if (lbl == null) return;\n      var checkedLabel = cb.dataset.toggleTextChecked;\n      var uncheckedLabel = cb.dataset.toggleTextUnchecked;\n      var upd = ()=> {\n        lbl.textContent = cb.checked ? checkedLabel : uncheckedLabel;\n        form.classList.toggle(\'active\', cb.checked);\n        if (card) card.classList.toggle(\'active\', cb.checked);\n      };\n      cb.addEventListener(\'change\', upd);\n      upd();\n    });\n  </script>\n  <!-- autosave/session-persistence logic now ships from frontend/js/modules/autosave.js via Vite -->\n  \n  \n</body>\n</html>' = <WrapperTestResponse 25921 bytes [200 OK]>.data
+
+tests/test_user_darkmode.py:120: AssertionError
+----------------------------- Captured stdout call -----------------------------
+LOGIN RESPONSE STATUS: 200
+LOGIN RESPONSE HEADERS: Content-Type: text/html; charset=utf-8
+Content-Length: 25921
+X-Request-ID: ec8aca57b84444efa54ac704bf2551a1
+Vary: Cookie
+Set-Cookie: session=.eJxFjjluwzAQRe_C2oC5L-pyEmKGM4yMCKJBUm6C3D1MUqT8D3_7FLl2HrvYZr_4JvKDxCaInVHaO-soUmKJRUOtjBwwOdIlRE4VDBPLGEmCCwzBSRXApIRUMQInVlZGa31CJLLoUjXaeatdDd4qw8EbC4YoQbWOF4lcCrOOAcQ6cg3uf2_UklDm48WZ-DkXefsnk084569R3UQZvebZPvj8yWGsXoYorUE23qAsqCoUnZKxFNcQweJ2lR0wZn5vjfLVjxXd53xu9_vRChx7G_NOMHZs0El8fQP8DV3V.abWZyA.yZB-1Qq8hE9RhgL_elCB8R13b4w; HttpOnly; Path=/; SameSite=Lax
+
+
+DASHBOARD RESPONSE STATUS: 200
+DASHBOARD RESPONSE HEADERS: Content-Type: text/html; charset=utf-8
+Content-Length: 25921
+X-Request-ID: 1701dbafbef44803a05fb56e1cdcaad0
+Vary: Cookie
+Set-Cookie: session=.eJxFjjluwzAQRe_C2oC5L-pyEmKGM4yMCKJBUm6C3D1MUqT8D3_7FLl2HrvYZr_4JvKDxCaInVHaO-soUmKJRUOtjBwwOdIlRE4VDBPLGEmCCwzBSRXApIRUMQInVlZGa31CJLLoUjXaeatdDd4qw8EbC4YoQbWOF4lcCrOOAcQ6cg3uf2_UklDm48WZ-DkXefsnk084569R3UQZvebZPvj8yWGsXoYorUE23qAsqCoUnZKxFNcQweJ2lR0wZn5vjfLVjxXd53xu9_vRChx7G_NOMHZs0El8fQP8DV3V.abWZyA.yZB-1Qq8hE9RhgL_elCB8R13b4w; HttpOnly; Path=/; SameSite=Lax
+
+
+DASHBOARD FULL HTML RESPONSE (first 2000 chars):
+ <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var vibeBtn = document.getElementById('vibeBtn');
+      if (vibeBtn) {
+        vibeBtn.addEventListener('click', function() {
+          var body = document.body;
+          if (body.getAttribute('data-theme') === 'vibe') {
+            body.removeAttribute('data-theme');
+          } else {
+            body.setAttribute('data-theme', 'vibe');
+          }
+        });
+      }
+    });
+  </script>
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="csrf-token" content="IjFiOGY2MDc4MDQzYmUzNjNiMGNiMWZhYzI5OTM0ZDgyODdkYWUzNjQi.abWZyA.ZAXL-HFVdUldSrzYrqHJ_R7wJho">
+  <title>FreshProcess</title>
+  <!-- Defensive shim early: avoid uncaught errors when third-party extensions expect a Sortable global -->
+  <script>
+    (function(){
+      try{
+        if(typeof window.Sortable === 'undefined'){
+          window.Sortable = {
+            create: function(){
+              try{ console.warn('Defensive shim: Sortable.create called; providing noop implementation.'); console.warn(new Error().stack); }catch(e){}
+              return { destroy: function(){}, toArray: function(){ return []; } };
+            }
+          };
+        }
+      }catch(e){}
+    })();
+  </script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" integrity="sha512-p1Cm0QlW0FQvgw+Vxv0+H5a6uVgnF6V5u0Y2dd4AozqA3BsnF7mk/WvJL3Z8zUuNX1U4MZT+O2e2d3dH+pvGVHg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link href="https://fonts.g
+DASHBOARD HTML PREVIEW:
+ b"<script>\n    document.addEventListener('DOMContentLoaded', function() {\n      var vibeBtn = document.getElementById('vibeBtn');\n      if (vibeBtn) {\n        vibeBtn.addEventListener('click', function() {\n          var body = document.body;\n          if (body.getAttribute('data-theme') === 'vibe') {\n            body.removeAttribute('data-theme');\n          } else {\n            body.setAttribute('data-theme', 'vibe');\n          }\n        });\n      }\n    });\n  </script>\n<!doctype html>\n<html>\n\n<hea"
+___________ test_user_settings_opt_in_to_session_toggle_persistence ____________
+
+client = <FlaskClient <Flask 'app'>>, app = <Flask 'app'>
+
+    def test_user_settings_opt_in_to_session_toggle_persistence(client, app):
+        make_user(app, dark_mode=False)
+        rv = login(client)
+        assert rv.status_code == 200
+    
+        rv = client.get("/auth/settings")
+        assert rv.status_code == 200
+        assert b'data-toggle-session-persist="session"' in rv.data
+    
+        admin = client.get("/admin/feature_flags")
+>       assert admin.status_code in (302, 200)
+E       assert 403 in (302, 200)
+E        +  where 403 = <WrapperTestResponse streamed [403 FORBIDDEN]>.status_code
+
+tests/test_user_darkmode.py:345: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_user_darkmode.py::test_admin_dashboard_keeps_dark_mode_and_hides_vibe_controls
+FAILED tests/test_user_darkmode.py::test_dashboard_shows_navbar_vibe_button_in_brand_banner
+FAILED tests/test_user_darkmode.py::test_user_settings_opt_in_to_session_toggle_persistence
+========================= 3 failed, 23 passed in 8.51s =========================

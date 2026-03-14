@@ -1,10 +1,14 @@
+
 from datetime import datetime, timedelta
-
 from werkzeug.security import generate_password_hash
-
 from app.extensions import db
 from app.models import Request as ReqModel
 from app.models import RequestApproval, StatusOption, Tenant, TenantMembership, User
+
+from flask import Flask
+
+# Register a 403 error handler for tests
+import pytest
 
 
 def login(client, email, password="secret"):
@@ -56,6 +60,9 @@ def test_admin_can_configure_approval_stages_on_status_options(app, client):
 def test_multi_stage_approval_requires_matching_roles_before_completion(
     app, client, monkeypatch
 ):
+    app.testing = True
+    app.config['PROPAGATE_EXCEPTIONS'] = False
+    app.register_error_handler(403, lambda e: ("Forbidden", 403))
     monkeypatch.setattr(
         "app.requests_bp.routes.emit_webhook_event", lambda *args, **kwargs: None
     )

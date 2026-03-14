@@ -50,10 +50,6 @@ def app(monkeypatch):
     # store the path on the app so the teardown block can remove it later
     application._test_sqlite_path = path
 
-    # The `poolclass` setting must be interpreted by SQLAlchemy; the simple
-    # string above is converted to StaticPool in the app factory so we don't
-    # have to import it here and risk circular imports.  (The factory handles
-    # this pattern elsewhere.)
 
     with application.app_context():
         if NotOpenSSLWarning:

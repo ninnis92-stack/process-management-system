@@ -2,6 +2,10 @@
 {% from 'admin/_macros.html' import command_section, command_nav_card, command_toggle_card %}
 
 {% block content %}
+    <!-- Offcanvas sidebar toggle for mobile -->
+    <button class="btn btn-outline-primary d-block d-md-none mb-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar" aria-controls="adminSidebar">
+      <i class="fas fa-bars me-2"></i> Menu
+    </button>
   <section class="admin-hero surface-panel">
     <div class="admin-hero__content">
       <p class="eyebrow-label">Command center</p>
@@ -20,6 +24,9 @@
         <div class="ui-action-group ui-action-group--meta">
           {% if current_user.dark_mode %}
             <div class="ui-action-note ui-action-note--warning">Vibe controls are disabled while dark mode is active.</div>
+          {% endif %}
+          {% if not FeatureFlags.get().enable_notifications %}
+            <div class="ui-action-note ui-action-note--warning">Notifications off</div>
           {% endif %}
           <span class="ui-action-note admin-hero__hint">Start with live monitoring, then branch into configuration per department.</span>
         </div>
@@ -83,7 +90,7 @@
       {{ command_nav_card(url_for('admin.list_users'), 'Users', 'Open account access, roles, and profile controls.', '<i class="fas fa-users"></i>', use_button=True) }}
       {{ command_nav_card(url_for('admin.list_departments'), 'Departments', 'Adjust department rules, labels, and ownership.', '<i class="fas fa-tags"></i>', use_button=True) }}
       {{ command_nav_card(url_for('admin.site_config'), 'Workspace branding', 'Update naming, theme, and shared workspace presentation.', '<i class="fas fa-globe"></i>', use_button=True) }}
-      {{ command_nav_card(url_for('admin.quotes_config'), 'Quotes', 'Manage rotating quote sets and workspace messaging.', '<i class="fas fa-quote-left"></i>', use_button=True) }}
+      {{ command_nav_card(url_for('admin.site_config', _anchor='quotes-settings'), 'Quotes', 'Manage rotating quote sets and workspace messaging.', '<i class="fas fa-quote-left"></i>', use_button=True) }}
       {{ command_nav_card(url_for('admin.special_email'), 'Email Forms', 'Configure inbound email intake and routing behavior.', '<i class="fas fa-envelope"></i>', use_button=True) }}
       {{ command_nav_card(url_for('admin.monitor'), 'Monitoring', 'Review live dashboards, activity, and support tooling.', '<i class="fas fa-chart-bar"></i>', use_button=True) }}
     {% endcall %}
@@ -96,7 +103,15 @@
 
     {% call command_section('admin-section-utilities', 'Utilities', 'Daily ops & helpers', 'Switch contexts or jump into diagnostics.') %}
       {{ command_nav_card(url_for('auth.choose_dept'), 'Switch department', 'Change the department context for your current session.', '<i class="fas fa-exchange-alt"></i>') }}
-      {{ command_nav_card(url_for('admin.notifications_retention'), 'Notification Retention', 'Review retention windows and delivery routing.', '<i class="fas fa-bell"></i>') }}
+      {{ command_toggle_card(
+        url_for('admin.toggle_notifications'),
+        FeatureFlags.get().enable_notifications,
+        'Notifications on',
+        'Notifications off',
+        'Review retention windows and delivery routing.',
+        '<i class="fas fa-bell"></i>'
+      ) }}
+      {{ command_nav_card(url_for('admin.notifications_retention') if 'admin.notifications_retention' in globals() else '#', 'Notification Retention', 'Configure notification retention policies.', '<i class="fas fa-history"></i>') }}
       {{ command_nav_card(url_for('admin.feature_flags'), 'Flags & integrations', 'Manage feature rollout, connections, and unmapped items.', '🚦') }}
       {{ command_nav_card(url_for('admin.migration_status'), 'Migrations', 'Check schema readiness and migration health.', '🛠️') }}
       {{ command_nav_card(url_for('admin.debug_workspace'), 'Debug workspace', 'Open diagnostics, helper tools, and troubleshooting views.', '🧰') }}

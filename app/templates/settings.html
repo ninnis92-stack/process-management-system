@@ -50,7 +50,7 @@
         {% if not external_theme and form.vibe_index %}
           <div class="mb-0">
             <label for="vibe_index" class="form-label">Theme</label>
-            <select class="form-select" id="vibe_index" name="vibe_index" {% if dark_mode_enabled %}disabled{% endif %} data-all-choices='{{ all_vibe_choices|tojson }}' style="max-width:100%; min-width:0;">
+            <select class="form-select" id="vibe_index" name="vibe_index" {% if dark_mode_enabled or not FeatureFlags.get().vibe_enabled %}disabled{% endif %} data-all-choices='{{ all_vibe_choices|tojson }}' style="max-width:100%; min-width:0;">
               {% for val, label in form.vibe_index.choices %}
                 <option value="{{ val }}" {% if (current_user.vibe_index is not none and current_user.vibe_index == val) or (form.vibe_index.data is not none and form.vibe_index.data == val) %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -67,13 +67,16 @@
                 </div>
                 {# Settings preview vibe button logic for tests: hidden if dark mode, brand adoption, or feature flag off #}
                 {% set preview_external_theme = active_theme_css is defined and active_theme_css %}
-                {% set preview_show_vibe_btn = vibe_button_enabled and not dark_mode_enabled and not preview_external_theme %}
+                {% set preview_show_vibe_btn = vibe_button_enabled and not dark_mode_enabled and not preview_external_theme and FeatureFlags.get().vibe_enabled %}
                 <button type="button" id="settingsVibePreview" class="btn btn-outline-secondary mt-2 brand-vibe-btn" style="width:100%;max-width:320px;" {% if not preview_show_vibe_btn %}hidden{% endif %}>Vibe</button>
               </div>
             </div>
-            <div class="form-text">Choose your UI accent theme. Teams that prefer a neutral tone can leave this on the default setting. When dark mode is enabled this control is disabled; adopted brand themes still carry their accent palette into native dark mode automatically. <span class="d-block d-md-none text-info">Theme controls are mobile-friendly.</span></div>
+            <div class="form-text">Choose your UI accent theme. Teams that prefer a neutral tone can leave this on the default setting. When dark mode is enabled or the workspace disables the vibe feature, this control is disabled; adopted brand themes still carry their accent palette into native dark mode automatically. <span class="d-block d-md-none text-info">Theme controls are mobile-friendly.</span></div>
             <div id="vibeDarkModeNote" class="form-text text-warning mt-1" {% if not dark_mode_enabled %}hidden{% endif %}>Theme selection is disabled while dark mode is active.</div>
-            <!-- Global vibe feature flag no longer disables user controls -->
+            {% if not FeatureFlags.get().vibe_enabled %}
+              <div id="vibeFeatureFlagNote" class="form-text text-warning mt-1">Theme selection is disabled while the global vibe feature is turned off.</div>
+            {% endif %}
+            <!-- Global vibe feature flag disables user controls when off -->
           </div>
         {% endif %}
       </section>

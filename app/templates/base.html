@@ -76,19 +76,20 @@
  {% set public_entry_screen = ep in ['auth.login', 'external.external_new', 'external.external_dashboard'] %}
  {% set guest_dashboard_available = guest_dashboard_enabled|default(True) %}
  {% set guest_submission_available = guest_submission_enabled|default(True) %}
-{# Global vibe feature flag no longer disables user controls #}
-{% set global_no_vibe = False %}
+{# Set global_no_vibe True if both vibe and rolling_quotes are disabled #}
+{% set global_no_vibe = (not FeatureFlags.get().vibe_enabled and not rolling_quotes_enabled) %}
  {% set dark_mode_active = current_user.is_authenticated and (current_user.dark_mode or False) %}
  {% set vibe_button_enabled = (current_user.vibe_button_enabled if current_user.is_authenticated else True) %}
 {% set vibe_ui_enabled = current_user.is_authenticated and not external_theme_loaded and not dark_mode_active and vibe_button_enabled %}
  {% set show_brand_banner = (rolling_quotes_enabled or vibe_ui_enabled) and not public_entry_screen %}
- {% set no_brand_banner = (not show_brand_banner) and (not public_entry_screen) %}
+{# If both vibe and rolling quotes are disabled, always set no_brand_banner True #}
+{% set no_brand_banner = ((not show_brand_banner) and (not public_entry_screen)) or global_no_vibe %}
  <body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if dark_mode_active %} dark-mode{% endif %}{% if global_no_vibe %} no-vibe{% endif %}{% if no_brand_banner %} no-brand-banner{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-endpoint="{{ ep }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if dark_mode_active else '0' }}" data-user-is-admin="{{ '1' if current_user.is_authenticated and current_user.is_admin else '0' }}">
   <a href="#content" class="skip-link">Skip to content</a>
 
   <nav class="navbar">
     <div class="navbar__left">
-      <a class="navbar__brand" href="{{ brand_href }}">
+      <a class="navbar__brand" href="{{ brand_href }}"{% if company_url %} target="_blank" rel="noopener"{% endif %}>
         {% if theme_logo_url %}
           <img src="{{ theme_logo_url }}" alt="FreshProcess logo" class="navbar__logo" />
         {% else %}
@@ -126,16 +127,22 @@
     </div>
   </nav>
 
-  {% if ep.startswith('admin') and (rolling_quotes_enabled or vibe_ui_enabled) %}
-    <div class="banner banner--admin mt-2 mb-3">
-      {% if rolling_quotes_enabled %}
-        <span class="banner__quote">{{ rolling_quotes[0] if rolling_quotes else 'Small habits compound into big results.' }}</span>
-      {% endif %}
-      {% if vibe_ui_enabled %}
-        <button id="vibeBtn" class="banner__vibe-btn button" type="button" aria-label="Toggle Vibe Theme">
-          <span class="vibe-icon">🎉</span> Vibe
-        </button>
-      {% endif %}
+  {% if current_user.is_authenticated %}
+    <div class="brand-cluster">
+      <div class="brand-banner-row mt-2 mb-3" data-theme-banner>
+        <div class="brand-banner-row__quote-panel">
+          <span id="motivation" class="brand-banner-row__motivation">{% if rolling_quotes_enabled %}{{ rolling_quotes[0] if rolling_quotes else 'Small habits compound into big results.' }}{% endif %}</span>
+        </div>
+        <div class="brand-banner-row__control-panel">
+          <div class="brand-banner-row__control-shell" data-vibe-shell>
+            {% if FeatureFlags.get().vibe_enabled and not external_theme_loaded and not dark_mode_active and vibe_button_enabled %}
+              <button id="vibeBtn" class="brand-banner-row__vibe-btn button" type="button" aria-label="Toggle Vibe Theme">
+                <span class="vibe-icon">🎉</span> Vibe
+              </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
     </div>
   {% endif %}
   <script>

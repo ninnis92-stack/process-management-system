@@ -3,7 +3,7 @@ import re
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import FeatureFlags, User
+from app.models import FeatureFlags, User, Department, Tenant, TenantMembership
 
 CARD_URL_RE = re.compile(r'data-nav-url="([^"]+)"')
 
@@ -18,6 +18,12 @@ def _login_admin(client, email="admin-logic@example.com", password="secret"):
 
 def test_admin_command_center_cards_route_to_expected_pages(app, client):
     with app.app_context():
+        # Create required department and tenant
+        dept = Department(code="B", name="Dept B", order=0, is_active=True)
+        db.session.add(dept)
+        tenant = Tenant(slug="default", name="Default Workspace", is_active=True)
+        db.session.add(tenant)
+        db.session.commit()
         admin = User(
             email="admin-logic@example.com",
             password_hash=generate_password_hash("secret"),
@@ -26,6 +32,16 @@ def test_admin_command_center_cards_route_to_expected_pages(app, client):
             is_admin=True,
         )
         db.session.add(admin)
+        db.session.commit()
+        # Add tenant membership for admin
+        tm = TenantMembership(
+            tenant_id=tenant.id,
+            user_id=admin.id,
+            role="admin",
+            is_active=True,
+            is_default=True,
+        )
+        db.session.add(tm)
         db.session.commit()
 
     rv = _login_admin(client)
@@ -126,6 +142,11 @@ def test_admin_navbar_department_switch_updates_session(app, client):
     # Admins should see the navbar dropdown and be able to POST to switch_dept,
     # which persists their active department rather than relying solely on ?as_dept.
     with app.app_context():
+        dept = Department(code="B", name="Dept B", order=0, is_active=True)
+        db.session.add(dept)
+        tenant = Tenant(slug="default", name="Default Workspace", is_active=True)
+        db.session.add(tenant)
+        db.session.commit()
         admin = User(
             email="admin-switch@example.com",
             password_hash=generate_password_hash("secret"),
@@ -134,6 +155,15 @@ def test_admin_navbar_department_switch_updates_session(app, client):
             is_admin=True,
         )
         db.session.add(admin)
+        db.session.commit()
+        tm = TenantMembership(
+            tenant_id=tenant.id,
+            user_id=admin.id,
+            role="admin",
+            is_active=True,
+            is_default=True,
+        )
+        db.session.add(tm)
         db.session.commit()
 
     rv = _login_admin(client, email="admin-switch@example.com")
@@ -154,6 +184,11 @@ def test_admin_navbar_department_switch_updates_session(app, client):
 
 def test_admin_notifications_card_toggles_feature_flag(app, client):
     with app.app_context():
+        dept = Department(code="B", name="Dept B", order=0, is_active=True)
+        db.session.add(dept)
+        tenant = Tenant(slug="default", name="Default Workspace", is_active=True)
+        db.session.add(tenant)
+        db.session.commit()
         admin = User(
             email="admin-toggle@example.com",
             password_hash=generate_password_hash("secret"),
@@ -162,6 +197,15 @@ def test_admin_notifications_card_toggles_feature_flag(app, client):
             is_admin=True,
         )
         db.session.add(admin)
+        db.session.commit()
+        tm = TenantMembership(
+            tenant_id=tenant.id,
+            user_id=admin.id,
+            role="admin",
+            is_active=True,
+            is_default=True,
+        )
+        db.session.add(tm)
         db.session.commit()
 
         flags = FeatureFlags.get()
@@ -190,6 +234,11 @@ def test_admin_notifications_card_toggles_feature_flag(app, client):
 
 def test_admin_can_hide_onboarding_guidance_panel(app, client):
     with app.app_context():
+        dept = Department(code="B", name="Dept B", order=0, is_active=True)
+        db.session.add(dept)
+        tenant = Tenant(slug="default", name="Default Workspace", is_active=True)
+        db.session.add(tenant)
+        db.session.commit()
         admin = User(
             email="admin-no-guide@example.com",
             password_hash=generate_password_hash("secret"),
@@ -199,6 +248,15 @@ def test_admin_can_hide_onboarding_guidance_panel(app, client):
             onboarding_guidance_enabled=False,
         )
         db.session.add(admin)
+        db.session.commit()
+        tm = TenantMembership(
+            tenant_id=tenant.id,
+            user_id=admin.id,
+            role="admin",
+            is_active=True,
+            is_default=True,
+        )
+        db.session.add(tm)
         db.session.commit()
 
     rv = _login_admin(client, email="admin-no-guide@example.com")

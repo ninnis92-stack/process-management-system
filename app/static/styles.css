@@ -1,3 +1,8 @@
+/* Dark mode override for page-header panel backgrounds */
+.dark-mode .page-header {
+  background: var(--surface) !important;
+  color: var(--body-text);
+}
 /* --- Navbar action area: consistent height, spacing, alignment --- */
 .nav-actions {
   display: flex;

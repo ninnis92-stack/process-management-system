@@ -264,7 +264,7 @@
         if(csrf) fd.append('csrf_token', csrf.value);
 
         try{
-          const resp = await fetch('{{ url_for('admin.preview_banner') }}', {
+            const resp = await fetch("{{ url_for('admin.preview_banner') }}", {
             method: 'POST',
             credentials: 'same-origin',
             body: fd,
@@ -305,7 +305,7 @@
         if(csrf) data.append('csrf_token', csrf.value);
 
         try{
-          const resp = await fetch('{{ url_for('admin.site_config_preview') }}', {
+            const resp = await fetch("{{ url_for('admin.site_config_preview') }}", {
             method: 'POST',
             credentials: 'same-origin',
             body: data,

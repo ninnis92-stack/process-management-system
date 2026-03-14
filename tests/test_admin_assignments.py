@@ -2,7 +2,7 @@ import pytest
 from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import DepartmentFormAssignment, FormTemplate, User, UserDepartment
+from app.models import DepartmentFormAssignment, FormTemplate, User, UserDepartment, Department, Tenant, TenantMembership
 
 
 def login_admin(client, email="admin-assign@example.com", password="secret"):
@@ -16,6 +16,11 @@ def login_admin(client, email="admin-assign@example.com", password="secret"):
 def test_department_assignment_crud(app, client):
     # Create an admin user and a template
     with app.app_context():
+        dept = Department(code="B", name="Dept B", order=0, is_active=True)
+        db.session.add(dept)
+        tenant = Tenant(slug="default", name="Default Workspace", is_active=True)
+        db.session.add(tenant)
+        db.session.commit()
         admin = User(
             email="admin-assign@example.com",
             name="Admin Assign",
@@ -25,6 +30,16 @@ def test_department_assignment_crud(app, client):
             department="B",
         )
         db.session.add(admin)
+        db.session.commit()
+        tm = TenantMembership(
+            tenant_id=tenant.id,
+            user_id=admin.id,
+            role="admin",
+            is_active=True,
+            is_default=True,
+        )
+        db.session.add(tm)
+        db.session.commit()
         t = FormTemplate(name="Dept B Template", description="Template for dept B")
         db.session.add(t)
         db.session.commit()

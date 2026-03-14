@@ -1,0 +1,61 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.3.4, pluggy-1.6.0 -- /Users/naheeminnis/Development/process-management-prototype/venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/naheeminnis/Development/process-management-prototype
+configfile: pytest.ini
+collecting ... collected 26 items
+
+tests/test_user_darkmode.py::test_dark_mode_class_added_server_side PASSED
+tests/test_user_darkmode.py::test_admin_dashboard_keeps_dark_mode_and_hides_vibe_controls PASSED
+tests/test_user_darkmode.py::test_dark_mode_not_added_by_default PASSED
+tests/test_user_darkmode.py::test_dashboard_shows_navbar_vibe_button_in_brand_banner DASHBOARD HTML PREVIEW:
+ b"<script>\n    document.addEventListener('DOMContentLoaded', function() {\n      var vibeBtn = document.getElementById('vibeBtn');\n      if (vibeBtn) {\n        vibeBtn.addEventListener('click', function() {\n          var body = document.body;\n          if (body.getAttribute('data-theme') === 'vibe') {\n            body.removeAttribute('data-theme');\n          } else {\n            body.setAttribute('data-theme', 'vibe');\n          }\n        });\n      }\n    });\n  </script>\n<!doctype html>\n<html>\n\n<hea"
+FAILED
+tests/test_user_darkmode.py::test_settings_page_shows_disable_text_when_dark_mode_enabled PASSED
+tests/test_user_darkmode.py::test_settings_page_shows_enable_text_when_dark_mode_disabled PASSED
+tests/test_user_darkmode.py::test_settings_page_shows_vibe_toggle PASSED
+tests/test_user_darkmode.py::test_vibe_button_preference_hides_nav PASSED
+tests/test_user_darkmode.py::test_preferences_autosave_broadcast PASSED
+tests/test_user_darkmode.py::test_workspace_vibe_flag_overrides_user_vibe_button_preference PASSED
+tests/test_user_darkmode.py::test_settings_page_disables_theme_when_vibe_feature_is_off PASSED
+tests/test_user_darkmode.py::test_dashboard_uses_compact_nav_state_when_vibe_and_quotes_are_disabled PASSED
+tests/test_user_darkmode.py::test_user_settings_opt_in_to_session_toggle_persistence PASSED
+tests/test_user_darkmode.py::test_generic_preferences_endpoint_updates_multiple_settings PASSED
+tests/test_user_darkmode.py::test_preferences_endpoint_does_not_change_vibe_when_feature_disabled PASSED
+tests/test_user_darkmode.py::test_vibe_endpoint_rejects_updates_while_dark_mode_enabled PASSED
+tests/test_user_darkmode.py::test_vibe_endpoint_rejects_any_updates_when_dark_mode_enabled PASSED
+tests/test_user_darkmode.py::test_vibe_endpoint_rejects_updates_when_feature_disabled PASSED
+tests/test_user_darkmode.py::test_dark_mode_dashboard_bootstraps_selected_vibe PASSED
+tests/test_user_darkmode.py::test_settings_preview_hides_vibe_button PASSED
+tests/test_user_darkmode.py::test_brand_adoption_keeps_native_dark_mode_with_brand_preset PASSED
+tests/test_user_darkmode.py::test_vibe_endpoint_persists_and_settings_reflect PASSED
+tests/test_user_darkmode.py::test_settings_post_unchecked_dark_mode_disables_preference PASSED
+tests/test_user_darkmode.py::test_settings_post_checked_dark_mode_enables_preference PASSED
+tests/test_user_darkmode.py::test_dark_mode_preference_endpoint_enables_account_wide_setting PASSED
+tests/test_user_darkmode.py::test_dark_mode_preference_endpoint_disables_account_wide_setting PASSED
+
+=================================== FAILURES ===================================
+___________ test_dashboard_shows_navbar_vibe_button_in_brand_banner ____________
+
+client = <FlaskClient <Flask 'app'>>, app = <Flask 'app'>
+
+    def test_dashboard_shows_navbar_vibe_button_in_brand_banner(client, app):
+        make_user(app, dark_mode=False)
+        rv = login(client)
+        assert rv.status_code == 200
+    
+        rv = client.get("/dashboard")
+        assert rv.status_code == 200
+        # Debug: print first 500 bytes of response data
+        print("DASHBOARD HTML PREVIEW:\n", rv.data[:500])
+        cluster = rv.data.split(b'class="brand-cluster"', 1)[1].split(
+            b'<button class="navbar-toggler"', 1
+        )[0]
+>       assert b'class="brand-banner-row"' in rv.data
+E       assert b'class="brand-banner-row"' in b'<script>\n    document.addEventListener(\'DOMContentLoaded\', function() {\n      var vibeBtn = document.getElementById(\'vibeBtn\');\n      if (vibeBtn) {\n        vibeBtn.addEventListener(\'click\', function() {\n          var body = document.body;\n          if (body.getAttribute(\'data-theme\') === \'vibe\') {\n            body.removeAttribute(\'data-theme\');\n          } else {\n            body.setAttribute(\'data-theme\', \'vibe\');\n          }\n        });\n      }\n    });\n  </script>\n<!doctype html>\n<html>\n\n<head>\n  <meta charset="utf-8" />\n  <meta name="viewport" content="width=device-width,initial-scale=1" />\n  <meta name="csrf-token" content="IjZhMDc0MzA0ZDVjNjY1MTUyMWU5Mzc3MmNlNGZjYzMwZjI1YjliZGMi.abWX1w.vSWyv350OmYadwTvyJM8T5aCRPc">\n  <title>FreshProcess</title>\n  <!-- Defensive shim early: avoid uncaught errors when third-party extensions expect a Sortable global -->\n  <script>\n    (function(){\n      try{\n        if(typeof window.Sortable === \'undefined\'){\n          window.Sortable = {\n            create: function(){\n              try{ console.warn(\'Defensive shim: Sortable.create called; providing noop implementation.\'); console.warn(new ...tour</h5>\n        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>\n      </div>\n      <div class="modal-body">\n        <p>Thanks for using this workspace. Here\'s a quick tour of the main areas to help you get started.</p>\n        <ol>\n          <li><strong>Command center:</strong> Use the admin tiles to access integrations, users, and tenant settings.</li>\n          <li><strong>Guest & staff experience:</strong> Open the staff dashboard or guest dashboard from the hero callouts.</li>\n          <li><strong>Integrations:</strong> Provider configs and webhook subscriptions are managed from the Integrations panel.</li>\n        </ol>\n        <p class="small text-muted">This message will be dismissed for your account when you click "Got it".</p>\n      </div>\n      <div class="modal-footer">\n        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Remind me later</button>\n        <button id="onboardingDismissBtn" type="button" class="btn btn-primary">Got it</button>\n      </div>\n    </div>\n  </div>\n</div>\n    <script src="/static/onboarding.js?v=20260310a" defer></script>\n  \n</body>\n</html>'
+E        +  where b'<script>\n    document.addEventListener(\'DOMContentLoaded\', function() {\n      var vibeBtn = document.getElementById(\'vibeBtn\');\n      if (vibeBtn) {\n        vibeBtn.addEventListener(\'click\', function() {\n          var body = document.body;\n          if (body.getAttribute(\'data-theme\') === \'vibe\') {\n            body.removeAttribute(\'data-theme\');\n          } else {\n            body.setAttribute(\'data-theme\', \'vibe\');\n          }\n        });\n      }\n    });\n  </script>\n<!doctype html>\n<html>\n\n<head>\n  <meta charset="utf-8" />\n  <meta name="viewport" content="width=device-width,initial-scale=1" />\n  <meta name="csrf-token" content="IjZhMDc0MzA0ZDVjNjY1MTUyMWU5Mzc3MmNlNGZjYzMwZjI1YjliZGMi.abWX1w.vSWyv350OmYadwTvyJM8T5aCRPc">\n  <title>FreshProcess</title>\n  <!-- Defensive shim early: avoid uncaught errors when third-party extensions expect a Sortable global -->\n  <script>\n    (function(){\n      try{\n        if(typeof window.Sortable === \'undefined\'){\n          window.Sortable = {\n            create: function(){\n              try{ console.warn(\'Defensive shim: Sortable.create called; providing noop implementation.\'); console.warn(new ...tour</h5>\n        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>\n      </div>\n      <div class="modal-body">\n        <p>Thanks for using this workspace. Here\'s a quick tour of the main areas to help you get started.</p>\n        <ol>\n          <li><strong>Command center:</strong> Use the admin tiles to access integrations, users, and tenant settings.</li>\n          <li><strong>Guest & staff experience:</strong> Open the staff dashboard or guest dashboard from the hero callouts.</li>\n          <li><strong>Integrations:</strong> Provider configs and webhook subscriptions are managed from the Integrations panel.</li>\n        </ol>\n        <p class="small text-muted">This message will be dismissed for your account when you click "Got it".</p>\n      </div>\n      <div class="modal-footer">\n        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Remind me later</button>\n        <button id="onboardingDismissBtn" type="button" class="btn btn-primary">Got it</button>\n      </div>\n    </div>\n  </div>\n</div>\n    <script src="/static/onboarding.js?v=20260310a" defer></script>\n  \n</body>\n</html>' = <WrapperTestResponse 30890 bytes [200 OK]>.data
+
+tests/test_user_darkmode.py:90: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_user_darkmode.py::test_dashboard_shows_navbar_vibe_button_in_brand_banner
+========================= 1 failed, 25 passed in 9.67s =========================
