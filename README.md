@@ -663,3 +663,11 @@ to a basic compatible dark treatment.
 ## March 13, 2026
 - Vibe button and quotes are now fully removed from the admin banner when disabled, for a cleaner UI.
 - Deployment, post-deployment script, and documentation update completed.
+## March 2026 Update
+
+- All admin dashboard cards now have improved visibility and contrast in both light and dark modes, matching the clarity of the notifications card.
+- Navbar title and admin UI elements are now highly visible in all themes.
+- Deployment workflow remains unchanged: use `fly deploy` and run `python scripts/release_tasks.py` after deployment.
+- See the **Fly.io Migration Workflow** section above for details.
+
+---
