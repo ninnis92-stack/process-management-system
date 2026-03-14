@@ -1,3 +1,76 @@
+/* --- PATCH: Fully compact hero/banner and quote card on mobile --- */
+@media (max-width: 600px) {
+  .hero-callouts {
+    flex-direction: column !important;
+    padding: 0.4rem 0.12rem !important;
+    border-radius: 10px !important;
+    gap: 0.22rem !important;
+    min-width: 0 !important;
+  }
+  .hero-callouts__intro {
+    min-width: 0 !important;
+    padding: 0 !important;
+    margin-bottom: 0.12rem !important;
+  }
+  .hero-callouts__grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.22rem !important;
+    min-width: 0 !important;
+  }
+  .hero-callout-card {
+    padding: 0.38rem 0.18rem !important;
+    border-radius: 7px !important;
+    gap: 0.18rem !important;
+    min-width: 0 !important;
+    box-shadow: var(--shadow-xs) !important;
+    margin: 0 !important;
+  }
+  .hero-callout-card__title,
+  .hero-callout-card__body,
+  .hero-callout-card__list {
+    font-size: clamp(0.95rem, 3vw, 1.05rem) !important;
+  }
+  .hero-callout-card__badge {
+    font-size: 0.62rem !important;
+  }
+  .hero-callout-card__link {
+    margin-top: 0.18rem !important;
+  }
+}
+/* --- PATCH: Compact hero/banner and quote card on mobile --- */
+@media (max-width: 600px) {
+  .hero-callouts {
+    flex-direction: column !important;
+    padding: 0.55rem 0.3rem !important;
+    border-radius: 12px !important;
+    gap: 0.4rem !important;
+  }
+  .hero-callouts__intro {
+    min-width: 0 !important;
+    padding: 0 !important;
+    margin-bottom: 0.18rem !important;
+  }
+  .hero-callouts__grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.4rem !important;
+    min-width: 0 !important;
+  }
+  .hero-callout-card {
+    padding: 0.55rem 0.4rem !important;
+    border-radius: 10px !important;
+    gap: 0.28rem !important;
+    min-width: 0 !important;
+    box-shadow: var(--shadow-xs) !important;
+  }
+  .hero-callout-card__title,
+  .hero-callout-card__body,
+  .hero-callout-card__list {
+    font-size: clamp(0.98rem, 3vw, 1.08rem) !important;
+  }
+  .hero-callout-card__badge {
+    font-size: 0.68rem !important;
+  }
+}
 @media (max-width: 700px) {
   .brand-cluster {
     flex-direction: column;
@@ -120,6 +193,24 @@
   max-width: 100%;
   overflow-wrap: break-word;
   word-break: break-word;
+}
+
+.admin-tile {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.admin-card .tile-title {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.admin-card .tile-sub {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 /* Prevent vertical text stacking and ensure safe wrapping */
 *, *:before, *:after {
@@ -2204,12 +2295,19 @@ body.no-brand-banner .brand-cluster {
     box-shadow: 0 8px 16px rgba(15, 23, 42, 0.22);
   }
 
-#motivation {
-  display: inline-block;
-  white-space: normal;
-  line-height: 1.32;
+/* --- PATCH START --- */
+#motivation,
+.brand-banner-row__motivation {
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  min-width: 0 !important;
   max-width: 100%;
-  overflow: hidden;
+  display: block;
+  -webkit-box-orient: unset !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  line-height: 1.32;
   pointer-events: auto;
   user-select: none;
   cursor: pointer;
@@ -2218,15 +2316,45 @@ body.no-brand-banner .brand-cluster {
   opacity: 1;
   transition: opacity 0.35s ease, transform 0.35s ease;
   flex: 1 1 auto;
-  min-width: 0;
   width: 100%;
-  overflow-wrap: anywhere;
   text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  line-clamp: 3;
-  -webkit-line-clamp: 3;
 }
+
+/* Remove overflow-wrap: anywhere, which causes letter-by-letter breaks */
+#motivation {
+  overflow-wrap: break-word !important;
+}
+
+/* Make quote area content-driven and compact on mobile */
+@media (max-width: 600px) {
+  .brand-banner-row {
+    min-height: unset !important;
+    padding: 0.12rem 0.25rem !important;
+    gap: 0.3rem !important;
+  }
+  .brand-banner-row__quote-panel {
+    padding: 0.18rem 0.3rem !important;
+    min-width: 0 !important;
+    border-radius: 10px !important;
+  }
+  #motivation,
+  .brand-banner-row__motivation {
+    font-size: clamp(0.85rem, 3vw, 1.05rem) !important;
+    line-height: 1.22 !important;
+    min-height: unset !important;
+    max-height: 3.2em !important;
+    padding: 0.05rem 0 !important;
+  }
+}
+
+/* Ensure all flex/grid wrappers allow children to shrink */
+.brand-banner-row,
+.brand-banner-row__quote-panel,
+.brand-cluster {
+  min-width: 0 !important;
+  flex-shrink: 1 !important;
+}
+/* --- PATCH END --- */
 
 .brand-banner-row--quotes-only #motivation {
   min-height: 0;

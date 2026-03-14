@@ -47,6 +47,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260310c') }}">
   {% if ep.startswith('admin') %}
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_theme.css', v='20260310a') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_theme_mobile_override.css', v='20260314a') }}">
   {% endif %}
   <!-- bundled frontend assets (built by Vite/ES modules) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css', v='20260310a') }}">
