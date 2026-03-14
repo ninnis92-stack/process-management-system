@@ -37,7 +37,16 @@ load_dotenv()
 
 
 def create_app():
+        # Enable Brotli/gzip compression for static assets
+        try:
+            from flask_compress import Compress
+            Compress(app)
+        except ImportError:
+            pass
     app = Flask(__name__)
+    # Set static asset cache headers for /static/dist assets
+    from config import set_cache_headers
+    app.after_request(set_cache_headers)
     app.config.from_object(Config)
     # Allow runtime override of DB URL so tests can monkeypatch env before calling create_app()
     db_url = os.getenv("DATABASE_URL", app.config.get("SQLALCHEMY_DATABASE_URI"))

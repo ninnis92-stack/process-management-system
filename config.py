@@ -1,3 +1,10 @@
+# Add cache headers for static/dist assets
+from flask import request
+
+def set_cache_headers(response):
+    if request.path.startswith('/static/') and 'dist/' in request.path:
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    return response
 import os
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))

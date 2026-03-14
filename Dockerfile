@@ -10,7 +10,8 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN python -m pip install --upgrade pip \
-	&& python -m pip install -r requirements.txt
+	&& python -m pip install -r requirements.txt \
+	&& python -m pip install flask-compress brotli
 
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
 	&& mkdir -p /data/uploads /app/instance \
