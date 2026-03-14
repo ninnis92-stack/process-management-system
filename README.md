@@ -51,12 +51,13 @@ lightweight Stimulus controllers for interactivity.
 **Recent Improvements:**
 
 - Fly.io deployment now fully automated with `flyctl deploy` and post-deployment script (`scripts/release_tasks.py`).
+- Settings and feature flag forms now autosave instantly with no save button; users are clearly informed that all changes are saved automatically.
 - Brand banner and quote area now theme-adaptive, with expanded quote section and current quote set name shown.
 - Admin dashboard, login, and account pages unified under theme/vibe system; theme selection available in settings for all users.
 - Vibe button removed; theme/vibe controls now managed via settings and feature flags.
 - UI polish: card borders, tile-sub color, and quote area all adapt to current theme; minimal mobile spacing and robust desktop layout.
 - Release script handles Alembic migrations and schema safety; manual schema workarounds removed.
-- README updated for deployment workflow, theme system, and UI improvements.
+- README updated for deployment workflow, theme system, autosave, and UI improvements.
 
 This prototype supports structured intake forms, multi-step process flows, and an extensible admin interface. Admins can build custom request templates, configure verification integrations that auto-fill other fields, and declare conditional requirements (per field, section, or upload area). The app runs on Postgres and optionally Redis, and is deployed on Fly.io with health checks and release-time schema safety.
 
