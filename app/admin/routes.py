@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from flask import abort, request as flask_request
 from datetime import datetime, timedelta
 from urllib.parse import unquote
 
@@ -488,7 +489,7 @@ def site_config():
             getattr(cfg, "rolling_quotes_enabled", getattr(cfg, "show_banner", False))
         )
 
-    if flask_request.method == "POST" and flask.request.form.get("import_branding"):
+    if flask_request.method == "POST" and flask_request.form.get("import_branding"):
         if not cfg:
             cfg = SiteConfig()
             db.session.add(cfg)
@@ -553,17 +554,17 @@ def site_config():
         # Support both current field names and legacy payload keys used by tests/UI.
         banner = form.navbar_banner.data
         if not banner:
-            banner = flask.request.form.get("banner_html")
+            banner = flask_request.form.get("banner_html")
 
         # only update rolling_quotes_enabled when the form actually
         # included the corresponding checkbox/key; otherwise we would turn
         # the feature off simply because the admin changed some other field.
         if (
-            "show_banner" in flask.request.form
-            or "rolling_enabled" in flask.request.form
+            "show_banner" in flask_request.form
+            or "rolling_enabled" in flask_request.form
         ):
             rolling_enabled = bool(form.show_banner.data)
-            if "rolling_enabled" in flask.request.form:
+            if "rolling_enabled" in flask_request.form:
                 # legacy flag present means enable regardless of checkbox state
                 rolling_enabled = True
             cfg.rolling_quotes_enabled = rolling_enabled
@@ -572,12 +573,12 @@ def site_config():
         # pasted something into the textarea (or provided the legacy CSV field).
         rolling_input = None
         if (
-            "rolling_quotes" in flask.request.form
-            or "rolling_csv" in flask.request.form
+            "rolling_quotes" in flask_request.form
+            or "rolling_csv" in flask_request.form
         ):
             rolling_input = form.rolling_quotes.data
             if not rolling_input:
-                rolling_input = flask.request.form.get("rolling_csv")
+                rolling_input = flask_request.form.get("rolling_csv")
 
         cfg.brand_name = (form.brand_name.data or "").strip() or None
         cfg.theme_preset = (form.theme_preset.data or "default").strip().lower()
@@ -585,7 +586,7 @@ def site_config():
             cfg.theme_preset = "default"
 
         remove_logo = bool(form.clear_logo.data)
-        uploaded_logo = flask.request.files.get("logo_upload")
+        uploaded_logo = flask_request.files.get("logo_upload")
         if remove_logo:
             cfg.logo_filename = None
         if uploaded_logo and uploaded_logo.filename:
@@ -613,7 +614,7 @@ def site_config():
         # allow admins to set the default advance interval (seconds)
         if hasattr(form, "rolling_quote_interval_default"):
             try:
-                if "rolling_quote_interval_default" in flask.request.form:
+                if "rolling_quote_interval_default" in flask_request.form:
                     cfg.rolling_quote_interval_default = int(
                         form.rolling_quote_interval_default.data or 0
                     )
@@ -627,8 +628,8 @@ def site_config():
             # only update when admin has actually provided non-empty JSON in the
             # textarea; blank submissions (common when changing other settings) should
             # not erase previously configured sets.
-            if "rolling_quote_sets" in flask.request.form:
-                raw = form.rolling_quote_sets.data or flask.request.form.get(
+            if "rolling_quote_sets" in flask_request.form:
+                raw = form.rolling_quote_sets.data or flask_request.form.get(
                     "rolling_quote_sets"
                 )
                 if raw and raw.strip():
@@ -650,10 +651,10 @@ def site_config():
         # handle quote permissions
         try:
             perms = {"departments": {}, "users": {}}
-            raw_dept = form.quote_permissions_dept.data or flask.request.form.get(
+            raw_dept = form.quote_permissions_dept.data or flask_request.form.get(
                 "quote_permissions_dept"
             )
-            raw_user = form.quote_permissions_user.data or flask.request.form.get(
+            raw_user = form.quote_permissions_user.data or flask_request.form.get(
                 "quote_permissions_user"
             )
             if raw_dept:
@@ -695,7 +696,7 @@ def site_config():
             flash("Failed to save site configuration (database error).", "danger")
         return redirect(url_for("admin.site_config"))
 
-    if flask.request.method == "POST" and form.errors:
+    if flask_request.method == "POST" and form.errors:
         for field_errors in form.errors.values():
             for error in field_errors:
                 flash(error, "danger")
@@ -723,22 +724,22 @@ def site_config_preview():
     raw_quotes = None
     try:
         raw_sets = (
-            flask.request.form.get("rolling_quote_sets")
-            or flask.request.json
-            and flask.request.json.get("rolling_quote_sets")
+            flask_request.form.get("rolling_quote_sets")
+            or flask_request.json
+            and flask_request.json.get("rolling_quote_sets")
         )
         raw_quotes = (
-            flask.request.form.get("rolling_csv")
-            or flask.request.form.get("rolling_quotes")
-            or (flask.request.json and flask.request.json.get("rolling_quotes"))
+            flask_request.form.get("rolling_csv")
+            or flask_request.form.get("rolling_quotes")
+            or (flask_request.json and flask_request.json.get("rolling_quotes"))
         )
     except Exception:
         raw_sets = None
         raw_quotes = None
 
     active = (
-        flask.request.form.get("active_quote_set")
-        or (flask.request.json and flask.request.json.get("active_quote_set"))
+        flask_request.form.get("active_quote_set")
+        or (flask_request.json and flask_request.json.get("active_quote_set"))
         or "default"
     )
 
@@ -946,8 +947,8 @@ def preview_banner():
         return jsonify({"error": "access_denied"}), 403
 
     raw = (
-        flask.request.form.get("banner")
-        or flask.request.form.get("navbar_banner")
+        flask_request.form.get("banner")
+        or flask_request.form.get("navbar_banner")
         or ""
     )
     cleaned = _sanitize_banner_html(raw)
@@ -1003,12 +1004,12 @@ def map_submission(submission_id: int):
     except Exception:
         current_app.logger.exception("Failed loading template/fields for mapping UI")
 
-    if flask.request.method == "POST":
+    if flask_request.method == "POST":
         # Expect form keys map__<payload_key> -> field_id or empty
         mapping = {}
         for pk in payload_keys:
             form_key = f"map__{pk}"
-            val = flask.request.form.get(form_key)
+            val = flask_request.form.get(form_key)
             if val:
                 try:
                     fid = int(val)
@@ -1121,8 +1122,8 @@ def edit_template_fields(template_id: int):
         return redirect(url_for("requests.dashboard"))
     t = get_or_404(FormTemplate, template_id)
     # Handle simple bulk update: inputs named field_<id>_label, field_<id>_required
-    if flask.request.method == "POST":
-        update_template_field_settings(t, flask.request.form, db.session)
+    if flask_request.method == "POST":
+        update_template_field_settings(t, flask_request.form, db.session)
         db.session.commit()
         flash("Fields updated.", "success")
         return redirect(url_for("admin.list_templates"))
@@ -1155,7 +1156,7 @@ def edit_field_verification(field_id: int):
         .first()
     )
     form = FieldVerificationForm()
-    if flask.request.method == "GET" and fv:
+    if flask_request.method == "GET" and fv:
         form.provider.data = fv.provider
         form.external_key.data = fv.external_key
         import json
@@ -1278,7 +1279,7 @@ def edit_field_requirements(field_id: int):
     form = FieldRequirementForm()
     current_rules = getattr(f, "requirement_rules", None) or {}
 
-    if flask.request.method == "GET" and isinstance(current_rules, dict):
+    if flask_request.method == "GET" and isinstance(current_rules, dict):
         populate_requirement_form_from_rules(form, current_rules)
 
     if form.validate_on_submit():
@@ -1361,7 +1362,7 @@ def special_email():
     form.request_form_user_id.choices = [(0, "-- None --")] + [
         (u.id, f"{u.email} (Dept {u.department})") for u in sso_users
     ]
-    if flask.request.method == "GET" and cfg:
+    if flask_request.method == "GET" and cfg:
         form.enabled.data = bool(getattr(cfg, "enabled", False))
         form.request_form_email.data = getattr(cfg, "request_form_email", None)
         form.request_form_user_id.data = int(
@@ -1678,7 +1679,8 @@ def feature_flags():
         except Exception:
             pass
         flags = FeatureFlags()
-    form = FeatureFlagsForm()
+    flags = FeatureFlags.get()
+    form = FeatureFlagsForm(obj=flags)
 
     # only process updates on POST; GET requests should fall through to the
     # normal render logic further down.  Autosave requests may arrive as JSON,
@@ -1686,22 +1688,22 @@ def feature_flags():
     # fallback).  We'll treat all of them the same, then reply with JSON if the
     # caller looked like it was AJAX, otherwise perform a redirect so the
     # manual "Save" button still behaves.
-    if flask.request.method == "POST":
+    if flask_request.method == "POST":
         # autosave/JSON requests are marked by the AJAX header inserted by
         # the global fetch wrapper; normal form submissions without that
         # header fall back to the familiar checkbox-coercion logic.
         if (
-            flask.request.headers.get("X-Requested-With") == "XMLHttpRequest"
-            or flask.request.is_json
+            flask_request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            or flask_request.is_json
         ):
             data = {}
-            if flask.request.is_json:
-                data = flask.request.get_json(silent=True) or {}
-            elif flask.request.form:
-                data = flask.request.form.to_dict(flat=True)
+            if flask_request.is_json:
+                data = flask_request.get_json(silent=True) or {}
+            elif flask_request.form:
+                data = flask_request.form.to_dict(flat=True)
             else:
                 # first try to interpret body as JSON
-                raw = flask.request.get_data(as_text=True) or ""
+                raw = flask_request.get_data(as_text=True) or ""
                 try:
                     data = json.loads(raw) if raw else {}
                 except Exception:
@@ -1793,7 +1795,7 @@ def feature_flags():
                 flash("Feature flags updated.", "success")
             return redirect(url_for("admin.feature_flags"))
 
-    if flask.request.method == "GET":
+    if flask_request.method == "GET":
         form.enable_notifications.data = bool(
             getattr(flags, "enable_notifications", True)
         )
@@ -1866,13 +1868,13 @@ def metrics_config():
 
     def build_admin_metrics_explorer_context():
         allowed_depts = ["A", "B", "C"]
-        range_key = (flask.request.args.get("range") or "weekly").lower()
-        selected_dept = (flask.request.args.get("dept") or "").strip().upper()
+        range_key = (flask_request.args.get("range") or "weekly").lower()
+        selected_dept = (flask_request.args.get("dept") or "").strip().upper()
         visible_depts = (
             [selected_dept] if selected_dept in allowed_depts else allowed_depts
         )
-        query = (flask.request.args.get("q") or "").strip()
-        user_filters = flask.request.args.getlist("user")
+        query = (flask_request.args.get("q") or "").strip()
+        user_filters = flask_request.args.getlist("user")
 
         snapshot = build_process_metrics_summary(
             range_key=range_key,
@@ -1950,7 +1952,7 @@ def metrics_config():
         cfg = MetricsConfig()
 
     form = MetricsConfigForm()
-    if flask.request.method == "GET":
+    if flask_request.method == "GET":
         form.enabled.data = bool(getattr(cfg, "enabled", True))
         form.track_request_created.data = bool(
             getattr(cfg, "track_request_created", True)
@@ -2008,11 +2010,11 @@ def metrics_overview():
     from ..services.process_metrics import build_process_metrics_summary
 
     allowed_depts = ["A", "B", "C"]
-    range_key = (flask.request.args.get("range") or "weekly").lower()
-    selected_dept = (flask.request.args.get("dept") or "").strip().upper()
+    range_key = (flask_request.args.get("range") or "weekly").lower()
+    selected_dept = (flask_request.args.get("dept") or "").strip().upper()
     visible_depts = [selected_dept] if selected_dept in allowed_depts else allowed_depts
-    query = (flask.request.args.get("q") or "").strip()
-    user_filters = flask.request.args.getlist("user")
+    query = (flask_request.args.get("q") or "").strip()
+    user_filters = flask_request.args.getlist("user")
 
     snapshot = build_process_metrics_summary(
         range_key=range_key,
@@ -2091,7 +2093,7 @@ def reject_request_config():
     cfg = RejectRequestConfig.get()
     form = RejectRequestConfigForm()
 
-    if flask.request.method == "GET":
+    if flask_request.method == "GET":
         form.enabled.data = bool(getattr(cfg, "enabled", True))
         form.button_label.data = (
             getattr(cfg, "button_label", "Reject Request") or "Reject Request"
@@ -2296,7 +2298,7 @@ def edit_integration(int_id: int):
             form.department.choices = choices
     except Exception:
         pass
-    if flask.request.method == "GET":
+    if flask_request.method == "GET":
         try:
             normalized = normalize_integration_config(ic.kind, ic.config)
             form.config_json.data = json.dumps(normalized, indent=2)
@@ -2546,7 +2548,7 @@ def edit_department(dept_id: int):
         db.session.commit()
         flash("Department updated.", "success")
         return redirect(url_for("admin.list_departments"))
-    if flask.request.method == "GET":
+    if flask_request.method == "GET":
         form.handoff_template_checklist.data = "\n".join(
             getattr(d, "handoff_template_checklist", []) or []
         )

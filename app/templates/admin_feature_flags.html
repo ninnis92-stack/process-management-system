@@ -50,10 +50,12 @@
           </div>
 
           <div class="admin-toggle-card admin-feature-flags__option{% if form.enable_notifications.data %} active{% endif %}">
-            <div class="form-check mb-0">
-              {{ form.enable_notifications(class_='form-check-input', **{'data-toggle-text-checked': 'Notifications enabled', 'data-toggle-text-unchecked': 'Notifications disabled'}) }}
-              <label class="form-check-label" for="{{ form.enable_notifications.id }}">{{ 'Notifications enabled' if form.enable_notifications.data else 'Notifications disabled' }}</label>
-            </div>
+            <form method="post" action="{{ url_for('admin.toggle_notifications') }}">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="enableNotificationsSwitchFlags" name="enable_notifications" value="1" {% if flags.enable_notifications %}checked{% endif %} onchange="this.form.submit()">
+                <label class="form-check-label" for="enableNotificationsSwitchFlags">Enable notifications</label>
+              </div>
+            </form>
             <div class="admin-feature-flags__option-copy">Shows notification affordances and inbox interactions in the main app shell.</div>
           </div>
 

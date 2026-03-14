@@ -19,13 +19,19 @@ def toggle_notifications():
         return redirect(url_for("requests.dashboard"))
 
     flags = FeatureFlags.get()
-    flags.enable_notifications = not bool(flags.enable_notifications)
+    # Support both direct POST (toggle) and checkbox POST (from form)
+    if 'enable_notifications' in flask_request.form:
+        flags.enable_notifications = bool(flask_request.form.get('enable_notifications'))
+    else:
+        flags.enable_notifications = not bool(flags.enable_notifications)
     db.session.commit()
     flash(
         f"Notifications {'enabled' if flags.enable_notifications else 'disabled'}.",
         "success",
     )
-    return redirect(url_for("admin.index"))
+    # Redirect back to referring page if possible
+    ref = flask_request.referrer or url_for("admin.index")
+    return redirect(ref)
 
 
 @admin_bp.route("/notifications_retention", methods=["GET", "POST"])
@@ -94,4 +100,5 @@ def notifications_retention():
         flash("Notification retention updated.", "success")
         return redirect(url_for("admin.notifications_retention"))
 
-    return render_template("admin_notifications_retention.html", form=form, cfg=cfg)
+    flags = FeatureFlags.get()
+    return render_template("admin_notifications_retention.html", form=form, cfg=cfg, flags=flags)

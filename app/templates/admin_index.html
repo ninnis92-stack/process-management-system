@@ -83,7 +83,7 @@
       {{ command_nav_card(url_for('admin.list_users'), 'Users', 'Open account access, roles, and profile controls.', '<i class="fas fa-users"></i>', use_button=True) }}
       {{ command_nav_card(url_for('admin.list_departments'), 'Departments', 'Adjust department rules, labels, and ownership.', '<i class="fas fa-tags"></i>', use_button=True) }}
       {{ command_nav_card(url_for('admin.site_config'), 'Workspace branding', 'Update naming, theme, and shared workspace presentation.', '<i class="fas fa-globe"></i>', use_button=True) }}
-      {{ command_nav_card(url_for('admin.site_config') ~ '#quotes-settings', 'Quotes', 'Manage rotating quote sets and workspace messaging.', '<i class="fas fa-quote-left"></i>', use_button=True) }}
+      {{ command_nav_card(url_for('admin.quotes_config'), 'Quotes', 'Manage rotating quote sets and workspace messaging.', '<i class="fas fa-quote-left"></i>', use_button=True) }}
       {{ command_nav_card(url_for('admin.special_email'), 'Email Forms', 'Configure inbound email intake and routing behavior.', '<i class="fas fa-envelope"></i>', use_button=True) }}
       {{ command_nav_card(url_for('admin.monitor'), 'Monitoring', 'Review live dashboards, activity, and support tooling.', '<i class="fas fa-chart-bar"></i>', use_button=True) }}
     {% endcall %}
@@ -94,9 +94,8 @@
       {{ command_nav_card(url_for('admin.list_buckets'), 'Buckets', 'Organize queue groupings shown on dashboards.', '<i class="fas fa-folder-open"></i>', use_button=True) }}
     {% endcall %}
 
-    {% call command_section('admin-section-utilities', 'Utilities', 'Daily ops & helpers', 'Switch contexts, toggle notifications, or jump into diagnostics.') %}
+    {% call command_section('admin-section-utilities', 'Utilities', 'Daily ops & helpers', 'Switch contexts or jump into diagnostics.') %}
       {{ command_nav_card(url_for('auth.choose_dept'), 'Switch department', 'Change the department context for your current session.', '<i class="fas fa-exchange-alt"></i>') }}
-      {{ command_toggle_card(url_for('admin.toggle_notifications'), flags.enable_notifications, 'Notifications on', 'Notifications off', 'Turn the shared notification feed on or off.', '<i class="fas fa-bell"></i>') }}
       {{ command_nav_card(url_for('admin.notifications_retention'), 'Notification Retention', 'Review retention windows and delivery routing.', '<i class="fas fa-bell"></i>') }}
       {{ command_nav_card(url_for('admin.feature_flags'), 'Flags & integrations', 'Manage feature rollout, connections, and unmapped items.', '🚦') }}
       {{ command_nav_card(url_for('admin.migration_status'), 'Migrations', 'Check schema readiness and migration health.', '🛠️') }}
