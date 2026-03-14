@@ -3,6 +3,7 @@ app = 'process-management-prototype-lingering-bush-6175'
 primary_region = 'sjc'
 
 [build]
+  dockerfile = "Dockerfile"
 
 [env]
   FLASK_DEBUG = "0"

@@ -3,6 +3,7 @@ name: Deploy to Fly
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 env:
   FLY_API_TOKEN_SECRET_NAME: FLY_API_TOKEN
@@ -28,14 +29,13 @@ jobs:
       - name: Run tests
         run: |
           PYTHONPATH=. pytest -q
-      - name: Install flyctl
-        run: |
-          curl -L https://fly.io/install.sh | sh
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@v1.5
       - name: Deploy to Fly
         env:
           FLY_API_TOKEN: ${{ secrets[env.FLY_API_TOKEN_SECRET_NAME] }}
         run: |
-          ~/.fly/bin/flyctl deploy -a process-management-prototype-lingering-bush-6175
+          flyctl deploy --remote-only -a process-management-prototype-lingering-bush-6175
       - name: Run post-deploy smoke checks
         env:
           SMOKE_ADMIN_EMAIL: ${{ secrets[env.PRODUCTION_ADMIN_EMAIL_SECRET_NAME] || 'admin@example.com' }}
