@@ -3,6 +3,7 @@ name: Deploy to Fly
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 env:
   FLY_API_TOKEN_SECRET_NAME: FLY_API_TOKEN
