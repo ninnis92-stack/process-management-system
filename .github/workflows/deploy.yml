@@ -16,7 +16,7 @@ jobs:
     env:
       APP_URL: https://process-management-prototype-lingering-bush-6175.fly.dev
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
