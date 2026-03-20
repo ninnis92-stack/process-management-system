@@ -1,4 +1,4 @@
-/* Remove text wrapping from admin hero callouts, ledes, hints, card headers, pills, section headers */
+/* Admin text elements: allow normal wrapping, prevent horizontal overflow */
 .hero-callout-card__badge,
 .hero-callout-card__title,
 .hero-callout-card__body,
@@ -10,17 +10,15 @@
 .card-header,
 .section-header,
 .section-header-title,
-.section-header-content {
-  white-space: nowrap;
-  overflow-x: auto;
-}
-/* Remove text wrapping from Command Center header and sidebar */
+.section-header-content,
 .admin-sidebar-panel__header,
 .admin-sidebar-panel__eyebrow,
 .admin-sidebar-panel__title,
 .admin-sidebar-panel__lede {
-  white-space: nowrap;
-  overflow-x: auto;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow-x: visible;
 }
 /* Admin responsive theme overrides: simple, high-contrast, mobile-friendly */
 :root{

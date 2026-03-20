@@ -117,10 +117,6 @@ Controls colors across the app
 :root {
   --color-bg: #f6f7fb;
   --color-surface: #ffffff;
-  --color-text: #1f2937;
-  --color-muted: #6b7280;
-  --color-bg: #f6f7fb;
-  --color-surface: #ffffff;
   --color-surface-alt: #f1f3f6;
   --color-text: #1f2937;
   --color-muted: #6b7280;
@@ -132,6 +128,10 @@ Controls colors across the app
   --color-accent-soft: #e0e7ff;
   --color-button-text: #fff;
   --vibe-color: #ff4f81;
+}
+
+/* -----------------------------------------------------
+VIBE THEME OVERRIDES
 Activated when vibe button is toggled
 ----------------------------------------------------- */
 body[data-theme="vibe"] {
@@ -147,7 +147,11 @@ body[data-theme="vibe"] {
   --color-accent-strong: #d72660;
   --color-accent-soft: #ffeaf2;
   --color-button-text: #fff;
-Ensures UI matches the vibe color
+}
+
+/* -----------------------------------------------------
+BASE ELEMENT THEMING
+Ensures UI matches the token system
 ----------------------------------------------------- */
 body {
   background: var(--color-bg);
@@ -205,11 +209,6 @@ a:hover, a:focus {
   color: var(--color-accent-strong);
   text-decoration: underline;
 }
-.accent,
-.highlight,
-.card-title,
-.icon-accent {
-}
 
 button.primary {
   background: var(--color-accent);
@@ -231,6 +230,32 @@ Fixes navbar breaking on phones
 .navbar-center {
   flex: 1;
   min-width: 0;
+}
+
+/* Nav action buttons: consistent height and alignment */
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-actions .btn,
+.nav-actions .dropdown-toggle {
+  height: 36px;
+  min-width: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 6px;
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 700px) {
+  .nav-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
 }
 
 /* -----------------------------------------------------

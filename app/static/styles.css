@@ -1694,44 +1694,34 @@ a:hover, .btn:hover {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.95rem 1rem;
-  .metric-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 0.8rem;
-  }
+}
 
-  .admin-card {
-    transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.12s ease;
-  }
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.8rem;
+}
 
-  /* keep admin-card hierarchy consistent across every tile state */
-  .admin-card .tile-title {
-    color: var(--body-text) !important;
-  }
+.admin-card {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.12s ease;
+  cursor: pointer;
+  position: relative;
+}
 
-  .admin-card .tile-sub {
-    color: var(--body-text-muted) !important;
-  }
+/* keep admin-card hierarchy consistent across every tile state */
+.admin-card .tile-title {
+  color: var(--body-text) !important;
+}
 
-  .admin-card,
-  .admin-grid,
-  .admin-section,
-  .admin-hero,
-  .admin-quicksearch {
-    position: relative;
-  }
+.admin-card .tile-sub {
+  color: var(--body-text-muted) !important;
+}
 
-  /* Make dashboard tiles clearly interactive and accessible */
-  .admin-card
-  .admin-quicksearch {
-    position: relative;
-  }
-
-  /* Make dashboard tiles clearly interactive and accessible */
-  .admin-card
-  {
-    cursor: pointer;
-  }
+.admin-grid,
+.admin-section,
+.admin-hero,
+.admin-quicksearch {
+  position: relative;
 }
 
 html {
