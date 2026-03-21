@@ -34,8 +34,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_theme.css', v='20260310a') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_theme_mobile_override.css', v='20260314a') }}">
   {% endif %}
-  <!-- bundled frontend assets (built by Vite/ES modules) -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='dist/app.css', v='20260310a') }}">
   {% if active_theme_css %}
     <script id="active-theme-css-data" type="application/json">{{ active_theme_css|tojson }}</script>
     <script>
@@ -56,21 +54,13 @@
       })();
     </script>
   {% endif %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260313a') }}">
  </head>
  {% set ep = request.endpoint or '' %}
  {% set public_entry_screen = ep in ['auth.login', 'external.external_new', 'external.external_dashboard'] %}
  {% set guest_dashboard_available = guest_dashboard_enabled|default(True) %}
  {% set guest_submission_available = guest_submission_enabled|default(True) %}
-{# Set global_no_vibe True if both vibe and rolling_quotes are disabled #}
-{% set global_no_vibe = (not FeatureFlags.get().vibe_enabled and not rolling_quotes_enabled) %}
  {% set dark_mode_active = current_user.is_authenticated and (current_user.dark_mode or False) %}
- {% set vibe_button_enabled = (current_user.vibe_button_enabled if current_user.is_authenticated else True) %}
-{% set vibe_ui_enabled = current_user.is_authenticated and not external_theme_loaded and not dark_mode_active and vibe_button_enabled %}
- {% set show_brand_banner = (rolling_quotes_enabled or vibe_ui_enabled) and not public_entry_screen %}
-{# If both vibe and rolling quotes are disabled, always set no_brand_banner True #}
-{% set no_brand_banner = ((not show_brand_banner) and (not public_entry_screen)) or global_no_vibe %}
- <body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if dark_mode_active %} dark-mode{% endif %}{% if global_no_vibe %} no-vibe{% endif %}{% if no_brand_banner %} no-brand-banner{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-endpoint="{{ ep }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if dark_mode_active else '0' }}" data-user-is-admin="{{ '1' if current_user.is_authenticated and current_user.is_admin else '0' }}">
+ <body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if dark_mode_active %} dark-mode{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-endpoint="{{ ep }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if dark_mode_active else '0' }}" data-user-is-admin="{{ '1' if current_user.is_authenticated and current_user.is_admin else '0' }}">
   <a href="#content" class="skip-link">Skip to content</a>
 
   <nav class="navbar navbar-expand-lg theme-nav" aria-label="Main navigation">
@@ -100,11 +90,13 @@
             {% endif %}
           {% endif %}
         {% endif %}
-        {% if guest_dashboard_available %}
-          <li class="nav-item" role="none"><a class="nav-link {{ 'active' if ep.startswith('external.external_dashboard') else '' }}" href="{{ url_for('external.external_dashboard') }}" role="menuitem">Guest Dashboard</a></li>
-        {% endif %}
-        {% if guest_submission_available %}
-          <li class="nav-item" role="none"><a class="nav-link {{ 'active' if ep.startswith('external.external_new') else '' }}" href="{{ url_for('external.external_new') }}" role="menuitem">Guest Submit</a></li>
+        {% if not current_user.is_authenticated %}
+          {% if guest_dashboard_available %}
+            <li class="nav-item" role="none"><a class="nav-link {{ 'active' if ep.startswith('external.external_dashboard') else '' }}" href="{{ url_for('external.external_dashboard') }}" role="menuitem">Guest Dashboard</a></li>
+          {% endif %}
+          {% if guest_submission_available %}
+            <li class="nav-item" role="none"><a class="nav-link {{ 'active' if ep.startswith('external.external_new') else '' }}" href="{{ url_for('external.external_new') }}" role="menuitem">Guest Submit</a></li>
+          {% endif %}
         {% endif %}
       </ul>
 
@@ -117,9 +109,6 @@
               </span>
               <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
             </button>
-          {% endif %}
-          {% if current_user.is_admin %}
-            <button id="toggleNotifBtn" type="button" class="btn btn-outline-light btn-sm" title="Toggle notifications icon" aria-label="Toggle notifications icon" tabindex="0">🔕</button>
           {% endif %}
           {% if current_user.is_admin or user_has_multiple_departments(current_user) %}
             <form method="post" action="{{ url_for('auth.switch_department') }}" class="m-0 d-inline" id="navbar-dept-switch-form" aria-label="Switch department">
@@ -150,16 +139,25 @@
                   <button type="submit" class="dropdown-item account-dropdown-item" role="menuitem">Sign out</button>
                 </form>
               </li>
+              {% if current_user.is_admin %}
+                <li><hr class="dropdown-divider"></li>
+                <li role="none">
+                  <button id="toggleNotifBtn" type="button" class="dropdown-item account-dropdown-item" title="Toggle notifications icon" aria-label="Toggle notifications icon">🔕 Toggle notif icon</button>
+                </li>
+              {% endif %}
+              {% if session.get('impersonate_admin_id') and config.get('ALLOW_IMPERSONATION') %}
+                <li><hr class="dropdown-divider"></li>
+                <li role="none">
+                  <form method="post" action="{{ url_for('admin.stop_impersonation') }}" class="m-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="dropdown-item account-dropdown-item text-warning fw-semibold" role="menuitem">Stop impersonation</button>
+                  </form>
+                </li>
+              {% endif %}
             </ul>
           </div>
           {% if current_user.is_acting_as %}
             <span class="badge bg-warning text-dark">{{ current_user.act_as_label }}</span>
-          {% endif %}
-          {% if session.get('impersonate_admin_id') and config.get('ALLOW_IMPERSONATION') %}
-            <form method="post" action="{{ url_for('admin.stop_impersonation') }}" class="m-0">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-warning btn-sm">Stop Impersonation</button>
-            </form>
           {% endif %}
         {% else %}
           {% if config.SSO_ENABLED %}
@@ -171,56 +169,6 @@
       </div>
     </div>
   </nav>
-
-  {% if current_user.is_authenticated %}
-    <div class="brand-cluster">
-      <div class="brand-banner-row mt-2 mb-3" data-theme-banner>
-        <div class="brand-banner-row__quote-panel">
-          <span id="motivation" class="brand-banner-row__motivation">{% if rolling_quotes_enabled %}{{ rolling_quotes[0] if rolling_quotes else 'Small habits compound into big results.' }}{% endif %}</span>
-        </div>
-        <div class="brand-banner-row__control-panel">
-          <div class="brand-banner-row__control-shell" data-vibe-shell>
-            {% if FeatureFlags.get().vibe_enabled and not external_theme_loaded and not dark_mode_active and vibe_button_enabled %}
-              <button id="vibeBtn" class="brand-banner-row__vibe-btn button" type="button" aria-label="Toggle Vibe Theme">
-                <span class="vibe-icon">🎉</span> Vibe
-              </button>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-  {% endif %}
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const vibeBtn = document.getElementById('vibeBtn');
-      function setTheme(theme, vibeColor) {
-        document.body.setAttribute('data-theme', theme);
-        if (vibeColor) {
-          document.body.style.setProperty('--vibe-color', vibeColor);
-          localStorage.setItem('vibeColor', vibeColor);
-        }
-        localStorage.setItem('theme', theme);
-        vibeBtn.classList.toggle('active', theme === 'vibe');
-      }
-      // Restore theme on load
-      const savedTheme = localStorage.getItem('theme') || 'default';
-      const savedVibeColor = localStorage.getItem('vibeColor') || '#ff4f81';
-      setTheme(savedTheme, savedVibeColor);
-
-      if (vibeBtn) {
-        vibeBtn.addEventListener('click', function() {
-          const currentTheme = document.body.getAttribute('data-theme') || 'default';
-          if (currentTheme === 'vibe') {
-            setTheme('default');
-          } else {
-            setTheme('vibe', savedVibeColor);
-          }
-        });
-      }
-    });
-  </script>
-
-
 
 
 
@@ -266,7 +214,7 @@
     {% endif %}
 
           <div class="page-shell{% if ep.startswith('admin') %} page-shell-admin{% endif %}">
-            {% set onboarding_guidance_enabled = current_user.onboarding_guidance_enabled|default(true) if current_user.is_authenticated else true %}
+            {% set onboarding_guidance_enabled = current_user.onboarding_guidance_enabled|default(false) if current_user.is_authenticated else false %}
             {% set highlight_endpoints = ['requests.dashboard', 'admin.index', 'external.external_dashboard'] %}
             {% if ep in highlight_endpoints and onboarding_guidance_enabled %}
               <section class="hero-callouts" aria-label="Workflow guidance">
@@ -419,218 +367,7 @@
   {% if rolling_quotes_enabled and rolling_quotes %}
   <script id="rolling-quotes-data" type="application/json" defer>{{ rolling_quotes|tojson }}</script>
   {% endif %}
-  <script type="module" src="{{ url_for('static', filename='dist/app.js', v='20260308c') }}" defer></script>
   <script src="{{ url_for('static', filename='app.js', v='20260310c') }}" defer></script>
-  <script>
-    (function(){
-      try{
-        const isDarkUser = document.body.getAttribute('data-user-dark-mode') === '1';
-        document.body.classList.toggle('dark-mode', isDarkUser);
-      }catch(e){}
-    })();
-  </script>
-  <script>
-    (function(){
-      try{
-        const loggedIn = document.body.getAttribute('data-user-logged-in') === '1';
-        const active = (document.body.getAttribute('data-active-dept') || '').trim();
-        const isAdmin = document.body.getAttribute('data-user-is-admin') === '1';
-        const navbarDept = document.getElementById('navbarDeptSelect');
-        // do not bother prompting admins or anyone who already has a
-        // department dropdown in the navbar; the selector is sufficient and
-        // the modal would just be noisy (especially on phones).
-        if (!loggedIn || active || isAdmin || navbarDept) return;
-        fetch('/auth/departments').then(r => r.json()).then(j => {
-          const depts = j && j.departments ? j.departments : [];
-          if (depts.length <= 1) return;
-          const sel = document.getElementById('chooseDeptSelect');
-          if (!sel) return;
-          sel.innerHTML = '';
-          depts.forEach(d => {
-            const opt = document.createElement('option');
-            opt.value = d; opt.textContent = d;
-            sel.appendChild(opt);
-          });
-          const modalEl = document.getElementById('chooseDeptModal');
-          if (!modalEl) return;
-          const modal = new bootstrap.Modal(modalEl);
-          modal.show();
-          // ensure backdrop doesn't stick around indefinitely
-          modalEl.addEventListener('hidden.bs.modal', () => {
-            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-          });
-          // auto-close if user takes no action in 8 seconds
-          setTimeout(() => {
-            if (modalEl.classList.contains('show')) {
-              try { modal.hide(); } catch(e){}
-            }
-          }, 8000);
-        });
-      } catch(e){}
-    })();
-
-    function copyTextFromString(text, btn) {
-      try {
-        navigator.clipboard.writeText(String(text));
-        var orig = btn.innerText;
-        btn.innerText = 'Copied';
-        setTimeout(() => btn.innerText = orig, 1500);
-      } catch (e) {
-        console.warn('Copy failed', e);
-      }
-    }
-  </script>
-  <!-- cleanup any stray backdrops that might linger from unfinished modals/offcanvas or page-cache restores -->
-  <script>
-    function removeAllBackdrops(){
-      document.querySelectorAll('.modal-backdrop, .offcanvas-backdrop').forEach(el => el.remove());
-      document.body.classList.remove('modal-open');
-    }
-    document.addEventListener('DOMContentLoaded', removeAllBackdrops);
-    // also catch bfcache/forward-back navigation where DOM is restored
-    window.addEventListener('pageshow', function(evt){
-      if(evt.persisted) removeAllBackdrops();
-      else removeAllBackdrops();
-    });
-  </script>
-  <style>
-    /* if a backdrop somehow sneaks in before JS runs, hide it via CSS
-       to avoid the grey mask lingering during page load or history restore */
-    .modal-backdrop,
-    .offcanvas-backdrop {
-      display: none !important;
-    }
-  </style>
-  <script>
-    (function(){
-      const toggle = document.getElementById('toggleNotifBtn');
-      const notif = document.getElementById('notifBtn');
-      const key = 'admin_notif_visible';
-      function applyPref() {
-        try {
-          const v = localStorage.getItem(key);
-          if (v === 'false') {
-            if (notif) notif.style.display = 'none';
-          } else {
-            if (notif) notif.style.display = '';
-          }
-        } catch (e){}
-      }
-      if (toggle) {
-        toggle.addEventListener('click', function(){
-          try {
-            const curr = localStorage.getItem(key);
-            const next = (curr === 'false') ? 'true' : 'false';
-            localStorage.setItem(key, next);
-          } catch(e){}
-          applyPref();
-        });
-        applyPref();
-      }
-    })();
-  </script>
-  <!-- shim moved to head to be available earlier in page load -->
-  <script>
-    (function(){
-      const input = document.getElementById('adminQuickSearch');
-      const cards = Array.from(document.querySelectorAll('.admin-card'));
-      const sections = Array.from(document.querySelectorAll('[data-admin-section]'));
-      const clearBtn = document.getElementById('adminQuickSearchClear');
-      const status = document.getElementById('adminQuickSearchStatus');
-      const emptyState = document.getElementById('adminSearchEmptyState');
-      if (cards.length) {
-        cards.forEach(card => {
-          card.style.cursor = 'pointer';
-          // always drive navigation from `data-nav-url` when available; falls back
-          // to the href attribute as a last resort.
-          const href = card.getAttribute('data-nav-url') || card.getAttribute('href');
-          if (href && card.tagName === 'A' && card.getAttribute('href') !== href) {
-            card.setAttribute('href', href);
-          }
-          if (card.tagName !== 'BUTTON' && !card.hasAttribute('tabindex')) {
-            card.setAttribute('tabindex', '0');
-          }
-          card.addEventListener('click', function(ev){
-            try {
-              ev.preventDefault();
-              if (href) window.location.assign(href);
-            } catch (e) {}
-          });
-          card.addEventListener('keydown', function(ev){
-            try {
-              if (ev.key !== 'Enter' && ev.key !== ' ') return;
-              if (!href) return;
-              ev.preventDefault();
-              window.location.assign(href);
-            } catch (e) {}
-          });
-        });
-      }
-      function syncSections(){
-        let visibleCards = 0;
-        sections.forEach(section => {
-          const sectionCards = Array.from(section.querySelectorAll('.admin-card'));
-          const visibleInSection = sectionCards.filter(card => !card.classList.contains('hidden-by-filter')).length;
-          section.hidden = visibleInSection === 0;
-          visibleCards += visibleInSection;
-        });
-        if (emptyState) emptyState.hidden = visibleCards !== 0;
-        return visibleCards;
-      }
-      function resetFilterState(){
-        cards.forEach(c => c.classList.remove('hidden-by-filter'));
-        sections.forEach(section => { section.hidden = false; });
-        if (clearBtn) clearBtn.hidden = true;
-        if (status) status.textContent = 'Filters as you type. Sections collapse automatically when nothing matches.';
-        if (emptyState) emptyState.hidden = true;
-      }
-      if (clearBtn && input) {
-        clearBtn.addEventListener('click', function(){
-          input.value = '';
-          resetFilterState();
-          input.focus();
-        });
-      }
-      if (!input) return;
-      input.addEventListener('input', function(){
-        const q = (input.value || '').trim().toLowerCase();
-        if (!q) {
-          resetFilterState();
-          return;
-        }
-        cards.forEach(c => {
-          const text = (c.textContent || '').toLowerCase();
-          if (text.indexOf(q) === -1) c.classList.add('hidden-by-filter'); else c.classList.remove('hidden-by-filter');
-        });
-        const visibleCards = syncSections();
-        if (clearBtn) clearBtn.hidden = false;
-        if (status) {
-          status.textContent = visibleCards
-            ? 'Showing ' + visibleCards + ' matching command-center card' + (visibleCards === 1 ? '' : 's') + '.'
-            : 'No command-center cards matched that search.';
-        }
-      });
-      resetFilterState();
-    })();
-  </script>
-  <!-- dynamic toggle labels -->
-  <script>
-    document.querySelectorAll('.form-check-input[data-toggle-text-checked]').forEach(cb=>{
-      var form = cb.closest('.form-check');
-      var card = cb.closest('.admin-toggle-card');
-      var lbl = form && form.querySelector('.form-check-label');
-      if (lbl == null) return;
-      var checkedLabel = cb.dataset.toggleTextChecked;
-      var uncheckedLabel = cb.dataset.toggleTextUnchecked;
-      var upd = ()=> {
-        lbl.textContent = cb.checked ? checkedLabel : uncheckedLabel;
-        form.classList.toggle('active', cb.checked);
-        if (card) card.classList.toggle('active', cb.checked);
-      };
-      cb.addEventListener('change', upd);
-      upd();
-    });
-  </script>
   <!-- autosave/session-persistence logic now ships from frontend/js/modules/autosave.js via Vite -->
   {% if ep.startswith('admin') %}
     <script src="{{ url_for('static', filename='admin_helpers.js', v='20260310a') }}"></script>

@@ -1304,3 +1304,75 @@ window.addEventListener('storage', (ev) => {
     try { location.reload(); } catch (e) { /* ignore */ }
   }
 });
+// ---------------------------------------------------------------------------
+// Extracted from base.html – global utility functions
+// ---------------------------------------------------------------------------
+
+// Dark mode sync: reads data-user-dark-mode from body and toggles dark-mode
+// class. Runs immediately (not in DOMContentLoaded) to avoid flash of
+// un-themed content.
+(function(){
+  try{
+    var isDarkUser = document.body.getAttribute('data-user-dark-mode') === '1';
+    document.body.classList.toggle('dark-mode', isDarkUser);
+  }catch(e){}
+})();
+
+// copyTextFromString is called from onclick attributes so must be global.
+window.copyTextFromString = function(text, btn) {
+  try {
+    navigator.clipboard.writeText(String(text));
+    var orig = btn.innerText;
+    btn.innerText = 'Copied';
+    setTimeout(function(){ btn.innerText = orig; }, 1500);
+  } catch (e) {
+    console.warn('Copy failed', e);
+  }
+};
+
+// removeAllBackdrops cleans up stray Bootstrap modal/offcanvas backdrops that
+// can linger after navigation or bfcache restores.
+function removeAllBackdrops(){
+  document.querySelectorAll('.modal-backdrop, .offcanvas-backdrop').forEach(function(el){ el.remove(); });
+  document.body.classList.remove('modal-open');
+}
+document.addEventListener('DOMContentLoaded', removeAllBackdrops);
+window.addEventListener('pageshow', function(evt){
+  removeAllBackdrops();
+});
+
+// Dept chooser modal: fetches /auth/departments and shows Bootstrap modal for
+// authenticated multi-dept users who haven't selected a dept yet.
+document.addEventListener('DOMContentLoaded', function(){
+  try{
+    var loggedIn = document.body.getAttribute('data-user-logged-in') === '1';
+    var active = (document.body.getAttribute('data-active-dept') || '').trim();
+    var isAdmin = document.body.getAttribute('data-user-is-admin') === '1';
+    var navbarDept = document.getElementById('navbarDeptSelect');
+    if (!loggedIn || active || isAdmin || navbarDept) return;
+    fetch('/auth/departments').then(function(r){ return r.json(); }).then(function(j){
+      var depts = j && j.departments ? j.departments : [];
+      if (depts.length <= 1) return;
+      var sel = document.getElementById('chooseDeptSelect');
+      if (!sel) return;
+      sel.innerHTML = '';
+      depts.forEach(function(d){
+        var opt = document.createElement('option');
+        opt.value = d; opt.textContent = d;
+        sel.appendChild(opt);
+      });
+      var modalEl = document.getElementById('chooseDeptModal');
+      if (!modalEl) return;
+      var modal = new bootstrap.Modal(modalEl);
+      modal.show();
+      modalEl.addEventListener('hidden.bs.modal', function(){
+        document.querySelectorAll('.modal-backdrop').forEach(function(el){ el.remove(); });
+      });
+      setTimeout(function(){
+        if (modalEl.classList.contains('show')) {
+          try { modal.hide(); } catch(e){}
+        }
+      }, 8000);
+    });
+  } catch(e){}
+});

@@ -3556,3 +3556,11 @@ a:hover { color: var(--accent-2); }
 .dark-mode .alert :is(a, strong, .btn-link, .alert-heading) {
   color: inherit !important;
 }
+
+/* Prevent stray Bootstrap modal backdrops from blocking the UI.
+   The JS removeAllBackdrops() cleans these up on load/navigation,
+   but this CSS ensures they are hidden even before JS runs. */
+.modal-backdrop,
+.offcanvas-backdrop {
+  display: none !important;
+}

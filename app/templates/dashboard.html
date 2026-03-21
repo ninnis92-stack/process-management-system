@@ -305,6 +305,30 @@
   {% endfor %}
 
 {% elif mode == "C" %}
+  <section class="surface-panel dashboard-launchpad mb-3">
+    <div class="dashboard-launchpad__intro">
+      <div>
+        <div class="dashboard-launchpad__eyebrow">Workspace overview</div>
+        <h4 class="mb-1">Review approvals with a clear signoff path</h4>
+        <p class="text-muted mb-0">Focus on the next review, the items waiting on other approvers, and the requests ready to hand back.</p>
+      </div>
+      <div class="dashboard-launchpad__stats">
+        <div class="dashboard-stat-card">
+          <span class="dashboard-stat-card__label">In queue</span>
+          <strong class="dashboard-stat-card__value">{{ requests|length if requests else 0 }}</strong>
+        </div>
+        <div class="dashboard-stat-card">
+          <span class="dashboard-stat-card__label">Saved views</span>
+          <strong class="dashboard-stat-card__value">{{ saved_views|length if saved_views else 0 }}</strong>
+        </div>
+        <div class="dashboard-stat-card">
+          <span class="dashboard-stat-card__label">Approval cards</span>
+          <strong class="dashboard-stat-card__value">{{ approval_cards|length if approval_cards else 0 }}</strong>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="surface-panel section-intro mb-3">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <div>
@@ -315,17 +339,24 @@
     </div>
   </section>
 
-  <div class="list-group surface-panel list-surface">
+  <div class="row g-3">
     {% for r in requests or [] %}
-      <a class="list-group-item list-group-item-action text-reset" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
-        <div class="d-flex justify-content-between">
-          <strong>#{{ r.id }} · {{ r.title }}</strong>
-          <span class="badge text-bg-secondary">{{ r.status }}</span>
-        </div>
-        <small class="text-muted">{{ r.pricebook_display }} · {{ r.priority }} · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}</small>
-      </a>
+      <div class="col-md-6">
+        <a class="card h-100 text-reset card-link-wrap request-summary-card" href="{{ url_for('requests.request_detail', request_id=r.id) }}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <div>
+                <div class="small text-muted">#{{ r.id }}</div>
+                <div class="fw-semibold">{{ r.title }}</div>
+              </div>
+              <span class="badge text-bg-secondary">{{ r.status }}</span>
+            </div>
+            <div class="small text-muted request-summary-meta">{{ r.pricebook_display }} · {{ r.priority }} · Due: {{ r.due_at.strftime("%b %d, %Y %I:%M %p") if r.due_at else "—" }}</div>
+          </div>
+        </a>
+      </div>
     {% else %}
-      <div class="empty-state">No pending items right now. New approvals will appear here when they need review.</div>
+      <div class="col-12"><div class="empty-state">No pending items right now. New approvals will appear here when they need review.</div></div>
     {% endfor %}
   </div>
 {% endif %}
