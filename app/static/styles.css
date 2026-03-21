@@ -3560,6 +3560,55 @@ a:hover { color: var(--accent-2); }
 /* Prevent stray Bootstrap modal backdrops from blocking the UI.
    The JS removeAllBackdrops() cleans these up on load/navigation,
    but this CSS ensures they are hidden even before JS runs. */
+/* Fix: admin-hero mobile collapse.
+   The grid definition at line ~2880 comes after the @media (max-width: 640px) block
+   at line ~1357, so equal-specificity rules at 2880 override the media query.
+   Repeat the collapse rule here, after the grid definition, so it wins. */
+@media (max-width: 767px) {
+  .admin-hero {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    text-align: center;
+  }
+
+  /* Remove the "reserve 240px for stats" constraint — stats stack below in single-column mode */
+  .admin-hero__content {
+    max-width: 100%;
+    align-items: center;
+  }
+
+  .admin-hero__actions,
+  .ui-action-bar,
+  .ui-action-group {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .admin-hero__stats {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+  }
+
+  .hero-metric {
+    flex: 1 1 auto;
+    min-width: 120px;
+    text-align: center;
+  }
+
+  /* Command rail pills: allow wrapping on small screens */
+  .admin-command-rail__actions {
+    flex-wrap: wrap;
+  }
+
+  .admin-command-pill {
+    flex: 1 1 auto;
+    justify-content: center;
+    text-align: center;
+  }
+}
+
 /* Fix: btn-outline-light is invisible on light (surface-panel) backgrounds.
    Admin hero and command rail sit on white/near-white surfaces in light mode,
    so light-colored buttons need to adopt readable dark styling. */
