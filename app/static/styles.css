@@ -410,7 +410,7 @@ body {
 .navbar__title {
   font-size: var(--font-header);
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--nav-text) !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -648,7 +648,7 @@ body {
 .navbar__title {
   font-size: var(--font-header);
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--nav-text) !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3560,6 +3560,29 @@ a:hover { color: var(--accent-2); }
 /* Prevent stray Bootstrap modal backdrops from blocking the UI.
    The JS removeAllBackdrops() cleans these up on load/navigation,
    but this CSS ensures they are hidden even before JS runs. */
+/* Fix: btn-outline-light is invisible on light (surface-panel) backgrounds.
+   Admin hero and command rail sit on white/near-white surfaces in light mode,
+   so light-colored buttons need to adopt readable dark styling. */
+.admin-hero .btn-outline-light,
+.admin-command-rail .btn-outline-light {
+  color: var(--body-text);
+  border-color: var(--border-strong);
+  background: transparent;
+}
+.admin-hero .btn-outline-light:hover,
+.admin-hero .btn-outline-light:focus-visible,
+.admin-command-rail .btn-outline-light:hover,
+.admin-command-rail .btn-outline-light:focus-visible {
+  color: var(--body-text);
+  background: var(--surface-accent);
+  border-color: var(--border-strong);
+}
+
+/* Also fix admin-command-pill text contrast on light surfaces */
+.admin-command-pill {
+  color: var(--body-text) !important;
+}
+
 .modal-backdrop,
 .offcanvas-backdrop {
   display: none !important;
