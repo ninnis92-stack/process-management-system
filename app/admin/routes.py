@@ -701,7 +701,8 @@ def site_config():
             for error in field_errors:
                 flash(error, "danger")
 
-    return render_template("admin_site_config.html", form=form, cfg=cfg)
+    flags = FeatureFlags.get()
+    return render_template("admin_site_config.html", form=form, cfg=cfg, flags=flags)
 
 
 @admin_bp.route("/quotes", methods=["GET"])

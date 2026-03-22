@@ -632,70 +632,29 @@ window.addEventListener('storage', (ev) => {
 });
 
 (function initNotifications() {
-  const btn = document.getElementById("notifBtn");
-  const dd = document.getElementById("notifDropdown");
-  const list = document.getElementById("notifList");
-  const pageList = document.getElementById("notificationsList");
   const badge = document.getElementById("notifBadge");
-  const momentum = document.getElementById("notifMomentum");
+  const dot = document.getElementById("notifDot");
+  const pageList = document.getElementById("notificationsList");
 
-  function setActive(hasUnread) {
-    btn.classList.toggle("notif-active", !!hasUnread);
-  }
+  if (!badge && !dot) return;
 
   async function refreshCount() {
     try {
       const r = await fetch("/notifications/unread_count");
       if (!r.ok) {
-        badge.style.display = "none";
-        if (momentum) momentum.textContent = "Unable to fetch notifications.";
-        setActive(false);
+        if (badge) badge.style.display = "none";
+        if (dot) dot.style.display = "none";
         return;
       }
       const data = await r.json();
       if (data.count > 0) {
-        badge.style.display = "inline-block";
-        badge.textContent = data.count;
-        if (momentum) momentum.textContent = `Momentum: ${data.count} to review`;
-        setActive(true);
+        if (badge) { badge.style.display = "inline-block"; badge.textContent = data.count; }
+        if (dot) dot.style.display = "inline-block";
       } else {
-        badge.style.display = "none";
-        if (momentum) momentum.textContent = "Momentum: Clear for now";
-        setActive(false);
+        if (badge) badge.style.display = "none";
+        if (dot) dot.style.display = "none";
       }
-    } catch (e) {
-      list.innerHTML = "<div class='text-muted'>Unable to load notifications right now.</div>";
-    }
-  }
-
-  async function loadLatest() {
-    list.innerHTML = "<div class='text-muted'>Loading…</div>";
-    try {
-      const r = await fetch("/notifications/latest");
-      if (!r.ok) {
-        try {
-          const txt = await r.text();
-          console.warn('notifications/latest non-ok response', r.status, txt);
-        } catch (e) { /* ignore */ }
-        list.innerHTML = "<div class='text-muted'>Unable to load notifications right now.</div>";
-        return;
-      }
-      const items = await r.json();
-      list.innerHTML = items.map(n => `
-        <div class="border rounded p-2 mb-2 notif-item ${n.is_read ? "opacity-75" : ""}" data-id="${n.id}" data-url="${n.url || ''}">
-          <div><strong>${n.title}</strong></div>
-          ${n.body ? `<div>${n.body}</div>` : ""}
-          ${n.url ? `<div class="small text-primary">Open</div>` : ""}
-        </div>
-      `).join("") || "<div class='text-muted'>No notifications.</div>";
-      // add link to full page at bottom
-      const viewAll = document.createElement('div');
-      viewAll.className = 'text-end mt-2';
-      viewAll.innerHTML = '<a href="/notifications/view">View all notifications</a>';
-      list.appendChild(viewAll);
-    } catch (e) {
-      list.innerHTML = "<div class='text-muted'>Unable to load notifications right now.</div>";
-    }
+    } catch (e) {}
   }
 
   function attachNotificationItemHandler(container) {
@@ -711,7 +670,6 @@ window.addEventListener('storage', (ev) => {
     });
   }
 
-  attachNotificationItemHandler(list);
   attachNotificationItemHandler(pageList);
 
   // if a full-page mark-all button exists, hook it up
@@ -720,40 +678,14 @@ window.addEventListener('storage', (ev) => {
     markAllBtn.addEventListener("click", async () => {
       try {
         await fetch('/notifications/mark_all_read', { method: 'POST' });
-        // visually mark items as read
         document.querySelectorAll('.notif-item').forEach(i => i.classList.add('opacity-75'));
         if (badge) badge.style.display = 'none';
+        if (dot) dot.style.display = 'none';
       } catch (e) {
         console.warn('mark all read failed', e);
       }
     });
   }
-
-  if (!btn || !dd || !list || !badge) return;
-
-  btn.addEventListener("click", async () => {
-    const willOpen = !dd.classList.contains("open");
-    dd.classList.toggle("open", willOpen);
-    btn.classList.toggle("open", willOpen);
-    if (willOpen) {
-      await loadLatest();
-      // Mark all as read when the user clicks to check their notifications
-      try{
-        await fetch('/notifications/mark_all_read', { method: 'POST' });
-        badge.style.display = 'none';
-        setActive(false);
-      }catch(e){ console.warn('mark_all_read failed', e); }
-      // Refresh server count in background
-      await refreshCount();
-    }
-  });
-
-  document.addEventListener("click", (ev) => {
-    if (!dd.contains(ev.target) && !btn.contains(ev.target)) {
-      dd.classList.remove("open");
-      btn.classList.remove("open");
-    }
-  });
 
   refreshCount();
   setInterval(refreshCount, 30000);
@@ -1257,17 +1189,6 @@ window.addEventListener('storage', (ev) => {
   }
 });
 
-// when user preferences change they may hide/show the vibe button; reflect
-// that immediately in any tab and reload others.
-document.addEventListener('DOMContentLoaded', () => {
-  const vibeToggle = document.querySelector('input[name="vibe_button_enabled"]');
-  if (vibeToggle) {
-    vibeToggle.addEventListener('change', () => {
-      const preview = document.getElementById('settingsVibePreview');
-      if (preview) preview.hidden = !vibeToggle.checked;
-    });
-  }
-});
 
 (function initPresence(){
   const el = document.getElementById('presenceList');

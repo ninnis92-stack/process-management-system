@@ -2,10 +2,6 @@
 {% from 'admin/_macros.html' import command_section, command_nav_card, command_toggle_card %}
 
 {% block content %}
-    <!-- Offcanvas sidebar toggle for mobile -->
-    <button class="btn btn-outline-primary d-block d-md-none mb-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar" aria-controls="adminSidebar">
-      <i class="fas fa-bars me-2"></i> Menu
-    </button>
   <section class="admin-hero surface-panel">
     <div class="admin-hero__content">
       <p class="eyebrow-label">Command center</p>
@@ -15,16 +11,8 @@
         <div class="ui-action-group">
           <a class="btn btn-sm btn-primary" href="{{ url_for('admin.monitor') }}">Open live monitor</a>
           <a class="btn btn-sm btn-outline-light" href="{{ url_for('admin.feature_flags') }}">Explore feature flags</a>
-          {% if FeatureFlags.get().vibe_enabled and not current_user.dark_mode %}
-            <div class="ui-control-shell ui-control-shell--compact" data-vibe-shell>
-              <button id="vibeBtnAdmin" data-vibe-trigger="admin" type="button" class="btn btn-sm btn-outline-light">Vibe · <span class="vibeLabel">—</span></button>
-            </div>
-          {% endif %}
         </div>
         <div class="ui-action-group ui-action-group--meta">
-          {% if current_user.dark_mode %}
-            <div class="ui-action-note ui-action-note--warning">Vibe controls are disabled while dark mode is active.</div>
-          {% endif %}
           {% if not FeatureFlags.get().enable_notifications %}
             <div class="ui-action-note ui-action-note--warning">Notifications off</div>
           {% endif %}
@@ -103,15 +91,7 @@
 
     {% call command_section('admin-section-utilities', 'Utilities', 'Daily ops & helpers', 'Switch contexts or jump into diagnostics.') %}
       {{ command_nav_card(url_for('auth.choose_dept'), 'Switch department', 'Change the department context for your current session.', '<i class="fas fa-exchange-alt"></i>') }}
-      {{ command_toggle_card(
-        url_for('admin.toggle_notifications'),
-        FeatureFlags.get().enable_notifications,
-        'Notifications on',
-        'Notifications off',
-        'Review retention windows and delivery routing.',
-        '<i class="fas fa-bell"></i>'
-      ) }}
-      {{ command_nav_card('#', 'Notification Retention', 'Configure notification retention policies.', '<i class="fas fa-history"></i>') }}
+      {{ command_nav_card(url_for('admin.notifications_retention'), 'Notifications', 'Enable or disable in-app alerts and configure retention windows per user.', '<i class="fas fa-bell"></i>') }}
       {{ command_nav_card(url_for('admin.feature_flags'), 'Flags & integrations', 'Manage feature rollout, connections, and unmapped items.', '🚦') }}
       {{ command_nav_card(url_for('admin.migration_status'), 'Migrations', 'Check schema readiness and migration health.', '🛠️') }}
       {{ command_nav_card(url_for('admin.debug_workspace'), 'Debug workspace', 'Open diagnostics, helper tools, and troubleshooting views.', '🧰') }}

@@ -29,7 +29,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" integrity="sha512-p1Cm0QlW0FQvgw+Vxv0+H5a6uVgnF6V5u0Y2dd4AozqA3BsnF7mk/WvJL3Z8zUuNX1U4MZT+O2e2d3dH+pvGVHg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <!-- bump version after latest CSS changes to force clients to fetch new stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260310c') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v='20260321a') }}">
   {% if ep.startswith('admin') %}
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_theme.css', v='20260310a') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_theme_mobile_override.css', v='20260314a') }}">
@@ -63,7 +63,7 @@
  <body class="{% block body_class %}theme-body top-nav-layout{% endblock %}{% if dark_mode_active %} dark-mode{% endif %} theme-preset-{{ site_theme_preset or 'default' }}{% if active_theme_css %} external-theme{% endif %}" data-endpoint="{{ ep }}" data-user-logged-in="{{ '1' if current_user.is_authenticated else '0' }}" data-user-vibe="{{ (current_user.vibe_index or 0) if current_user.is_authenticated else '' }}" data-active-dept="{{ session.get('active_dept','') }}" data-user-dark-mode="{{ '1' if dark_mode_active else '0' }}" data-user-is-admin="{{ '1' if current_user.is_authenticated and current_user.is_admin else '0' }}">
   <a href="#content" class="skip-link">Skip to content</a>
 
-  <nav class="navbar navbar-expand-lg theme-nav" aria-label="Main navigation">
+  <nav class="navbar navbar-expand-lg navbar-dark theme-nav" aria-label="Main navigation">
     <a class="navbar-brand navbar__brand" href="{{ brand_href }}"{% if company_url %} target="_blank" rel="noopener"{% endif %}>
       {% if theme_logo_url %}
         <img src="{{ theme_logo_url }}" alt="FreshProcess logo" class="navbar__logo" />
@@ -102,14 +102,6 @@
 
       <div class="d-flex align-items-center nav-actions gap-2" aria-label="User actions">
         {% if current_user.is_authenticated %}
-          {% if not current_user.is_admin %}
-            <button id="notifBtn" class="btn btn-outline-light btn-sm position-relative notif-btn" type="button" aria-label="Open notifications panel" tabindex="0">
-              <span class="notif-ico" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7v3.3l-.9 1.8A1 1 0 0 0 5 16h14a1 1 0 0 0 .9-1.9L19 12.3V9a7 7 0 0 0-7-7Zm0 20a3 3 0 0 0 2.82-2H9.18A3 3 0 0 0 12 22Z"/></svg>
-              </span>
-              <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
-            </button>
-          {% endif %}
           {% if current_user.is_admin or user_has_multiple_departments(current_user) %}
             <form method="post" action="{{ url_for('auth.switch_department') }}" class="m-0 d-inline" id="navbar-dept-switch-form" aria-label="Switch department">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -121,8 +113,11 @@
             </form>
           {% endif %}
           <div class="dropdown">
-            <button type="button" class="btn btn-outline-light btn-sm d-flex align-items-center dropdown-toggle" id="accountMenuBtn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Open account menu" data-user-name="{{ current_user.name or '' }}" data-user-email="{{ current_user.email or '' }}" data-sso-sub="{{ current_user.sso_sub or '' }}">
+            <button type="button" class="btn btn-outline-light btn-sm d-flex align-items-center dropdown-toggle position-relative" id="accountMenuBtn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Open account menu" data-user-name="{{ current_user.name or '' }}" data-user-email="{{ current_user.email or '' }}" data-sso-sub="{{ current_user.sso_sub or '' }}">
               <img src="{{ avatar_url_for(current_user, size=34) }}" alt="Account avatar" class="avatar avatar-sm me-2" />
+              {% if not current_user.is_admin %}
+              <span id="notifDot" class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" style="display:none; width:10px; height:10px;" aria-label="Unread notifications"></span>
+              {% endif %}
               <span class="visually-hidden">Account</span>
             </button>
             <ul class="dropdown-menu dropdown-menu-end account-dropdown-menu" aria-labelledby="accountMenuBtn" role="menu">
@@ -131,6 +126,15 @@
                 <div class="fw-bold">{{ current_user.email }}</div>
                 <div class="small text-muted mt-1">{{ department_labels.get(current_user.department, 'Dept ' ~ current_user.department) }}</div>
               </li>
+              {% if not current_user.is_admin %}
+              <li><hr class="dropdown-divider"></li>
+              <li role="none">
+                <a class="dropdown-item account-dropdown-item d-flex justify-content-between align-items-center" href="{{ url_for('notifications.view_all') }}" role="menuitem">
+                  Notifications
+                  <span id="notifBadge" class="badge rounded-pill bg-danger ms-2" style="display:none;">0</span>
+                </a>
+              </li>
+              {% endif %}
               <li><hr class="dropdown-divider"></li>
               <li role="none"><a class="dropdown-item account-dropdown-item" href="{{ url_for('auth.settings') }}" role="menuitem">Account settings</a></li>
               <li role="none">
@@ -175,10 +179,6 @@
   {% if session.get('impersonate_admin_id') and config.get('ALLOW_IMPERSONATION') %}
     <div class="impersonation-banner text-dark">
       <div class="container d-flex justify-content-between align-items-center py-2">
-      <!-- Minimal, safe quote/theme indicator -->
-      <div class="theme-indicator text-center py-1" style="background: #f8fafc; color: #334155; font-size: 0.95rem; border-bottom: 1px solid #e2e8f0;">
-        {{ initial_quote or 'Keep work moving with shared context.' }}
-      </div>
         <div>
           You (<strong>{{ current_user.email }}</strong>) are acting as <strong>{{ department_labels.get(session.get('impersonate_dept'), 'Dept ' ~ session.get('impersonate_dept')) }}</strong>
         </div>
@@ -192,26 +192,14 @@
     </div>
   {% endif %}
 
-  {% if current_user.is_authenticated %}
-    <div id="notifDropdown" class="notif-dropdown card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <strong>Notifications</strong>
-        <small id="notifMomentum" class="text-muted">Momentum: —</small>
-      </div>
-      <div class="card-body">
-        <div id="notifList"></div>
-      </div>
-    </div>
+  {# Desktop-only rotating quote bar #}
+  {% if current_user.is_authenticated and (current_user.quotes_enabled is not defined or current_user.quotes_enabled) %}
+  <div class="d-none d-lg-flex quote-bar container-fluid px-4 py-1 align-items-center gap-2">
+    <span id="motivation" class="quote-bar__text"></span>
+  </div>
   {% endif %}
 
-  <main id="content" class="main container my-4" role="main" tabindex="-1">
-    {% if ep.startswith('admin') %}
-      <div class="row g-4 admin-layout">
-        <div class="col-md-3 col-lg-2 d-none d-md-block">
-          {% include 'admin/_sidebar.html' %}
-        </div>
-        <div class="col-md-9 col-lg-10">
-    {% endif %}
+  <main id="content" class="main container mt-2 mb-4 mt-lg-4" role="main" tabindex="-1">
 
           <div class="page-shell{% if ep.startswith('admin') %} page-shell-admin{% endif %}">
             {% set onboarding_guidance_enabled = current_user.onboarding_guidance_enabled|default(false) if current_user.is_authenticated else false %}
@@ -278,8 +266,7 @@
 
 
           {% with messages = get_flashed_messages(with_categories=true) %}
-            <div id="globalVibeFeedback" class="alert alert-warning vibe-feedback d-none" role="status" aria-live="polite"></div>
-            {% if messages %}
+{% if messages %}
               <div class="flash-stack">
                 {% for category, message in messages %}
                   <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
@@ -331,10 +318,6 @@
 
       </div>
 
-    {% if ep.startswith('admin') %}
-        </div>
-      </div>
-    {% endif %}
   </main>
 
   {% if current_user.is_authenticated and not current_user.is_admin and user_has_multiple_departments(current_user) %}

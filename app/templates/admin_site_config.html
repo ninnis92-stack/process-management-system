@@ -1,39 +1,16 @@
 {% extends "base.html" %}
+{% from 'admin/_macros.html' import page_header %}
 
 {% block content %}
-  <style>
-    .site-config-layout { display:grid; grid-template-columns: minmax(0, 1fr); gap:1rem; }
-    @media (min-width: 992px) {
-      .site-config-layout { grid-template-columns: 260px minmax(0, 1fr); align-items:start; }
-    }
-    .site-config-nav { position:sticky; top:1rem; }
-    .site-config-card { border:1px solid rgba(0,0,0,.08); box-shadow:0 0.25rem 1rem rgba(0,0,0,.04); }
-    .site-config-card .card-header { background:#f8f9fa; }
-    .site-config-help code, .site-config-help pre { font-size:.85rem; }
-    .site-config-preview-box { min-height:84px; background:#f8f9fa; border:1px dashed rgba(0,0,0,.12); border-radius:.5rem; padding:.75rem; }
-    .theme-preset-swatches { display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:.75rem; margin-top:.85rem; }
-    .theme-preset-card { border:1px solid rgba(0,0,0,.08); border-radius:.85rem; padding:.75rem; background:rgba(255,255,255,.75); }
-    .theme-preset-card__bar { height:14px; border-radius:999px; margin-bottom:.55rem; }
-    .theme-preset-card__name { font-weight:600; font-size:.92rem; }
-    .theme-preset-card__meta { font-size:.78rem; color:#64748b; }
-  </style>
-
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <div>
-      <h2 class="mb-1">Site Configuration</h2>
-      <p class="text-muted mb-0">Update branding, banner text, and rotating quotes without editing raw app code.</p>
-    </div>
-    <a class="btn btn-sm btn-outline-secondary admin-back-btn" href="{{ url_for('admin.index') }}">← Admin dashboard</a>
-  </div>
+  {{ page_header('Site Configuration', eyebrow='Administration', lede='Update branding, theme, and rotating messages without editing code.') }}
 
   <div class="site-config-layout">
     <aside class="site-config-nav">
-      <div class="card site-config-card">
+      <div class="card surface-panel site-config-card">
         <div class="card-header fw-semibold">Quick jump</div>
         <div class="list-group list-group-flush">
-          <a class="list-group-item list-group-item-action" href="#branding-settings">Branding</a>
-          <a class="list-group-item list-group-item-action" href="#banner-settings">Banner</a>
-          <a class="list-group-item list-group-item-action" href="#quotes-settings">Quotes</a>
+          <a class="list-group-item list-group-item-action" href="#branding-settings">Branding &amp; theme</a>
+          <a class="list-group-item list-group-item-action" href="#quotes-settings">Rotating messages</a>
         </div>
       </div>
     </aside>
@@ -41,69 +18,62 @@
     <form method="post" enctype="multipart/form-data">
       {{ form.hidden_tag() }}
 
-      <section class="card site-config-card mb-3" id="branding-settings">
+      {# ── Branding & theme ── #}
+      <section class="card surface-panel site-config-card mb-4" id="branding-settings">
         <div class="card-header">
-          <h5 class="mb-1">Branding</h5>
-          <div class="small text-muted">Set the name, theme, and logo shown across the app.</div>
+          <h5 class="mb-1">Branding &amp; theme</h5>
+          <div class="small text-muted">Set the workspace name, logo, and colour palette.</div>
         </div>
         <div class="card-body">
-          <div class="row g-3">
-            <div class="col-12">
-              <div class="p-3 rounded border bg-light-subtle">
-                <div class="fw-semibold mb-1">Import branding safely</div>
-                <div class="small text-muted mb-3">Pull in the homepage URL, detected brand name, nearest built-in theme preset, and a locally stored logo without importing external HTML, CSS, or JavaScript.</div>
-                <div class="row g-2 align-items-end">
-                  <div class="col-lg-8">
-                    {{ form.import_url.label(class_='form-label') }}
-                    {{ form.import_url(class_='form-control', placeholder='https://example.com') }}
-                    <div class="form-text">Only trusted branding fields are imported so app workflows and layouts stay intact.</div>
-                  </div>
-                  <div class="col-lg-4 d-grid">
-                    {{ form.import_branding(class_='btn btn-outline-primary') }}
-                  </div>
-                </div>
+
+          {# Import helper #}
+          <div class="p-3 rounded border bg-light-subtle mb-4">
+            <div class="fw-semibold mb-1">Import branding</div>
+            <div class="small text-muted mb-3">Pull brand name, theme preset, and logo from a URL — no HTML, CSS, or scripts imported.</div>
+            <div class="row g-2 align-items-end">
+              <div class="col-lg-8">
+                {{ form.import_url.label(class_='form-label') }}
+                {{ form.import_url(class_='form-control', placeholder='https://example.com') }}
+              </div>
+              <div class="col-lg-4 d-grid">
+                {{ form.import_branding(class_='btn btn-outline-secondary') }}
               </div>
             </div>
+          </div>
+
+          <div class="row g-3">
             <div class="col-md-6">
               {{ form.brand_name.label(class_='form-label') }}
-              {{ form.brand_name(class_='form-control', placeholder='Your Company Name') }}
+              {{ form.brand_name(class_='form-control', placeholder='Your workspace name') }}
             </div>
+
             <div class="col-md-6">
-              {{ form.theme_preset.label(class_='form-label') }}
-              {{ form.theme_preset(class_='form-select') }}
-              <div class="form-text">Choose a preset theme for internal branding.</div>
-              <div class="theme-preset-swatches" data-theme-preview-grid>
-                <div class="theme-preset-card">
-                  <div class="theme-preset-card__bar" style="background:linear-gradient(90deg,#4f8cff,#8b5cf6);"></div>
-                  <div class="theme-preset-card__name">Default</div>
-                  <div class="theme-preset-card__meta">Blue / violet brand baseline</div>
-                </div>
-                <div class="theme-preset-card">
-                  <div class="theme-preset-card__bar" style="background:linear-gradient(90deg,#3ec1d3,#7ad7f0);"></div>
-                  <div class="theme-preset-card__name">Sky</div>
-                  <div class="theme-preset-card__meta">Cool cyan with airy contrast</div>
-                </div>
-                <div class="theme-preset-card">
-                  <div class="theme-preset-card__bar" style="background:linear-gradient(90deg,#7bc96f,#b6d7a8);"></div>
-                  <div class="theme-preset-card__name">Moss</div>
-                  <div class="theme-preset-card__meta">Natural green operational theme</div>
-                </div>
-                <div class="theme-preset-card">
-                  <div class="theme-preset-card__bar" style="background:linear-gradient(90deg,#ff8a5b,#ffb26b);"></div>
-                  <div class="theme-preset-card__name">Dawn</div>
-                  <div class="theme-preset-card__meta">Warm orange for energetic branding</div>
-                </div>
-                <div class="theme-preset-card">
-                  <div class="theme-preset-card__bar" style="background:linear-gradient(90deg,#8ea7ff,#7a5cff);"></div>
-                  <div class="theme-preset-card__name">Twilight</div>
-                  <div class="theme-preset-card__meta">Deeper indigo for darker identity</div>
-                </div>
+              <label class="form-label">Theme preset</label>
+              {{ form.theme_preset(class_='form-select mb-2', id='themePresetSelect') }}
+              <div class="theme-preset-swatches" id="themeSwatches">
+                {% set presets = [
+                  ('default',  'linear-gradient(90deg,#4f8cff,#8b5cf6)', 'Default',  'Blue / violet baseline'),
+                  ('sky',      'linear-gradient(90deg,#3ec1d3,#7ad7f0)', 'Sky',      'Cool cyan, airy contrast'),
+                  ('moss',     'linear-gradient(90deg,#7bc96f,#b6d7a8)', 'Moss',     'Natural green'),
+                  ('dawn',     'linear-gradient(90deg,#ff8a5b,#ffb26b)', 'Dawn',     'Warm orange'),
+                  ('twilight', 'linear-gradient(90deg,#8ea7ff,#7a5cff)', 'Twilight', 'Deep indigo'),
+                ] %}
+                {% for value, grad, name, meta in presets %}
+                  <button type="button"
+                    class="theme-preset-card {% if form.theme_preset.data == value %}theme-preset-card--active{% endif %}"
+                    data-preset="{{ value }}">
+                    <div class="theme-preset-card__bar" style="background:{{ grad }};"></div>
+                    <div class="theme-preset-card__name">{{ name }}</div>
+                    <div class="theme-preset-card__meta">{{ meta }}</div>
+                  </button>
+                {% endfor %}
               </div>
             </div>
+
             <div class="col-md-8">
               {{ form.logo_upload.label(class_='form-label') }}
               {{ form.logo_upload(class_='form-control') }}
-              <div class="form-text">Supported formats: png, jpg, jpeg, webp, svg.</div>
+              <div class="form-text">png, jpg, jpeg, webp, svg supported.</div>
               {% if cfg and cfg.logo_filename %}
                 <div class="mt-2 d-flex align-items-center gap-2">
                   <img src="{{ url_for('static', filename=cfg.logo_filename) }}" alt="Current logo" style="height:40px;" />
@@ -118,207 +88,141 @@
               </div>
             </div>
           </div>
+
         </div>
       </section>
 
-      <section class="card site-config-card mb-3" id="banner-settings">
-        <div class="card-header">
-          <h5 class="mb-1">Navbar banner</h5>
-          <div class="small text-muted">Short text shown in the top bar. Keep it short and readable.</div>
-        </div>
-        <div class="card-body">
-          <div class="mb-3">
-            {{ form.navbar_banner.label(class_='form-label') }}
-            {{ form.navbar_banner(class_='form-control', placeholder='Example: Welcome to the Acme workflow hub') }}
-            <div class="form-text">Plain text works best. Avoid pasting code or long scripts here.</div>
+      {# ── Rotating messages ── #}
+      <section class="card surface-panel site-config-card mb-4" id="quotes-settings">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1">Rotating messages</h5>
+            <div class="small text-muted">Short lines shown across the app to keep momentum. One per line.</div>
           </div>
-          <div class="form-check mb-3">
-            {{ form.show_banner(class_='form-check-input') }}
-            {{ form.show_banner.label(class_='form-check-label') }}
-          </div>
-          <div class="d-flex flex-wrap gap-2">
-            <button id="preview-banner-btn" type="button" class="btn btn-sm btn-outline-primary">Preview banner</button>
-          </div>
-        </div>
-      </section>
-
-      <section class="card site-config-card mb-3" id="quotes-settings">
-        <div class="card-header">
-          <h5 class="mb-1">Rotating messages</h5>
-          <div class="small text-muted">Use one quote per line for the default set. Advanced named sets are optional, and teams can keep the workspace neutral by leaving these simple.</div>
+          {# Toggle co-located with content #}
+          <form method="post" action="{{ url_for('admin.toggle_rolling_quotes') }}" class="m-0">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm {{ 'btn-primary' if flags.rolling_quotes_enabled else 'btn-outline-secondary' }}">
+              {{ 'Messages on' if flags.rolling_quotes_enabled else 'Messages off' }}
+            </button>
+          </form>
         </div>
         <div class="card-body">
           <div class="row g-3">
             <div class="col-lg-7">
               {{ form.rolling_quotes.label(class_='form-label') }}
               {{ form.rolling_quotes(class_='form-control', rows=8, placeholder='Small wins create momentum.&#10;Progress, not perfection.&#10;One request at a time.') }}
-              <div class="form-text">Each line becomes one quote in the default rotation. Use 30 quotes max and keep each quote to 160 characters or fewer.</div>
+              <div class="form-text">One quote per line. Max 30 quotes, 160 characters each.</div>
             </div>
-            <div class="col-lg-5 site-config-help">
+            <div class="col-lg-5">
               <label class="form-label">Quick example</label>
               <div class="site-config-preview-box small">
                 Small wins create momentum.<br>
                 Progress, not perfection.<br>
                 One request at a time.
               </div>
+              <div class="mt-3">
+                <button id="preview-quotes-btn" type="button" class="btn btn-sm btn-outline-secondary w-100">Preview quotes</button>
+              </div>
             </div>
             <div class="col-12">
               <details>
-                <summary class="fw-semibold mb-2">Advanced: named quote sets</summary>
-                <div class="mt-3">
-                  <div class="mb-3">
+                <summary class="fw-semibold mb-2 text-muted small">Advanced: named quote sets</summary>
+                <div class="mt-3 row g-3">
+                  <div class="col-md-6">
                     {{ form.active_quote_set.label(class_='form-label') }}
                     {{ form.active_quote_set(class_='form-select') }}
-                    <div class="form-text">Choose which named set is active. Defaults to <strong>default</strong>.</div>
+                    <div class="form-text">Which named set is active. Defaults to <strong>default</strong>.</div>
                   </div>
-                  <div class="mb-3">
+                  <div class="col-12">
                     {{ form.rolling_quote_sets.label(class_='form-label') }}
-                    {{ form.rolling_quote_sets(class_='form-control', rows=8, placeholder='{"default": ["Small wins create momentum."], "motivational": ["Progress, not perfection.", "Your attitude determines your direction."]}') }}
-                    <div class="form-text">Optional JSON map of quote groups for advanced setups. Each set can contain up to 30 quotes and each quote must stay within 160 characters.</div>
+                    {{ form.rolling_quote_sets(class_='form-control', rows=6, placeholder='{"default": ["Small wins create momentum."], "motivational": ["Progress, not perfection."]}') }}
+                    <div class="form-text">JSON map of named quote groups. Each group: up to 30 quotes, 160 chars each.</div>
                   </div>
-                  <div class="mb-3">
+                  <div class="col-md-6">
                     {{ form.quote_permissions_dept.label(class_='form-label') }}
-                    {{ form.quote_permissions_dept(class_='form-control', rows=4, placeholder='{"A": ["default", "engineering"], "B": ["coffee-humour"]}') }}
-                    <div class="form-text">JSON object mapping department codes to allowed quote sets. Leave empty for no restriction.</div>
+                    {{ form.quote_permissions_dept(class_='form-control', rows=3, placeholder='{"A": ["default", "engineering"]}') }}
+                    <div class="form-text">Map department codes to allowed quote sets.</div>
                   </div>
-                  <div class="mb-3">
+                  <div class="col-md-6">
                     {{ form.quote_permissions_user.label(class_='form-label') }}
-                    {{ form.quote_permissions_user(class_='form-control', rows=4, placeholder='{"user@example.com": ["productivity"]}') }}
-                    <div class="form-text">JSON object mapping user emails to allowed quote sets. Specific users override department restrictions, while admins always retain access to every quote set.</div>
+                    {{ form.quote_permissions_user(class_='form-control', rows=3, placeholder='{"user@example.com": ["productivity"]}') }}
+                    <div class="form-text">Per-user overrides. Admins always see all sets.</div>
                   </div>
                 </div>
               </details>
             </div>
           </div>
-          <div class="d-flex flex-wrap gap-2 mt-3">
-            <button id="preview-quotes-btn" type="button" class="btn btn-outline-secondary">Preview quotes</button>
-          </div>
         </div>
       </section>
 
       <div class="d-flex flex-wrap gap-2">
-        <button class="btn btn-primary">Save site settings</button>
+        <button class="btn btn-primary">Save settings</button>
         <a class="btn btn-outline-secondary" href="{{ url_for('admin.index') }}">Cancel</a>
       </div>
     </form>
   </div>
 
-  <!-- Preview Modal -->
-  <div class="modal fade" id="bannerPreviewModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Banner Preview — Original vs Cleaned</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row">
-            <div class="col-md-6">
-              <h6>Original (raw)</h6>
-              <div id="banner-preview-original" class="border p-2" style="min-height:120px;white-space:pre-wrap;overflow:auto;background:#f8f9fa;"></div>
-            </div>
-            <div class="col-md-6">
-              <h6>Cleaned (sanitized)</h6>
-              <div id="banner-preview-cleaned" class="border p-2" style="min-height:120px;overflow:auto;background:#fff;"></div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Quotes Preview Modal -->
+  {# Quotes Preview Modal #}
   <div class="modal fade" id="quotesPreviewModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Rolling Quotes Preview</h5>
+          <h5 class="modal-title">Rotating Messages Preview</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <div id="quotes-preview-info" class="mb-2 text-muted"></div>
-          <ul id="quotes-preview-list" class="list-group"></ul>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <div id="quotes-preview-info" class="mb-2 text-muted small"></div>
+          <ul id="quotes-preview-list" class="list-group list-group-flush"></ul>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    (function(){
-      const btn = document.getElementById('preview-banner-btn');
-      if(!btn) return;
-      btn.addEventListener('click', async function(){
-        // find the textarea/input for navbar_banner
-        const field = document.querySelector('[name="navbar_banner"]') || document.querySelector('[name="banner_html"]');
-        const val = field ? field.value : '';
-        const fd = new FormData();
-        fd.append('banner', val);
-        // include CSRF token if present
-        const csrf = document.querySelector('input[name="csrf_token"]');
-        if(csrf) fd.append('csrf_token', csrf.value);
+    // Make theme swatches interactive — click sets the select value
+    (function () {
+      const select = document.getElementById('themePresetSelect');
+      const swatches = document.querySelectorAll('#themeSwatches .theme-preset-card');
+      if (!select || !swatches.length) return;
 
-        try{
-            const resp = await fetch("{{ url_for('admin.preview_banner') }}", {
-            method: 'POST',
-            credentials: 'same-origin',
-            body: fd,
-            headers: {
-              'X-Requested-With': 'XMLHttpRequest'
-            }
-          });
-          if(!resp.ok) throw new Error('Preview request failed');
-          const j = await resp.json();
-          const origEl = document.getElementById('banner-preview-original');
-          const cleanEl = document.getElementById('banner-preview-cleaned');
-          origEl.textContent = j.original || val || '';
-          // inject cleaned HTML into preview pane (already sanitized server-side)
-          cleanEl.innerHTML = j.cleaned || '';
-          // show bootstrap modal
-          const modalEl = document.getElementById('bannerPreviewModal');
-          if(modalEl){
-            const modal = new bootstrap.Modal(modalEl);
-            modal.show();
-          }
-        }catch(e){
-          alert('Failed to preview banner: '+(e&&e.message?e.message:e));
-        }
+      function syncActive(val) {
+        swatches.forEach(s => s.classList.toggle('theme-preset-card--active', s.dataset.preset === val));
+      }
+
+      swatches.forEach(card => {
+        card.addEventListener('click', () => {
+          select.value = card.dataset.preset;
+          syncActive(card.dataset.preset);
+        });
       });
+
+      select.addEventListener('change', () => syncActive(select.value));
     })();
-    (function(){
+
+    // Quotes preview
+    (function () {
       const btn = document.getElementById('preview-quotes-btn');
-      if(!btn) return;
-      btn.addEventListener('click', async function(){
+      if (!btn) return;
+      btn.addEventListener('click', async function () {
+        const data = new FormData();
+        const defaultQ = document.querySelector('[name="rolling_quotes"]');
         const setsField = document.querySelector('[name="rolling_quote_sets"]');
         const activeField = document.querySelector('[name="active_quote_set"]');
-        const data = new FormData();
-        const defaultQuotesField = document.querySelector('[name="rolling_quotes"]');
-        if(defaultQuotesField && defaultQuotesField.value) data.append('rolling_csv', defaultQuotesField.value);
-        if(setsField && setsField.value) data.append('rolling_quote_sets', setsField.value);
-        if(activeField && activeField.value) data.append('active_quote_set', activeField.value);
         const csrf = document.querySelector('input[name="csrf_token"]');
-        if(csrf) data.append('csrf_token', csrf.value);
-
-        try{
-            const resp = await fetch("{{ url_for('admin.site_config_preview') }}", {
-            method: 'POST',
-            credentials: 'same-origin',
-            body: data,
+        if (defaultQ && defaultQ.value) data.append('rolling_csv', defaultQ.value);
+        if (setsField && setsField.value) data.append('rolling_quote_sets', setsField.value);
+        if (activeField && activeField.value) data.append('active_quote_set', activeField.value);
+        if (csrf) data.append('csrf_token', csrf.value);
+        try {
+          const resp = await fetch("{{ url_for('admin.site_config_preview') }}", {
+            method: 'POST', credentials: 'same-origin', body: data,
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
           });
           const j = await resp.json();
-          if(!resp.ok){
-            alert('Preview error: '+(j && j.message? j.message : JSON.stringify(j)));
-            return;
-          }
-          const info = document.getElementById('quotes-preview-info');
+          if (!resp.ok) { alert('Preview error: ' + (j.message || JSON.stringify(j))); return; }
+          document.getElementById('quotes-preview-info').textContent = `Active set: ${j.active} — ${j.count} quote(s)`;
           const list = document.getElementById('quotes-preview-list');
-          info.textContent = `Active set: ${j.active} — ${j.count} quote(s)`;
           list.innerHTML = '';
           (j.sample || []).forEach(s => {
             const li = document.createElement('li');
@@ -326,13 +230,9 @@
             li.textContent = s;
             list.appendChild(li);
           });
-          const modalEl = document.getElementById('quotesPreviewModal');
-          if(modalEl){
-            const modal = new bootstrap.Modal(modalEl);
-            modal.show();
-          }
-        }catch(e){
-          alert('Failed to preview quotes: '+(e && e.message? e.message : e));
+          new bootstrap.Modal(document.getElementById('quotesPreviewModal')).show();
+        } catch (e) {
+          alert('Failed to preview quotes: ' + (e && e.message ? e.message : e));
         }
       });
     })();

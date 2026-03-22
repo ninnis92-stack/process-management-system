@@ -34,6 +34,28 @@ def toggle_notifications():
     return redirect(ref)
 
 
+@admin_bp.route("/toggle_rolling_quotes", methods=["POST"])
+@login_required
+def toggle_rolling_quotes():
+    """Flip the rolling quotes enabled flag."""
+    if not _is_admin_user():
+        flash("Access denied.", "danger")
+        return redirect(url_for("requests.dashboard"))
+    flags = FeatureFlags.get()
+    if 'rolling_quotes_enabled' in flask_request.form:
+        flags.rolling_quotes_enabled = bool(flask_request.form.get('rolling_quotes_enabled'))
+    else:
+        flags.rolling_quotes_enabled = not bool(flags.rolling_quotes_enabled)
+    db.session.commit()
+    flash(
+        f"Rotating messages {'enabled' if flags.rolling_quotes_enabled else 'disabled'}.",
+        "success",
+    )
+    ref = flask_request.referrer or url_for("admin.site_config")
+    return redirect(ref)
+
+
+
 @admin_bp.route("/notifications_retention", methods=["GET", "POST"])
 @login_required
 def notifications_retention():

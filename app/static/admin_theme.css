@@ -48,7 +48,7 @@ body{ font-family: Poppins, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helve
 
 /* Admin dashboard grid and tiles */
 .admin-dashboard-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; align-items:stretch; }
-.admin-tile{ display:block; text-decoration:none; color:var(--admin-text); background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02)); border-radius:10px; padding:12px; min-height:100px; transition:transform .08s ease, box-shadow .08s ease; border:1px solid rgba(255,255,255,0.03); }
+.admin-tile{ display:block; text-decoration:none; color:var(--admin-text); background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02)); border-radius:10px; padding:12px; min-height:100px; transition:transform .08s ease, box-shadow .08s ease; border:1px solid rgba(255,255,255,0.03); text-align:center; }
 .admin-tile:hover, .admin-tile:focus{ transform:translateY(-3px); box-shadow:0 6px 18px rgba(0,0,0,0.12); }
 .admin-tile .tile-ico{ font-size:1.4rem; margin-bottom:6px; }
 .admin-tile .tile-title{ font-weight:700; font-size:1rem; margin-bottom:4px; }

@@ -191,31 +191,36 @@
 .surface-panel {
   min-width: 0;
   max-width: 100%;
-  overflow-wrap: break-word;
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .admin-tile {
   white-space: normal;
-  word-break: break-word;
-  overflow-wrap: break-word;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 .admin-card .tile-title {
   white-space: normal;
-  word-break: break-word;
-  overflow-wrap: break-word;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 .admin-card .tile-sub {
   white-space: normal;
-  word-break: break-word;
-  overflow-wrap: break-word;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 /* Prevent vertical text stacking and ensure safe wrapping */
 *, *:before, *:after {
-  min-width: 0;
   box-sizing: border-box;
+}
+
+/* Buttons and labels should never break mid-word */
+.btn, label, .nav-link, .badge, .eyebrow-label {
+  white-space: nowrap;
+  word-break: normal;
 }
 
 h1, h2, h3, h4, h5, h6,
@@ -387,7 +392,7 @@ body {
   padding: var(--space-md) var(--space-lg);
   background: var(--color-accent);
   color: var(--color-text);
-  border-radius: var(--radius-lg);
+  border-radius: 0;
   box-shadow: var(--shadow-md);
   font-family: var(--font-family);
 }
@@ -625,7 +630,7 @@ body {
   padding: var(--space-md) var(--space-lg);
   background: var(--color-accent);
   color: var(--color-text);
-  border-radius: var(--radius-lg);
+  border-radius: 0;
   box-shadow: var(--shadow-md);
   font-family: var(--font-family);
 }
@@ -1124,13 +1129,13 @@ body {
   color: #e0e6f6;
 }
 
-a, .btn {
-  color: #fff;
+a {
+  color: var(--accent, #3f8cff);
   text-decoration: none;
 }
 
-a:hover, .btn:hover {
-  color: #3f8cff;
+a:hover {
+  color: var(--accent, #3f8cff);
 }
 
 ::-webkit-scrollbar {
@@ -1621,14 +1626,15 @@ a:hover, .btn:hover {
 }
 
 .admin-toggle-card.active {
-  background: var(--accent-2);
+  background: var(--surface-raised);
   border-color: var(--accent);
-  color: var(--nav-text);
+  border-left: 3px solid var(--accent);
+  color: var(--body-text);
 }
 
 .admin-toggle-card.active .form-check-label {
   font-weight: 600;
-  color: var(--nav-text);
+  color: var(--body-text);
 }
 
 .admin-toggle-card--neutral,
@@ -2564,8 +2570,17 @@ a:hover { color: var(--accent-2); }
 }
 
 .theme-nav .navbar-toggler {
-  border-color: rgba(255,255,255,0.24);
-  background: #22304a;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  width: auto;
+  padding: 0.4rem 0.6rem;
+}
+
+.theme-nav .navbar-toggler-icon {
+  width: 1.6em;
+  height: 1.6em;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255%2C255%2C255%2C0.9%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.5' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
 }
 
 /* Allow nav actions (right-side buttons) to wrap on small screens to avoid overflow */
@@ -3635,4 +3650,160 @@ a:hover { color: var(--accent-2); }
 .modal-backdrop,
 .offcanvas-backdrop {
   display: none !important;
+}
+
+/* ── Site config layout ── */
+.site-config-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+@media (min-width: 992px) {
+  .site-config-layout { grid-template-columns: 220px minmax(0, 1fr); align-items: start; }
+}
+.site-config-nav { position: sticky; top: 1rem; }
+.site-config-card { border: 1px solid var(--border, rgba(0,0,0,.08)); box-shadow: 0 0.25rem 1rem rgba(0,0,0,.04); }
+.site-config-card .card-header { background: var(--surface-muted, #f8f9fa); }
+.site-config-preview-box {
+  min-height: 84px;
+  background: var(--surface-muted, #f8f9fa);
+  border: 1px dashed rgba(0,0,0,.12);
+  border-radius: .5rem;
+  padding: .75rem;
+  line-height: 1.7;
+}
+.theme-preset-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: .5rem;
+  margin-top: .75rem;
+}
+.theme-preset-card {
+  border: 2px solid rgba(0,0,0,.08);
+  border-radius: .85rem;
+  padding: .65rem .75rem;
+  background: rgba(255,255,255,.75);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.theme-preset-card:hover { border-color: var(--accent, #3f8cff); }
+.theme-preset-card--active {
+  border-color: var(--accent, #3f8cff) !important;
+  box-shadow: 0 0 0 3px rgba(63,140,255,0.18);
+}
+.theme-preset-card__bar { height: 12px; border-radius: 999px; margin-bottom: .45rem; }
+.theme-preset-card__name { font-weight: 600; font-size: .88rem; color: var(--body-text); }
+.theme-preset-card__meta { font-size: .75rem; color: var(--body-text-muted, #64748b); }
+
+/* ── Secondary outline buttons — improve contrast on light surfaces ── */
+.page-shell .btn-outline-secondary,
+.surface-panel .btn-outline-secondary,
+.admin-back-btn {
+  color: var(--body-text) !important;
+  border-color: #6c757d !important;
+  background: transparent !important;
+}
+
+.page-shell .btn-outline-secondary:hover,
+.surface-panel .btn-outline-secondary:hover,
+.admin-back-btn:hover {
+  color: #fff !important;
+  background: #6c757d !important;
+  border-color: #6c757d !important;
+}
+
+/* ── Notifications dropdown ── */
+.notif-wrapper {
+  position: relative;
+}
+
+.notif-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 300px;
+  max-height: 380px;
+  overflow-y: auto;
+  z-index: 1055;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+  background: var(--surface-raised, #fff);
+}
+
+.notif-dropdown.open {
+  display: block;
+}
+
+.notif-dropdown .card-header {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.notif-dropdown .card-body {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.notif-item {
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--border) !important;
+  margin-bottom: 0.4rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.notif-item:hover {
+  background: var(--surface-muted, #f8f9fa);
+}
+
+.dark-mode .notif-item:hover {
+  background: var(--surface-2);
+}
+
+.notif-btn.notif-active {
+  border-color: var(--color-accent-2, #e8b84b);
+  color: var(--color-accent-2, #e8b84b);
+}
+
+/* ── Desktop quote bar ── */
+.quote-bar {
+  border-bottom: 1px solid var(--border, rgba(0,0,0,0.08));
+  background: var(--surface-raised, #fff);
+  min-height: 2rem;
+  max-height: 2.5rem;
+}
+
+.quote-bar__text {
+  font-size: 0.875rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.dark-mode .quote-bar {
+  background: var(--surface-2);
+  border-bottom-color: var(--border);
+}
+
+/* Override old min-height/color constraints when #motivation is in the quote bar */
+.quote-bar #motivation {
+  min-height: 0 !important;
+  max-height: none !important;
+  font-size: 0.875rem !important;
+  color: #64748b !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dark-mode .quote-bar #motivation {
+  color: #94a3b8 !important;
 }

@@ -33,16 +33,8 @@
         </div>
 
         <div class="admin-feature-flags__options">
-          <div class="admin-toggle-card admin-feature-flags__option{% if form.vibe_enabled.data %} active{% endif %}">
-            <div class="form-check mb-0">
-              {{ form.vibe_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Theme button enabled', 'data-toggle-text-unchecked': 'Theme button disabled'}) }}
-              <label class="form-check-label" for="{{ form.vibe_enabled.id }}">{{ 'Theme button enabled' if form.vibe_enabled.data else 'Theme button disabled' }}</label>
-            </div>
-            <div class="admin-feature-flags__option-copy">Keeps the navbar appearance button available so users can change accent palettes from the banner area when your workspace uses that feature.</div>
-          </div>
-
           <div class="admin-toggle-card admin-feature-flags__option{% if form.rolling_quotes_enabled.data %} active{% endif %}">
-            <div class="form-check mb-0">
+            <div class="form-check form-switch mb-0">
               {{ form.rolling_quotes_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Rotating messages enabled', 'data-toggle-text-unchecked': 'Rotating messages disabled'}) }}
               <label class="form-check-label" for="{{ form.rolling_quotes_enabled.id }}">{{ 'Rotating messages enabled' if form.rolling_quotes_enabled.data else 'Rotating messages disabled' }}</label>
             </div>
@@ -62,7 +54,7 @@
           </div>
 
           <div class="admin-toggle-card admin-feature-flags__option{% if form.enable_nudges.data %} active{% endif %}">
-            <div class="form-check mb-0">
+            <div class="form-check form-switch mb-0">
               {{ form.enable_nudges(class_='form-check-input', **{'data-toggle-text-checked': 'Automated reminders enabled', 'data-toggle-text-unchecked': 'Automated reminders disabled'}) }}
               <label class="form-check-label" for="{{ form.enable_nudges.id }}">{{ 'Automated reminders enabled' if form.enable_nudges.data else 'Automated reminders disabled' }}</label>
             </div>
@@ -70,7 +62,7 @@
           </div>
 
           <div class="admin-toggle-card admin-feature-flags__option{% if form.allow_user_nudges.data %} active{% endif %}">
-            <div class="form-check mb-0">
+            <div class="form-check form-switch mb-0">
               {{ form.allow_user_nudges(class_='form-check-input', **{'data-toggle-text-checked': 'User reminders enabled', 'data-toggle-text-unchecked': 'User reminders disabled'}) }}
               <label class="form-check-label" for="{{ form.allow_user_nudges.id }}">{{ 'User reminders enabled' if form.allow_user_nudges.data else 'User reminders disabled' }}</label>
             </div>
@@ -87,7 +79,7 @@
 
         <div class="admin-feature-flags__options">
           <div class="admin-toggle-card admin-feature-flags__option{% if form.sso_admin_sync_enabled.data %} active{% endif %}">
-            <div class="form-check mb-0">
+            <div class="form-check form-switch mb-0">
               {{ form.sso_admin_sync_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'SSO admin sync enabled', 'data-toggle-text-unchecked': 'SSO admin sync disabled'}) }}
               <label class="form-check-label" for="{{ form.sso_admin_sync_enabled.id }}">{{ 'SSO admin sync enabled' if form.sso_admin_sync_enabled.data else 'SSO admin sync disabled' }}</label>
             </div>
@@ -95,7 +87,7 @@
           </div>
 
           <div class="admin-toggle-card admin-feature-flags__option{% if form.sso_department_sync_enabled.data %} active{% endif %}">
-            <div class="form-check mb-0">
+            <div class="form-check form-switch mb-0">
               {{ form.sso_department_sync_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'SSO department sync enabled', 'data-toggle-text-unchecked': 'SSO department sync disabled'}) }}
               <label class="form-check-label" for="{{ form.sso_department_sync_enabled.id }}">{{ 'SSO department sync enabled' if form.sso_department_sync_enabled.data else 'SSO department sync disabled' }}</label>
             </div>
@@ -103,7 +95,7 @@
           </div>
 
           <div class="admin-toggle-card admin-feature-flags__option{% if form.enable_external_forms.data %} active{% endif %}">
-            <div class="form-check mb-0">
+            <div class="form-check form-switch mb-0">
               {{ form.enable_external_forms(class_='form-check-input', **{'data-toggle-text-checked': 'External forms enabled', 'data-toggle-text-unchecked': 'External forms disabled'}) }}
               <label class="form-check-label" for="{{ form.enable_external_forms.id }}">{{ 'External forms enabled' if form.enable_external_forms.data else 'External forms disabled' }}</label>
             </div>
@@ -111,7 +103,7 @@
           </div>
 
           <div class="admin-toggle-card admin-feature-flags__option{% if form.guest_dashboard_enabled.data %} active{% endif %}">
-            <div class="form-check mb-0">
+            <div class="form-check form-switch mb-0">
               {{ form.guest_dashboard_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Guest dashboard enabled', 'data-toggle-text-unchecked': 'Guest dashboard disabled'}) }}
               <label class="form-check-label" for="{{ form.guest_dashboard_enabled.id }}">{{ 'Guest dashboard enabled' if form.guest_dashboard_enabled.data else 'Guest dashboard disabled' }}</label>
             </div>
@@ -119,7 +111,7 @@
           </div>
 
           <div class="admin-toggle-card admin-feature-flags__option{% if form.guest_submission_enabled.data %} active{% endif %}">
-            <div class="form-check mb-0">
+            <div class="form-check form-switch mb-0">
               {{ form.guest_submission_enabled(class_='form-check-input', **{'data-toggle-text-checked': 'Guest submission enabled', 'data-toggle-text-unchecked': 'Guest submission disabled'}) }}
               <label class="form-check-label" for="{{ form.guest_submission_enabled.id }}">{{ 'Guest submission enabled' if form.guest_submission_enabled.data else 'Guest submission disabled' }}</label>
             </div>

@@ -4,44 +4,59 @@
   <section class="page-header">
     <div>
       <div class="page-header__eyebrow">Notification settings</div>
-      <h2 class="page-header__title mb-0">Notification Retention</h2>
-      <p class="page-header__lede mb-0">Control how long notifications remain visible and how many are stored per user.</p>
+      <h2 class="page-header__title mb-0">Notifications</h2>
+      <p class="page-header__lede mb-0">Enable in-app alerts and control how long they remain visible per user.</p>
     </div>
   </section>
+
+  {# ── Enable / disable toggle ── #}
+  <section class="surface-panel mb-3">
+    <div class="section-heading section-heading-compact mb-3">
+      <div>
+        <h3 class="section-heading__title">Global toggle</h3>
+        <p class="section-heading__subtitle">Turn in-app alerts on or off for the entire workspace.</p>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('admin.toggle_notifications') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="enableNotificationsSwitch" name="enable_notifications" value="1" {% if flags.enable_notifications %}checked{% endif %} onchange="this.form.submit()">
+        <label class="form-check-label" for="enableNotificationsSwitch">
+          {{ 'Notifications enabled' if flags.enable_notifications else 'Notifications disabled' }}
+        </label>
+      </div>
+    </form>
+  </section>
+
+  {# ── Retention settings ── #}
   <section class="surface-panel">
-  <form method="post">
-    {{ form.hidden_tag() }}
-    <div class="form-check mb-3">
-      {{ form.retain_until_eod(class_='form-check-input') }}
-      {{ form.retain_until_eod.label(class_='form-check-label') }}
+    <div class="section-heading section-heading-compact mb-3">
+      <div>
+        <h3 class="section-heading__title">Retention</h3>
+        <p class="section-heading__subtitle">Control how long notifications are stored and how many are shown per user.</p>
+      </div>
     </div>
-
-    <div class="mb-3">
-      {{ form.clear_after_choice.label(class_='form-label') }}
-      {{ form.clear_after_choice(class_='form-select') }}
-    </div>
-    <div class="mb-3">
-      {{ form.custom_days.label(class_='form-label') }}
-      {{ form.custom_days(class_='form-control', placeholder='Enter 1-7') }}
-      <div class="form-text">If choosing "Custom", enter number of days (max 7).</div>
-    </div>
-
-    <div class="mb-3">
-      {{ form.max_notifications_per_user.label(class_='form-label') }}
-      {{ form.max_notifications_per_user(class_='form-control') }}
-      <div class="form-text">Maximum number of notifications stored and shown per user (max 20).</div>
-    </div>
-
-    <div class="mb-3">
-      <form method="post" action="{{ url_for('admin.toggle_notifications') }}">
-        <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" id="enableNotificationsSwitch" name="enable_notifications" value="1" {% if flags.enable_notifications %}checked{% endif %} onchange="this.form.submit()">
-          <label class="form-check-label" for="enableNotificationsSwitch">Enable notifications</label>
-        </div>
-      </form>
-    </div>
-
-    <button class="btn btn-primary">Save</button>
-  </form>
+    <form method="post">
+      {{ form.hidden_tag() }}
+      <div class="form-check mb-3">
+        {{ form.retain_until_eod(class_='form-check-input') }}
+        {{ form.retain_until_eod.label(class_='form-check-label') }}
+      </div>
+      <div class="mb-3">
+        {{ form.clear_after_choice.label(class_='form-label') }}
+        {{ form.clear_after_choice(class_='form-select') }}
+      </div>
+      <div class="mb-3">
+        {{ form.custom_days.label(class_='form-label') }}
+        {{ form.custom_days(class_='form-control', placeholder='Enter 1-7') }}
+        <div class="form-text">Only applies when "Custom" is selected above. Max 7 days.</div>
+      </div>
+      <div class="mb-3">
+        {{ form.max_notifications_per_user.label(class_='form-label') }}
+        {{ form.max_notifications_per_user(class_='form-control') }}
+        <div class="form-text">Maximum notifications stored and shown per user (max 20).</div>
+      </div>
+      <button class="btn btn-primary">Save</button>
+    </form>
   </section>
 {% endblock %}
